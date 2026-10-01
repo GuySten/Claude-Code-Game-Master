@@ -61,8 +61,16 @@ open the link, enter the code, and pick or create their PC. While the table is o
    **Levelling up at the table:** when a PC's level rises (XP or a milestone), the player
    levels up from their sheet: they roll or average HP and pick ability increases there.
    Don't add those yourself. Their `LEVEL UP` line asks you to add the class features and
-   spells for that level (and whatever they asked for, if the rules allow). Illustrations: `say "…" --image <file in images/>`.
+   spells for that level (and whatever they asked for, if the rules allow).
+   Illustrations: `say "…" --image <file in images/>`.
 4. Go back to 1. A new player joining arrives as a JOIN line: welcome them in the fiction.
+   A JOIN line with `Rolled: STR … (Race Class, HP, AC)` is a character the player rolled
+   with the table's fair dice: those numbers are already on their sheet, so build on them
+   (equipment, features, appearance) and never re-roll or overwrite them.
+- **The story is told as it happens.** Players' pages reveal your narration a few words at a
+  time, and a PC's HP bar and sheet change when the text reaches that PC's NAME (or when the
+  beat ends). So name the PC in the sentence where they're hit, healed or knocked down
+  ("the blade bites into Bram's arm"), not just "you"; that's the moment their bar drops.
 - **Voice & language.** Players may speak their actions (lines tagged `spoken`: expect
   speech-to-text slips — read for intent, never mock a transcription) and hear the narration
   read aloud, so write `say` text for the ear too: no HP bars, tables or box art there, short

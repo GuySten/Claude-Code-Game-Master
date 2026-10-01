@@ -4,6 +4,7 @@ Claude is the Game Master. One person, **the host**, runs the game on their comp
 everyone else just opens a link in their browser. Players can type or **speak** (English or
 Hebrew), **hear the story read aloud**, and the music follows the scene by itself.
 
+- [What your table gets](#what-your-table-gets)
 - [The recommended setup at a glance](#the-recommended-setup-at-a-glance)
 - [One-time setup (host)](#one-time-setup-host)
 - [Each game night (host)](#each-game-night-host)
@@ -14,6 +15,31 @@ Hebrew), **hear the story read aloud**, and the music follows the scene by itsel
 
 ---
 
+## What your table gets
+
+Everything below works with the basic install. The items marked *optional* need one extra
+setup step on the host's computer, and the game plays fine without them.
+
+- **Play from anywhere, in English or Hebrew.** Each player reads, speaks and hears the game in
+  their own language; the GM translates the other players' actions.
+- **Voice.** Speak your actions; hear the story read aloud (Hebrew in a natural voice).
+- **A fair, shared table.** Every die roll is public, with the DC set before the dice land.
+  Rounds: the GM answers when everyone has acted, or a minute after the first player did, with
+  a countdown for the rest.
+- **The story, told as it happens.** Narration appears in step with the voice, and HP changes
+  land when the story reaches you.
+- **Characters.** Roll one at the table; open your full character sheet; level up from it.
+- **Music.** Mood music for every scene, a theme for every villain, battle music for bosses.
+  *Optional:* composed themes for main villains and bosses, and a heroic anthem for every player
+  character ([step 6](#one-time-setup-host)).
+- **Pictures** *(optional)*: places, villains, bosses, treasures and a portrait for every character,
+  collected in a gallery ([step 5](#one-time-setup-host)).
+- **Between the players.** A private table-talk chat the GM never sees; a Narrator to ask "what
+  happened again?"; hover cards on names in the story. All of them show only what that player
+  already knows.
+
+---
+
 ## The recommended setup at a glance
 
 | Part of the game | Model | Why |
@@ -21,6 +47,7 @@ Hebrew), **hear the story read aloud**, and the music follows the scene by itsel
 | **The GM** — the Claude Code session you play in | **Opus** | Tells the story, follows the rules, keeps the world consistent, writes good Hebrew |
 | **Story helpers** — plots, NPCs, places, new characters, rules rulings | **Sonnet** | Need judgment, but run in the background, so faster and cheaper is better |
 | **Lookup helpers** — monster stats, spells, gear, loot, image prompts | **Haiku** | Simple, quick jobs |
+| **The Narrator and hover cards** — reminding players of the story | **Haiku** | Quick, and can't change the game. Uses your Claude Code login; nothing to set up |
 | **Book import** — reading a whole PDF once | **Opus** | Happens once, and it shapes the whole campaign |
 
 The whole recipe, start to finish (each step is explained below):
@@ -33,6 +60,10 @@ bash tools/gm-models.sh recommended   # the model set above — run once
 bash tools/gm-music-library.sh fetch  # music for every mood
 claude                                # then type /gm and say "my friends are joining online"
 ```
+
+Optional extras, any time later: **pictures** (an OpenAI key, or the free local Forge:
+[step 5](#one-time-setup-host)) and **composed music** (`bash tools/gm-music-compose.sh setup`:
+[step 6](#one-time-setup-host)).
 
 On **Windows**, the same in PowerShell — no WSL needed:
 
@@ -132,7 +163,8 @@ friends on your Wi-Fi need it if they want to talk instead of type.
 
 The GM can illustrate the adventure: new places, villains, big moments. The players see each
 picture on their screens, drawn in one locked art style, with recurring characters looking the
-same every time. There are two ways to make the pictures:
+same every time. Without a picture source the game simply plays in words. There are two ways
+to make the pictures:
 
 - **OpenAI** (best quality, about $0.04 a picture): put `OPENAI_API_KEY=sk-...` in `.env`.
 - **Your own computer** (free and private, needs an NVIDIA graphics card with 6 GB or more,
@@ -208,22 +240,24 @@ Ask the GM *"lock an art style for this campaign"*, or run:
 ```bash
 bash tools/gm-image.sh chronicler --name "Astreus" --style "ink-and-watercolor fantasy illustration" --persona "a wry court scholar"
 ```
-**Portraits.** Every player character gets a portrait. With the table open it's drawn in the
-background a minute or two after they join and shown to everyone; then it sits at the top of
-their character sheet and next to their name in the party panel. For an important NPC, or a PC
-made outside the table, the GM runs `bash tools/gm-image.sh portrait "<name>"` (you can too).
 
-**Places.** Every important place gets a picture too. When the party arrives somewhere the GM
-has described, the table paints it in the background and shows it to everyone. Tap **🖼**
-next to the location name at the top of the page to see it again, along with every place
-you've been. The GM can paint any place with `bash tools/gm-image.sh location "<name>"`.
+**What gets painted** (all of it in the background, so the story never waits):
 
-**Foes and treasures.** When a notable enemy steps in, the table paints them and shows them
-as their music starts. A boss gets an epic portrait with a red glow, and when a fight turns
-into a boss fight the boss version is painted. Important loot (a magic sword, an artifact) is
-painted when it's found, shown with a gold glow, and appears beside the item on the owner's
-character sheet. All of it is collected in the 🖼 gallery, which has Places, Foes and
-Treasures tabs.
+- **Scenes.** The GM illustrates big moments as it sees fit: a reveal, a vista, a styled
+  flourish. Players can ask for one too ("show me that!").
+- **Portraits.** Every player character gets one a minute or two after they join. It's shown to
+  everyone, then sits at the top of their character sheet and next to their name in the party
+  panel. The GM paints important NPCs (`bash tools/gm-image.sh portrait "<name>"`; you can too).
+- **Places.** When the party arrives somewhere the GM has described, the table paints it and
+  shows it to everyone (`bash tools/gm-image.sh location "<name>"` paints one on demand).
+- **Foes.** When a notable enemy steps in, they're painted as their music starts. A boss gets an
+  epic portrait with a red glow, and when a fight turns into a boss fight the boss version is
+  painted. A foe met before reappears at once.
+- **Treasures.** Important loot (a magic sword, an artifact) is painted when it's found, shown
+  with a gold glow, and appears beside the item on the owner's character sheet.
+
+Players find all of it in the **🖼** gallery next to the location name: *Places*, *Foes* and
+*Treasures*, listing only what they've already seen.
 
 To keep characters on-model, every PC and NPC needs a stored appearance. Ask the GM *"write
 appearances for everyone in the party"*: characters created on the join page don't have one yet.
@@ -275,7 +309,8 @@ git pull            # pick up the latest version
 claude
 ```
 
-Using local pictures (Forge)? Start Forge's `run.bat` first.
+Using local pictures (Forge)? Start Forge's `run.bat` first. (The composer, if you set it up,
+needs nothing: the table starts it by itself.)
 
 **Check the GM is on Opus:** type `/model`. It should show **Opus**. If it doesn't (a new
 computer, or you switched to try something), run `/models` and pick **Recommended**, or
@@ -311,9 +346,12 @@ all night — closing it disconnects remote players. The link changes every time
 **5. Join yourself** — open `http://localhost:8765` in your own browser and take a seat like
 everyone else. Keep the Claude Code window open; that's where your GM lives.
 
-**6. Play.** Claude waits for everyone's actions, rolls the dice, keeps the sheets, and
-posts the story to every screen. Talk to Claude in the terminal only for out-of-game things
-("pause", "take it slower", "let's end at the next rest").
+**6. Play.** Claude waits for everyone's actions (the round: until everyone has acted, or a
+minute after the first player did), rolls the dice in public, keeps the sheets, and posts the
+story to every screen. Talk to Claude in the terminal only for out-of-game things ("pause",
+"take it slower", "let's end at the next rest"). Want longer rounds tonight?
+`bash tools/gm-table.sh round 120` (or `round off`). A player who's away for a while holds up
+nobody for more than a minute, but you can free their seat: `bash tools/gm-table.sh free "Name"`.
 
 > **Tip:** Claude Code asks permission before running commands. When it asks to run
 > `bash tools/...` during the game, choose the option to allow it without asking again, or
@@ -333,122 +371,158 @@ Copy, fill in the link and code, and send:
 > 🎲 **D&D tonight!** Open this link in **Chrome, Edge or Safari** (phone or computer):
 > **LINK**
 > Table code: **CODE**
-> Pick a character or make your own (a name and one line about them is enough). Type what
-> you do, or tap 🎤 and say it. Tap 🔊 to hear the story read aloud. Headphones recommended.
-> For Hebrew, tap **עברית** at the top.
+> Pick a character, make your own (a name and one line is enough), or tap 🎲 to roll one.
+> Type what you do, or tap 🎤 and say it. Tap 🔊 to hear the story read aloud. 💬 is a chat
+> for us players (the GM can't see it), and 📖 reminds you what happened if you forget.
+> Headphones recommended. For Hebrew, tap **עברית** at the top.
 
 > 🎲 **ערב D&D!** פתחו את הקישור ב-**Chrome, Edge או Safari** (בטלפון או במחשב):
 > **LINK**
 > קוד השולחן: **CODE**
-> בחרו דמות או צרו אחת משלכם (מספיקים שם ושורה אחת על הדמות). כתבו מה אתם עושים, או
-> לחצו 🎤 ותגידו את זה. לחצו 🔊 כדי לשמוע את הסיפור בקול. מומלץ אוזניות.
-> לאנגלית לחצו **English** למעלה.
+> בחרו דמות, צרו אחת משלכם (מספיקים שם ושורה אחת), או לחצו 🎲 כדי להטיל דמות. כתבו מה אתם
+> עושים, או לחצו 🎤 ותגידו את זה. לחצו 🔊 כדי לשמוע את הסיפור בקול. 💬 הוא צ'אט רק לנו השחקנים
+> (מנהל המשחק לא רואה), ו-📖 מזכיר מה קרה אם שכחתם. מומלץ אוזניות. לאנגלית לחצו **English** למעלה.
 
 ---
 
 ## Player guide
 
-1. **Open the link** in Chrome, Edge or Safari and enter the **table code**.
-2. **Choose who you are** — tap a free character, or create one: a name and one line
-   ("a dwarf cleric who lost her faith"). "Nameless traveler" works too — the world will
-   name you. Or tap **🎲 Roll a character**: fair dice roll your abilities (4d6, lowest
-   dropped) and suggest a race, class, name and concept you can change. Everyone sees what
-   you rolled, and how many tries it took.
-3. **Act.** Type what your character does and press Enter — or tap **🎤**, speak, and it
-   sends when you stop talking (untick "Send when I stop talking" to check the text first).
-   Talk the way you'd talk at a table: *"I sneak up behind the guard and try to grab his
-   keys."* Typo, or the microphone misheard you? Tap **✏️** on your message to fix it —
-   you can until the GM answers it.
-4. **Listen.** **🔊** reads the story aloud. Hebrew is read by a natural voice that the
-   host's computer makes (🌐 Hila or Avri); English uses your device's voice. **🎵**
-   turns the music on/off. The volume, reading speed and voices are in the side panel (tap
-   **Party** on a phone).
-5. **Secrets.** Tick **"Only the GM sees this"** to whisper to the GM. Purple messages are
-   whispers only you can see. **Table talk** (the chat column, or **💬 Chat** on a smaller
-   screen) is just for the players: plan, joke, argue. The GM never sees it. It isn't saved,
-   so it clears when the host restarts the table. Forgot who gave you the key, or what the
-   oracle said? Ask the **📖 Narrator** tab beside it. It answers from what *you* have seen
-   in the story so far, privately, and it can't change the game or reveal secrets. Names
-   underlined with dots in the story (people, places, factions) work the same way: hover
-   over one, or tap it on a phone, to see what you know about it.
-6. **Language.** **עברית / English** switches the whole page, your microphone, and the
-   language the GM answers you in. You read everything in your language: the story, and
-   the other players' actions too — the GM translates them (marked 🌐; tap
-   **show original** to see what they wrote).
-7. **Rounds.** When the first player acts, a one-minute countdown starts above the text box.
+**Joining**
+
+1. **Open the link** in Chrome, Edge or Safari (phone or computer) and enter the **table code**.
+2. **Choose who you are.** Tap a free character, or make one: a name and one line ("a dwarf
+   cleric who lost her faith"). **Nameless traveler** works too; the world will name you. Or
+   tap **🎲 Roll a character**: fair dice roll your abilities (4d6, lowest die dropped) and
+   suggest a race, class, name and concept, which you can change. Everyone sees what you
+   rolled, and how many tries it took.
+
+**Playing**
+
+3. **Act.** Type what your character does and press Enter, or tap **🎤**, speak, and it sends
+   when you stop talking (untick *Send when I stop talking* to check the text first). Talk
+   the way you would at a table: *"I sneak up behind the guard and try to grab his keys."*
+   A typo, or the microphone misheard you? Tap **✏️** on your message to fix it. You can until
+   the GM answers it.
+4. **Rounds.** When the first player acts, a one-minute countdown starts above the text box.
    The GM answers once everyone has acted, or when the minute is up. In the last 15 seconds
-   it turns red and chimes for whoever hasn't acted yet. Nothing ticks while the table is on
-   a break: the countdown only starts with the first action. A character who can't act
+   it turns red and chimes for whoever hasn't acted yet. Nothing ticks while the table is on a
+   break: the countdown starts only with the first action. A character who can't act
    (unconscious, stunned, dead…) isn't waited for.
-8. **While the GM works**, a bar above the text box shows what it's doing (reading your
+5. **While the GM works**, the bar above the text box shows what it's doing (reading your
    actions, rolling dice, updating the sheets, writing the story) and roughly how long is
-   left. The estimate comes from how long this table's GM really took on recent turns, so it
-   gets more accurate as you play.
-9. **Every die roll is public.** The table itself rolls the dice and shows each roll to
-   everyone the moment the GM sees it — who rolled, for what, and the DC or AC, which is
-   set before the dice land ("🎯 Pip — Stealth · DC 15 · 🎲 [12] + 5 = 17 ✓"). A secret
-   roll (say, a hidden enemy) shows up as "the GM rolled in secret".
-10. **The story is told as it happens.** New narration appears a few words at a time, in step
-   with the voice when 🔊 is on. Tap it to see the rest at once. The side panel shows
-   everyone's **HP**, and it changes with the story: a hit lands on your HP bar when the text
-   reaches your name, not before.
-11. **Your character sheet.** Tap **📜 My sheet**, or any character in the side panel, for
-   the full sheet: a portrait (when pictures are on), abilities, skills, features, spells,
-   equipment, conditions. The **🖼** next to the location at the top shows the places you've
-   been. It updates
-   with the story too, and what just changed flashes. When you earn a level, **⬆** appears:
-   open your sheet and tap **Level up**. Roll your hit die at the table (or take the average),
-   pick your ability increases when your class gets them, and tell the GM what you'd like
-   (a subclass, spells, a feat). The GM adds the new class features.
-12. Refreshing the page keeps your seat. To switch devices, tap **Leave seat** first (or ask
-   the host to free it).
+   left. It learns this table's pace, so it gets more accurate as you play.
+6. **The story is told as it happens.** New narration appears a few words at a time, in step
+   with the voice when 🔊 is on. Tap it to see the rest at once. The party panel moves with the
+   story: a hit lands on your HP bar when the text reaches your name, not before.
+7. **Every die roll is public.** The table itself rolls and shows each roll to everyone the
+   moment the GM sees it: who rolled, for what, and the DC or AC, which is set before the dice
+   land ("🎯 Pip — Stealth · DC 15 · 🎲 [12] + 5 = 17 ✓"). A hidden roll shows as "the GM
+   rolled in secret".
+8. **Secrets.** Tick **Only the GM sees this** to whisper to the GM. Purple messages are
+   whispers only you can see.
+
+**Your character**
+
+9. **Your sheet.** Tap **📜 My sheet**, or any character in the party panel, for the full
+   sheet: portrait, abilities, skills, features, spells, equipment (with pictures of special
+   treasures) and conditions. It follows the story too, and whatever just changed flashes.
+10. **Levelling up.** When you earn a level, **⬆** appears next to your name. Open your sheet
+    and tap **Level up**: roll your hit die at the table (or take the average), pick your
+    ability increases when your class gets them, and tell the GM what you'd like (a subclass,
+    spells, a feat). The GM adds the new class features.
+
+**Sight and sound**
+
+11. **Listen.** **🔊** reads the story aloud. Hebrew is read by a natural voice that the host's
+    computer makes (🌐 Hila or Avri); English uses your device's voice. **🎵** turns the
+    music on or off. The volume, reading speed and voices are in the party panel (tap
+    **Party** on a phone). Music follows the scene; villains have their own themes, bosses
+    get battle music, and when you do something truly heroic your own anthem may play.
+12. **Pictures** (when the host has them on). Places, villains, bosses and important
+    treasures are painted as you meet them, and every character gets a portrait. Tap **🖼**
+    next to the location at the top for the gallery: *Places*, *Foes*, *Treasures*.
+
+**Between the players**
+
+13. **Table talk.** The chat column (or **💬 Chat** on a smaller screen) is just for the
+    players: plan, joke, argue. The GM never sees it. It isn't saved, so it clears when the
+    host restarts the table.
+14. **Forgot something?** Ask the **📖 Narrator** tab beside it: *"Who gave us the key? What did
+    the oracle say?"* It answers privately from what *you* have seen in the story, and it can't
+    change the game or reveal secrets. Names underlined with dots in the story (people,
+    places, factions) work the same way: hover over one, or tap it on a phone.
+15. **Language.** **עברית / English** switches the whole page, your microphone, and the language
+    the GM answers you in. You read everything in your language, including the other players'
+    actions, which the GM translates (marked 🌐; tap **show original** to see what they wrote).
+16. **Refreshing** the page keeps your seat. To switch devices, tap **Leave seat** first (or ask
+    the host to free it).
 
 ## מדריך לשחקנים
 
-1. **פתחו את הקישור** ב-Chrome, Edge או Safari והכניסו את **קוד השולחן**.
-2. **בחרו מי אתם** — לחצו על דמות פנויה, או צרו דמות: שם ושורה אחת ("גמדה כוהנת שאיבדה
-   את אמונתה"). אפשר גם "נווד/ת בלי שם" — העולם כבר ייתן לכם שם. או לחצו **🎲 הטלת דמות**:
-   קוביות הוגנות מטילות את התכונות שלכם (4d6, הנמוכה נזרקת) ומציעות גזע, מקצוע, שם ותיאור
-   שאפשר לשנות. כולם רואים מה הטלתם, וכמה ניסיונות זה לקח.
-3. **פעלו.** כתבו מה הדמות עושה ולחצו Enter — או לחצו **🎤**, דברו, וההודעה תישלח כשתסיימו
-   לדבר (בטלו את "לשלוח כשאני מסיים/ת לדבר" אם אתם רוצים לבדוק את הטקסט קודם). דברו כמו ליד
-   שולחן אמיתי: *"אני מתגנב מאחורי השומר ומנסה לחטוף לו את המפתחות."* טעות הקלדה, או
-   שהמיקרופון לא הבין אתכם? לחצו **✏️** על ההודעה כדי לתקן — אפשר עד שמנהל המשחק עונה עליה.
-4. **הקשיבו.** **🔊** מקריא את הסיפור. את העברית מקריא קול טבעי שהמחשב של המארח מייצר
-   (🌐 הילה או אברי); אנגלית מוקראת בקול של המכשיר. **🎵** מפעיל ומכבה את המוזיקה. עוצמה,
-   מהירות הקראה וקולות נמצאים בפאנל הצד (בטלפון: לחצו **החבורה**).
-5. **סודות.** סמנו **"רק מנהל המשחק יראה"** כדי ללחוש למנהל המשחק. הודעות סגולות הן לחישות
-   שרק אתם רואים. **שיחת שולחן** (עמודת הצ'אט, או **💬 צ'אט** במסך קטן) היא רק לשחקנים:
-   לתכנן, לצחוק, להתווכח. מנהל המשחק לא רואה אותה. היא לא נשמרת, ולכן נמחקת כשהמארח מפעיל
-   את השולחן מחדש. שכחתם מי נתן לכם את המפתח, או מה אמרה האורקל? שאלו את לשונית
-   **📖 המספר** שלידה. הוא עונה ממה *שאתם* ראיתם בסיפור עד עכשיו, בפרטיות, ולא יכול לשנות את
-   המשחק או לגלות סודות. שמות המסומנים בקו מנוקד בסיפור (דמויות, מקומות, פלגים) עובדים אותו
-   דבר: העבירו עליהם את העכבר, או הקישו עליהם בטלפון, כדי לראות מה אתם יודעים עליהם.
-6. **שפה.** **English / עברית** מחליף את כל הדף, את המיקרופון ואת השפה שבה מנהל המשחק עונה
-   לכם. הכול מופיע בשפה שלכם: הסיפור, וגם הפעולות של השחקנים האחרים — מנהל המשחק מתרגם אותן
-   (מסומן ב-🌐; לחצו **הצג מקור** כדי לראות מה הם כתבו).
-7. **סבבים.** כשהשחקן הראשון פועל, מתחילה ספירה לאחור של דקה מעל תיבת הטקסט. מנהל המשחק עונה
-   כשכולם פעלו, או כשהדקה נגמרת. ב-15 השניות האחרונות היא מאדימה ומצלצלת למי שעוד לא פעל. בזמן
-   הפסקה שום דבר לא סופר: הספירה מתחילה רק עם הפעולה הראשונה. השולחן לא מחכה לדמות שאינה
-   יכולה לפעול (מחוסרת הכרה, המומה, מתה…).
-8. **בזמן שמנהל המשחק עובד**, פס מעל תיבת הטקסט מראה מה הוא עושה (קורא את הפעולות, מטיל
-   קוביות, מעדכן את הדפים, כותב את הסיפור) וכמה זמן נשאר בערך. ההערכה מבוססת על כמה זמן
-   מנהל המשחק של השולחן הזה באמת לקח בתורות האחרונים, כך שהיא נעשית מדויקת יותר במהלך המשחק.
-9. **כל הטלת קובייה גלויה.** השולחן עצמו מטיל את הקוביות ומראה כל הטלה לכולם ברגע שמנהל
-   המשחק רואה אותה — מי הטיל, בשביל מה, ודרגת הקושי או דרגת השריון, שנקבעת לפני שהקובייה
-   נוחתת ("🎯 Pip — התגנבות · דרגת קושי 15 · 🎲 [12] + 5 = 17 ✓"). הטלה סודית (למשל אויב
-   נסתר) מופיעה כ"מנהל המשחק הטיל קובייה בסתר".
-10. **הסיפור מסופר בזמן אמת.** קטע חדש מופיע מילה אחרי מילה, ובקצב הקול כש-🔊 פועל. לחצו
-   עליו כדי לראות את כולו מיד. בפאנל הצד רואים את **נקודות החיים** של כולם, והן משתנות יחד
-   עם הסיפור: מכה נוחתת על פס החיים שלכם כשהטקסט מגיע לשם שלכם, לא לפני כן.
-11. **דף הדמות.** לחצו **📜 הדף שלי**, או על כל דמות בפאנל הצד, כדי לראות את הדף המלא:
-   דיוקן (כשהתמונות פועלות), תכונות, מיומנויות, יכולות, לחשים, ציוד ומצבים. ה-**🖼** ליד
-   שם המקום למעלה מציג את המקומות שביקרתם בהם. גם הוא מתעדכן יחד עם הסיפור, ומה שהשתנה
-   מהבהב. כשאתם מרוויחים דרגה מופיע **⬆**: פתחו את הדף ולחצו **עלייה בדרגה**. הטילו את קוביית
-   החיים ליד השולחן (או קחו את הממוצע), בחרו שיפורי תכונות כשהמקצוע מקבל אותם, וכתבו למנהל
-   המשחק מה תרצו (תת־מקצוע, לחשים, הישג). מנהל המשחק מוסיף את יכולות המקצוע החדשות.
-12. רענון הדף שומר לכם את המקום. כדי לעבור למכשיר אחר, לחצו קודם **עזיבת המושב** (או בקשו
-   מהמארח לפנות אותו).
+**הצטרפות**
+
+1. **פתחו את הקישור** ב-Chrome, Edge או Safari (בטלפון או במחשב) והכניסו את **קוד השולחן**.
+2. **בחרו מי אתם.** לחצו על דמות פנויה, או צרו אחת: שם ושורה אחת ("גמדה כוהנת שאיבדה את
+   אמונתה"). אפשר גם **נווד/ת בלי שם**: העולם כבר ייתן לכם שם. או לחצו **🎲 הטלת דמות**:
+   קוביות הוגנות מטילות את התכונות שלכם (4d6, הקובייה הנמוכה נזרקת) ומציעות גזע, מקצוע, שם
+   ותיאור, שאפשר לשנות. כולם רואים מה הטלתם, וכמה ניסיונות זה לקח.
+
+**משחק**
+
+3. **פעלו.** כתבו מה הדמות עושה ולחצו Enter, או לחצו **🎤**, דברו, וההודעה תישלח כשתסיימו לדבר
+   (בטלו את *לשלוח כשאני מסיים/ת לדבר* כדי לבדוק את הטקסט קודם). דברו כמו ליד שולחן אמיתי:
+   *"אני מתגנב מאחורי השומר ומנסה לחטוף לו את המפתחות."* טעות הקלדה, או שהמיקרופון לא הבין
+   אתכם? לחצו **✏️** על ההודעה כדי לתקן. אפשר עד שמנהל המשחק עונה עליה.
+4. **סבבים.** כשהשחקן הראשון פועל, מתחילה ספירה לאחור של דקה מעל תיבת הטקסט. מנהל המשחק עונה
+   כשכולם פעלו, או כשהדקה נגמרת. ב-15 השניות האחרונות היא מאדימה ומצלצלת למי שעוד לא פעל.
+   בזמן הפסקה שום דבר לא סופר: הספירה מתחילה רק עם הפעולה הראשונה. השולחן לא מחכה לדמות
+   שאינה יכולה לפעול (מחוסרת הכרה, המומה, מתה…).
+5. **בזמן שמנהל המשחק עובד**, הפס מעל תיבת הטקסט מראה מה הוא עושה (קורא את הפעולות, מטיל
+   קוביות, מעדכן את הדפים, כותב את הסיפור) וכמה זמן נשאר בערך. הוא לומד את הקצב של השולחן
+   הזה, כך שההערכה נעשית מדויקת יותר במהלך המשחק.
+6. **הסיפור מסופר בזמן אמת.** קטע חדש מופיע מילה אחרי מילה, ובקצב הקול כש-🔊 פועל. לחצו עליו
+   כדי לראות את כולו מיד. פאנל החבורה זז יחד עם הסיפור: מכה נוחתת על פס החיים שלכם כשהטקסט
+   מגיע לשם שלכם, לא לפני כן.
+7. **כל הטלת קובייה גלויה.** השולחן עצמו מטיל ומראה כל הטלה לכולם ברגע שמנהל המשחק רואה
+   אותה: מי הטיל, בשביל מה, ודרגת הקושי או דרגת השריון, שנקבעת לפני שהקובייה נוחתת
+   ("🎯 Pip — התגנבות · דרגת קושי 15 · 🎲 [12] + 5 = 17 ✓"). הטלה נסתרת מופיעה כ"מנהל המשחק
+   הטיל קובייה בסתר".
+8. **סודות.** סמנו **רק מנהל המשחק יראה** כדי ללחוש למנהל המשחק. הודעות סגולות הן לחישות שרק
+   אתם רואים.
+
+**הדמות שלכם**
+
+9. **הדף שלכם.** לחצו **📜 הדף שלי**, או על כל דמות בפאנל החבורה, כדי לראות את הדף המלא: דיוקן,
+   תכונות, מיומנויות, יכולות, לחשים, ציוד (עם תמונות של אוצרות מיוחדים) ומצבים. גם הוא
+   מתעדכן יחד עם הסיפור, ומה שהשתנה עכשיו מהבהב.
+10. **עלייה בדרגה.** כשאתם מרוויחים דרגה מופיע **⬆** ליד השם שלכם. פתחו את הדף ולחצו **עלייה
+    בדרגה**: הטילו את קוביית החיים ליד השולחן (או קחו את הממוצע), בחרו שיפורי תכונות כשהמקצוע
+    מקבל אותם, וכתבו למנהל המשחק מה תרצו (תת־מקצוע, לחשים, הישג). מנהל המשחק מוסיף את יכולות
+    המקצוע החדשות.
+
+**מראה וקול**
+
+11. **הקשיבו.** **🔊** מקריא את הסיפור. את העברית מקריא קול טבעי שהמחשב של המארח מייצר (🌐 הילה
+    או אברי); אנגלית מוקראת בקול של המכשיר. **🎵** מפעיל ומכבה את המוזיקה. עוצמה, מהירות הקראה
+    וקולות נמצאים בפאנל החבורה (בטלפון: לחצו **החבורה**). המוזיקה הולכת אחרי הסצנה; לנבלים יש
+    מנגינה משלהם, לבוסים מוזיקת קרב, וכשאתם עושים משהו הרואי באמת, ייתכן שההמנון שלכם יתנגן.
+12. **תמונות** (כשהמארח הפעיל אותן). מקומות, נבלים, בוסים ואוצרות חשובים מצוירים כשאתם פוגשים
+    אותם, ולכל דמות יש דיוקן. לחצו **🖼** ליד שם המקום למעלה כדי לפתוח את הגלריה: *מקומות*,
+    *אויבים*, *אוצרות*.
+
+**בין השחקנים**
+
+13. **שיחת שולחן.** עמודת הצ'אט (או **💬 צ'אט** במסך קטן) היא רק לשחקנים: לתכנן, לצחוק,
+    להתווכח. מנהל המשחק לא רואה אותה. היא לא נשמרת, ולכן נמחקת כשהמארח מפעיל את השולחן מחדש.
+14. **שכחתם משהו?** שאלו את לשונית **📖 המספר** שלידה: *"מי נתן לנו את המפתח? מה אמרה האורקל?"*
+    הוא עונה בפרטיות ממה *שאתם* ראיתם בסיפור, ולא יכול לשנות את המשחק או לגלות סודות. שמות
+    המסומנים בקו מנוקד בסיפור (דמויות, מקומות, פלגים) עובדים אותו דבר: העבירו עליהם את העכבר,
+    או הקישו עליהם בטלפון.
+15. **שפה.** **English / עברית** מחליף את כל הדף, את המיקרופון ואת השפה שבה מנהל המשחק עונה לכם.
+    הכול מופיע בשפה שלכם, כולל הפעולות של השחקנים האחרים, שמנהל המשחק מתרגם (מסומן ב-🌐; לחצו
+    **הצג מקור** כדי לראות מה הם כתבו).
+16. **רענון** הדף שומר לכם את המקום. כדי לעבור למכשיר אחר, לחצו קודם **עזיבת המושב** (או בקשו
+    מהמארח לפנות אותו).
 
 ---
 
@@ -462,6 +536,7 @@ You rarely need these — Claude runs them — but they're yours to use:
 | `bash tools/gm-table.sh status` | Link, code, who's seated, unread actions |
 | `bash tools/gm-table.sh free "Name"` | Free a seat (player switching devices) |
 | `bash tools/gm-table.sh round 90` · `round off` | How long the GM waits for everyone once the first player acts (default 60 s) |
+| `bash tools/gm-table.sh alias "Marta" "מרתה"` | Another spelling of a name, so its hover card works in Hebrew too |
 | `bash tools/gm-table.sh music list` | What plays for each mood, and the enemy themes |
 | `bash tools/gm-table.sh music --mood tavern` | Force a mood's music right now |
 | `bash tools/gm-table.sh music theme "Grimaldi" waltz.mp3` | Give a villain their own track |
@@ -469,14 +544,29 @@ You rarely need these — Claude runs them — but they're yours to use:
 | `bash tools/gm-player.sh party` | Every player character and their stats |
 | `bash tools/gm-music-library.sh fetch` | Download (or re-download) the music library |
 | `bash tools/gm-image.sh generate --title "Test" --prompt "..."` | Make a picture now (checks the image setup) |
+| `bash tools/gm-image.sh portrait "Name"` · `location "Place"` | Paint a character's portrait · a place, now |
+| `bash tools/gm-image.sh enemy "Name" --boss` · `item "Thing"` | Paint a foe (epic for a boss) · a treasure, now |
 | `bash tools/gm-image.sh log` | Every picture made so far (and the OpenAI spend) |
 | `bash tools/gm-music-compose.sh test` · `status` | Time the local composer · what it has composed |
+| `bash tools/gm-music-compose.sh theme "Name" --boss` · `anthem "PC"` | Compose a villain's (boss) theme · a hero's anthem ahead of time |
 | `bash tools/gm-models.sh [preset]` | Which models run the game (recommended · budget · premium · inherit) |
 | `/model` · `/fast` (inside Claude Code) | Check or switch the GM's model now · faster GM replies |
 
 ---
 
 ## Troubleshooting
+
+**The GM says "the players are still acting".** That's the round: the GM may answer only when
+everyone has acted or a minute after the first action. If someone has left for the night,
+`bash tools/gm-table.sh free "Name"`; to switch rounds off, `bash tools/gm-table.sh round off`.
+
+**The Narrator only quotes the story instead of answering.** It answers through the host's
+Claude Code (`claude` must work in a terminal on the host, signed in). If it can't reach it, it
+falls back to quoting the story lines that match. `NARRATOR_BACKEND=off` in `.env` turns the
+model off on purpose; `ANTHROPIC_API_KEY` is an alternative to the Claude Code login.
+
+**A name isn't underlined in Hebrew narration.** The campaign knows it by another spelling.
+Tell the GM, or run `bash tools/gm-table.sh alias "Marta" "מרתה"`.
 
 **No composed music.** Run `bash tools/gm-music-compose.sh check`. It should name your GPU
 (`"device": "cuda"`). *"no kernel image is available"* means the PyTorch build doesn't support the

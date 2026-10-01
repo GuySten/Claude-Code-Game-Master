@@ -40,6 +40,7 @@ Display all available commands and tools.
   gm-session.sh     Session management, save/restore
   gm-player.sh      Player character stats (every PC at the table: join/party/leave)
   gm-table.sh       Online table — friends join from their own browsers
+                    (wait/say/translate, round 90|off, alias, music, free, stop)
   gm-npc.sh         Create and update NPCs
   gm-location.sh    Add and connect locations
   gm-consequence.sh Track future events
@@ -48,7 +49,11 @@ Display all available commands and tools.
   gm-enhance.sh     Enrich entities with RAG
   gm-overview.sh    Quick world summary
   gm-campaign.sh    Switch between campaigns
-  gm-image.sh       Generate a scene image (gpt-image-2) + clickable link
+  gm-image.sh       Pictures: scenes, portraits, places, foes, treasures
+                    (OpenAI or a local Forge)
+  gm-music-library.sh  Download the mood music library
+  gm-music-compose.sh  Local AI composer: villain/boss themes, hero anthems
+  gm-models.sh      Which Claude models run the game (also /models)
 
 ================================================================
 
@@ -57,6 +62,8 @@ Display all available commands and tools.
   New campaign:     /new-game
   Continue playing: /gm
   Import module:    /import
+  Friends online:   /gm, then "my friends are joining online"
+                    (the full guide: GAME-NIGHT.md)
 
   SCENE IMAGES (optional)
   --------------------------------------------------------
@@ -67,7 +74,9 @@ Display all available commands and tools.
     bash tools/gm-image.sh generate --title "..." --prompt "..."
   The locked --style is auto-added to every prompt so the gallery
   reads like one artbook. Saves a PNG + prints a clickable file://
-  link. Needs OPENAI_API_KEY in .env; gm-image.sh log shows spend.
+  link. Needs OPENAI_API_KEY in .env, or a local Stable Diffusion
+  Forge with IMAGE_BACKEND=forge (free; GAME-NIGHT.md step 5).
+  gm-image.sh log shows what was made and the OpenAI spend.
 
 ================================================================
 ```
