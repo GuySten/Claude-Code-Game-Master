@@ -278,6 +278,8 @@ class TableState:
                             target.pop("tr", None)
                         if entry.get("tr"):
                             target.setdefault("tr", {}).update(entry["tr"])
+                        if entry.get("read"):  # the GM read it: no more editing
+                            target["read"] = True
                         target["rev"] = self.rev
                     continue
                 entry["rev"] = self.rev
@@ -351,12 +353,13 @@ class TableState:
         self.visited: List[str] = [v for v in visited if isinstance(v, str)]
         # Characters rolled on the join screen, not created yet: roll id -> roll.
         self.pending_rolls: Dict[str, Dict[str, Any]] = {}
-        # Actions corrected AFTER the GM read them: id -> the text the GM read.
-        self.corrections: Dict[int, str] = {}
         try:
             self.gm_cursor = int(self.cursor_path.read_text().strip())
         except (OSError, ValueError):
             self.gm_cursor = self.messages[-1]["id"] if self.messages else 0
+        for m in self.messages:                 # what the GM has read can't be edited
+            if m["kind"] == "player" and m["id"] <= self.gm_cursor:
+                m["read"] = True
 
     @staticmethod
     def _read_json(path: Path, default):
@@ -1071,10 +1074,22 @@ class TableState:
                    and (not m.get("to") or m.get("to") == msg.get("pc"))
                    for m in reversed(self.messages))
 
+    def locked(self, msg: Dict[str, Any]) -> Optional[str]:
+        """Why this action can no longer be edited, or None: the GM has read it
+        (and may already be rolling for it), dice were rolled after it, or the
+        GM answered. (caller holds the lock)"""
+        if self.answered(msg):
+            return "answered"
+        if msg.get("read") or msg["id"] <= self.gm_cursor:
+            return "read"
+        if any(m["id"] > msg["id"] and m["kind"] == "roll" for m in self.messages):
+            return "rolled"
+        return None
+
     def edit(self, pc: str, msg_id: Any, text: str) -> Dict[str, Any]:
         """A player fixes their own action (a typo, a misheard word) — allowed
-        until the GM answers it. If the GM already read it, the next inbox shows
-        the correction next to what the GM read."""
+        until the GM reads it: after that the GM acts on what it read (rolls the
+        dice for it), so a change would be ignored."""
         try:
             msg_id = int(msg_id)
         except (TypeError, ValueError):
@@ -1085,13 +1100,12 @@ class TableState:
                     msg.get("pc") or "", pc):
                 return {"ok": False, "error": "You can only edit your own actions.",
                         "reason": "not-yours"}
-            if self.answered(msg):
-                return {"ok": False, "error": "The GM already answered that — write a new action.",
-                        "reason": "answered"}
+            why = self.locked(msg)
+            if why:
+                return {"ok": False, "reason": why,
+                        "error": "The GM is already playing that out — write a new action."}
             if text == msg.get("text"):
                 return {"ok": True, "message": dict(msg)}
-            if msg_id <= self.gm_cursor:
-                self.corrections.setdefault(msg_id, msg.get("text", ""))
             msg["text"] = text
             msg["edited"] = _now()
             msg.pop("tr", None)                 # re-translated from the new text
@@ -1203,12 +1217,14 @@ class TableState:
         with self.lock:
             unread = [m for m in self.messages
                       if m["id"] > self.gm_cursor and m["kind"] in ("player", "system")]
-            by_id = {m["id"]: m for m in self.messages}
-            fixed = [dict(by_id[i], corrected_from=was)
-                     for i, was in sorted(self.corrections.items()) if i in by_id]
-            unread = fixed + unread
             if mark and self.messages:
-                self.corrections.clear()
+                with open(self.log_path, "a", encoding="utf-8") as f:
+                    for m in unread:            # read: no more editing (pages see it)
+                        if m["kind"] == "player" and not m.get("read"):
+                            m["read"] = True
+                            self.rev += 1
+                            m["rev"] = self.rev
+                            f.write(json.dumps({"patch": m["id"], "read": True}) + "\n")
                 self.gm_cursor = self.messages[-1]["id"]
                 self.cursor_path.write_text(str(self.gm_cursor))
                 if any(m["kind"] == "player" for m in unread):
@@ -2770,10 +2786,7 @@ def _print_messages(messages: List[dict], waiting_on: List[str],
                 tags.append("spoken")
             if m.get("to"):
                 tags.append("private, to GM only")
-            if m.get("corrected_from") is not None:
-                tags.append("CORRECTED — use this version; you read: "
-                            + json.dumps(m["corrected_from"], ensure_ascii=False))
-            elif m.get("edited"):
+            if m.get("edited"):
                 tags.append("edited")
             tag = f" ({', '.join(tags)})" if tags else ""
             print(f"[#{m['id']} {m.get('pc', '?')}{tag}] {m['text']}")

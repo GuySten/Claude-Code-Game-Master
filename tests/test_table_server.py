@@ -530,42 +530,46 @@ def test_dice_natural_and_judge():
     assert dice.judge({"notation": "2d6", "type": "standard", "rolls": [3, 4], "total": 7}, None) is None
 
 
-def test_players_can_fix_their_action_until_the_gm_answers(table):
+def test_players_can_fix_their_action_until_the_gm_reads_it(table):
     table["state"].set_round_seconds(0)        # (rounds: tested on their own)
     call, state = table["call"], table["state"]
     pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
     bram = call("/api/create", {"code": CODE, "name": "Bram", "concept": "a dwarf"})[1]["token"]
+    call("/api/gm/inbox", {}, host=True)                          # (the join notices)
     _, said = call("/api/say", {"code": CODE, "token": pip, "text": "I pick the lcok."})
     mid = said["message"]["id"]
 
     # Before the GM reads it: the GM simply gets the fixed text.
     status, body = call("/api/edit", {"code": CODE, "token": pip, "id": mid, "text": "I pick the lock."})
     assert status == 200 and body["message"]["text"] == "I pick the lock." and body["message"]["edited"]
-    inbox = call("/api/gm/inbox", {}, host=True)[1]["messages"]
-    assert [m["text"] for m in inbox if m["kind"] == "player"] == ["I pick the lock."]
-    assert not any("corrected_from" in m for m in inbox)
-
+    assert not body["message"].get("read")
     # Only your own actions.
     assert call("/api/edit", {"code": CODE, "token": bram, "id": mid, "text": "Mine now."})[0] == 409
-
-    # After the GM read it: the next inbox flags the correction with what the GM read.
-    state.translate({str(mid): {"he": "אני פורץ את המנעול."}})
-    call("/api/edit", {"code": CODE, "token": pip, "id": mid, "text": "I pick the lock quietly."})
-    assert call("/api/gm/pending", host=True)[1]["unread"] == 1
-    inbox = call("/api/gm/inbox", {}, host=True)[1]["messages"]
-    assert inbox[0]["text"] == "I pick the lock quietly."
-    assert inbox[0]["corrected_from"] == "I pick the lock."
-    assert "tr" not in inbox[0]                       # the old translation is dropped
-    assert call("/api/gm/inbox", {}, host=True)[1]["messages"] == []
-
     # Other players see it change in place (new rev).
-    _, seen = call(f"/api/messages?code={CODE}&token={bram}&after={mid}&rev=1")
-    assert any(m["id"] == mid and m["text"] == "I pick the lock quietly." for m in seen["messages"])
+    _, seen = call(f"/api/messages?code={CODE}&token={bram}&after={mid - 1}&rev=1")
+    assert any(m["id"] == mid and m["text"] == "I pick the lock." for m in seen["messages"])
 
-    # The edit survives a restart.
+    # The GM reads it: from now on the GM plays it out (rolls for it), so it's final,
+    # and the players' pages learn that (the message comes again, marked read).
+    rev = state.rev
+    inbox = call("/api/gm/inbox", {}, host=True)[1]["messages"]
+    assert [m["text"] for m in inbox if m["kind"] == "player"] == ["I pick the lock."]
+    status, body = call("/api/edit", {"code": CODE, "token": pip, "id": mid, "text": "I kick the door."})
+    assert status == 409 and body["reason"] == "read"
+    _, seen = call(f"/api/messages?code={CODE}&token={pip}&after=0&rev={rev}")
+    assert any(m["id"] == mid and m.get("read") for m in seen["messages"])
+
+    # Dice rolled after an action lock it too, read or not.
+    _, said = call("/api/say", {"code": CODE, "token": bram, "text": "I swing my axe."})
+    call("/api/gm/roll", {"notation": "1d20+3", "pc": "Bram", "why": "attack"}, host=True)
+    status, body = call("/api/edit", {"code": CODE, "token": bram, "id": said["message"]["id"],
+                                      "text": "I run away."})
+    assert status == 409 and body["reason"] == "rolled"
+
+    # It all survives a restart: the edit, and that the GM read it.
     reloaded = TableState(table["camp"], str(table["world"]))
     again = next(m for m in reloaded.messages if m["id"] == mid)
-    assert again["text"] == "I pick the lock quietly." and again.get("edited") and "tr" not in again
+    assert again["text"] == "I pick the lock." and again.get("edited") and again.get("read")
 
     # Once the GM has answered, it's history.
     call("/api/gm/say", {"text": "The lock clicks open."}, host=True)

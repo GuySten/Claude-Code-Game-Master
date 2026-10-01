@@ -422,7 +422,7 @@ Copy, fill in the link and code, and send:
    when you stop talking (untick *Send when I stop talking* to check the text first). Talk
    the way you would at a table: *"I sneak up behind the guard and try to grab his keys."*
    A typo, or the microphone misheard you? Tap **✏️** on your message to fix it. You can until
-   the GM answers it.
+   the GM starts playing it out: once it reads the round (or rolls dice), the ✏️ goes away.
 4. **Rounds.** When the first player acts, a one-minute countdown starts above the text box.
    The GM answers once everyone has acted, or when the minute is up. In the last 15 seconds
    it turns red and chimes for whoever hasn't acted yet. Nothing ticks while the table is on a
@@ -492,7 +492,8 @@ Copy, fill in the link and code, and send:
 3. **פעלו.** כתבו מה הדמות עושה ולחצו Enter, או לחצו **🎤**, דברו, וההודעה תישלח כשתסיימו לדבר
    (בטלו את *לשלוח כשאני מסיים/ת לדבר* כדי לבדוק את הטקסט קודם). דברו כמו ליד שולחן אמיתי:
    *"אני מתגנב מאחורי השומר ומנסה לחטוף לו את המפתחות."* טעות הקלדה, או שהמיקרופון לא הבין
-   אתכם? לחצו **✏️** על ההודעה כדי לתקן. אפשר עד שמנהל המשחק עונה עליה.
+   אתכם? לחצו **✏️** על ההודעה כדי לתקן. אפשר עד שמנהל המשחק מתחיל לטפל בה: ברגע שהוא קורא
+   את הסבב (או מטיל קוביות), ה־✏️ נעלם.
 4. **סבבים.** כשהשחקן הראשון פועל, מתחילה ספירה לאחור של דקה מעל תיבת הטקסט. מנהל המשחק עונה
    כשכולם פעלו, או כשהדקה נגמרת. ב-15 השניות האחרונות היא מאדימה ומצלצלת למי שעוד לא פעל.
    בזמן הפסקה שום דבר לא סופר: הספירה מתחילה רק עם הפעולה הראשונה. השולחן לא מחכה לדמות

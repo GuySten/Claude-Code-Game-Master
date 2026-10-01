@@ -2112,9 +2112,10 @@
 
   // Your own action stays editable until the GM answers it (the server checks too).
   const editing = new Set();           // ids whose edit box is open
+  // Your own action, until the GM reads it (then it plays it out: rolls for it).
   function canEdit(m) {
-    return m.kind === "player" && me && m.pc === me
-      && !allMessages.some((x) => x.kind === "gm" && x.id > m.id && (!x.to || x.to === me));
+    return m.kind === "player" && me && m.pc === me && !m.read
+      && !allMessages.some((x) => x.id > m.id && (x.kind === "roll" || (x.kind === "gm" && (!x.to || x.to === me))));
   }
   function refreshEditable() {
     allMessages.forEach((m) => {
@@ -2429,7 +2430,7 @@
           }
         });
         if (atBottom || !historyLoaded) log.scrollTop = log.scrollHeight;
-        if (r.messages.some((m) => m.kind === "gm")) refreshEditable();
+        if (r.messages.some((m) => m.kind === "gm" || m.kind === "roll" || m.read)) refreshEditable();
         const last = r.messages[r.messages.length - 1];
         updateProgress();
         // The music changed: fetch it now instead of on the next 4-second refresh,
