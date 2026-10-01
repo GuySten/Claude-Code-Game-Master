@@ -156,10 +156,12 @@ again remember about tell said say name called mean happened happen""".split())
 
 
 TRANSLATE_RULES = """You translate the text of a tabletop role-playing game's character sheet \
-from English into {lang}. You get a JSON list of strings. Reply with ONLY a JSON object that maps \
-each string, exactly as given, to its translation. Use the usual {lang} terms of role-playing \
-games (Dungeons & Dragons) where they exist. Keep numbers, dice (1d8+2) and modifiers (+3) as \
-they are. Write personal and place names in {lang} letters. No notes, no markdown."""
+from English into {lang}. You get a JSON object of numbered strings, like {{"1": "Stealth", \
+"2": "Fire Bolt (1d10)"}}. Reply with ONLY a JSON object with the same numbers, each mapped to \
+its translation, like {{"1": "...", "2": "..."}}. Translate every one. Use the usual {lang} terms \
+of role-playing games (Dungeons & Dragons) where they exist. Keep numbers, dice (1d8+2) and \
+modifiers (+3) as they are. Write personal and place names in {lang} letters. No notes, no \
+markdown."""
 
 
 def translate(strings: List[str], lang: str,
@@ -170,7 +172,10 @@ def translate(strings: List[str], lang: str,
     if lang == "en" or not strings or source == "off":
         return {}
     system = TRANSLATE_RULES.format(lang=LANG_NAMES.get(lang, lang))
-    prompt = json.dumps(strings, ensure_ascii=False)
+    # Numbered: the answer comes back by number, so a phrase the model retypes a
+    # little differently (or translates) can't lose its translation.
+    numbered = {str(i + 1): s for i, s in enumerate(strings)}
+    prompt = json.dumps(numbered, ensure_ascii=False)
     if ask:
         text = ask(system, prompt)
     elif source == "claude":
@@ -182,9 +187,14 @@ def translate(strings: List[str], lang: str,
         got = json.loads(text[start:end + 1]) if start >= 0 else {}
     except ValueError:
         return {}
-    wanted = set(strings)
-    return {k: v.strip() for k, v in got.items()
-            if k in wanted and isinstance(v, str) and v.strip()} if isinstance(got, dict) else {}
+    if not isinstance(got, dict):
+        return {}
+    out = {}
+    for k, v in got.items():
+        src = numbered.get(str(k).strip()) or (k if k in strings else None)
+        if src and isinstance(v, str) and v.strip():
+            out[src] = v.strip()
+    return out
 
 
 FIND_NAMES_RULES = """You match names in a {lang} passage from a role-playing game to the game's \

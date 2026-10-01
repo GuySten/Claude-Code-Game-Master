@@ -1555,7 +1555,7 @@
       const tags = [pc.lead ? t("lead") : "", pc.name === me ? t("you") : "",
                     !pc.claimed && pc.name !== me ? t("emptySeat") : ""].filter(Boolean);
       const status = pc.status && pc.status !== "alive" ? pc.status.toUpperCase() : "";
-      const conds = (pc.conditions || []).join(", ");
+      const conds = (pc.conditions || []).map((c) => tx(String(c))).join(", ");
       const from = before ? hpPct(before) : pct;
       d.innerHTML = `<div><span class="open-sheet">${esc(t("openSheet"))}</span>` +
         (pc.portrait ? `<img class="avatar" alt="" src="${esc(imageUrl(pc.portrait, 96))}">` : "") +
@@ -1563,8 +1563,8 @@
         (pc.level_up && pc.name === me ? `<span class="lvl-ready">${esc(t("lvlBadge"))}</span>` : "") +
         tags.map((x) => `<span class="tag">${esc(x)}</span>`).join("") + `</div>` +
         `<div class="bar"><div style="width:${from}%;background:${color}"></div></div>` +
-        `<div class="meta" dir="auto">HP ${esc(pc.hp)}/${esc(pc.hp_max)} · ${t("lvl")} ${esc(pc.level)} ` +
-        `${esc([pc.race, pc.class].filter(Boolean).join(" "))}` +
+        `<div class="meta" dir="auto">${esc(t("sheet_hp"))} ${esc(pc.hp)}/${esc(pc.hp_max)} · ${t("lvl")} ${esc(pc.level)} ` +
+        `${esc([tx(pc.race), tx(pc.class)].filter(Boolean).join(" "))}` +
         `${status ? " · " + esc(status) : ""}${conds ? " · " + esc(conds) : ""}</div>`;
       if (from !== pct) requestAnimationFrame(() => requestAnimationFrame(() => {
         d.querySelector(".bar > div").style.width = pct + "%";
@@ -1622,7 +1622,35 @@
   // phrase on the host (the Narrator's model), fetched as the translations land.
   const sheetTr = new Map();
   let txOff = false;                   // (the untranslated text, for matching names)
-  const tx = (s) => (!txOff && typeof s === "string" && sheetTr.get(s.trim())) || s;
+  // The game's standard words, in Hebrew without waiting for the model.
+  const HE_TERMS = {
+    acrobatics: "אקרובטיקה", "animal handling": "טיפול בבעלי חיים", arcana: "ידע קסום",
+    athletics: "אתלטיקה", deception: "הונאה", history: "היסטוריה", insight: "תובנה",
+    intimidation: "הפחדה", investigation: "חקירה", medicine: "רפואה", nature: "טבע",
+    perception: "תפיסה", performance: "הופעה", persuasion: "שכנוע", religion: "דת",
+    "sleight of hand": "זריזות ידיים", stealth: "התגנבות", survival: "הישרדות",
+    strength: "כוח", dexterity: "זריזות", constitution: "חוסן", intelligence: "תבונה",
+    wisdom: "חוכמה", charisma: "כריזמה", str: "כוח", dex: "זריזות", con: "חוסן",
+    int: "תבונה", wis: "חוכמה", cha: "כריזמה",
+    blinded: "עיוור", charmed: "מוקסם", deafened: "חירש", frightened: "מפוחד",
+    grappled: "אחוז", incapacitated: "חסר אונים", invisible: "בלתי נראה",
+    paralyzed: "משותק", petrified: "מאובן", poisoned: "מורעל", prone: "שרוע",
+    restrained: "כבול", stunned: "המום", unconscious: "מחוסר הכרה", exhaustion: "תשישות",
+    "proficiency bonus": "בונוס התמחות", saves: "הצלות", "saving throws": "הצלות",
+    speed: "מהירות", initiative: "יוזמה", languages: "שפות", proficiencies: "התמחויות",
+    cantrips: "לחשי בסיס", used: "בשימוש", remaining: "נותרו", total: "סך הכול",
+    barbarian: "ברברי", bard: "פייטן", cleric: "כוהן", druid: "דרואיד", fighter: "לוחם",
+    monk: "נזיר", paladin: "פלדין", ranger: "סייר", rogue: "נוכל", sorcerer: "מכשף",
+    warlock: "מכשף אופל", wizard: "קוסם", artificer: "אומן",
+    human: "אדם", elf: "אלף", dwarf: "גמד", halfling: "זוטון", gnome: "גנום",
+    "half-elf": "חצי־אלף", "half-orc": "חצי־אורק", tiefling: "טיפלינג", dragonborn: "בן־דרקון",
+    orc: "אורק", goliath: "גוליית", aasimar: "אאסימר",
+  };
+  const tx = (s) => {
+    if (txOff || typeof s !== "string") return s;
+    const k = s.trim();
+    return sheetTr.get(k) || (lang === "he" && HE_TERMS[k.toLowerCase()]) || s;
+  };
   const prettyKey = (k) => String(k).replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
   function label(k) {
     const key = "sheet_" + k;
@@ -1745,7 +1773,7 @@
     if (stats.length) {
       const classic = stats.every(([k, v]) => SIX.includes(k.toLowerCase()) && typeof v === "number");
       sec("stats", t("sheet_stats"), boxes(stats.map(([k, v]) =>
-        [sheetTr.get(prettyKey(k)) || k, typeof v === "object" ? itemLine(v) : v,
+        [sheetTr.get(prettyKey(k)) || tx(k), typeof v === "object" ? itemLine(v) : v,
          classic ? signed(Math.floor((v - 10) / 2)) : undefined])));
     }
     const order = ["conditions", "skills", "saves", "features", "spells", "spell_slots", "equipment",
@@ -1754,7 +1782,12 @@
     const done = new Set([...SHEET_HIDE, "stats"]);
     order.forEach((k) => {
       done.add(k);
-      sec(k, label(k), sheetValue(s[k], k === "skills" || k === "saves"));
+      let v = s[k];
+      if (k === "spell_slots" && v && typeof v === "object" && !Array.isArray(v))
+        // {"1": 2} reads "Lvl 1: 2" (two first-level slots), not a bare "1 2"
+        v = Object.fromEntries(Object.entries(v).map(([lv, n]) =>
+          [/^\d+$/.test(lv) ? t("lvl") + " " + lv : lv, n]));
+      sec(k, label(k), sheetValue(v, k === "skills" || k === "saves"));
     });
     const more = {};
     Object.keys(s).forEach((k) => { if (!done.has(k)) more[k] = s[k]; });

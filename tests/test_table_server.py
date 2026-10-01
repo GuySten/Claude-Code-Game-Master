@@ -1351,7 +1351,7 @@ def test_every_player_character_has_a_card_and_the_sheet_speaks_the_players_lang
     def ask(system, prompt):
         calls.append(system)
         if "character sheet" in system:
-            return json.dumps({s: "ע:" + s for s in json.loads(prompt)})
+            return json.dumps({k: "ע:" + v for k, v in json.loads(prompt).items()})
         return "Bram, a dwarf."
 
     state.narrator_ask = ask
@@ -1458,7 +1458,21 @@ def test_pictures_are_kept_by_browsers_and_come_small_where_shown_small(table):
         assert Image.open(io.BytesIO(body)).size == (400, 274)   # the nearest size, same shape
     assert (table["state"].dir / "thumbs" / "crypt-400.jpg").is_file()   # made once
     with opener.open(f"{base}/images/crypt.png?code={CODE}&w=nonsense") as r:
-        assert r.headers["Content-Type"] == "image/png"          # the original, then
+        assert r.headers["Content-Type"] == "image/png" and len(r.read()) == big   # the original
+
+
+def test_sheet_translations_come_back_by_number():
+    import narrator
+    seen = []
+
+    def ask(system, prompt):
+        seen.append(json.loads(prompt))
+        # the model retypes one phrase differently, and answers out of order
+        return 'Here: {"2": "שכנוע", "1": "ידע קסום", "3": "  "}'
+
+    got = narrator.translate(["Arcana", "Persuasion", "Fire Bolt (1d10)"], "he", ask=ask)
+    assert seen[0] == {"1": "Arcana", "2": "Persuasion", "3": "Fire Bolt (1d10)"}
+    assert got == {"Arcana": "ידע קסום", "Persuasion": "שכנוע"}      # the blank one is left out
 
 
 def test_sheet_strings_are_the_words_a_player_reads():

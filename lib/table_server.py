@@ -778,6 +778,8 @@ class TableState:
         if self.narrator_ask is None and narrator.backend() == "off":
             return
         lang = self.langs.get(viewer, "en")
+        for pc in self.party():                 # and every sheet, in their language
+            self.sheet_translation(viewer, pc["name"])
         with self.lock:
             have = set(self.lore_store)
         terms = sorted(self.lore_terms(viewer), key=lambda t: -t.get("last", -1))
@@ -2203,7 +2205,10 @@ def make_handler(state: TableState, code: str, host_key: str):
             self.send_header("Cache-Control", cache)
             self.send_header("X-Content-Type-Options", "nosniff")
             self.end_headers()
-            self.wfile.write(body)
+            try:
+                self.wfile.write(body)
+            except (ConnectionResetError, BrokenPipeError):
+                pass                            # the page went away mid-download
 
         def _json(self, data: Any, status: int = 200) -> None:
             self._send(status, json.dumps(data, ensure_ascii=False).encode("utf-8"),

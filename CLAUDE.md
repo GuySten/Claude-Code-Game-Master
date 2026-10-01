@@ -57,6 +57,8 @@ open the link, enter the code, and pick or create their PC. While the table is o
    "only the GM sees this" aside arrives marked `(private, to GM only)` — answer it with
    `--to`. Players can fix a typo in an action until you read it (they always get at least
    5 seconds; the inbox waits that out): what you read is final.
+   **Sheets are written in English, one language per entry** ("Fire Bolt (1d10)", never
+   "Fire Bolt (קרן אש)"): each player's page translates them into their own language.
    **Levelling up at the table:** XP you announce in the story must be AWARDED in the same
    turn (`gm-player.sh xp "<PC>" +N`, or `award`): that is what raises their level. Never
    only narrate it. When a level rises, the table tells the player, who levels up from
