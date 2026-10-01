@@ -28,6 +28,7 @@ if [ "$#" -lt 1 ]; then
     echo "      --no-appearance-lock       Skip the visual_appearance injection for the WHOLE frame."
     echo "                                 For ONE transformed/disguised character, just omit their"
     echo "                                 --character and describe the altered look in the prompt."
+    echo "  portrait <name>            - Draw a PC's or NPC's portrait and save it on their record"
     echo "  appearance <name>          - Print a character's visual_appearance bible line (PC or NPC)"
     echo "  chronicler                 - Show this campaign's in-world chronicler"
     echo "      --name <text>            Set the chronicler's name"
@@ -96,6 +97,23 @@ case "$ACTION" in
         else
             echo "  est cost: \$$COST ($QUALITY $SIZE)"
         fi
+        ;;
+
+    portrait)
+        require_active_campaign
+        if [ -z "$1" ]; then
+            error "Usage: gm-image.sh portrait \"<PC or NPC name>\" [--quality low|medium|high]"
+            exit 1
+        fi
+        NAME="$1"; shift
+        PQUALITY="medium"
+        [ "$1" = "--quality" ] && PQUALITY="$2"
+        RESULT=$($PYTHON_CMD "$LIB_DIR/image_gen.py" --portrait "$NAME" --quality "$PQUALITY" --json) || exit $?
+        SHORT_URI=$(echo "$RESULT" | $PYTHON_CMD -c "import sys,json,pathlib; d=json.load(sys.stdin); print(pathlib.Path(d.get('short_path') or d['path']).resolve().as_uri())")
+        FILE=$(echo "$RESULT" | $PYTHON_CMD -c "import sys,json; print(json.load(sys.stdin)['portrait'])")
+        success "Portrait of $NAME saved on their record ($FILE)"
+        echo "  open: $SHORT_URI"
+        echo "  at the online table: bash tools/gm-table.sh say \"…\" --image $FILE"
         ;;
 
     chronicler)

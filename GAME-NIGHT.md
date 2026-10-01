@@ -208,6 +208,11 @@ Ask the GM *"lock an art style for this campaign"*, or run:
 ```bash
 bash tools/gm-image.sh chronicler --name "Astreus" --style "ink-and-watercolor fantasy illustration" --persona "a wry court scholar"
 ```
+**Portraits.** Every player character gets a portrait. With the table open it's drawn in the
+background a minute or two after they join and shown to everyone; then it sits at the top of
+their character sheet and next to their name in the party panel. For an important NPC, or a PC
+made outside the table, the GM runs `bash tools/gm-image.sh portrait "<name>"` (you can too).
+
 To keep characters on-model, every PC and NPC needs a stored appearance. Ask the GM *"write
 appearances for everyone in the party"*: characters created on the join page don't have one yet.
 
@@ -330,7 +335,8 @@ Copy, fill in the link and code, and send:
    everyone's **HP**, and it changes with the story: a hit lands on your HP bar when the text
    reaches your name, not before.
 10. **Your character sheet.** Tap **📜 My sheet**, or any character in the side panel, for
-   the full sheet: abilities, skills, features, spells, equipment, conditions. It updates
+   the full sheet: a portrait (when pictures are on), abilities, skills, features, spells,
+   equipment, conditions. It updates
    with the story too, and what just changed flashes. When you earn a level, **⬆** appears:
    open your sheet and tap **Level up**. Roll your hit die at the table (or take the average),
    pick your ability increases when your class gets them, and tell the GM what you'd like
@@ -368,7 +374,7 @@ Copy, fill in the link and code, and send:
    עליו כדי לראות את כולו מיד. בפאנל הצד רואים את **נקודות החיים** של כולם, והן משתנות יחד
    עם הסיפור: מכה נוחתת על פס החיים שלכם כשהטקסט מגיע לשם שלכם, לא לפני כן.
 10. **דף הדמות.** לחצו **📜 הדף שלי**, או על כל דמות בפאנל הצד, כדי לראות את הדף המלא:
-   תכונות, מיומנויות, יכולות, לחשים, ציוד ומצבים. גם הוא מתעדכן יחד עם הסיפור, ומה שהשתנה
+   דיוקן (כשהתמונות פועלות), תכונות, מיומנויות, יכולות, לחשים, ציוד ומצבים. גם הוא מתעדכן יחד עם הסיפור, ומה שהשתנה
    מהבהב. כשאתם מרוויחים דרגה מופיע **⬆**: פתחו את הדף ולחצו **עלייה בדרגה**. הטילו את קוביית
    החיים ליד השולחן (או קחו את הממוצע), בחרו שיפורי תכונות כשהמקצוע מקבל אותם, וכתבו למנהל
    המשחק מה תרצו (תת־מקצוע, לחשים, הישג). מנהל המשחק מוסיף את יכולות המקצוע החדשות.

@@ -368,7 +368,7 @@ def build_prompt(prompt: str, characters=None, campaign_dir=None, *,
 def generate_image(prompt: str, *, title: str = "", quality: str = DEFAULT_QUALITY,
                    size: str = DEFAULT_SIZE, model: str = DEFAULT_MODEL,
                    characters=None, style_lock: bool = True,
-                   appearance_lock: bool = True) -> dict:
+                   appearance_lock: bool = True, campaign_dir=None) -> dict:
     """Generate one image and save it under the active campaign's images/ dir.
 
     ``characters`` is an optional list of character names in frame; each one's
@@ -389,7 +389,7 @@ def generate_image(prompt: str, *, title: str = "", quality: str = DEFAULT_QUALI
             "(GAME-NIGHT.md → Pictures)."
         )
 
-    campaign_dir = resolve_campaign_dir()
+    campaign_dir = campaign_dir or resolve_campaign_dir()
     if campaign_dir is None:
         raise ImageGenError("No active campaign. Run /new-game or /import first.")
 
@@ -436,6 +436,67 @@ def generate_image(prompt: str, *, title: str = "", quality: str = DEFAULT_QUALI
         "size": size,
         "title": title,
     }
+
+
+# ------------------------------------------------------------ portraits ----
+def _find_character(name: str, campaign_dir: Path):
+    """('pc', path, sheet) or ('npc', path, record) for ``name``, else None."""
+    import party_roster
+    from character_schema import to_flat
+    path = party_roster.find_pc(campaign_dir, name)
+    if path is not None:
+        return "pc", path, to_flat(json.loads(path.read_text(encoding="utf-8")))
+    npcs_path = Path(campaign_dir) / "npcs.json"
+    if npcs_path.exists():
+        npcs = json.loads(npcs_path.read_text(encoding="utf-8"))
+        table = npcs["npcs"] if isinstance(npcs.get("npcs"), dict) else npcs
+        for key, data in table.items():
+            if key.strip().lower() == name.strip().lower() and isinstance(data, dict):
+                return "npc", npcs_path, dict(data, name=key)
+    return None
+
+
+def portrait_prompt(record: dict) -> str:
+    """A head-and-shoulders portrait brief from whatever the record says about them."""
+    name = record.get("name", "")
+    who = " ".join(str(record.get(k) or "").strip() for k in ("race", "class")).strip()
+    about = record.get("concept") or record.get("description") or ""
+    lines = [f"Character portrait of {name}" + (f", {who}" if who else "") + "."]
+    if about:
+        lines.append(f"Who they are: {about}.")
+    lines.append("Head-and-shoulders portrait facing the viewer, expressive detailed face, "
+                 "simple softly lit background, no text.")
+    return " ".join(lines)
+
+
+def _record_portrait(kind: str, path: Path, name: str, filename: str) -> None:
+    """Write ``portrait`` onto the PC sheet / NPC entry (re-read just before writing)."""
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if kind == "pc":
+        data["portrait"] = filename
+    else:
+        table = data["npcs"] if isinstance(data.get("npcs"), dict) else data
+        key = next(k for k in table if k.strip().lower() == name.strip().lower())
+        table[key]["portrait"] = filename
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(path)
+
+
+def generate_portrait(name: str, campaign_dir=None, quality: str = DEFAULT_QUALITY) -> dict:
+    """Draw ``name``'s portrait (PC or NPC) in the campaign's style, from their stored
+    appearance, and record it on their sheet / NPC entry as ``portrait``."""
+    campaign_dir = Path(campaign_dir or resolve_campaign_dir() or "")
+    found = _find_character(name, campaign_dir) if str(campaign_dir) else None
+    if not found:
+        raise ImageGenError(f"No character named '{name}' in this campaign.")
+    kind, path, record = found
+    out = generate_image(portrait_prompt(record), title=f"portrait {record['name']}",
+                         quality=quality, size="1024x1536", characters=[record["name"]],
+                         campaign_dir=campaign_dir)
+    filename = Path(out["path"]).name
+    _record_portrait(kind, path, record["name"], filename)
+    return {**out, "portrait": filename, "kind": kind, "name": record["name"]}
 
 
 def _openai_generate(final_prompt: str, api_key: str, model: str, quality: str, size: str) -> bytes:
@@ -502,6 +563,8 @@ def main() -> None:
                         help="Skip the campaign art-style injection (dream sequence, flashback)")
     parser.add_argument("--no-appearance-lock", dest="appearance_lock", action="store_false",
                         help="Skip the visual_appearance injection (transformation, disguise, vision)")
+    parser.add_argument("--portrait", metavar="NAME",
+                        help="Draw this PC's or NPC's portrait and save it on their record")
     parser.add_argument("--appearance", metavar="NAME",
                         help="Print one character's visual_appearance bible line and exit")
     parser.add_argument("--quality", default=DEFAULT_QUALITY, choices=["low", "medium", "high", "auto"])
@@ -515,6 +578,15 @@ def main() -> None:
     parser.add_argument("--style", help="Locked art-style signature (with --set-chronicler)")
     parser.add_argument("--persona", help="Chronicler persona/voice (with --set-chronicler)")
     args = parser.parse_args()
+
+    if args.portrait is not None:
+        try:
+            out = generate_portrait(args.portrait, quality=args.quality)
+        except ImageGenError as e:
+            print(f"[ERROR] {e}", file=sys.stderr)
+            sys.exit(1)
+        print(json.dumps(out) if args.json else f"Portrait of {out['name']}: {out['path']}")
+        return
 
     if args.appearance is not None:
         line = appearance_line(args.appearance)

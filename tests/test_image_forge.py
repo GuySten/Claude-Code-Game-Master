@@ -107,3 +107,26 @@ def test_the_session_brief_names_the_image_source(forge, dcc_world):
     forge["seen"]["models"] = []
     ctx = SessionManager(dcc_world).get_full_context()
     assert "Scene images: DISABLED (Forge is running but has no model" in ctx
+
+
+def test_portraits_are_drawn_and_kept_on_the_record(forge):
+    camp = forge["camp"]
+    (camp / "character.json").write_text(json.dumps({
+        "name": "Pip", "race": "Halfling", "class": "Rogue", "concept": "a nervous lockpick",
+        "hp": {"current": 9, "max": 9},
+        "visual_appearance": {"sex": "female", "hair": "red curls", "gear": "lockpicks"}}))
+    (camp / "npcs.json").write_text(json.dumps({"Grimnar": {"description": "dwarf blacksmith"}}))
+
+    out = image_gen.generate_portrait("pip", camp)
+    sent = forge["seen"]["requests"][-1]
+    assert (sent["width"], sent["height"]) == (832, 1216)                 # a portrait shape
+    assert "Character portrait of Pip, Halfling Rogue" in sent["prompt"]
+    assert "red curls" in sent["prompt"] and "ink and watercolor" in sent["prompt"]
+    assert json.loads((camp / "character.json").read_text())["portrait"] == out["portrait"]
+    assert (camp / "images" / out["portrait"]).read_bytes() == PNG
+
+    npc = image_gen.generate_portrait("Grimnar", camp)
+    assert "dwarf blacksmith" in forge["seen"]["requests"][-1]["prompt"]
+    assert json.loads((camp / "npcs.json").read_text())["Grimnar"]["portrait"] == npc["portrait"]
+    with pytest.raises(image_gen.ImageGenError, match="No character"):
+        image_gen.generate_portrait("Nobody", camp)

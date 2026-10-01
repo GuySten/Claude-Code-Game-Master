@@ -718,3 +718,43 @@ def test_players_level_up_from_their_sheet(table):
     assert done["hp_gain"] == max(1, roll["event"]["roll"]["total"])
     reloaded = TableState(camp, str(table["world"]))
     assert reloaded.built_levels["Pip"] == 5
+
+
+def test_every_pc_gets_a_portrait_shown_to_the_table(table):
+    import table_server
+    call, state, camp = table["call"], table["state"], table["camp"]
+    drawn, fail = [], {"on": False}
+
+    def maker(name, campaign_dir):
+        if fail["on"]:
+            raise RuntimeError("out of GPU memory")
+        drawn.append(name)
+        (campaign_dir / "images").mkdir(exist_ok=True)
+        fname = f"000{len(drawn)}-portrait-{name.lower()}.png"
+        (campaign_dir / "images" / fname).write_bytes(b"png")
+        path = camp / "character.json" if name == "Pip" else next((camp / "players").glob("*.json"))
+        data = json.loads(path.read_text()); data["portrait"] = fname; path.write_text(json.dumps(data))
+        return fname
+
+    state.portrait_maker = maker
+    t0 = 1000.0
+    assert state.portrait_pass(now=t0) == []                  # no look written yet: wait a bit
+    assert state.portrait_pass(now=t0 + table_server.PORTRAIT_GRACE) == ["Pip"]
+    msg = state.messages[-1]
+    assert msg["event"] == {"type": "portrait"} and msg["image"] == "0001-portrait-pip.png"
+    assert state.portrait_pass(now=t0 + 9999) == []           # has one now
+
+    # A new player with a written look is drawn at once; a failure is retried later.
+    tok = call("/api/create", {"code": CODE, "name": "Bram", "concept": "a dwarf"})[1]["token"]
+    assert state.portrait_wake.is_set()
+    bram = next((camp / "players").glob("*.json"))
+    data = json.loads(bram.read_text()); data["visual_appearance"] = {"sex": "male"}
+    bram.write_text(json.dumps(data))
+    fail["on"] = True
+    assert state.portrait_pass(now=t0 + 10000) == []
+    fail["on"] = False
+    assert state.portrait_pass(now=t0 + 10001) == []          # not hammering a broken GPU
+    assert state.portrait_pass(now=t0 + 10000 + table_server.PORTRAIT_RETRY) == ["Bram"]
+    _, info = call(f"/api/info?code={CODE}&token={tok}")
+    assert {p["name"]: p["portrait"] for p in info["party"]} == {
+        "Pip": "0001-portrait-pip.png", "Bram": "0002-portrait-bram.png"}

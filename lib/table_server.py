@@ -196,6 +196,11 @@ NAMES = [("Bram", "בראם"), ("Tamsin", "תמסין"), ("Orrin", "אורין")
          ("Thorne", "ת'ורן"), ("Isra", "איסרה"), ("Galen", "גאלן"), ("Nyra", "נירה"),
          ("Corwin", "קורווין"), ("Elsbeth", "אלסבת"), ("Ruk", "רוק"), ("Talia", "טליה")]
 MAX_PENDING_ROLLS = 200
+# Portraits: a PC without one gets one drawn in the background. The worker waits
+# this long for the GM to write the character's look (so the portrait matches
+# every later picture of them), and retries a failed one after a while.
+PORTRAIT_GRACE = 180
+PORTRAIT_RETRY = 900
 # Ability score increases (5e): every class at these levels, plus a few extras.
 ASI_LEVELS = {4, 8, 12, 16, 19}
 ASI_EXTRA = {"Fighter": {6, 14}, "Rogue": {10}}
@@ -264,6 +269,11 @@ class TableState:
         # from their sheet. A PC first seen counts as built at their level.
         self.levels_path = self.dir / "levels.json"
         self.built_levels: Dict[str, int] = self._read_json(self.levels_path, {})
+        # Portraits (see portrait_pass): who we've tried, when we first saw them.
+        self.portrait_tried: Dict[str, float] = {}
+        self.portrait_seen: Dict[str, float] = {}
+        self.portrait_wake = threading.Event()
+        self.portrait_maker = None            # tests plug in a fake: (name, campaign_dir) -> filename
         # Characters rolled on the join screen, not created yet: roll id -> roll.
         self.pending_rolls: Dict[str, Dict[str, Any]] = {}
         # Actions corrected AFTER the GM read them: id -> the text the GM read.
@@ -902,6 +912,7 @@ class TableState:
                 "conditions": c.get("conditions", []),
                 "claimed": self.claimed_by_anyone(c.get("name", "")),
                 "sheet_rev": hashlib.sha1(sheet_json.encode("utf-8")).hexdigest()[:12],
+                "portrait": c.get("portrait"),
                 "level_up": max(0, self._level_of(c) - self._built(c.get("name", path.stem),
                                                                    self._level_of(c))),
             })
@@ -1091,6 +1102,53 @@ class TableState:
         return {"ok": True, "level": to, "hp_gain": gain, "asi": asi,
                 "more": opts["pending"] - 1}
 
+    # --- portraits ---
+    def portrait_pass(self, now: Optional[float] = None) -> List[str]:
+        """Draw the portrait of every PC who has none (one at a time; slow on a
+        laptop GPU), and show it to the table. Returns the names drawn."""
+        now = now or time.time()
+        if self.portrait_maker is None:
+            try:
+                import image_gen
+                if not image_gen.images_status()[0]:
+                    return []
+            except Exception:
+                return []
+        drawn = []
+        for path, raw in party_roster.all_pcs(self.campaign_dir):
+            sheet = to_flat(raw)
+            name = sheet.get("name") or path.stem
+            if sheet.get("portrait") and (self.campaign_dir / "images" / sheet["portrait"]).is_file():
+                continue
+            first = self.portrait_seen.setdefault(name, now)
+            if not sheet.get("visual_appearance") and now - first < PORTRAIT_GRACE:
+                continue                    # give the GM a moment to write their look
+            if now - self.portrait_tried.get(name, -PORTRAIT_RETRY) < PORTRAIT_RETRY:
+                continue
+            self.portrait_tried[name] = now
+            try:
+                if self.portrait_maker is not None:
+                    filename = self.portrait_maker(name, self.campaign_dir)
+                else:
+                    import image_gen
+                    filename = image_gen.generate_portrait(name, self.campaign_dir)["portrait"]
+            except Exception as e:          # no GPU memory, service down...: try later
+                print(f"[portrait] {name}: {e}", flush=True)
+                continue
+            self.append("system", f"{name}'s portrait.", pc=name, image=filename,
+                        event={"type": "portrait"})
+            drawn.append(name)
+        return drawn
+
+    def portrait_worker(self) -> None:
+        while True:
+            self.portrait_wake.wait(30)
+            self.portrait_wake.clear()
+            try:
+                self.portrait_pass()
+            except Exception as e:
+                print(f"[portrait] {e}", flush=True)
+
     def create_pc(self, mode: str, name: str, concept: str) -> Dict[str, Any]:
         from identity_onboarding import IdentityOnboarding
         # Always THIS table's campaign — never whichever campaign happens to be
@@ -1264,6 +1322,7 @@ def make_handler(state: TableState, code: str, host_key: str):
                                            ("stats", "dice", "tries", "race", "class", "hp", "ac")
                                            if k in rolled}
                     state.append("system", line, pc=created["pc"], event=event)
+                    state.portrait_wake.set()        # start on their portrait
                 return self._json(result, 200 if result["ok"] else 409)
 
             me = state.pc_for(data.get("token"))
@@ -1725,6 +1784,7 @@ def serve(port: int, bind: str, code: Optional[str]) -> None:
         sys.exit(f"[ERROR] Port {port} is not available ({e.strerror or e}). Another table or "
                  f"program is using it — try: bash tools/gm-table.sh start --port {port + 1}")
     httpd.daemon_threads = True
+    threading.Thread(target=state.portrait_worker, daemon=True).start()
     lan = _lan_ip()
     record = {"campaign": campaign_dir.name, "port": port, "bind": bind, "code": code,
               "host_key": host_key,
@@ -1814,8 +1874,17 @@ def _print_messages(messages: List[dict], waiting_on: List[str],
                       f"(gm-player.sh), honouring what they asked if the rules allow, and "
                       f"celebrate it in the story.")
                 continue
+            if kind == "portrait":
+                print(f"[#{m['id']} PORTRAIT] {m['text']} (shown to the table: {m.get('image')})")
+                continue
             label = "MUSIC" if kind.startswith("music") else "JOIN/LEAVE"
             print(f"[#{m['id']} {label}] {m['text']}")
+            if kind == "join":
+                print(f"   -> welcome {m.get('pc')} in the fiction. If scene images are ENABLED, "
+                      f"write their look now (bash tools/gm-player.sh set-appearance "
+                      f"\"{m.get('pc')}\" --sex … --age … --race … --hair … --face … --eyes … "
+                      f"--clothing … --gear … --demeanor … --size …): the table draws their "
+                      f"portrait from it within a few minutes.")
         else:
             tags = [LANGS[m["lang"]]] if m.get("lang") in LANGS else []
             if m.get("voice"):

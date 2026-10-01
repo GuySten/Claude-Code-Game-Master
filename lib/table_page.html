@@ -139,6 +139,12 @@
   .pc { cursor: pointer; border-radius: 6px; }
   .pc:hover, .pc:focus-visible { background: var(--me); outline: none; }
   .pc .open-sheet { float: inline-end; font-size: .75rem; color: var(--muted); }
+  .pc .avatar { width: 30px; height: 30px; border-radius: 50%; object-fit: cover;
+                vertical-align: middle; margin-inline-end: 6px; border: 1px solid var(--line); }
+  #sheet-body .portrait { float: inline-end; width: min(180px, 42%); border-radius: 10px;
+                          margin: 4px 0 8px 12px; border: 1px solid var(--line); cursor: zoom-in; }
+  #sheet-body .portrait.big { float: none; width: 100%; margin: 4px 0 8px; cursor: zoom-out; }
+  .msg.system img { max-width: 260px; margin: 6px auto 0; }
   .bar > div { transition: width .9s ease; }
   /* A PC's card changes the moment the story reaches them. */
   .pc.hurt { animation: hurt 1.6s ease-out; }
@@ -378,7 +384,7 @@
       rollChar: "🎲 Roll a character", rollAgain: "🎲 Roll again", rollTry: "roll #{n}",
       rolledNote: "Rolled with fair dice: 4d6 for each ability, lowest die dropped. Change the name and concept if you like, then Create — the table sees what you rolled.",
       rolledHp: "HP", rolledAc: "AC",
-      ev_levelup: "⬆ {pc} reaches level {level}",
+      ev_levelup: "⬆ {pc} reaches level {level}", ev_portrait: "🖼 {pc}'s portrait",
       ev_seat: "{pc} takes their seat at the table.", ev_join: "A new player joins: {pc}",
       ev_leave: "{pc} steps away from the table.", ev_music_stop: "🎵 The music fades away.",
       amb_wind: "Howling wind", amb_rain: "Steady rain", amb_storm: "Rain with rolling thunder",
@@ -446,7 +452,7 @@
       rollChar: "🎲 הטלת דמות", rollAgain: "🎲 להטיל שוב", rollTry: "הטלה מס' {n}",
       rolledNote: "הוטל בקוביות הוגנות: 4d6 לכל תכונה, הקובייה הנמוכה נזרקת. שנו את השם והתיאור אם תרצו ולחצו צור — השולחן יראה מה הטלתם.",
       rolledHp: "נק״ח", rolledAc: "דרגת שריון",
-      ev_levelup: "⬆ {pc} עולה לדרגה {level}",
+      ev_levelup: "⬆ {pc} עולה לדרגה {level}", ev_portrait: "🖼 הדיוקן של {pc}",
       ev_seat: "{pc} מתיישב/ת ליד השולחן.", ev_join: "שחקן/ית חדש/ה מצטרף/ת: {pc}",
       ev_leave: "{pc} קם/ה מהשולחן.", ev_music_stop: "🎵 המוזיקה דועכת.",
       amb_wind: "רוח מייללת", amb_rain: "גשם יורד", amb_storm: "סערה ורעמים",
@@ -1265,6 +1271,7 @@
       const conds = (pc.conditions || []).join(", ");
       const from = before ? hpPct(before) : pct;
       d.innerHTML = `<div><span class="open-sheet">${esc(t("openSheet"))}</span>` +
+        (pc.portrait ? `<img class="avatar" alt="" src="${esc(imageUrl(pc.portrait))}">` : "") +
         `<span class="name" dir="auto">${esc(pc.name)}</span>` +
         (pc.level_up && pc.name === me ? `<span class="lvl-ready">${esc(t("lvlBadge"))}</span>` : "") +
         tags.map((x) => `<span class="tag">${esc(x)}</span>`).join("") + `</div>` +
@@ -1395,6 +1402,12 @@
       d.appendChild(content);
       body.appendChild(d);
     };
+    if (s.portrait) {
+      const img = imageEl(s.portrait);
+      img.className = "portrait";
+      img.onclick = () => img.classList.toggle("big");
+      body.appendChild(img);
+    }
     const hp = s.hp || {};
     const vit = [];
     if (hp.max !== undefined || hp.current !== undefined)
@@ -1772,6 +1785,15 @@
     box.setSelectionRange(box.value.length, box.value.length);
   }
 
+  function imageUrl(name) {
+    return "/images/" + encodeURIComponent(name) + "?code=" + encodeURIComponent(code);
+  }
+  function imageEl(name) {
+    const img = document.createElement("img");
+    img.alt = ""; img.loading = "lazy"; img.src = imageUrl(name);
+    return img;
+  }
+
   function renderMessage(m) {
     if (!shownToMe(m)) return null;
     if (m.kind === "gm" && !m.to) lastGmId = Math.max(lastGmId, m.id);
@@ -1782,6 +1804,7 @@
     } else if (m.kind === "system") {
       d.textContent = systemText(m);
       d.dir = dirFor(d.textContent);
+      if (m.image) d.appendChild(imageEl(m.image));
     } else {
       const who = document.createElement("div");
       who.className = "who";
