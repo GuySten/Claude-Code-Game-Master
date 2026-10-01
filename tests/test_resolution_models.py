@@ -1,7 +1,7 @@
 """Tests for executable resolution models: the kit's declared `resolution.model`
 actually changes how a check is rolled, instead of being a label nothing reads.
 
-RNG is pinned by monkeypatching random.randint with a scripted sequence, so every
+RNG is pinned by monkeypatching random.randint (and SystemRandom's) with a scripted sequence, so every
 assertion is about the model's arithmetic, not about luck.
 """
 
@@ -26,6 +26,8 @@ def faces(monkeypatch):
         return face
 
     monkeypatch.setattr(random, "randint", scripted)
+    # dice.py rolls with the OS source (random.SystemRandom): pin that too.
+    monkeypatch.setattr(random.SystemRandom, "randint", lambda self, low, high: scripted(low, high))
     return queue
 
 

@@ -218,7 +218,8 @@ Copy, fill in the link and code, and send:
 3. **Act.** Type what your character does and press Enter — or tap **🎤**, speak, and it
    sends when you stop talking (untick "Send when I stop talking" to check the text first).
    Talk the way you'd talk at a table: *"I sneak up behind the guard and try to grab his
-   keys."*
+   keys."* Typo, or the microphone misheard you? Tap **✏️** on your message to fix it —
+   you can until the GM answers it.
 4. **Listen.** **🔊** reads the story aloud. **🎵** turns the music on/off; the
    volume, reading speed and voices are in the side panel (tap **Party** on a phone).
 5. **Secrets.** Tick **"Only the GM sees this"** to whisper to the GM. Purple messages are
@@ -245,7 +246,8 @@ Copy, fill in the link and code, and send:
    את אמונתה"). אפשר גם "נווד/ת בלי שם" — העולם כבר ייתן לכם שם.
 3. **פעלו.** כתבו מה הדמות עושה ולחצו Enter — או לחצו **🎤**, דברו, וההודעה תישלח כשתסיימו
    לדבר (בטלו את "לשלוח כשאני מסיים/ת לדבר" אם אתם רוצים לבדוק את הטקסט קודם). דברו כמו ליד
-   שולחן אמיתי: *"אני מתגנב מאחורי השומר ומנסה לחטוף לו את המפתחות."*
+   שולחן אמיתי: *"אני מתגנב מאחורי השומר ומנסה לחטוף לו את המפתחות."* טעות הקלדה, או
+   שהמיקרופון לא הבין אתכם? לחצו **✏️** על ההודעה כדי לתקן — אפשר עד שמנהל המשחק עונה עליה.
 4. **הקשיבו.** **🔊** מקריא את הסיפור. **🎵** מפעיל ומכבה את המוזיקה; עוצמה, מהירות הקראה
    וקולות נמצאים בפאנל הצד (בטלפון: לחצו **החבורה**).
 5. **סודות.** סמנו **"רק מנהל המשחק יראה"** כדי ללחוש למנהל המשחק. הודעות סגולות הן לחישות

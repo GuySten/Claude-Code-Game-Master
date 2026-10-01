@@ -67,6 +67,11 @@
   .who { font-size: .8rem; color: var(--muted); margin-bottom: 2px; letter-spacing: .02em;
          display: flex; justify-content: space-between; gap: 8px; }
   .who button { border: 0; background: none; padding: 0 4px; font-size: .9rem; color: var(--muted); }
+  .who .edited { font-style: italic; margin-inline-start: 4px; }
+  .msg .edit-box { width: 100%; box-sizing: border-box; font: inherit; min-height: 3.2em;
+                   resize: vertical; margin-top: 2px; }
+  .msg .edit-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 4px; }
+  .msg .edit-actions button { font-size: .85rem; padding: 2px 10px; }
   .tr-note { font-size: .78rem; color: var(--muted); margin-top: 4px; }
   /* The public dice log: every roll the table makes, with its DC/AC. */
   .msg.roll { background: transparent; border: 1px dashed var(--line); max-width: 560px;
@@ -256,6 +261,8 @@
       private: "Only the GM sees this", autoSend: "Send when I stop talking", send: "Send",
       playingAs: "Playing as", waiting: "Waiting on: ", considering: "The GM is considering…",
       reconnecting: "Reconnecting…", gm: "Game Master", whisper: "whispered to you", toGm: "to the GM only",
+      edit: "Edit", edited: "(edited)", editSave: "Save", editCancel: "Cancel",
+      editTooLate: "The GM already answered that — write a new action.",
       lead: "lead", you: "you", emptySeat: "empty seat", lvl: "Lvl",
       readOn: "🔊 Reading aloud", readOff: "🔈 Read aloud", replay: "Read this aloud",
       listening: "Listening… tap 🎤 again to stop", heard: "Got it — sending…",
@@ -302,6 +309,8 @@
       private: "רק מנהל המשחק יראה", autoSend: "לשלוח כשאני מסיים/ת לדבר", send: "שליחה",
       playingAs: "משחקים בתור", waiting: "מחכים ל: ", considering: "מנהל המשחק חושב…",
       reconnecting: "מתחבר מחדש…", gm: "מנהל המשחק", whisper: "לחש לך", toGm: "רק למנהל המשחק",
+      edit: "עריכה", edited: "(נערך)", editSave: "שמירה", editCancel: "ביטול",
+      editTooLate: "מנהל המשחק כבר ענה על זה — כתבו פעולה חדשה.",
       lead: "מוביל/ה", you: "את/ה", emptySeat: "מושב פנוי", lvl: "דרגה",
       readOn: "🔊 מקריא", readOff: "🔈 הקראה", replay: "הקריאו את זה",
       listening: "מקשיב… לחצו שוב על 🎤 כדי לעצור", heard: "הבנתי — שולח…",
@@ -1139,6 +1148,61 @@
     d.append(head, line);
   }
 
+  // Your own action stays editable until the GM answers it (the server checks too).
+  const editing = new Set();           // ids whose edit box is open
+  function canEdit(m) {
+    return m.kind === "player" && me && m.pc === me
+      && !allMessages.some((x) => x.kind === "gm" && x.id > m.id && (!x.to || x.to === me));
+  }
+  function refreshEditable() {
+    allMessages.forEach((m) => {
+      const el = msgEls.get(m.id);
+      if (el && el.querySelector(".edit-btn") && !canEdit(m)) { editing.delete(m.id); updateMessage(m); }
+    });
+  }
+  function openEditor(m, d) {
+    editing.add(m.id);
+    const body = d.querySelector(".body");
+    const box = document.createElement("textarea");
+    box.className = "edit-box";
+    box.value = m.text || "";
+    box.dir = dirFor(box.value) || (lang === "he" ? "rtl" : "ltr");
+    box.oninput = () => { box.dir = dirFor(box.value); };
+    const bar = document.createElement("div");
+    bar.className = "edit-actions";
+    const save = document.createElement("button");
+    save.type = "button"; save.textContent = t("editSave");
+    const cancel = document.createElement("button");
+    cancel.type = "button"; cancel.textContent = t("editCancel");
+    const close = () => { editing.delete(m.id); updateMessage(m); };
+    cancel.onclick = close;
+    save.onclick = async () => {
+      const text = box.value.trim();
+      if (!text) return;
+      if (text === m.text) return close();
+      save.disabled = true;
+      const r = await api("/api/edit", { id: m.id, text });
+      if (r.ok && r.message) {
+        const i = allMessages.findIndex((x) => x.id === m.id);
+        if (i >= 0) allMessages[i] = r.message;
+        editing.delete(m.id);
+        updateMessage(r.message);
+      } else {
+        setStatus(r.reason === "answered" ? t("editTooLate") : (r.error || "?"));
+        close();
+      }
+    };
+    box.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); save.onclick(); }
+      else if (ev.key === "Escape") { ev.preventDefault(); close(); }
+    });
+    bar.append(cancel, save);
+    body.replaceWith(box);
+    box.after(bar);
+    box.focus();
+    box.setSelectionRange(box.value.length, box.value.length);
+  }
+
   function renderMessage(m) {
     if (!shownToMe(m)) return null;
     if (m.kind === "gm" && !m.to) lastGmId = Math.max(lastGmId, m.id);
@@ -1157,6 +1221,17 @@
         ? t("gm") + (m.to ? " — " + t("whisper") : "")
         : (m.pc || "?") + (m.voice ? " 🎤" : "") + (m.to ? " — " + t("toGm") : "");
       who.appendChild(label);
+      if (m.edited) {
+        const ed = document.createElement("span");
+        ed.className = "edited"; ed.textContent = t("edited");
+        who.appendChild(ed);
+      }
+      if (canEdit(m)) {
+        const pen = document.createElement("button");
+        pen.type = "button"; pen.className = "edit-btn"; pen.textContent = "✏️"; pen.title = t("edit");
+        pen.onclick = () => openEditor(m, d);
+        who.appendChild(pen);
+      }
       if (m.kind === "gm" && m.text) {
         const play = document.createElement("button");
         play.type = "button"; play.textContent = "🔊"; play.title = t("replay");
@@ -1197,6 +1272,7 @@
       }
     }
     msgEls.set(m.id, d);
+    if (editing.has(m.id) && canEdit(m)) setTimeout(() => openEditor(m, d), 0);
     return d;
   }
 
@@ -1214,7 +1290,8 @@
       const changed = r.ok ? r.messages.filter((m) => m.id <= lastId) : [];
       changed.forEach((m) => {
         const i = allMessages.findIndex((x) => x.id === m.id);
-        if (i >= 0) { allMessages[i] = m; updateMessage(m); }
+        // (an edit box you have open stays open: your typing isn't thrown away)
+        if (i >= 0) { allMessages[i] = m; if (!editing.has(m.id)) updateMessage(m); }
       });
       if (r.ok) r.messages = r.messages.filter((m) => m.id > lastId);
       if (r.ok && r.messages.length) {
@@ -1226,6 +1303,7 @@
           if (historyLoaded && readAloud && m.kind === "gm" && m.text && shownToMe(m)) speak(m.text);
         });
         if (atBottom || !historyLoaded) log.scrollTop = log.scrollHeight;
+        if (r.messages.some((m) => m.kind === "gm")) refreshEditable();
         const last = r.messages[r.messages.length - 1];
         updateProgress();
         // The music changed: fetch it now instead of on the next 4-second refresh,

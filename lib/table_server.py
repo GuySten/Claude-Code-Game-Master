@@ -196,10 +196,15 @@ class TableState:
                 except ValueError:
                     continue
                 self.rev += 1
-                if "patch" in entry:          # a translation added later
+                if "patch" in entry:          # a later edit or translation
                     target = by_id.get(entry.get("patch"))
                     if target is not None:
-                        target.setdefault("tr", {}).update(entry.get("tr") or {})
+                        if "text" in entry:   # the player corrected it: old translations go
+                            target["text"] = entry["text"]
+                            target["edited"] = entry.get("edited") or True
+                            target.pop("tr", None)
+                        if entry.get("tr"):
+                            target.setdefault("tr", {}).update(entry["tr"])
                         target["rev"] = self.rev
                     continue
                 entry["rev"] = self.rev
@@ -217,6 +222,8 @@ class TableState:
         self.turn_times: List[float] = [float(t) for t in times if isinstance(t, (int, float))] \
             if isinstance(times, list) else []
         self.turn: Optional[Dict[str, Any]] = None
+        # Actions corrected AFTER the GM read them: id -> the text the GM read.
+        self.corrections: Dict[int, str] = {}
         try:
             self.gm_cursor = int(self.cursor_path.read_text().strip())
         except (OSError, ValueError):
@@ -474,6 +481,44 @@ class TableState:
                     if (m["id"] > after or (rev and m.get("rev", 0) > rev))
                     and self.visible_to(m, pc)]
 
+    def answered(self, msg: Dict[str, Any]) -> bool:
+        """Has the GM narrated since this action (publicly, or to its player)?
+        (caller holds the lock)"""
+        return any(m["id"] > msg["id"] and m["kind"] == "gm"
+                   and (not m.get("to") or m.get("to") == msg.get("pc"))
+                   for m in reversed(self.messages))
+
+    def edit(self, pc: str, msg_id: Any, text: str) -> Dict[str, Any]:
+        """A player fixes their own action (a typo, a misheard word) — allowed
+        until the GM answers it. If the GM already read it, the next inbox shows
+        the correction next to what the GM read."""
+        try:
+            msg_id = int(msg_id)
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "No such message.", "reason": "missing"}
+        with self.lock:
+            msg = next((m for m in self.messages if m["id"] == msg_id), None)
+            if msg is None or msg["kind"] != "player" or not party_roster._same_name(
+                    msg.get("pc") or "", pc):
+                return {"ok": False, "error": "You can only edit your own actions.",
+                        "reason": "not-yours"}
+            if self.answered(msg):
+                return {"ok": False, "error": "The GM already answered that — write a new action.",
+                        "reason": "answered"}
+            if text == msg.get("text"):
+                return {"ok": True, "message": dict(msg)}
+            if msg_id <= self.gm_cursor:
+                self.corrections.setdefault(msg_id, msg.get("text", ""))
+            msg["text"] = text
+            msg["edited"] = _now()
+            msg.pop("tr", None)                 # re-translated from the new text
+            self.rev += 1
+            msg["rev"] = self.rev
+            with open(self.log_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps({"patch": msg_id, "text": text, "edited": msg["edited"]},
+                                   ensure_ascii=False) + "\n")
+            return {"ok": True, "message": dict(msg)}
+
     # --- translation: every player reads one language ---
     @staticmethod
     def text_lang(text: str) -> str:
@@ -575,7 +620,12 @@ class TableState:
         with self.lock:
             unread = [m for m in self.messages
                       if m["id"] > self.gm_cursor and m["kind"] in ("player", "system")]
+            by_id = {m["id"]: m for m in self.messages}
+            fixed = [dict(by_id[i], corrected_from=was)
+                     for i, was in sorted(self.corrections.items()) if i in by_id]
+            unread = fixed + unread
             if mark and self.messages:
+                self.corrections.clear()
                 self.gm_cursor = self.messages[-1]["id"]
                 self.cursor_path.write_text(str(self.gm_cursor))
                 if any(m["kind"] == "player" for m in unread):
@@ -905,6 +955,17 @@ def make_handler(state: TableState, code: str, host_key: str):
                 msg = state.append("player", text, pc=me, to=me if private else None,
                                    lang=lang, voice=bool(data.get("voice")))
                 return self._json({"ok": True, "message": msg})
+
+            if url.path == "/api/edit":
+                if not me:
+                    return self._err("Take a seat first.", 403)
+                text = str(data.get("text", "")).strip()
+                if not text:
+                    return self._err("Say something.")
+                if len(text) > MAX_PLAYER_TEXT:
+                    return self._err(f"Keep it under {MAX_PLAYER_TEXT} characters.")
+                result = state.edit(me, data.get("id"), text)
+                return self._json(result, 200 if result["ok"] else 409)
 
             if url.path == "/api/lang":
                 if not me:
@@ -1418,6 +1479,11 @@ def _print_messages(messages: List[dict], waiting_on: List[str],
                 tags.append("spoken")
             if m.get("to"):
                 tags.append("private, to GM only")
+            if m.get("corrected_from") is not None:
+                tags.append("CORRECTED — use this version; you read: "
+                            + json.dumps(m["corrected_from"], ensure_ascii=False))
+            elif m.get("edited"):
+                tags.append("edited")
             tag = f" ({', '.join(tags)})" if tags else ""
             print(f"[#{m['id']} {m.get('pc', '?')}{tag}] {m['text']}")
     if waiting_on:
