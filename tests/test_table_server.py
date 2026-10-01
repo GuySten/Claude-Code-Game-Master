@@ -673,3 +673,48 @@ def test_a_joining_player_can_roll_a_character(table):
     _, r3 = call("/api/roll-character", {"code": CODE})
     assert list(r3["stats"]) == ["might", "guile", "grit"] and "class" not in r3
     assert call("/api/roll-character", {"code": "wrong"})[0] == 403
+
+
+def test_players_level_up_from_their_sheet(table):
+    call, state, camp = table["call"], table["state"], table["camp"]
+    path = camp / "character.json"
+    sheet = json.loads(path.read_text())
+    sheet.update({"class": "Rogue", "level": 3, "hp": {"current": 20, "max": 24},
+                  "stats": {"str": 8, "dex": 17, "con": 14, "int": 12, "wis": 10, "cha": 13}})
+    path.write_text(json.dumps(sheet))
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    _, info = call(f"/api/info?code={CODE}&token={pip}")
+    assert info["party"][0]["level_up"] == 0          # first seen at 3: built at 3
+    assert "level_up" not in call(f"/api/sheet?code={CODE}&token={pip}&pc=Pip")[1]
+    assert call("/api/level-up", {"code": CODE, "token": pip})[0] == 409
+
+    # XP takes Pip to level 4 (the GM's award bumps the level, nothing else).
+    sheet["level"] = 4
+    path.write_text(json.dumps(sheet))
+    _, info = call(f"/api/info?code={CODE}&token={pip}")
+    assert info["party"][0]["level_up"] == 1
+    offer = call(f"/api/sheet?code={CODE}&token={pip}&pc=Pip")[1]["level_up"]
+    assert offer == {"to": 4, "pending": 1, "hit_die": 8, "con_mod": 2, "asi": True,
+                     "abilities": ["str", "dex", "con", "int", "wis", "cha"]}
+
+    assert call("/api/level-up", {"code": CODE, "token": pip, "asi": {"dex": 3}})[0] == 409
+    assert call("/api/level-up", {"code": CODE, "token": pip, "asi": {"dex": 1}})[0] == 409
+    status, done = call("/api/level-up", {"code": CODE, "token": pip, "hp": "average",
+                                          "asi": {"dex": 1, "con": 1}, "wish": "Arcane Trickster"})
+    assert status == 200 and done["hp_gain"] == 8 // 2 + 1 + 2 and done["level"] == 4
+    after = json.loads(path.read_text())
+    assert after["hp"] == {"current": 27, "max": 31} and after["stats"]["dex"] == 18
+    assert after["stats"]["con"] == 15
+    note = [m for m in state.messages if (m.get("event") or {}).get("type") == "levelup"][-1]
+    assert note["event"]["wish"] == "Arcane Trickster" and "reaches level 4" in note["text"]
+    assert call("/api/level-up", {"code": CODE, "token": pip})[0] == 409      # built now
+
+    # Rolling HP happens at the table, in the public dice log.
+    sheet = json.loads(path.read_text()); sheet["level"] = 5
+    path.write_text(json.dumps(sheet))
+    status, done = call("/api/level-up", {"code": CODE, "token": pip, "hp": "roll"})
+    roll = [m for m in state.messages if m["kind"] == "roll"][-1]
+    assert status == 200 and roll["event"]["roll"]["notation"] == "1d8+2"
+    assert done["hp_gain"] == max(1, roll["event"]["roll"]["total"])
+    reloaded = TableState(camp, str(table["world"]))
+    assert reloaded.built_levels["Pip"] == 5

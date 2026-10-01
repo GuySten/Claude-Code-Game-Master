@@ -177,6 +177,15 @@
   dl.kv dt { color: var(--muted); }
   dl.kv dd { margin: 0; font-variant-numeric: tabular-nums; }
   .sheet-held { font-size: .8rem; color: var(--muted); margin-top: 4px; }
+  /* Levelling up from the sheet */
+  .levelup { border: 1px solid var(--accent); border-radius: 10px; padding: 10px 12px; margin-top: 10px; }
+  .levelup h3 { color: var(--accent); font-size: 1rem; text-transform: none; letter-spacing: 0; margin: 0 0 6px; }
+  .levelup label { display: flex; gap: 8px; align-items: center; margin: 6px 0; color: var(--ink); }
+  .levelup input[type=radio] { width: auto; }
+  .levelup .asi { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .levelup textarea { min-height: 3em; resize: vertical; }
+  .levelup .row { justify-content: flex-end; }
+  .pc .lvl-ready { color: var(--accent); font-weight: bold; margin-inline-start: 4px; }
   .voice-settings { margin-top: 14px; font-size: .85rem; }
   .voice-settings label { margin: 8px 0 2px; }
   .voice-settings select { width: 100%; }
@@ -327,6 +336,11 @@
       sheet_traits: "Traits", sheet_ideals: "Ideals", sheet_bonds: "Bonds", sheet_flaws: "Flaws",
       sheet_notes: "Notes", sheet_visual_appearance: "Appearance", sheet_pronouns: "Pronouns",
       sheet_more: "More",
+      lvlReady: "⬆ Level {n} is ready!", lvlGo: "Level up", lvlHp: "Hit points",
+      lvlRoll: "🎲 Roll {d} at the table", lvlAvg: "Take the average: {n}",
+      lvlNoHp: "The GM will set your hit points.", lvlAsi: "Ability score increase: +1 and +1 (pick the same one twice for +2)",
+      lvlAsiSkip: "— (I'd rather ask for a feat)", lvlWish: "What do you want from this level? (subclass, spells, a feat…) The GM adds your class features.",
+      lvlDone: "⬆ You're level {n}!", lvlBadge: "⬆",
       party: "Party", partyTitle: "The party", placeholder: "What do you do? (type, or tap 🎤 and speak)",
       private: "Only the GM sees this", autoSend: "Send when I stop talking", send: "Send",
       playingAs: "Playing as", waiting: "Waiting on: ", considering: "The GM is considering…",
@@ -364,6 +378,7 @@
       rollChar: "🎲 Roll a character", rollAgain: "🎲 Roll again", rollTry: "roll #{n}",
       rolledNote: "Rolled with fair dice: 4d6 for each ability, lowest die dropped. Change the name and concept if you like, then Create — the table sees what you rolled.",
       rolledHp: "HP", rolledAc: "AC",
+      ev_levelup: "⬆ {pc} reaches level {level}",
       ev_seat: "{pc} takes their seat at the table.", ev_join: "A new player joins: {pc}",
       ev_leave: "{pc} steps away from the table.", ev_music_stop: "🎵 The music fades away.",
       amb_wind: "Howling wind", amb_rain: "Steady rain", amb_storm: "Rain with rolling thunder",
@@ -389,6 +404,11 @@
       sheet_traits: "תכונות אופי", sheet_ideals: "אידיאלים", sheet_bonds: "קשרים",
       sheet_flaws: "חולשות", sheet_notes: "הערות", sheet_visual_appearance: "מראה",
       sheet_pronouns: "לשון פנייה", sheet_more: "עוד",
+      lvlReady: "⬆ דרגה {n} מוכנה!", lvlGo: "עלייה בדרגה", lvlHp: "נקודות חיים",
+      lvlRoll: "🎲 להטיל {d} ליד השולחן", lvlAvg: "לקחת את הממוצע: {n}",
+      lvlNoHp: "מנהל המשחק יקבע את נקודות החיים.", lvlAsi: "שיפור תכונות: ‎+1 ו-‎+1 (בחרו אותה תכונה פעמיים ל-‎+2)",
+      lvlAsiSkip: "— (אעדיף לבקש הישג)", lvlWish: "מה תרצו מהדרגה הזו? (תת־מקצוע, לחשים, הישג…) מנהל המשחק מוסיף את יכולות המקצוע.",
+      lvlDone: "⬆ עליתם לדרגה {n}!", lvlBadge: "⬆",
       party: "החבורה", partyTitle: "החבורה", placeholder: "מה אתם עושים? (הקלידו, או לחצו 🎤 ודברו)",
       private: "רק מנהל המשחק יראה", autoSend: "לשלוח כשאני מסיים/ת לדבר", send: "שליחה",
       playingAs: "משחקים בתור", waiting: "מחכים ל: ", considering: "מנהל המשחק חושב…",
@@ -426,6 +446,7 @@
       rollChar: "🎲 הטלת דמות", rollAgain: "🎲 להטיל שוב", rollTry: "הטלה מס' {n}",
       rolledNote: "הוטל בקוביות הוגנות: 4d6 לכל תכונה, הקובייה הנמוכה נזרקת. שנו את השם והתיאור אם תרצו ולחצו צור — השולחן יראה מה הטלתם.",
       rolledHp: "נק״ח", rolledAc: "דרגת שריון",
+      ev_levelup: "⬆ {pc} עולה לדרגה {level}",
       ev_seat: "{pc} מתיישב/ת ליד השולחן.", ev_join: "שחקן/ית חדש/ה מצטרף/ת: {pc}",
       ev_leave: "{pc} קם/ה מהשולחן.", ev_music_stop: "🎵 המוזיקה דועכת.",
       amb_wind: "רוח מייללת", amb_rain: "גשם יורד", amb_storm: "סערה ורעמים",
@@ -1225,7 +1246,7 @@
     }));
   }
   function renderParty(list) {
-    const sig = lang + "|" + me + "|" + list.map((p) => [p.name, p.sheet_rev, p.claimed, p.lead, p.hp].join("/")).join("|");
+    const sig = lang + "|" + me + "|" + list.map((p) => [p.name, p.sheet_rev, p.claimed, p.lead, p.hp, p.level_up].join("/")).join("|");
     if (sig === partySig) return;
     partySig = sig;
     const box = $("party-list");
@@ -1245,6 +1266,7 @@
       const from = before ? hpPct(before) : pct;
       d.innerHTML = `<div><span class="open-sheet">${esc(t("openSheet"))}</span>` +
         `<span class="name" dir="auto">${esc(pc.name)}</span>` +
+        (pc.level_up && pc.name === me ? `<span class="lvl-ready">${esc(t("lvlBadge"))}</span>` : "") +
         tags.map((x) => `<span class="tag">${esc(x)}</span>`).join("") + `</div>` +
         `<div class="bar"><div style="width:${from}%;background:${color}"></div></div>` +
         `<div class="meta" dir="auto">HP ${esc(pc.hp)}/${esc(pc.hp_max)} · ${t("lvl")} ${esc(pc.level)} ` +
@@ -1263,7 +1285,7 @@
   }
 
   // ------------------------------------------------- the character sheet ---
-  let sheetFor = null, sheetShownRev = null;
+  let sheetFor = null, sheetShownRev = null, sheetLevelUp = null;
   const sheetCache = new Map();        // sheet_rev -> sheet
   function openSheet(name) {
     sheetFor = name; sheetShownRev = null;
@@ -1280,14 +1302,15 @@
     if (!sheetFor || !dlg.open) return;
     const shown = partyShown.get(sheetFor);
     const rev = shown && shown.sheet_rev;
-    if (rev && rev === sheetShownRev) return;
-    let sheet = rev && sheetCache.get(rev);
+    if (rev && rev === sheetShownRev && !(shown.level_up && !sheetLevelUp && sheetFor === me)) return;
+    let sheet = rev && !(shown && shown.level_up && sheetFor === me) && sheetCache.get(rev);
     let got = rev;
     if (!sheet) {
       const want = sheetFor;
       const r = await api("/api/sheet?pc=" + encodeURIComponent(want) + (rev ? "&rev=" + rev : ""));
       if (!r.ok || want !== sheetFor) return;
       sheet = r.sheet; got = r.rev;
+      sheetLevelUp = r.level_up || null;
       sheetCache.set(r.rev, sheet);
       const now = partyShown.get(sheetFor);       // the panel moved on while we waited
       if (now && now.sheet_rev !== r.rev && rev) return refreshSheet();
@@ -1400,12 +1423,66 @@
     const more = {};
     Object.keys(s).forEach((k) => { if (!done.has(k)) more[k] = s[k]; });
     sec("more", label("more"), sheetValue(more));
+    if (sheetLevelUp && sheetFor === me) body.prepend(levelUpForm(sheetLevelUp, s));
     if (!first) {                       // what the story just changed, flashed
       body.querySelectorAll(".sheet-sec").forEach((x) => {
         const was = before.get(x.dataset.key);
         if (was !== x.textContent) x.classList.add("changed");   // (or new)
       });
     }
+  }
+  // Levelling up: the server knows what this level offers (HP die, an ability
+  // increase); the player chooses, and the GM adds the class features.
+  function levelUpForm(lu, s) {
+    const box = document.createElement("div");
+    box.className = "levelup";
+    const h = document.createElement("h3");
+    h.textContent = t("lvlReady").replace("{n}", lu.to);
+    const go = document.createElement("button");
+    go.type = "button"; go.className = "primary"; go.textContent = t("lvlGo");
+    box.append(h, go);
+    go.onclick = () => {
+      go.remove();
+      const form = document.createElement("div");
+      if (lu.hit_die) {
+        const avg = Math.max(1, Math.floor(lu.hit_die / 2) + 1 + lu.con_mod);
+        const mod = lu.con_mod ? (lu.con_mod > 0 ? "+" : "") + lu.con_mod : "";
+        form.innerHTML = `<div class="muted">${esc(t("lvlHp"))}</div>` +
+          `<label><input type="radio" name="lvl-hp" value="roll" checked> ${esc(t("lvlRoll").replace("{d}", "1d" + lu.hit_die + mod))}</label>` +
+          `<label><input type="radio" name="lvl-hp" value="average"> ${esc(t("lvlAvg").replace("{n}", avg))}</label>`;
+      } else {
+        form.innerHTML = `<div class="muted">${esc(t("lvlNoHp"))}</div>`;
+      }
+      if (lu.asi) {
+        const opts = `<option value="">${esc(t("lvlAsiSkip"))}</option>` +
+          lu.abilities.map((a) => `<option value="${esc(a)}">${esc(a.toUpperCase())} (${esc((s.stats || {})[a])})</option>`).join("");
+        form.insertAdjacentHTML("beforeend", `<div class="muted" style="margin-top:8px">${esc(t("lvlAsi"))}</div>` +
+          `<div class="asi"><select id="lvl-a1">${opts}</select><select id="lvl-a2">${opts}</select></div>`);
+      }
+      form.insertAdjacentHTML("beforeend", `<label class="muted" for="lvl-wish" style="display:block;margin-top:8px">${esc(t("lvlWish"))}</label>` +
+        `<textarea id="lvl-wish" maxlength="400" dir="auto"></textarea>`);
+      const row = document.createElement("div");
+      row.className = "row";
+      const ok = document.createElement("button");
+      ok.type = "button"; ok.className = "primary"; ok.textContent = t("lvlGo");
+      row.appendChild(ok);
+      form.appendChild(row);
+      box.appendChild(form);
+      ok.onclick = async () => {
+        const asi = {};
+        ["lvl-a1", "lvl-a2"].forEach((id) => { const v = $(id) && $(id).value; if (v) asi[v] = (asi[v] || 0) + 1; });
+        const hp = form.querySelector('input[name="lvl-hp"]:checked');
+        ok.disabled = true;
+        const r = await api("/api/level-up", { hp: hp ? hp.value : "average", wish: $("lvl-wish").value.trim(),
+                                               asi: Object.keys(asi).length ? asi : null });
+        ok.disabled = false;
+        if (!r.ok) { setStatus(r.error || "?", true); return; }
+        setStatus(t("lvlDone").replace("{n}", r.level));
+        sheetLevelUp = null; sheetShownRev = null;
+        refreshInfo();
+      };
+    };
+    return box;
   }
   $("sheet-close").onclick = () => $("sheet").close();
   $("sheet").addEventListener("click", (ev) => { if (ev.target === $("sheet")) $("sheet").close(); });
@@ -1509,6 +1586,13 @@
     if (!ev || (!STRINGS.en["ev_" + ev.type] && ev.type !== "music")) return m.text;
     if (ev.type === "music") return "🎵 " + trackTitle(ev);
     let s = t("ev_" + ev.type).replace("{pc}", m.pc || "");
+    if (ev.type === "levelup") {
+      s = s.replace("{level}", ev.level);
+      if (ev.hp_gain) s += ` · ${t("rolledHp")} +${ev.hp_gain}`;
+      if (ev.asi) Object.entries(ev.asi).forEach(([k, v]) => { s += ` · ${k.toUpperCase()} +${v}`; });
+      if (ev.wish) s += ` · "${ev.wish}"`;
+      return s;
+    }
     if (ev.type === "join" && ev.concept) s += " — " + ev.concept;
     if (ev.type === "join" && ev.rolled && ev.rolled.stats) {
       const r = ev.rolled;

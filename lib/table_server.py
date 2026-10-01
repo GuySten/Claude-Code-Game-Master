@@ -196,6 +196,9 @@ NAMES = [("Bram", "בראם"), ("Tamsin", "תמסין"), ("Orrin", "אורין")
          ("Thorne", "ת'ורן"), ("Isra", "איסרה"), ("Galen", "גאלן"), ("Nyra", "נירה"),
          ("Corwin", "קורווין"), ("Elsbeth", "אלסבת"), ("Ruk", "רוק"), ("Talia", "טליה")]
 MAX_PENDING_ROLLS = 200
+# Ability score increases (5e): every class at these levels, plus a few extras.
+ASI_LEVELS = {4, 8, 12, 16, 19}
+ASI_EXTRA = {"Fighter": {6, 14}, "Rogue": {10}}
 
 
 def _mod(score: int) -> int:
@@ -215,7 +218,7 @@ class TableState:
         self.log_path = self.dir / "log.jsonl"
         self.seats_path = self.dir / "seats.json"
         self.cursor_path = self.dir / "gm-cursor"
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()       # re-entrant: party() runs inside turn bookkeeping
         self.messages: List[Dict[str, Any]] = []
         self.rev = 0          # bumps on every new message AND every translation
         if self.log_path.exists():
@@ -256,6 +259,11 @@ class TableState:
         self.tts_dir = self.dir / "tts"
         self.tts_engine = None
         self.tts_down_until = 0.0
+        # The level each PC's sheet was last BUILT at (HP, abilities): a PC whose
+        # level is higher (XP crossed a threshold, or a milestone) can level up
+        # from their sheet. A PC first seen counts as built at their level.
+        self.levels_path = self.dir / "levels.json"
+        self.built_levels: Dict[str, int] = self._read_json(self.levels_path, {})
         # Characters rolled on the join screen, not created yet: roll id -> roll.
         self.pending_rolls: Dict[str, Dict[str, Any]] = {}
         # Actions corrected AFTER the GM read them: id -> the text the GM read.
@@ -861,6 +869,19 @@ class TableState:
         v = live[0] if live else versions[0]
         return {"name": v["name"], "rev": v["sheet_rev"], "sheet": v["sheet"]}
 
+    def sheet_for(self, viewer: Optional[str], name: str, rev: Optional[str] = None
+                  ) -> Optional[Dict[str, Any]]:
+        """sheet(), plus — on the viewer's OWN sheet — what levelling up offers."""
+        found = self.sheet(viewer, name, rev)
+        if found and viewer and party_roster._same_name(viewer, found["name"]):
+            live = party_roster.find_pc(self.campaign_dir, found["name"])
+            if live is not None:
+                opts = self.level_up_options(
+                    found["name"], to_flat(json.loads(live.read_text(encoding="utf-8"))))
+                if opts:
+                    found["level_up"] = opts
+        return found
+
     def party(self, sheets: bool = False) -> List[Dict[str, Any]]:
         """The PCs, summarised for the party panel. Each carries ``sheet_rev``, a
         fingerprint of the whole sheet, so pages refetch a sheet only when it
@@ -881,6 +902,8 @@ class TableState:
                 "conditions": c.get("conditions", []),
                 "claimed": self.claimed_by_anyone(c.get("name", "")),
                 "sheet_rev": hashlib.sha1(sheet_json.encode("utf-8")).hexdigest()[:12],
+                "level_up": max(0, self._level_of(c) - self._built(c.get("name", path.stem),
+                                                                   self._level_of(c))),
             })
             if sheets:          # (a copy, in the sheet's own order: STR DEX CON...)
                 out[-1]["sheet"] = json.loads(json.dumps(c, ensure_ascii=False, default=str))
@@ -958,6 +981,115 @@ class TableState:
         tmp.write_text(json.dumps(sheet, indent=2, ensure_ascii=False), encoding="utf-8")
         tmp.replace(path)
         return roll
+
+    # --- levelling up from the sheet ---
+    def _built(self, name: str, level: int) -> int:
+        with self.lock:
+            if name not in self.built_levels:
+                self.built_levels[name] = level
+                self._save_levels()
+            return self.built_levels[name]
+
+    def _save_levels(self) -> None:          # caller holds the lock
+        tmp = self.levels_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(self.built_levels, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(self.levels_path)
+
+    @staticmethod
+    def _level_of(sheet: Dict[str, Any]) -> int:
+        try:
+            return max(1, int(sheet.get("level") or 1))
+        except (TypeError, ValueError):
+            return 1
+
+    @staticmethod
+    def _class_of(sheet: Dict[str, Any]) -> Optional[str]:
+        text = str(sheet.get("class") or "").lower()
+        return next((c for c in CLASSES if c.lower() in text), None)
+
+    def level_up_options(self, name: str, sheet: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """What levelling up offers this PC now, or None when there's nothing to do."""
+        level = self._level_of(sheet)
+        built = self._built(name, level)
+        if built >= level:
+            return None
+        to = built + 1
+        cls = self._class_of(sheet)
+        hit_die = None
+        raw = sheet.get("hit_die")
+        import re
+        found = re.search(r"(\d+)\s*$", str(raw or ""))    # 8, "d8", "1d8"
+        hit_die = int(found.group(1)) if found and int(found.group(1)) in (4, 6, 8, 10, 12, 20) else None
+        if hit_die is None and cls:
+            hit_die = CLASSES[cls][1]
+        stats = sheet.get("stats") if isinstance(sheet.get("stats"), dict) else {}
+        low = {str(k).lower(): v for k, v in stats.items()}
+        con = low.get("con", low.get("constitution"))
+        classic = sorted(low) == sorted(CLASSIC_SIX) and all(isinstance(v, int) for v in low.values())
+        asi = classic and (to in ASI_LEVELS or to in ASI_EXTRA.get(cls or "", set()))
+        return {"to": to, "pending": level - built, "hit_die": hit_die,
+                "con_mod": _mod(con) if isinstance(con, int) else 0,
+                "asi": bool(asi), "abilities": list(stats) if asi else []}
+
+    def level_up(self, pc: str, choice: Dict[str, Any]) -> Dict[str, Any]:
+        """Build one level: HP (rolled at the table, or the average), an ability
+        score increase where the class gets one, and the player's wishes for the
+        GM (subclass, spells, a feat), who adds the class features."""
+        path = party_roster.find_pc(self.campaign_dir, pc)
+        if path is None:
+            return {"ok": False, "error": "No such character."}
+        sheet = to_flat(json.loads(path.read_text(encoding="utf-8")))
+        name = sheet.get("name", pc)
+        opts = self.level_up_options(name, sheet)
+        if not opts:
+            return {"ok": False, "error": "There's no new level to take yet.", "reason": "none"}
+        to = opts["to"]
+        asi = {}
+        if opts["asi"] and choice.get("asi"):
+            stats = sheet["stats"]
+            try:
+                asi = {k: int(v) for k, v in dict(choice["asi"]).items() if int(v)}
+            except (TypeError, ValueError):
+                return {"ok": False, "error": "Pick abilities to raise."}
+            if (sum(asi.values()) != 2 or any(v not in (1, 2) for v in asi.values())
+                    or any(k not in stats for k in asi)
+                    or any(stats[k] + v > 20 for k, v in asi.items())):
+                return {"ok": False, "error": "Raise one ability by 2, or two by 1 (20 at most)."}
+        wish = " ".join(str(choice.get("wish") or "").split())[:400]
+
+        gain, how = None, None
+        if opts["hit_die"]:
+            mod = opts["con_mod"]
+            if choice.get("hp") == "roll":
+                notation = f"1d{opts['hit_die']}" + (f"{mod:+d}" if mod else "")
+                rolled = self.roll({"notation": notation, "pc": name, "why": f"HP for level {to}",
+                                    "why_tr": {"he": f"נקודות חיים לדרגה {to}"}})
+                gain, how = max(1, rolled["result"]["total"]), "rolled"
+            else:
+                gain, how = max(1, opts["hit_die"] // 2 + 1 + mod), "average"
+            hp = sheet.get("hp") if isinstance(sheet.get("hp"), dict) else {}
+            hp_max = int(hp.get("max") or 0) + gain
+            sheet["hp"] = {**hp, "max": hp_max, "current": min(hp_max, int(hp.get("current") or 0) + gain)}
+        for k, v in asi.items():
+            sheet["stats"][k] += v
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(sheet, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(path)
+        with self.lock:
+            self.built_levels[name] = to
+            self._save_levels()
+
+        parts = [f"{name} reaches level {to}"]
+        if gain is not None:
+            parts.append(f"HP +{gain} ({how})")
+        if asi:
+            parts.append(", ".join(f"{k.upper()} +{v}" for k, v in asi.items()))
+        line = " · ".join(parts) + "." + (f' Asks: "{wish}"' if wish else "")
+        self.append("system", line, pc=name,
+                    event={"type": "levelup", "level": to, "hp_gain": gain, "hp_how": how,
+                           "asi": asi, "wish": wish})
+        return {"ok": True, "level": to, "hp_gain": gain, "asi": asi,
+                "more": opts["pending"] - 1}
 
     def create_pc(self, mode: str, name: str, concept: str) -> Dict[str, Any]:
         from identity_onboarding import IdentityOnboarding
@@ -1062,7 +1194,7 @@ def make_handler(state: TableState, code: str, host_key: str):
             if url.path == "/api/sheet":
                 if not me:
                     return self._err("Take a seat first.", 403)
-                found = state.sheet(me, q.get("pc", ""), q.get("rev"))
+                found = state.sheet_for(me, q.get("pc", ""), q.get("rev"))
                 if found is None:
                     return self._err("No such character.", 404)
                 return self._json({"ok": True, **found})
@@ -1159,6 +1291,12 @@ def make_handler(state: TableState, code: str, host_key: str):
                 if len(text) > MAX_PLAYER_TEXT:
                     return self._err(f"Keep it under {MAX_PLAYER_TEXT} characters.")
                 result = state.edit(me, data.get("id"), text)
+                return self._json(result, 200 if result["ok"] else 409)
+
+            if url.path == "/api/level-up":
+                if not me:
+                    return self._err("Take a seat first.", 403)
+                result = state.level_up(me, data)
                 return self._json(result, 200 if result["ok"] else 409)
 
             if url.path == "/api/lang":
@@ -1670,6 +1808,12 @@ def _print_messages(messages: List[dict], waiting_on: List[str],
     for m in messages:
         if m["kind"] == "system":
             kind = str((m.get("event") or {}).get("type", ""))
+            if kind == "levelup":
+                print(f"[#{m['id']} LEVEL UP] {m['text']} -> HP and ability scores are done; add "
+                      f"level {m['event'].get('level')}'s class features/spells to the sheet "
+                      f"(gm-player.sh), honouring what they asked if the rules allow, and "
+                      f"celebrate it in the story.")
+                continue
             label = "MUSIC" if kind.startswith("music") else "JOIN/LEAVE"
             print(f"[#{m['id']} {label}] {m['text']}")
         else:

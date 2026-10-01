@@ -51,7 +51,11 @@ open the link, enter the code, and pick or create their PC. While the table is o
    "only the GM sees this" aside arrives marked `(private, to GM only)` — answer it with
    `--to`. Players can fix a typo in an action until you answer it: a fix made after you
    read it comes back marked `CORRECTED — use this version; you read: "…"` — act on the
-   corrected text (if you already rolled for the old one, narrate the roll you made). Illustrations: `say "…" --image <file in images/>`.
+   corrected text (if you already rolled for the old one, narrate the roll you made).
+   **Levelling up at the table:** when a PC's level rises (XP or a milestone), the player
+   levels up from their sheet: they roll or average HP and pick ability increases there.
+   Don't add those yourself. Their `LEVEL UP` line asks you to add the class features and
+   spells for that level (and whatever they asked for, if the rules allow). Illustrations: `say "…" --image <file in images/>`.
 4. Go back to 1. A new player joining arrives as a JOIN line: welcome them in the fiction.
 - **Voice & language.** Players may speak their actions (lines tagged `spoken`: expect
   speech-to-text slips — read for intent, never mock a transcription) and hear the narration

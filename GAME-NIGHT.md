@@ -246,7 +246,10 @@ Copy, fill in the link and code, and send:
    reaches your name, not before.
 10. **Your character sheet.** Tap **📜 My sheet**, or any character in the side panel, for
    the full sheet: abilities, skills, features, spells, equipment, conditions. It updates
-   with the story too, and what just changed flashes.
+   with the story too, and what just changed flashes. When you earn a level, **⬆** appears:
+   open your sheet and tap **Level up**. Roll your hit die at the table (or take the average),
+   pick your ability increases when your class gets them, and tell the GM what you'd like
+   (a subclass, spells, a feat). The GM adds the new class features.
 11. Refreshing the page keeps your seat. To switch devices, tap **Leave seat** first (or ask
    the host to free it).
 
@@ -281,7 +284,9 @@ Copy, fill in the link and code, and send:
    עם הסיפור: מכה נוחתת על פס החיים שלכם כשהטקסט מגיע לשם שלכם, לא לפני כן.
 10. **דף הדמות.** לחצו **📜 הדף שלי**, או על כל דמות בפאנל הצד, כדי לראות את הדף המלא:
    תכונות, מיומנויות, יכולות, לחשים, ציוד ומצבים. גם הוא מתעדכן יחד עם הסיפור, ומה שהשתנה
-   מהבהב.
+   מהבהב. כשאתם מרוויחים דרגה מופיע **⬆**: פתחו את הדף ולחצו **עלייה בדרגה**. הטילו את קוביית
+   החיים ליד השולחן (או קחו את הממוצע), בחרו שיפורי תכונות כשהמקצוע מקבל אותם, וכתבו למנהל
+   המשחק מה תרצו (תת־מקצוע, לחשים, הישג). מנהל המשחק מוסיף את יכולות המקצוע החדשות.
 11. רענון הדף שומר לכם את המקום. כדי לעבור למכשיר אחר, לחצו קודם **עזיבת המושב** (או בקשו
    מהמארח לפנות אותו).
 
