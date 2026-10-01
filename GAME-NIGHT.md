@@ -4,12 +4,35 @@ Claude is the Game Master. One person, **the host**, runs the game on their comp
 everyone else just opens a link in their browser. Players can type or **speak** (English or
 Hebrew), **hear the story read aloud**, and the music follows the scene by itself.
 
+- [The recommended setup at a glance](#the-recommended-setup-at-a-glance)
 - [One-time setup (host)](#one-time-setup-host)
 - [Each game night (host)](#each-game-night-host)
 - [Message to send your friends](#message-to-send-your-friends)
 - [Player guide](#player-guide) · [מדריך לשחקנים](#מדריך-לשחקנים)
 - [Host cheat sheet](#host-cheat-sheet)
 - [Troubleshooting](#troubleshooting)
+
+---
+
+## The recommended setup at a glance
+
+| Part of the game | Model | Why |
+|---|---|---|
+| **The GM** — the Claude Code session you play in | **Opus** | Tells the story, follows the rules, keeps the world consistent, writes good Hebrew |
+| **Story helpers** — plots, NPCs, places, new characters, rules rulings | **Sonnet** | Need judgment, but run in the background, so faster and cheaper is better |
+| **Lookup helpers** — monster stats, spells, gear, loot, image prompts | **Haiku** | Simple, quick jobs |
+| **Book import** — reading a whole PDF once | **Opus** | Happens once, and it shapes the whole campaign |
+
+The whole recipe, start to finish (each step is explained below):
+
+```bash
+git clone https://github.com/GuySten/claude-code-game-master.git
+cd claude-code-game-master
+./install.sh                          # choose 1) Core only, unless you'll import a book
+bash tools/gm-models.sh recommended   # the model set above — run once
+bash tools/gm-music-library.sh fetch  # music for every mood
+claude                                # then type /gm and say "my friends are joining online"
+```
 
 ---
 
@@ -33,7 +56,33 @@ The installer asks what to install:
 - **2) Core + RAG** — adds importing a PDF/book and smarter memory search. Larger download
   (PyTorch, CPU-only build). You can add it later with `uv sync --extra rag`.
 
-**2. Get the music library (recommended)**
+**2. Set the recommended models**
+
+```bash
+bash tools/gm-models.sh recommended
+```
+
+You should see:
+
+```
+✓ Preset 'recommended': Best balance: a top-quality GM, quick helpers in the background.
+  GM: opus  ·  story helpers: sonnet  ·  lookup helpers: haiku  ·  book import: opus
+```
+
+This does two things:
+
+- **The helpers** — each helper agent gets its model (they already come set this way with
+  the game, so this just makes sure).
+- **The GM** — saves Opus as the model Claude Code starts with in this folder
+  (`.claude/settings.local.json`). This part is **yours only**: it is not in git, so a fresh
+  copy of the game doesn't have it until you run the command. Run it once per computer.
+
+Prefer a menu? Start `claude` in the folder and type `/models`. Changed your mind later?
+`bash tools/gm-models.sh budget` (Sonnet GM, Haiku helpers — cheapest that still plays well),
+`premium` (Opus nearly everywhere — best quality, costs the most), or `recommended` to come
+back. `bash tools/gm-models.sh` on its own shows what runs where right now.
+
+**3. Get the music library (recommended)**
 
 ```bash
 bash tools/gm-music-library.sh fetch
@@ -47,20 +96,6 @@ built-in generated sounds for every mood. Credits are shown on screen and in
 Want your own music? Drop `.mp3`/`.ogg` files into `music/` and put the mood in the file
 name — `battle-drums.mp3`, `tavern-night.ogg`, `creepy-crypt.mp3`. A file named after a
 villain (`grimaldi.mp3`, `grimaldi-boss.mp3`) becomes that villain's theme.
-
-**3. Choose the models (optional — the recommended set is already on)**
-
-```bash
-bash tools/gm-models.sh            # see what runs where
-bash tools/gm-models.sh recommended   # or: budget · premium · inherit
-```
-
-Or type `/models` inside Claude Code and pick from a menu. **Recommended** = Opus as the GM,
-Sonnet for story helpers, Haiku for quick lookups, Opus for book import — the best balance
-of story quality, speed and cost. **Budget** = Sonnet GM, Haiku helpers. **Premium** = Opus
-almost everywhere. It applies from the next Claude Code session (or switch the GM now with
-`/model opus`). With friends waiting on every reply, `/fast` makes the GM answer faster
-(same model, higher price).
 
 **4. Install a tunnel (only for friends outside your home network)**
 
@@ -80,6 +115,14 @@ cd claude-code-game-master
 git pull            # pick up the latest version
 claude
 ```
+
+**Check the GM is on Opus:** type `/model`. It should show **Opus**. If it doesn't (a new
+computer, or you switched to try something), run `/models` and pick **Recommended**, or
+just `/model opus` for tonight.
+
+**Optional — faster replies:** type `/fast`. The GM stays Opus but answers noticeably
+quicker, which matters when four people are waiting on every reply. It costs about twice
+as much per reply; type `/fast` again to turn it off.
 
 **2. Start the adventure**
 
@@ -196,6 +239,7 @@ You rarely need these — Claude runs them — but they're yours to use:
 | `bash tools/gm-player.sh party` | Every player character and their stats |
 | `bash tools/gm-music-library.sh fetch` | Download (or re-download) the music library |
 | `bash tools/gm-models.sh [preset]` | Which models run the game (recommended · budget · premium · inherit) |
+| `/model` · `/fast` (inside Claude Code) | Check or switch the GM's model now · faster GM replies |
 
 ---
 
@@ -228,3 +272,11 @@ device). The host runs `bash tools/gm-table.sh free "Name"`.
 
 **The GM is quiet.** Claude may be waiting on a permission prompt in the terminal — check
 the Claude Code window. If it seems stuck, tell it: *"keep running the table."*
+
+**The GM feels slow.** Turn on `/fast`. Check `/model` says Opus, not a bigger model —
+the most capable models write richer prose but can take minutes per reply, which is too slow
+for a live table.
+
+**The story feels flat or forgets things.** Check `/model` — if the GM is on Sonnet or Haiku
+(for example after trying the budget preset), go back with `bash tools/gm-models.sh recommended`
+and restart Claude Code (or `/model opus` right away).
