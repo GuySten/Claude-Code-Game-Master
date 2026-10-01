@@ -29,7 +29,7 @@ setup step on the host's computer, and the game plays fine without them.
 - **The story, told as it happens.** Narration appears in step with the voice, and HP changes
   land when the story reaches you.
 - **Characters.** Roll one at the table; open your full character sheet, in your own language;
-  level up from it.
+  when the story says you've earned a level, level up from it.
 - **Music.** Mood music for every scene, a theme for every villain, battle music for bosses.
   *Optional:* composed themes for main villains and bosses, and a heroic anthem for every player
   character ([step 6](#one-time-setup-host)).
@@ -578,6 +578,7 @@ You rarely need these — Claude runs them — but they're yours to use:
 | `bash tools/gm-table.sh music theme "Grimaldi" waltz.mp3` | Give a villain their own track |
 | `bash tools/gm-table.sh music auto off` | Stop Claude from changing the music |
 | `bash tools/gm-player.sh party` | Every player character and their stats |
+| `bash tools/gm-player.sh xp "Name" +300` | Award XP (raises the level when it's enough; the player is told and levels up from their sheet) |
 | `bash tools/gm-music-library.sh fetch` | Download (or re-download) the music library |
 | `bash tools/gm-image.sh generate --title "Test" --prompt "..."` | Make a picture now (checks the image setup) |
 | `bash tools/gm-image.sh portrait "Name"` · `location "Place"` | Paint a character's portrait (recurring NPCs get one by themselves) · a place, now |
@@ -612,6 +613,11 @@ Narrator's model (the host's Claude Code login). A card is prepared after each m
 kept, so it normally opens at once; the first card of a name nobody hovered can take 5–10
 seconds. If the host's `claude` isn't signed in, cards quote the story instead and the sheet
 stays as written.
+
+**Nobody was told to level up.** A level only rises when the GM *awards* the XP
+(`gm-player.sh xp`), not when it just mentions it in the story. Ask the GM *"award the XP from
+that fight"*, or run `bash tools/gm-player.sh xp "Name" +300` yourself. The story then says
+who can level up, and they do it from their sheet (**📜** → **Level up**).
 
 **My portrait isn't on my sheet.** Portraits need pictures turned on (Forge or OpenAI). The
 table waits about 3 minutes for the GM to describe a new character's look, then paints them
