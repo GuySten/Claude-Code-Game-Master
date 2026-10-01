@@ -27,6 +27,8 @@ HOST_KEY = "host-secret"
 @pytest.fixture
 def table(tmp_path, monkeypatch):
     monkeypatch.setenv("NARRATOR_BACKEND", "off")      # never the host's real model in tests
+    import lib.table_server
+    monkeypatch.setattr(lib.table_server, "EDIT_GRACE", 0)   # (the typo window: its own test)
     world = tmp_path / "world-state"
     camp = world / "campaigns" / "camp"
     camp.mkdir(parents=True)
@@ -575,6 +577,26 @@ def test_players_can_fix_their_action_until_the_gm_reads_it(table):
     call("/api/gm/say", {"text": "The lock clicks open."}, host=True)
     status, body = call("/api/edit", {"code": CODE, "token": pip, "id": mid, "text": "Never mind."})
     assert status == 409 and body["reason"] == "answered"
+
+
+def test_every_action_can_be_fixed_for_its_first_seconds(table, monkeypatch):
+    import lib.table_server
+    monkeypatch.setattr(lib.table_server, "EDIT_GRACE", 1.5)
+    call, state = table["call"], table["state"]
+    state.set_round_seconds(0)                                    # even with rounds off
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    call("/api/gm/inbox", {}, host=True)
+    mid = call("/api/say", {"code": CODE, "token": pip, "text": "I pick the lcok."})[1]["message"]["id"]
+    # The GM can't read it yet...
+    held = call("/api/gm/inbox", {}, host=True)[1]
+    assert held["held"] and held["messages"] == [] and held["round"]["settling"]
+    # ...and even a roll in those seconds doesn't take the edit away.
+    call("/api/gm/roll", {"notation": "1d20"}, host=True)
+    assert call("/api/edit", {"code": CODE, "token": pip, "id": mid, "text": "I pick the lock."})[0] == 200
+    # Then the GM reads the fixed action.
+    time.sleep(1.6)
+    got = call("/api/gm/inbox", {}, host=True)[1]["messages"]
+    assert [m["text"] for m in got if m["kind"] == "player"] == ["I pick the lock."]
 
 
 def test_the_host_makes_natural_voices_for_seated_players(table):

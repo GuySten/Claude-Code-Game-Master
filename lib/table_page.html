@@ -2113,9 +2113,17 @@
   // Your own action stays editable until the GM answers it (the server checks too).
   const editing = new Set();           // ids whose edit box is open
   // Your own action, until the GM reads it (then it plays it out: rolls for it).
+  // Its first EDIT_GRACE seconds are always yours: the GM can't read it sooner.
+  const EDIT_GRACE = 5, graceTimers = new Set();
   function canEdit(m) {
-    return m.kind === "player" && me && m.pc === me && !m.read
-      && !allMessages.some((x) => x.id > m.id && (x.kind === "roll" || (x.kind === "gm" && (!x.to || x.to === me))));
+    if (m.kind !== "player" || !me || m.pc !== me || m.read) return false;
+    const young = m.t && serverNow() - m.t < EDIT_GRACE;
+    if (young && !graceTimers.has(m.id)) {
+      graceTimers.add(m.id);
+      setTimeout(() => { graceTimers.delete(m.id); refreshEditable(); }, (m.t + EDIT_GRACE - serverNow()) * 1000 + 100);
+    }
+    return !allMessages.some((x) => x.id > m.id && ((x.kind === "roll" && !young)
+                                                     || (x.kind === "gm" && (!x.to || x.to === me))));
   }
   function refreshEditable() {
     allMessages.forEach((m) => {

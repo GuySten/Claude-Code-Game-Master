@@ -207,6 +207,8 @@ MAX_PENDING_ROLLS = 200
 # A round: once the first player acts, the GM waits until every seated player has
 # acted, or this many seconds (gm-table.sh round <seconds|off>).
 ROUND_SECONDS = 60
+# Every action can be fixed for at least this long: the GM can't read it sooner.
+EDIT_GRACE = 5.0
 # The players' side chat: kept in memory only, never on disk and never in any
 # GM endpoint, so the GM (and Claude, who can read the campaign's files) can't
 # see it. It clears when the table restarts.
@@ -458,13 +460,17 @@ class TableState:
             acts = [m for m in self.messages if m["id"] > self.gm_cursor and m["kind"] == "player"]
             seated = list(dict.fromkeys(self.seats.values()))
         if not acts:
-            return {"open": False, "seconds": secs}
+            return {"open": False, "seconds": secs, "settling": False}
         acted = {party_roster.slugify(m.get("pc", "")) for m in acts}
         out = self.out_of_action()
         waiting = [n for n in seated if party_roster.slugify(n) not in acted and n not in out]
         started = self._sent_at(acts[0])
         deadline = started + secs
+        # The newest action is a few seconds old at most: its player may still be
+        # fixing a typo. The GM waits that out too (rounds on or off).
+        ready_at = max(self._sent_at(m) for m in acts) + EDIT_GRACE
         return {"open": bool(secs and waiting and now < deadline), "seconds": secs,
+                "settling": now < ready_at, "ready_at": ready_at,
                 "out_of_action": {n: why for n, why in out.items() if n in seated},
                 "started_at": started, "deadline": deadline, "waiting_on": waiting,
                 "timed_out": bool(secs and waiting and now >= deadline)}
@@ -1082,6 +1088,8 @@ class TableState:
             return "answered"
         if msg.get("read") or msg["id"] <= self.gm_cursor:
             return "read"
+        if time.time() - self._sent_at(msg) < EDIT_GRACE:
+            return None                         # its first seconds: always fixable
         if any(m["id"] > msg["id"] and m["kind"] == "roll" for m in self.messages):
             return "rolled"
         return None
@@ -1952,6 +1960,16 @@ def sheet_strings(sheet: Dict[str, Any]) -> List[str]:
     return list(dict.fromkeys(out))
 
 
+def _held_note(rnd: Dict[str, Any]) -> str:
+    """Why the GM can't read or narrate yet, for the GM."""
+    if rnd.get("open"):
+        left = max(0, int(rnd["deadline"] - time.time()))
+        return (f"The players are still acting — waiting for {', '.join(rnd['waiting_on'])} "
+                f"(the round closes in {left} s)")
+    left = max(1, int(rnd.get("ready_at", time.time()) - time.time() + 0.99))
+    return f"A player just acted and may still fix a typo — readable in {left} s"
+
+
 def warm_up() -> None:
     """At the start of the game, read the AI models into RAM, one after the other
     (not both at once from the disk): Forge's picture model, then the music model.
@@ -2228,8 +2246,9 @@ def make_handler(state: TableState, code: str, host_key: str):
         def _gm(self, path: str, data: Dict[str, Any]):
             if path == "/api/gm/inbox":
                 rnd = state.round_state()
-                if rnd["open"]:
-                    # The players are still acting: their actions wait for the round.
+                if rnd["open"] or rnd.get("settling"):
+                    # The players are still acting (or just did, and may fix a typo):
+                    # their actions wait.
                     return self._json({"ok": True, "messages": [], "held": True, "round": rnd,
                                        "waiting_on": rnd["waiting_on"], "langs": state.seated_langs(),
                                        "music": state.music, "auto_music": state.auto_music})
@@ -2249,11 +2268,10 @@ def make_handler(state: TableState, code: str, host_key: str):
                 if not text and not image:
                     return self._err("nothing to say")
                 rnd = state.round_state()
-                if not data.get("to") and rnd["open"] and not state.gm_read_since_narration():
-                    left = max(0, int(rnd["deadline"] - time.time()))
+                if (not data.get("to") and (rnd["open"] or rnd.get("settling"))
+                        and not state.gm_read_since_narration()):
                     return self._json({"ok": False, "round": rnd, "error": (
-                        f"The players are still acting — waiting for {', '.join(rnd['waiting_on'])} "
-                        f"(the round closes in {left} s). Run: bash tools/gm-table.sh wait")}, 409)
+                        _held_note(rnd) + " Run: bash tools/gm-table.sh wait")}, 409)
                 if len(text) > MAX_TEXT * 4:
                     return self._err("narration too long; split it into beats")
                 to = data.get("to")
@@ -2946,9 +2964,7 @@ def main() -> None:
     if args.action == "inbox":
         r = _call(campaign_dir, "POST", "/api/gm/inbox", {})
         if r.get("held"):
-            rnd = r["round"]
-            print(f"(the players are still acting: waiting for {', '.join(rnd['waiting_on'])}; "
-                  f"the round closes in {max(0, int(rnd['deadline'] - time.time()))} s — run wait)")
+            print(f"({_held_note(r['round'])} — run wait)")
             return
         return _print_messages(r.get("messages", []), r.get("waiting_on", []), r.get("langs"),
                                r.get("music"), r.get("auto_music", True),
@@ -2961,6 +2977,9 @@ def main() -> None:
         while time.time() < deadline:
             r = _call(campaign_dir, "GET", "/api/gm/pending")
             rnd = r.get("round") or {}
+            if rnd.get("settling"):                 # a player may still be fixing a typo
+                time.sleep(max(0.2, min(1.0, rnd["ready_at"] - time.time() + 0.05)))
+                continue
             if r.get("unread") and rnd.get("seconds"):
                 # Rounds: every seated player has acted, or the round's time is up.
                 if not rnd.get("open") and (not args.all or not r.get("waiting_on")):
