@@ -25,18 +25,19 @@ setup step on the host's computer, and the game plays fine without them.
 - **Voice.** Speak your actions; hear the story read aloud (Hebrew in a natural voice).
 - **A fair, shared table.** Every die roll is public, with the DC set before the dice land.
   Rounds: the GM answers when everyone has acted, or a minute after the first player did, with
-  a countdown for the rest.
+  a countdown for the rest. Mistyped? Fix your action until the GM reads it (always at least 5 seconds).
 - **The story, told as it happens.** Narration appears in step with the voice, and HP changes
   land when the story reaches you.
-- **Characters.** Roll one at the table; open your full character sheet; level up from it.
+- **Characters.** Roll one at the table; open your full character sheet, in your own language;
+  level up from it.
 - **Music.** Mood music for every scene, a theme for every villain, battle music for bosses.
   *Optional:* composed themes for main villains and bosses, and a heroic anthem for every player
   character ([step 6](#one-time-setup-host)).
-- **Pictures** *(optional)*: places, villains, bosses, treasures and a portrait for every character,
-  collected in a gallery ([step 5](#one-time-setup-host)).
+- **Pictures** *(optional)*: places, villains, bosses, treasures, a portrait for every character
+  and for the NPCs you keep meeting, collected in a gallery ([step 5](#one-time-setup-host)).
 - **Between the players.** A private table-talk chat the GM never sees; a Narrator to ask "what
-  happened again?"; hover cards on names in the story. All of them show only what that player
-  already knows.
+  happened again?"; hover cards on the names in the story and on every player, which open
+  instantly. All of them show only what that player already knows.
 
 ---
 
@@ -448,7 +449,9 @@ Copy, fill in the link and code, and send:
 
 9. **Your sheet.** Tap **📜 My sheet**, or any character in the party panel, for the full
    sheet: portrait, abilities, skills, features, spells, equipment (with pictures of special
-   treasures) and conditions. It follows the story too, and whatever just changed flashes.
+   treasures) and conditions. It follows the story too, and whatever just changed flashes. It's
+   in your language: in Hebrew, what's written on it is translated (the very first time it can
+   show English for a few seconds).
 10. **Levelling up.** When you earn a level, **⬆** appears next to your name. Open your sheet
     and tap **Level up**: roll your hit die at the table (or take the average), pick your
     ability increases when your class gets them, and tell the GM what you'd like (a subclass,
@@ -463,8 +466,9 @@ Copy, fill in the link and code, and send:
     get battle music, and when you do something truly heroic your own anthem may play.
 12. **Pictures** (when the host has them on). Places, villains, bosses and important
     treasures are painted as you meet them, every character gets a portrait, and so does an
-    NPC you keep meeting. Tap **🖼** next to the location at the top for the gallery: *Places*,
-    *People*, *Foes*, *Treasures*.
+    NPC you keep meeting. ⚔ marks a foe, 💀 a boss (bigger, glowing red), 💎 a treasure. Tap
+    **🖼** next to the location at the top for the gallery: *Places*, *People*, *Foes*,
+    *Treasures*.
 
 **Between the players**
 
@@ -474,7 +478,9 @@ Copy, fill in the link and code, and send:
 14. **Forgot something?** Ask the **📖 Narrator** tab beside it: *"Who gave us the key? What did
     the oracle say?"* It answers privately from what *you* have seen in the story, and it can't
     change the game or reveal secrets. Names underlined with dots in the story (people,
-    places, factions) work the same way: hover over one, or tap it on a phone.
+    places, factions) work the same way: hover over one, or tap it on a phone, for a card of
+    what you know, with their picture. So do the players' names, in the party panel and on
+    their messages. Cards are prepared as the story is told, so they open at once.
 15. **Language.** **עברית / English** switches the whole page, your microphone, and the language
     the GM answers you in. You read everything in your language, including the other players'
     actions, which the GM translates (marked 🌐; tap **show original** to see what they wrote).
@@ -519,7 +525,8 @@ Copy, fill in the link and code, and send:
 
 9. **הדף שלכם.** לחצו **📜 הדף שלי**, או על כל דמות בפאנל החבורה, כדי לראות את הדף המלא: דיוקן,
    תכונות, מיומנויות, יכולות, לחשים, ציוד (עם תמונות של אוצרות מיוחדים) ומצבים. גם הוא
-   מתעדכן יחד עם הסיפור, ומה שהשתנה עכשיו מהבהב.
+   מתעדכן יחד עם הסיפור, ומה שהשתנה עכשיו מהבהב. הדף בשפה שלכם: בעברית, מה שכתוב בו מתורגם
+   (בפעם הראשונה ממש הוא עשוי להופיע באנגלית לכמה שניות).
 10. **עלייה בדרגה.** כשאתם מרוויחים דרגה מופיע **⬆** ליד השם שלכם. פתחו את הדף ולחצו **עלייה
     בדרגה**: הטילו את קוביית החיים ליד השולחן (או קחו את הממוצע), בחרו שיפורי תכונות כשהמקצוע
     מקבל אותם, וכתבו למנהל המשחק מה תרצו (תת־מקצוע, לחשים, הישג). מנהל המשחק מוסיף את יכולות
@@ -532,8 +539,9 @@ Copy, fill in the link and code, and send:
     וקולות נמצאים בפאנל החבורה (בטלפון: לחצו **החבורה**). המוזיקה הולכת אחרי הסצנה; לנבלים יש
     מנגינה משלהם, לבוסים מוזיקת קרב, וכשאתם עושים משהו הרואי באמת, ייתכן שההמנון שלכם יתנגן.
 12. **תמונות** (כשהמארח הפעיל אותן). מקומות, נבלים, בוסים ואוצרות חשובים מצוירים כשאתם פוגשים
-    אותם, לכל דמות יש דיוקן, וגם לדמות משנה שחוזרת שוב ושוב. לחצו **🖼** ליד שם המקום למעלה
-    כדי לפתוח את הגלריה: *מקומות*, *דמויות*, *אויבים*, *אוצרות*.
+    אותם, לכל דמות יש דיוקן, וגם לדמות משנה שחוזרת שוב ושוב. ⚔ מסמן אויב, 💀 בוס (גדול יותר,
+    עם זוהר אדום), 💎 אוצר. לחצו **🖼** ליד שם המקום למעלה כדי לפתוח את הגלריה: *מקומות*,
+    *דמויות*, *אויבים*, *אוצרות*.
 
 **בין השחקנים**
 
@@ -542,7 +550,8 @@ Copy, fill in the link and code, and send:
 14. **שכחתם משהו?** שאלו את לשונית **📖 המספר** שלידה: *"מי נתן לנו את המפתח? מה אמרה האורקל?"*
     הוא עונה בפרטיות ממה *שאתם* ראיתם בסיפור, ולא יכול לשנות את המשחק או לגלות סודות. שמות
     המסומנים בקו מנוקד בסיפור (דמויות, מקומות, פלגים) עובדים אותו דבר: העבירו עליהם את העכבר,
-    או הקישו עליהם בטלפון.
+    או הקישו עליהם בטלפון, ותקבלו כרטיס של מה שאתם יודעים, עם התמונה. כך גם השמות של השחקנים,
+    בפאנל החבורה ועל ההודעות שלהם. הכרטיסים מוכנים מראש בזמן שהסיפור מסופר, ולכן נפתחים מיד.
 15. **שפה.** **English / עברית** מחליף את כל הדף, את המיקרופון ואת השפה שבה מנהל המשחק עונה לכם.
     הכול מופיע בשפה שלכם, כולל הפעולות של השחקנים האחרים, שמנהל המשחק מתרגם (מסומן ב-🌐; לחצו
     **הצג מקור** כדי לראות מה הם כתבו).
@@ -561,7 +570,7 @@ You rarely need these — Claude runs them — but they're yours to use:
 | `bash tools/gm-table.sh status` | Link, code, who's seated, unread actions |
 | `bash tools/gm-table.sh free "Name"` | Free a seat (player switching devices) |
 | `bash tools/gm-table.sh round 90` · `round off` | How long the GM waits for everyone once the first player acts (default 60 s) |
-| `bash tools/gm-table.sh alias "Marta" "מרתה"` | Another spelling of a name, so its hover card works in Hebrew too |
+| `bash tools/gm-table.sh alias "Marta" "מרתה"` | Another spelling of a name, so its hover card works in Hebrew too (the table usually learns these by itself) |
 | `bash tools/gm-table.sh music list` | What plays for each mood, and the enemy themes |
 | `bash tools/gm-table.sh music --mood tavern` | Force a mood's music right now |
 | `bash tools/gm-table.sh music theme "Grimaldi" waltz.mp3` | Give a villain their own track |
@@ -569,7 +578,7 @@ You rarely need these — Claude runs them — but they're yours to use:
 | `bash tools/gm-player.sh party` | Every player character and their stats |
 | `bash tools/gm-music-library.sh fetch` | Download (or re-download) the music library |
 | `bash tools/gm-image.sh generate --title "Test" --prompt "..."` | Make a picture now (checks the image setup) |
-| `bash tools/gm-image.sh portrait "Name"` · `location "Place"` | Paint a character's portrait · a place, now |
+| `bash tools/gm-image.sh portrait "Name"` · `location "Place"` | Paint a character's portrait (recurring NPCs get one by themselves) · a place, now |
 | `bash tools/gm-image.sh enemy "Name" --boss` · `item "Thing"` | Paint a foe (epic for a boss) · a treasure, now |
 | `bash tools/gm-image.sh log` | Every picture made so far (and the OpenAI spend) |
 | `bash tools/gm-music-compose.sh test` · `status` | Time the local composer · what it has composed |
@@ -591,8 +600,22 @@ Claude Code (`claude` must work in a terminal on the host, signed in). If it can
 falls back to quoting the story lines that match. `NARRATOR_BACKEND=off` in `.env` turns the
 model off on purpose; `ANTHROPIC_API_KEY` is an alternative to the Claude Code login.
 
-**A name isn't underlined in Hebrew narration.** The campaign knows it by another spelling.
-Tell the GM, or run `bash tools/gm-table.sh alias "Marta" "מרתה"`.
+**A name isn't underlined in Hebrew narration.** The table learns Hebrew spellings of the
+campaign's names by itself, a few seconds after each message (with the Narrator's model). If a
+name still isn't underlined, either the GM never recorded that character or place (ask: *"record
+Marta as an NPC"*), or the spelling wasn't caught: `bash tools/gm-table.sh alias "Marta" "מרתה"`.
+
+**Hover cards or the sheet's Hebrew are slow, or the sheet stays in English.** Both use the
+Narrator's model (the host's Claude Code login). A card is prepared after each message and
+kept, so it normally opens at once; the first card of a name nobody hovered can take 5–10
+seconds. If the host's `claude` isn't signed in, cards quote the story instead and the sheet
+stays as written.
+
+**My portrait isn't on my sheet.** Portraits need pictures turned on (Forge or OpenAI). The
+table waits about 3 minutes for the GM to describe a new character's look, then paints them
+(30–60 s on a laptop). If a try failed it waits 15 minutes before the next. To find out why at
+once, ask the GM to run `bash tools/gm-image.sh portrait "<your character>"`: it paints the
+portrait or says what's wrong (often *"Can't reach Forge"*: start `run.bat`).
 
 **No composed music.** Run `bash tools/gm-music-compose.sh check`. It should name your GPU
 (`"device": "cuda"`). *"no kernel image is available"* means the PyTorch build doesn't support the
