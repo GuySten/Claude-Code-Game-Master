@@ -894,3 +894,58 @@ def test_the_game_plays_in_words_without_any_image_source(table, monkeypatch):
     _, sheet = call(f"/api/sheet?code={CODE}&token={pip}&pc=Pip")
     assert sheet["ok"] and "portrait" not in sheet["sheet"]
     assert state.music.get("theme") == "Lich"                       # the music still works
+
+
+def test_villains_bosses_and_heroes_get_composed_music(table):
+    call, state, camp = table["call"], table["state"], table["camp"]
+    call("/api/claim", {"code": CODE, "pc": "Pip"})
+    made = []
+
+    def maker(kind, name, boss, look, sheet):
+        import composer
+        made.append((kind, name, boss))
+        sub = "themes" if kind == "theme" else "anthems"
+        (camp / "music" / sub).mkdir(parents=True, exist_ok=True)
+        f = f"{composer.slug(name)}-{'boss' if boss else 'theme'}.ogg" if kind == "theme" else "anthem-pip.ogg"
+        (camp / "music" / sub / f).write_bytes(b"OggS")
+        reg = composer.load_registry(camp)
+        if kind == "theme":
+            reg["themes"].setdefault(name, {})["boss" if boss else "normal"] = f
+        else:
+            reg["anthems"][name] = {"file": f, "seconds": 20}
+        composer.save_registry(camp, reg)
+        return f
+
+    state.music_maker = maker
+    # A main villain: their theme is composed and takes over while they're on stage.
+    call("/api/gm/say", {"text": "Grimaldi bows.", "theme": "Grimaldi", "villain": True}, host=True)
+    assert state.music["track"] == "theme:Grimaldi"                    # the generated one, meanwhile
+    assert state.music_pass() == ["Grimaldi", "Pip"]                   # + Pip's anthem
+    assert state.music["track"] == "grimaldi-theme.ogg" and state.music["theme"] == "Grimaldi"
+    assert state.find_music("grimaldi-theme.ogg") is not None          # served to the players
+
+    # The fight turns into a boss fight: a boss theme, without asking.
+    call("/api/gm/say", {"text": "He grows!", "mood": "boss"}, host=True)
+    assert state.music_pass() == ["Grimaldi"] and made[-1] == ("theme", "Grimaldi", True)
+    assert state.music["track"] == "grimaldi-boss.ogg" and state.music["boss"] is True
+    assert state.mood_files("boss") == []           # never picked for some other fight
+
+    # Pip does something heroic: the anthem, then back to the boss theme.
+    call("/api/gm/say", {"text": "Pip leaps onto the beast!", "heroic": "Pip"}, host=True)
+    assert state.music["track"] == "anthem-pip.ogg" and state.music["loop"] is False
+    state.music_revert["at"] = 0
+    call(f"/api/info?code={CODE}")
+    assert state.music["track"] == "grimaldi-boss.ogg"
+
+
+def test_heroic_moments_and_bosses_without_a_composer(table, monkeypatch):
+    monkeypatch.setenv("MUSIC_COMPOSE", "off")
+    call, state = table["call"], table["state"]
+    call("/api/gm/say", {"text": "The lich!", "theme": "Lich", "boss": True, "villain": True}, host=True)
+    assert state.music_jobs == [] and state.music["track"] == "theme:Lich"
+    assert state.music_pass() == []
+    call("/api/gm/say", {"text": "Pip strikes true!", "heroic": "Pip"}, host=True)
+    assert state.music["mood"] == "victory"                     # the victory music instead
+    state.music_revert["at"] = 0
+    state.music_tick()
+    assert state.music["track"] == "theme:Lich" and state.music["boss"] is True

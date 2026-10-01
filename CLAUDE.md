@@ -84,6 +84,14 @@ open the link, enter the code, and pick or create their PC. While the table is o
   escalates mid-way (phase two, true form) → `--mood boss` upgrades the playing theme; a
   boss with no name → `--mood boss` (epic battle music). Regular foes and mooks: just
   `--mood combat`. `music list` / `music themes` show what's available.
+- **Composed music (if the host set up the local composer; harmless otherwise).** Mark the
+  campaign's MAIN villain(s) when they first appear: `say --theme "<name>" --villain
+  --look "<what they're like>"`, and the table composes their own theme in the background.
+  A `--boss` fight gets a composed battle theme by itself. Either takes over the moment
+  it's ready. **Heroic moments:** when a PC does something truly heroic (the killing blow on
+  a boss, a sacrifice, a desperate save that works; at most once or twice a session, never
+  for an ordinary hit), add `--heroic "<PC>"` to that beat's `say`: their personal anthem
+  plays, then the scene's music returns. Without the composer the victory music plays.
 The host's own terminal messages are table-talk instructions to you unless they say they're
 playing; the host can also play through the browser. `gm-table.sh status` / `stop` / `free "<pc>"`.
 

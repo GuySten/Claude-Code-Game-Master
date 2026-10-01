@@ -1,5 +1,6 @@
 # Virtual Environment
 .venv/
+.compose-venv/
 venv/
 ENV/
 env/

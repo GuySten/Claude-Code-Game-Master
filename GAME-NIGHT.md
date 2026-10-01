@@ -228,6 +228,41 @@ Treasures tabs.
 To keep characters on-model, every PC and NPC needs a stored appearance. Ask the GM *"write
 appearances for everyone in the party"*: characters created on the join page don't have one yet.
 
+**6. Composed music (optional)**
+
+Your own local AI composer (MusicGen) can write music for the moments that matter. It
+needs an NVIDIA graphics card for reasonable speed (a GTX 1060 works); the music on
+every other occasion comes from the library and the built-in sounds as before.
+
+- **Main villains** get their own composed theme (the GM marks them).
+- **Bosses** get a composed battle theme: thundering drums, brass, choir.
+- **Every player character** gets a heroic anthem. When they do something truly heroic,
+  it plays for everyone, and then the scene's music comes back.
+
+Everything is composed in the background while you play: a theme takes a minute or two on
+a GPU. Until it's ready, the built-in theme plays, and then the composed one takes over.
+
+Set it up once, in Git Bash in the game folder (Windows) or a terminal (Mac/Linux):
+
+```bash
+bash tools/gm-music-compose.sh setup     # its own environment, about 3 GB (the game stays CPU-only)
+bash tools/gm-music-compose.sh test      # composes one 30-second piece and times it
+```
+
+`test` also downloads the model the first time (about 2.5 GB), then prints how long your
+computer took and a link to listen. That tells you what to expect: if a 30-second piece took
+90 seconds, a villain's theme takes about a minute and a half.
+
+- **No NVIDIA card?** `setup --cpu` works on any computer, but each piece takes several
+  minutes. The music still arrives, just later.
+- **Pictures and music share the GPU.** If the card's memory is full (Forge holding its model),
+  the composer switches to the CPU for that piece: slower, but nothing breaks.
+- **Compose ahead of time** (optional): `bash tools/gm-music-compose.sh theme "Grimaldi" --boss
+  --look "a rotting circus ringmaster"`, or `anthem "Pip"`. `status` lists what's composed.
+- **Turn it off**: `MUSIC_COMPOSE=off` in `.env`. **Uninstall**: `bash tools/gm-music-compose.sh remove`.
+
+The model's license (CC BY-NC 4.0) allows this for a home game, but not selling the music.
+
 ---
 
 ## Each game night (host)
@@ -414,12 +449,18 @@ You rarely need these — Claude runs them — but they're yours to use:
 | `bash tools/gm-music-library.sh fetch` | Download (or re-download) the music library |
 | `bash tools/gm-image.sh generate --title "Test" --prompt "..."` | Make a picture now (checks the image setup) |
 | `bash tools/gm-image.sh log` | Every picture made so far (and the OpenAI spend) |
+| `bash tools/gm-music-compose.sh test` · `status` | Time the local composer · what it has composed |
 | `bash tools/gm-models.sh [preset]` | Which models run the game (recommended · budget · premium · inherit) |
 | `/model` · `/fast` (inside Claude Code) | Check or switch the GM's model now · faster GM replies |
 
 ---
 
 ## Troubleshooting
+
+**No composed music.** Run `bash tools/gm-music-compose.sh check`. It should name your GPU
+(`"device": "cuda"`). *"no kernel image is available"* means the PyTorch build doesn't support the
+card: run `bash tools/gm-music-compose.sh remove`, then `setup --cpu`. Composing happens in the
+background, so a first theme can take a few minutes to arrive; until then the built-in theme plays.
 
 **No pictures with Forge.** The GM's session notes say why (`Scene images: DISABLED (...)`):
 - *"Forge isn't answering"*: start `run.bat`, wait until the console shows the
