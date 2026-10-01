@@ -21,6 +21,39 @@ Heavy mechanics + craft live in on-demand Skills (`.claude/skills/gm-*`).
 4. Active campaign but no `character.json` → identity-first onboarding ("Who are you in this world?": canon / original / nameless).
 5. All good → greet, offer `/gm`.
 
+## Multiplayer (several humans, one table)
+One GM, several player characters. The lead PC is `character.json`; every other
+player's PC is `players/<name>.json`. `gm-session.sh context` lists them all under
+`--- PLAYER CHARACTERS ---` once there is more than one.
+- **Seat a player:** `gm-player.sh join original "<name>" "<concept>"` (or `canon "<npc>"` /
+  `nameless`; full builder → `gm-player.sh save-json --join '<json>'`). `party` shows the
+  table, `leave "<name>"` archives a PC to `departed/`, `set "<name>"` makes them the lead.
+- **Always name the PC** in every `gm-player.sh` / `gm-condition.sh` call (`hp Bram -4`,
+  `vital vigor -1 --name Bram`). With more than one PC an unknown name is refused, never
+  guessed. XP/loot are per PC: award each one that earned it.
+- **Spotlight:** address players by character name; resolve each player's action with their
+  own roll; give every player a beat before the scene moves on; when actions arrive together,
+  resolve them in a sensible order inside one narration. The action menu (when ON) may be
+  addressed to the whole party or to a named PC.
+- **A PC dies:** Death Protocol for THAT player — `gm-player.sh become "<party member>" --for
+  "<fallen PC>"` or a fresh `join`. The rest of the table plays on.
+
+## Online table (players on their own computers)
+`bash tools/gm-table.sh start` opens a browser table (prints links + a table code). Players
+open the link, enter the code, and pick or create their PC. While the table is open:
+1. `bash tools/gm-table.sh wait` (≈9 min max; rerun on timeout) — blocks until players act
+   and prints their actions (`[#12 Bram] I kick the door`), joins, and who hasn't acted.
+   Use `--all` to wait for every seated player (rounds), `inbox` to check without waiting.
+2. Run the normal core loop for those actions (roll, persist with the PC's name).
+3. Post the narration with `bash tools/gm-table.sh say --stdin <<'EOF' … EOF` — it is the
+   ONLY way players see anything; your terminal reply is for the host. Markdown works.
+   `--to "<pc>"` whispers (secret perception results, private notes); a player's
+   "only the GM sees this" aside arrives marked `(private, to GM only)` — answer it with
+   `--to`. Illustrations: `say "…" --image <file in images/>`.
+4. Go back to 1. A new player joining arrives as a JOIN line: welcome them in the fiction.
+The host's own terminal messages are table-talk instructions to you unless they say they're
+playing; the host can also play through the browser. `gm-table.sh status` / `stop` / `free "<pc>"`.
+
 ## The Core Loop
 Every interaction: **CONTEXT → DECIDE → EXECUTE → PERSIST → NARRATE.**
 **Persist ALL state changes BEFORE narrating.** (Advisory hooks audit this; the original rule still stands.)

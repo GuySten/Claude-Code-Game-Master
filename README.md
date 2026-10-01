@@ -119,6 +119,25 @@ Then launch and play:
 
 `/gm` is the only command you need. It offers a **New Adventure** — author an original world (`/new-game`), import a book you've dropped in `source-material/` (`/import`), or spin up a quick one-shot — then builds your character and runs the game. First thing it asks once a world exists: **"Who are you in this world?"** — play a character lifted straight from the source, an original of your own, or a nameless traveler who wanders in. The mechanics get figured out behind the scenes.
 
+### Play together — every player on their own computer
+
+The GM can run a whole party. Each player gets their own character (`players/<name>.json`
+next to the lead's `character.json`), and the GM tracks HP, loot and deaths per player.
+
+To let friends join from their own machines, the host opens the **online table**:
+
+```bash
+bash tools/gm-table.sh start      # or just tell /gm "my friends want to join"
+```
+
+It prints a link and a table code. Friends open the link in any browser (phone works),
+enter the code, and pick a hero or create their own. They type what they do; Claude reads
+everyone's actions, rolls, and posts the narration to every screen. It also handles private
+asides to the GM, whispers back, and live HP bars for the party. Same Wi-Fi works out of
+the box. For friends elsewhere, run a free tunnel such as
+`cloudflared tunnel --url http://localhost:8765` and share its https link. No extra
+dependencies are needed (Python standard library only).
+
 ---
 
 ## Why a harness, and not just a long prompt
@@ -202,7 +221,8 @@ The harness is plumbing you can poke at: bash wrappers (`tools/`) → Python man
 | `gm-campaign.sh` | Create, list, switch, delete campaigns |
 | `gm-session.sh` | Session lifecycle, party movement, save/restore |
 | `gm-context.sh` | Assemble scene context (world state + source passages) |
-| `gm-player.sh` | Player stats — health, progression, gold, inventory |
+| `gm-player.sh` | Player stats — health, progression, gold, inventory (every PC; `join`/`party`/`leave` for multiplayer) |
+| `gm-table.sh` | Online table — players join from their own browsers; `wait` / `say` run the loop |
 | `gm-npc.sh` | NPCs — creation, updates, mood/goal/voice, party members |
 | `gm-location.sh` | Locations and connections |
 | `gm-plot.sh` | Quest and storyline tracking |

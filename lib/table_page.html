@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Table</title>
+<style>
+  :root {
+    --bg: #f6f1e7; --panel: #fffaf0; --ink: #2b2620; --muted: #7a6f60;
+    --line: #e2d8c6; --accent: #8a3b12; --accent-ink: #fff;
+    --gm: #fffdf8; --me: #efe6d4; --sys: #8a7f70; --whisper: #f3e8ff;
+    --hp: #3f8f4f; --hp-low: #c0392b; --hp-mid: #d68910;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17140f; --panel: #211d17; --ink: #ece4d6; --muted: #a39782;
+      --line: #3a3328; --accent: #e07a3f; --accent-ink: #1a140d;
+      --gm: #1d1a14; --me: #2b251c; --sys: #9a8f7c; --whisper: #2a2236;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--ink);
+         font: 16px/1.55 Georgia, "Iowan Old Style", "Palatino Linotype", serif; }
+  button, input, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; border: 1px solid var(--line); background: var(--panel);
+           border-radius: 8px; padding: 8px 14px; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  input, textarea { width: 100%; padding: 10px 12px; border-radius: 8px;
+                    border: 1px solid var(--line); background: var(--panel); }
+  .hidden { display: none !important; }
+  .muted { color: var(--muted); }
+  .error { color: var(--hp-low); min-height: 1.4em; }
+
+  /* join screen */
+  #join { max-width: 520px; margin: 0 auto; padding: 32px 16px; }
+  #join h1 { font-size: 1.9rem; margin: 0 0 4px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+          padding: 16px; margin: 16px 0; }
+  .card h2 { font-size: 1.1rem; margin: 0 0 10px; }
+  .pc-choice { display: flex; justify-content: space-between; align-items: center; gap: 12px;
+               width: 100%; text-align: left; margin: 6px 0; }
+  .row { display: flex; gap: 8px; margin-top: 8px; }
+  label { display: block; margin: 10px 0 4px; font-size: .9rem; color: var(--muted); }
+
+  /* table screen */
+  #table { display: grid; grid-template-columns: 1fr 280px; height: 100vh; height: 100dvh; }
+  #main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  header { padding: 10px 16px; border-bottom: 1px solid var(--line); display: flex;
+           justify-content: space-between; align-items: center; gap: 8px; }
+  header .title { font-weight: bold; }
+  header .where { font-size: .9rem; color: var(--muted); }
+  #log { flex: 1; overflow-y: auto; padding: 16px; }
+  .msg { max-width: 760px; margin: 0 auto 14px; padding: 10px 14px; border-radius: 10px; }
+  .msg.gm { background: var(--gm); border: 1px solid var(--line); }
+  .msg.player { background: var(--me); }
+  .msg.player.mine { border-left: 3px solid var(--accent); }
+  .msg.system { color: var(--sys); font-style: italic; text-align: center; padding: 2px; }
+  .msg.whisper { background: var(--whisper); }
+  .who { font-size: .8rem; color: var(--muted); margin-bottom: 2px; letter-spacing: .02em; }
+  .msg img { max-width: 100%; border-radius: 8px; margin-top: 8px; display: block; }
+  .msg p { margin: 0 0 .6em; } .msg p:last-child { margin: 0; }
+  .msg h3 { margin: .2em 0 .4em; font-size: 1.05rem; }
+  .msg code { font-family: ui-monospace, Menlo, monospace; font-size: .9em; }
+  #status { padding: 4px 16px; font-size: .85rem; color: var(--muted); min-height: 1.6em; }
+  form#say { border-top: 1px solid var(--line); padding: 10px 16px 14px; }
+  form#say textarea { resize: none; height: 64px; }
+  .say-row { display: flex; justify-content: space-between; align-items: center; gap: 8px;
+             margin-top: 6px; flex-wrap: wrap; }
+  .say-row label { margin: 0; display: flex; align-items: center; gap: 6px; }
+  .say-row input[type=checkbox] { width: auto; }
+
+  aside { border-left: 1px solid var(--line); overflow-y: auto; padding: 12px 14px; }
+  aside h2 { font-size: .95rem; margin: 4px 0 10px; color: var(--muted); font-weight: normal;
+             text-transform: uppercase; letter-spacing: .08em; }
+  .pc { padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .pc .name { font-weight: bold; }
+  .pc .tag { font-size: .75rem; color: var(--muted); margin-left: 4px; }
+  .bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; margin: 4px 0; }
+  .bar > div { height: 100%; background: var(--hp); }
+  .pc .meta { font-size: .8rem; color: var(--muted); }
+  #party-toggle { display: none; }
+
+  @media (max-width: 760px) {
+    #table { grid-template-columns: 1fr; }
+    aside { display: none; position: fixed; inset: 52px 0 auto 0; max-height: 60vh;
+            background: var(--panel); border: 0; border-bottom: 1px solid var(--line); z-index: 5; }
+    aside.open { display: block; }
+    #party-toggle { display: inline-block; }
+  }
+</style>
+</head>
+<body>
+
+<section id="join">
+  <h1>The Table</h1>
+  <p class="muted">Your Game Master is waiting. Enter the table code the host gave you.</p>
+
+  <div class="card" id="code-card">
+    <label for="code">Table code</label>
+    <input id="code" autocomplete="off" placeholder="e.g. ember-482">
+    <div class="row"><button class="primary" id="code-go">Enter</button></div>
+    <div class="error" id="code-error"></div>
+  </div>
+
+  <div id="seat-cards" class="hidden">
+    <div class="card">
+      <h2>Who are you in this world?</h2>
+      <div id="pc-list"></div>
+      <p class="muted" id="pc-empty">No heroes yet — make the first one below.</p>
+    </div>
+    <div class="card">
+      <h2>Bring a new character</h2>
+      <label for="new-name">Name</label>
+      <input id="new-name" maxlength="60" placeholder="Pip Underbough">
+      <label for="new-concept">One line about them</label>
+      <input id="new-concept" maxlength="200" placeholder="a halfling thief with a debt">
+      <div class="row">
+        <button class="primary" id="create">Join as this character</button>
+        <button id="nameless">Just a nameless traveler</button>
+      </div>
+    </div>
+    <div class="error" id="seat-error"></div>
+  </div>
+</section>
+
+<section id="table" class="hidden">
+  <div id="main">
+    <header>
+      <div>
+        <div class="title" id="campaign">The Table</div>
+        <div class="where" id="where"></div>
+      </div>
+      <div>
+        <button id="party-toggle">Party</button>
+        <button id="leave" title="Give up your seat">Leave seat</button>
+      </div>
+    </header>
+    <div id="log" aria-live="polite"></div>
+    <div id="status"></div>
+    <form id="say">
+      <textarea id="text" maxlength="1200" placeholder="What do you do?"></textarea>
+      <div class="say-row">
+        <label><input type="checkbox" id="private"> Only the GM sees this</label>
+        <span class="muted" id="me"></span>
+        <button class="primary" type="submit" id="send">Send</button>
+      </div>
+    </form>
+  </div>
+  <aside id="party"><h2>The party</h2><div id="party-list"></div></aside>
+</section>
+
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const store = {
+    get(k) { try { return localStorage.getItem("gmtable." + k); } catch (e) { return null; } },
+    set(k, v) { try { v == null ? localStorage.removeItem("gmtable." + k)
+                                 : localStorage.setItem("gmtable." + k, v); } catch (e) {} },
+  };
+  let code = new URLSearchParams(location.search).get("code") || store.get("code") || "";
+  let token = store.get("token");
+  let me = null, lastId = 0, polling = false, pcCache = [];
+
+  async function api(path, body) {
+    const opts = body ? { method: "POST", headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify(Object.assign({ code, token }, body)) } : {};
+    const sep = path.includes("?") ? "&" : "?";
+    const url = body ? path : `${path}${sep}code=${encodeURIComponent(code)}&token=${encodeURIComponent(token || "")}`;
+    const r = await fetch(url, opts);
+    let data = {};
+    try { data = await r.json(); } catch (e) { data = { ok: false, error: "Server error" }; }
+    if (!r.ok && data.ok !== false) data.ok = false;
+    return data;
+  }
+
+  // --- tiny, safe markdown: escape first, then a few inline rules ---
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;",
+                                                   '"': "&quot;", "'": "&#39;" }[c]));
+  }
+  function md(text) {
+    return String(text).trim().split(/\n{2,}/).map((block) => {
+      let h = esc(block)
+        .replace(/`([^`]+)`/g, "<code>$1</code>")
+        .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+        .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>")
+        .replace(/(^|\s)_([^_\n]+)_/g, "$1<em>$2</em>");
+      if (/^#{1,6} /.test(h)) return "<h3>" + h.replace(/^#{1,6} /, "") + "</h3>";
+      return "<p>" + h.replace(/\n/g, "<br>") + "</p>";
+    }).join("");
+  }
+
+  // --- join flow ---
+  async function enterCode() {
+    code = $("code").value.trim().toLowerCase();
+    $("code-error").textContent = "";
+    const info = await api("/api/info");
+    if (!info.ok) { $("code-error").textContent = info.error || "That code didn't work."; return; }
+    store.set("code", code);
+    if (info.me) { me = info.me; return openTable(info); }
+    showSeats(info);
+  }
+
+  function showSeats(info) {
+    $("code-card").classList.add("hidden");
+    $("seat-cards").classList.remove("hidden");
+    const list = $("pc-list");
+    list.textContent = "";
+    $("pc-empty").classList.toggle("hidden", info.party.length > 0);
+    info.party.forEach((pc) => {
+      const b = document.createElement("button");
+      b.className = "pc-choice";
+      const left = document.createElement("span");
+      left.innerHTML = `<strong>${esc(pc.name)}</strong> <span class="muted">${esc(
+        [pc.race, pc.class].filter(Boolean).join(" ") || pc.concept || "")}</span>`;
+      const right = document.createElement("span");
+      right.className = "muted";
+      right.textContent = pc.claimed ? "taken" : (pc.status === "dead" ? "fallen" : "play");
+      b.append(left, right);
+      b.disabled = pc.claimed || pc.status === "dead";
+      b.onclick = () => seat("/api/claim", { pc: pc.name });
+      list.appendChild(b);
+    });
+  }
+
+  async function seat(path, body) {
+    $("seat-error").textContent = "";
+    const r = await api(path, body);
+    if (!r.ok) { $("seat-error").textContent = r.error || "Couldn't take that seat."; return; }
+    token = r.token; me = r.pc; store.set("token", token);
+    openTable(await api("/api/info"));
+  }
+
+  // --- the table ---
+  function openTable(info) {
+    $("join").classList.add("hidden");
+    $("table").classList.remove("hidden");
+    $("me").textContent = "Playing as " + me;
+    renderInfo(info);
+    if (!polling) { polling = true; pollMessages(); setInterval(refreshInfo, 4000); }
+    $("text").focus();
+  }
+
+  function renderInfo(info) {
+    if (!info || !info.ok) return;
+    if (!info.me && me) {           // our PC left the table or was replaced
+      me = null; token = null; store.set("token", null);
+      $("table").classList.add("hidden"); $("join").classList.remove("hidden");
+      return showSeats(info);
+    }
+    $("campaign").textContent = info.campaign || "The Table";
+    document.title = (info.campaign || "The Table");
+    $("where").textContent = [info.location, info.time].filter(Boolean).join(" · ");
+    pcCache = info.party;
+    const list = $("party-list");
+    list.textContent = "";
+    info.party.forEach((pc) => {
+      const d = document.createElement("div");
+      d.className = "pc";
+      const pct = pc.hp_max ? Math.max(0, Math.min(100, 100 * pc.hp / pc.hp_max)) : 0;
+      const color = pct <= 25 ? "var(--hp-low)" : pct <= 50 ? "var(--hp-mid)" : "var(--hp)";
+      const tags = [pc.lead ? "lead" : "", pc.name === me ? "you" : "",
+                    !pc.claimed && pc.name !== me ? "empty seat" : ""].filter(Boolean);
+      const status = pc.status && pc.status !== "alive" ? pc.status.toUpperCase() : "";
+      const conds = (pc.conditions || []).join(", ");
+      d.innerHTML = `<div><span class="name">${esc(pc.name)}</span>` +
+        tags.map((t) => `<span class="tag">${esc(t)}</span>`).join("") + `</div>` +
+        `<div class="bar"><div style="width:${pct}%;background:${color}"></div></div>` +
+        `<div class="meta">HP ${esc(pc.hp)}/${esc(pc.hp_max)} · Lvl ${esc(pc.level)} ` +
+        `${esc([pc.race, pc.class].filter(Boolean).join(" "))}` +
+        `${status ? " · " + esc(status) : ""}${conds ? " · " + esc(conds) : ""}</div>`;
+      list.appendChild(d);
+    });
+    const waiting = (info.waiting_on || []);
+    $("status").textContent = waiting.length ? "Waiting on: " + waiting.join(", ") : "";
+  }
+
+  async function refreshInfo() { renderInfo(await api("/api/info")); }
+
+  function addMessage(m) {
+    const d = document.createElement("div");
+    d.className = "msg " + m.kind + (m.to ? " whisper" : "") + (m.pc === me && m.kind === "player" ? " mine" : "");
+    if (m.kind === "system") {
+      d.textContent = m.text;
+    } else {
+      const who = document.createElement("div");
+      who.className = "who";
+      who.textContent = m.kind === "gm"
+        ? (m.to ? "Game Master — whispered to you" : "Game Master")
+        : (m.pc || "?") + (m.to ? " — to the GM only" : "");
+      const body = document.createElement("div");
+      body.innerHTML = md(m.text || "");
+      d.append(who, body);
+      if (m.image) {
+        const img = document.createElement("img");
+        img.alt = "Illustration";
+        img.loading = "lazy";
+        img.src = "/images/" + encodeURIComponent(m.image) + "?code=" + encodeURIComponent(code);
+        d.appendChild(img);
+      }
+    }
+    $("log").appendChild(d);
+  }
+
+  async function pollMessages() {
+    try {
+      const r = await api("/api/messages?after=" + lastId);
+      if (r.ok && r.messages.length) {
+        const log = $("log");
+        const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
+        r.messages.forEach((m) => { addMessage(m); lastId = Math.max(lastId, m.id); });
+        if (atBottom || lastId === r.messages[r.messages.length - 1].id) log.scrollTop = log.scrollHeight;
+        const last = r.messages[r.messages.length - 1];
+        if (last.kind === "player") $("status").textContent = "The GM is considering…";
+      }
+    } catch (e) { $("status").textContent = "Reconnecting…"; }
+    setTimeout(pollMessages, 1500);
+  }
+
+  $("say").onsubmit = async (ev) => {
+    ev.preventDefault();
+    const text = $("text").value.trim();
+    if (!text) return;
+    $("send").disabled = true;
+    const r = await api("/api/say", { text, private: $("private").checked });
+    $("send").disabled = false;
+    if (!r.ok) { $("status").textContent = r.error || "Couldn't send."; if (r.error === "Take a seat first.") refreshInfo(); return; }
+    $("text").value = "";
+    $("private").checked = false;
+  };
+  $("text").addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); $("say").requestSubmit(); }
+  });
+  $("leave").onclick = async () => {
+    if (!confirm("Give up your seat? You can take it again afterwards.")) return;
+    await api("/api/leave", {});
+    token = null; me = null; store.set("token", null);
+    location.reload();
+  };
+  $("party-toggle").onclick = () => $("party").classList.toggle("open");
+  $("code-go").onclick = enterCode;
+  $("code").addEventListener("keydown", (ev) => { if (ev.key === "Enter") enterCode(); });
+  $("create").onclick = () => {
+    const name = $("new-name").value.trim();
+    if (!name) { $("seat-error").textContent = "Give your character a name."; return; }
+    seat("/api/create", { name, concept: $("new-concept").value.trim() });
+  };
+  $("nameless").onclick = () => seat("/api/create", { mode: "nameless" });
+
+  $("code").value = code;
+  if (code) enterCode();
+})();
+</script>
+</body>
+</html>

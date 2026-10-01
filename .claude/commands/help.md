@@ -37,7 +37,8 @@ Display all available commands and tools.
   CLI TOOLS (bash tools/gm-*.sh)
   --------------------------------------------------------
   gm-session.sh     Session management, save/restore
-  gm-player.sh      Player character stats
+  gm-player.sh      Player character stats (every PC at the table: join/party/leave)
+  gm-table.sh       Online table — friends join from their own browsers
   gm-npc.sh         Create and update NPCs
   gm-location.sh    Add and connect locations
   gm-consequence.sh Track future events

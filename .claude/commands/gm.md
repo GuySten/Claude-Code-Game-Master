@@ -18,6 +18,7 @@ When user invokes `/gm <subcommand>`, route to the appropriate section:
 | overview | Jump to CAMPAIGN OVERVIEW section |
 | status | Run `bash tools/gm-overview.sh` and display results |
 | end | Jump to ENDING SESSION section |
+| table | Jump to ONLINE TABLE section |
 | choices [on\|off\|toggle] | Run `bash tools/gm-session.sh choices <arg>`, confirm the new play style, and continue the current scene in it |
 
 ---
@@ -149,10 +150,29 @@ archives the outgoing sheet to `fallen/` first.
 The full builder is the **opt-in deep dive**: if the player wants to roll stats, pick a
 class, and build a sheet properly, run `/create-character` instead. Offer it, never impose it.
 
+**More than one player?** Ask once: *"Is anyone else joining you?"* Seat each extra player
+with `bash tools/gm-player.sh join canon|original|nameless ...` (same three doors; the first
+PC stays the lead). If they are on their own computers, open the ONLINE TABLE instead and let
+them create their characters from the browser.
+
 **After identity, before you open the scene, ask where/when they want to start.** Offer a
 fitting default (an iconic opening for this world/character) but make it plain they can name
 their own: a specific location, a particular scene, or a point in the timeline. Persist their
 choice into the play pack's `room`/`hook` and build the opening around **that** start.
+
+---
+
+## ONLINE TABLE
+
+**Invoked via:** `/gm table` (or "my friends want to join from their computers").
+
+1. `bash tools/gm-table.sh start` — share the printed link and table code with the players.
+   Same Wi-Fi works directly. Friends elsewhere need a tunnel the host runs: offer
+   `cloudflared tunnel --url http://localhost:8765` (no account) or `ngrok http 8765`, and
+   share the https link it prints. (`gm-table.sh help` lists these.)
+2. Players pick an existing PC or create one in the browser (it lands in `players/`).
+3. Run the table loop from CLAUDE.md → "Online table": `wait` → resolve + persist → `say`.
+4. Ending: `gm-session.sh end ...` as usual, `say` a closing line, then `gm-table.sh stop`.
 
 ---
 
