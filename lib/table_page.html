@@ -43,6 +43,15 @@
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
           padding: 16px; margin: 16px 0; }
   .card h2 { font-size: 1.1rem; margin: 0 0 10px; }
+  /* A rolled character, on the join screen */
+  #rolled { margin-top: 12px; }
+  #rolled .boxes { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 6px; }
+  #rolled .box { border: 1px solid var(--line); border-radius: 8px; text-align: center; padding: 4px; }
+  #rolled .box .k { font-size: .72rem; color: var(--muted); text-transform: uppercase; }
+  #rolled .box .v { font-size: 1.3rem; font-weight: bold; }
+  #rolled .box .d { font-size: .75rem; color: var(--muted); }
+  #rolled .box .d s { opacity: .6; }
+  #rolled .who-rolled { margin-top: 8px; }
   .pc-choice { display: flex; justify-content: space-between; align-items: center; gap: 12px;
                width: 100%; text-align: start; margin: 6px 0; }
   .row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
@@ -213,7 +222,9 @@
       <div class="row">
         <button class="primary" id="create" data-i18n="create"></button>
         <button id="nameless" data-i18n="nameless"></button>
+        <button id="roll-char" type="button" data-i18n="rollChar"></button>
       </div>
+      <div id="rolled" class="hidden"></div>
     </div>
     <div class="error" id="seat-error"></div>
   </div>
@@ -350,6 +361,9 @@
       trFrom: "🌐 Translated from {lang}", trShowOriginal: "show original",
       trShowTranslation: "show translation", trWaiting: "🌐 Translating…",
       lang_en: "English", lang_he: "Hebrew",
+      rollChar: "🎲 Roll a character", rollAgain: "🎲 Roll again", rollTry: "roll #{n}",
+      rolledNote: "Rolled with fair dice: 4d6 for each ability, lowest die dropped. Change the name and concept if you like, then Create — the table sees what you rolled.",
+      rolledHp: "HP", rolledAc: "AC",
       ev_seat: "{pc} takes their seat at the table.", ev_join: "A new player joins: {pc}",
       ev_leave: "{pc} steps away from the table.", ev_music_stop: "🎵 The music fades away.",
       amb_wind: "Howling wind", amb_rain: "Steady rain", amb_storm: "Rain with rolling thunder",
@@ -409,6 +423,9 @@
       trFrom: "🌐 תורגם מ{lang}", trShowOriginal: "הצג מקור",
       trShowTranslation: "הצג תרגום", trWaiting: "🌐 מתרגם…",
       lang_en: "אנגלית", lang_he: "עברית",
+      rollChar: "🎲 הטלת דמות", rollAgain: "🎲 להטיל שוב", rollTry: "הטלה מס' {n}",
+      rolledNote: "הוטל בקוביות הוגנות: 4d6 לכל תכונה, הקובייה הנמוכה נזרקת. שנו את השם והתיאור אם תרצו ולחצו צור — השולחן יראה מה הטלתם.",
+      rolledHp: "נק״ח", rolledAc: "דרגת שריון",
       ev_seat: "{pc} מתיישב/ת ליד השולחן.", ev_join: "שחקן/ית חדש/ה מצטרף/ת: {pc}",
       ev_leave: "{pc} קם/ה מהשולחן.", ev_music_stop: "🎵 המוזיקה דועכת.",
       amb_wind: "רוח מייללת", amb_rain: "גשם יורד", amb_storm: "סערה ורעמים",
@@ -1493,6 +1510,12 @@
     if (ev.type === "music") return "🎵 " + trackTitle(ev);
     let s = t("ev_" + ev.type).replace("{pc}", m.pc || "");
     if (ev.type === "join" && ev.concept) s += " — " + ev.concept;
+    if (ev.type === "join" && ev.rolled && ev.rolled.stats) {
+      const r = ev.rolled;
+      s += " · 🎲 " + Object.entries(r.stats).map(([k, v]) => k.toUpperCase() + " " + v).join(", ");
+      if (r.hp) s += ` · ${t("rolledHp")} ${r.hp} · ${t("rolledAc")} ${r.ac}`;
+      if (r.tries > 1) s += " · " + t("rollTry").replace("{n}", r.tries);
+    }
     return s;
   }
 
@@ -1866,10 +1889,38 @@
   $("party-toggle").onclick = () => $("party").classList.toggle("open");
   $("code-go").onclick = enterCode;
   $("code").addEventListener("keydown", (ev) => { if (ev.key === "Enter") enterCode(); });
+  // Rolling a character: the server rolls and keeps the numbers; we show them,
+  // fill in a name and concept if they're empty (the player can change those).
+  let rolled = null, rolledFill = { name: "", concept: "" };
+  async function rollCharacter() {
+    $("roll-char").disabled = true;
+    const r = await api("/api/roll-character", { lang, previous: rolled && rolled.roll_id });
+    $("roll-char").disabled = false;
+    if (!r.ok) { $("seat-error").textContent = r.error || "?"; return; }
+    rolled = r;
+    // Replace our own earlier suggestions, never what the player typed.
+    [["new-name", "name"], ["new-concept", "concept"]].forEach(([id, k]) => {
+      const box = $(id);
+      if (!box.value.trim() || box.value === rolledFill[k]) { box.value = r[k] || ""; rolledFill[k] = box.value; }
+    });
+    const out = $("rolled");
+    out.classList.remove("hidden");
+    out.innerHTML = '<div class="boxes">' + Object.entries(r.dice).map(([k, d]) =>
+      `<div class="box"><div class="k">${esc(k)}</div><div class="v">${esc(d.score)}</div>` +
+      `<div class="d" dir="ltr">${d.dice.map((x, i) => i === d.dropped ? `<s>${x}</s>` : x).join(" ")}</div></div>`
+    ).join("") + "</div>" +
+      (r.class ? `<div class="who-rolled" dir="auto"><b>${esc(lang === "he" && r.concept ? r.concept : r.race + " " + r.class)}</b> · ` +
+                 `${esc(t("rolledHp"))} ${esc(r.hp)} · ${esc(t("rolledAc"))} ${esc(r.ac)}</div>` : "") +
+      `<p class="muted">${esc(t("rolledNote"))}` +
+      (r.tries > 1 ? " · " + esc(t("rollTry").replace("{n}", r.tries)) : "") + "</p>";
+    $("roll-char").textContent = t("rollAgain");
+  }
+  $("roll-char").onclick = rollCharacter;
   $("create").onclick = () => {
     const name = $("new-name").value.trim();
     if (!name) { $("seat-error").textContent = t("nameRequired"); return; }
-    seat("/api/create", { name, concept: $("new-concept").value.trim() });
+    seat("/api/create", { name, concept: $("new-concept").value.trim(),
+                          roll_id: rolled ? rolled.roll_id : undefined });
   };
   $("nameless").onclick = () => seat("/api/create", { mode: "nameless" });
   if (!SR) $("mic").title = t("noMic");

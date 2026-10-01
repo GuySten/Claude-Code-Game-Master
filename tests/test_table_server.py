@@ -640,3 +640,36 @@ def test_sheets_follow_the_story_like_the_party_panel(table):
 
     assert call(f"/api/sheet?code={CODE}&token=nope&pc=Pip")[0] == 403
     assert call(f"/api/sheet?code={CODE}&token={pip}&pc=Nobody")[0] == 404
+
+
+def test_a_joining_player_can_roll_a_character(table):
+    call, state = table["call"], table["state"]
+    _, r1 = call("/api/roll-character", {"code": CODE, "lang": "en"})
+    assert r1["ok"] and list(r1["stats"]) == ["str", "dex", "con", "int", "wis", "cha"]
+    for a, d in r1["dice"].items():
+        assert len(d["dice"]) == 4 and all(1 <= x <= 6 for x in d["dice"])
+        assert d["score"] == sum(d["dice"]) - d["dice"][d["dropped"]] == r1["stats"][a]
+        assert d["dice"][d["dropped"]] == min(d["dice"])
+    assert r1["class"] and r1["race"] and r1["hp"] >= 1 and r1["tries"] == 1
+
+    _, r2 = call("/api/roll-character", {"code": CODE, "lang": "he", "previous": r1["roll_id"]})
+    assert r2["tries"] == 2 and r1["roll_id"] not in state.pending_rolls
+    assert any("֐" <= ch <= "׿" for ch in r2["name"] + r2["concept"])   # Hebrew suggestions
+
+    # Created with the roll: the sheet gets exactly the server's numbers, whatever the page sends.
+    status, seat = call("/api/create", {"code": CODE, "name": "Bram", "concept": "a dwarf",
+                                        "roll_id": r2["roll_id"], "stats": {"str": 18}})
+    assert status == 200
+    _, sheet = call(f"/api/sheet?code={CODE}&token={seat['token']}&pc=Bram")
+    assert sheet["sheet"]["stats"] == r2["stats"] and sheet["sheet"]["class"] == r2["class"]
+    assert sheet["sheet"]["hp"] == {"current": r2["hp"], "max": r2["hp"]}
+    join = [m for m in state.messages if (m.get("event") or {}).get("type") == "join"][-1]
+    assert join["event"]["rolled"]["tries"] == 2 and "Rolled: STR" in join["text"]
+    assert not state.pending_rolls                       # a roll is used once
+
+    # A campaign with its own abilities rolls those.
+    (table["camp"] / "ruleset.json").write_text(json.dumps(
+        {"stat_schema": {"attributes": ["might", "guile", "grit"]}}))
+    _, r3 = call("/api/roll-character", {"code": CODE})
+    assert list(r3["stats"]) == ["might", "guile", "grit"] and "class" not in r3
+    assert call("/api/roll-character", {"code": "wrong"})[0] == 403

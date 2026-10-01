@@ -214,7 +214,9 @@ Copy, fill in the link and code, and send:
 1. **Open the link** in Chrome, Edge or Safari and enter the **table code**.
 2. **Choose who you are** — tap a free character, or create one: a name and one line
    ("a dwarf cleric who lost her faith"). "Nameless traveler" works too — the world will
-   name you.
+   name you. Or tap **🎲 Roll a character**: fair dice roll your abilities (4d6, lowest
+   dropped) and suggest a race, class, name and concept you can change. Everyone sees what
+   you rolled, and how many tries it took.
 3. **Act.** Type what your character does and press Enter — or tap **🎤**, speak, and it
    sends when you stop talking (untick "Send when I stop talking" to check the text first).
    Talk the way you'd talk at a table: *"I sneak up behind the guard and try to grab his
@@ -252,7 +254,9 @@ Copy, fill in the link and code, and send:
 
 1. **פתחו את הקישור** ב-Chrome, Edge או Safari והכניסו את **קוד השולחן**.
 2. **בחרו מי אתם** — לחצו על דמות פנויה, או צרו דמות: שם ושורה אחת ("גמדה כוהנת שאיבדה
-   את אמונתה"). אפשר גם "נווד/ת בלי שם" — העולם כבר ייתן לכם שם.
+   את אמונתה"). אפשר גם "נווד/ת בלי שם" — העולם כבר ייתן לכם שם. או לחצו **🎲 הטלת דמות**:
+   קוביות הוגנות מטילות את התכונות שלכם (4d6, הנמוכה נזרקת) ומציעות גזע, מקצוע, שם ותיאור
+   שאפשר לשנות. כולם רואים מה הטלתם, וכמה ניסיונות זה לקח.
 3. **פעלו.** כתבו מה הדמות עושה ולחצו Enter — או לחצו **🎤**, דברו, וההודעה תישלח כשתסיימו
    לדבר (בטלו את "לשלוח כשאני מסיים/ת לדבר" אם אתם רוצים לבדוק את הטקסט קודם). דברו כמו ליד
    שולחן אמיתי: *"אני מתגנב מאחורי השומר ומנסה לחטוף לו את המפתחות."* טעות הקלדה, או

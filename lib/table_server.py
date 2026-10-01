@@ -174,6 +174,34 @@ def _now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%S")
 
 
+# ------------------------------------------------- rolling a character ----
+# Joining players can roll one: 4d6, drop the lowest, for each of the campaign's
+# abilities (its ruleset's stat_schema; the classic six by default). With the
+# classic six, a race and a class that suits the best scores are suggested too,
+# with level-1 HP and AC. All of it is a starting point the GM builds on.
+CLASSIC_SIX = ["str", "dex", "con", "int", "wis", "cha"]
+RACES = {"Human": "אדם", "Elf": "אלף", "Dwarf": "גמד", "Halfling": "בן־גמד",
+         "Gnome": "גנום", "Half-Elf": "חצי־אלף", "Half-Orc": "חצי־אורק",
+         "Tiefling": "טיפלינג", "Dragonborn": "בן־דרקון"}
+# class -> (Hebrew, hit die, the abilities it leans on)
+CLASSES = {"Barbarian": ("ברברי", 12, ["str", "con"]), "Bard": ("פייטן", 8, ["cha"]),
+           "Cleric": ("כוהן", 8, ["wis"]), "Druid": ("דרואיד", 8, ["wis"]),
+           "Fighter": ("לוחם", 10, ["str", "dex"]), "Monk": ("נזיר", 8, ["dex", "wis"]),
+           "Paladin": ("פלדין", 10, ["str", "cha"]), "Ranger": ("סייר", 10, ["dex", "wis"]),
+           "Rogue": ("נוכל", 8, ["dex"]), "Sorcerer": ("מכשף", 6, ["cha"]),
+           "Warlock": ("קוסם אופל", 8, ["cha"]), "Wizard": ("קוסם", 6, ["int"])}
+NAMES = [("Bram", "בראם"), ("Tamsin", "תמסין"), ("Orrin", "אורין"), ("Liora", "ליאורה"),
+         ("Kestrel", "קסטרל"), ("Doran", "דורן"), ("Ysolde", "איזולדה"), ("Fenn", "פן"),
+         ("Marek", "מארק"), ("Seren", "סרן"), ("Halden", "הלדן"), ("Wren", "רן"),
+         ("Thorne", "ת'ורן"), ("Isra", "איסרה"), ("Galen", "גאלן"), ("Nyra", "נירה"),
+         ("Corwin", "קורווין"), ("Elsbeth", "אלסבת"), ("Ruk", "רוק"), ("Talia", "טליה")]
+MAX_PENDING_ROLLS = 200
+
+
+def _mod(score: int) -> int:
+    return (score - 10) // 2
+
+
 # ============================================================ table state ====
 
 class TableState:
@@ -228,6 +256,8 @@ class TableState:
         self.tts_dir = self.dir / "tts"
         self.tts_engine = None
         self.tts_down_until = 0.0
+        # Characters rolled on the join screen, not created yet: roll id -> roll.
+        self.pending_rolls: Dict[str, Dict[str, Any]] = {}
         # Actions corrected AFTER the GM read them: id -> the text the GM read.
         self.corrections: Dict[int, str] = {}
         try:
@@ -862,6 +892,73 @@ class TableState:
                 "location": (o.get("player_position") or {}).get("current_location"),
                 "time": o.get("time_of_day")}
 
+    def abilities(self) -> List[str]:
+        """The abilities this campaign's characters have (the classic six by default)."""
+        ruleset = self._read_json(self.campaign_dir / "ruleset.json", {})
+        schema = ruleset.get("stat_schema") if isinstance(ruleset, dict) else None
+        attrs = schema.get("attributes") if isinstance(schema, dict) else None
+        names = [str(a) for a in attrs if str(a).strip()] if isinstance(attrs, list) else []
+        return names[:12] or list(CLASSIC_SIX)
+
+    def roll_character(self, lang: Optional[str] = None, previous: Optional[str] = None
+                       ) -> Dict[str, Any]:
+        """Roll a new character: the dice (fair: the OS random source), kept here
+        so the scores can't be edited before they're used. ``previous`` (the
+        roll it replaces) counts the tries, which the table is told."""
+        import dice
+        rng = dice._rng
+        tries = 1
+        with self.lock:
+            if previous and previous in self.pending_rolls:
+                tries = self.pending_rolls.pop(previous)["tries"] + 1
+        abilities = self.abilities()
+        rolls = {}
+        for a in abilities:
+            d = [rng.randint(1, 6) for _ in range(4)]
+            low = d.index(min(d))
+            rolls[a] = {"dice": d, "dropped": low, "score": sum(d) - d[low]}
+        stats = {a: r["score"] for a, r in rolls.items()}
+        he = lang == "he"
+        name_en, name_he = rng.choice(NAMES)
+        roll: Dict[str, Any] = {"stats": stats, "dice": rolls, "tries": tries,
+                                "name": name_he if he else name_en}
+        if [a.lower() for a in abilities] == CLASSIC_SIX:
+            low = {a.lower(): v for a, v in stats.items()}
+            best = max(low.values())
+            fits = [c for c, (_, _, leans) in CLASSES.items() if any(low[x] == best for x in leans)]
+            cls = rng.choice(fits or list(CLASSES))
+            race = rng.choice(list(RACES))
+            cls_he, hit_die, _ = CLASSES[cls]
+            hp = max(1, hit_die + _mod(low["con"]))
+            roll.update({"race": race, "class": cls, "hp": hp, "ac": 10 + _mod(low["dex"]),
+                         "concept": f"{RACES[race]} {cls_he}" if he else f"a {race.lower()} {cls.lower()}"})
+        roll_id = secrets.token_urlsafe(9)
+        with self.lock:
+            self.pending_rolls[roll_id] = roll
+            while len(self.pending_rolls) > MAX_PENDING_ROLLS:
+                self.pending_rolls.pop(next(iter(self.pending_rolls)))
+        return {"ok": True, "roll_id": roll_id, **roll}
+
+    def apply_roll(self, pc: str, roll_id: Optional[str]) -> Optional[Dict[str, Any]]:
+        """Write a rolled character's numbers onto the PC just created."""
+        with self.lock:
+            roll = self.pending_rolls.pop(roll_id, None) if roll_id else None
+        path = party_roster.find_pc(self.campaign_dir, pc) if roll else None
+        if not roll or path is None:
+            return None
+        sheet = to_flat(json.loads(path.read_text(encoding="utf-8")))
+        sheet["stats"] = dict(roll["stats"])
+        for k in ("race", "class", "ac"):
+            if k in roll:
+                sheet[k] = roll[k]
+        if "hp" in roll:
+            sheet["hp"] = {"current": roll["hp"], "max": roll["hp"]}
+        sheet.setdefault("level", 1)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(sheet, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(path)
+        return roll
+
     def create_pc(self, mode: str, name: str, concept: str) -> Dict[str, Any]:
         from identity_onboarding import IdentityOnboarding
         # Always THIS table's campaign — never whichever campaign happens to be
@@ -1001,6 +1098,10 @@ def make_handler(state: TableState, code: str, host_key: str):
                                  pc=result["pc"], event={"type": "seat"})
                 return self._json(result, 200 if result["ok"] else 409)
 
+            if url.path == "/api/roll-character":
+                lang = data.get("lang") if data.get("lang") in LANGS else None
+                return self._json(state.roll_character(lang, data.get("previous")))
+
             if url.path == "/api/create":
                 name = " ".join(str(data.get("name", "")).split())[:60]
                 concept = " ".join(str(data.get("concept", "")).split())[:200]
@@ -1015,12 +1116,22 @@ def make_handler(state: TableState, code: str, host_key: str):
                                             f"pick them in the list above to play them.")
                         created["existing"] = name
                     return self._json(created, 409)
+                rolled = state.apply_roll(created["pc"], data.get("roll_id"))
                 result = state.claim(created["pc"])
                 if result["ok"]:
                     line = f"A new player joins: {created['pc']}"
                     line += f" — {concept}." if concept else "."
-                    state.append("system", line, pc=created["pc"],
-                                 event={"type": "join", "concept": concept})
+                    event = {"type": "join", "concept": concept}
+                    if rolled:
+                        scores = ", ".join(f"{a.upper()} {v}" for a, v in rolled["stats"].items())
+                        line += (f" Rolled: {scores}"
+                                 + (f" ({rolled['race']} {rolled['class']}, HP {rolled['hp']}, "
+                                    f"AC {rolled['ac']})" if "class" in rolled else "")
+                                 + (f" — roll #{rolled['tries']}." if rolled["tries"] > 1 else "."))
+                        event["rolled"] = {k: rolled[k] for k in
+                                           ("stats", "dice", "tries", "race", "class", "hp", "ac")
+                                           if k in rolled}
+                    state.append("system", line, pc=created["pc"], event=event)
                 return self._json(result, 200 if result["ok"] else 409)
 
             me = state.pc_for(data.get("token"))
