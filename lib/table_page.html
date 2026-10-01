@@ -365,6 +365,16 @@
   }
   const noticeShowing = () => Date.now() < noticeUntil;
 
+  // Text direction by majority, not by first letter: "Asterisk, אתה יושב ליד האח"
+  // is a Hebrew sentence that happens to start with an English name. The browser's
+  // dir="auto" looks only at the first letter and would lay the whole paragraph out
+  // left-to-right, throwing the name to the wrong end of the sentence.
+  function dirFor(text) {
+    const he = (String(text).match(/[\u0590-\u05FF]/g) || []).length;
+    const latin = (String(text).match(/[A-Za-z]/g) || []).length;
+    return he > latin ? "rtl" : latin > he ? "ltr" : (lang === "he" ? "rtl" : "ltr");
+  }
+
   // --- tiny, safe markdown: escape first, then a few inline rules ---
   function esc(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;",
@@ -377,8 +387,9 @@
         .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
         .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>")
         .replace(/(^|\s)_([^_\n]+)_/g, "$1<em>$2</em>");
-      if (/^#{1,6} /.test(h)) return '<h3 dir="auto">' + h.replace(/^#{1,6} /, "") + "</h3>";
-      return '<p dir="auto">' + h.replace(/\n/g, "<br>") + "</p>";
+      const dir = dirFor(block);
+      if (/^#{1,6} /.test(h)) return `<h3 dir="${dir}">` + h.replace(/^#{1,6} /, "") + "</h3>";
+      return `<p dir="${dir}">` + h.replace(/\n/g, "<br>") + "</p>";
     }).join("");
   }
 
@@ -1046,7 +1057,7 @@
     d.className = "msg " + m.kind + (m.to ? " whisper" : "") + (m.pc === me && m.kind === "player" ? " mine" : "");
     if (m.kind === "system") {
       d.textContent = systemText(m);
-      d.dir = "auto";
+      d.dir = dirFor(d.textContent);
     } else {
       const who = document.createElement("div");
       who.className = "who";
@@ -1117,12 +1128,16 @@
     $("send").disabled = false;
     if (!r.ok) { setStatus(r.error || "?"); if (r.error === "Take a seat first.") refreshInfo(); return; }
     $("text").value = "";
+    fitTextDir();
     $("private").checked = false;
     spoke = false;
   }
 
   // ------------------------------------------------------------- wiring ---
   $("say").onsubmit = (ev) => { ev.preventDefault(); sendAction(); };
+  const fitTextDir = () => { $("text").dir = $("text").value.trim() ? dirFor($("text").value)
+                                                                   : (lang === "he" ? "rtl" : "ltr"); };
+  $("text").addEventListener("input", fitTextDir);
   $("text").addEventListener("keydown", (ev) => {
     if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); sendAction(); }
   });
@@ -1162,7 +1177,7 @@
       lang = lang === "he" ? "en" : "he";
       store.set("lang", lang);
       applyLang();
-      if (me) { api("/api/lang", { lang }); rerenderLog(); refreshInfo(); updateProgress(); }
+      if (me) { api("/api/lang", { lang }); rerenderLog(); refreshInfo(); updateProgress(); fitTextDir(); }
       if (!$("seat-cards").classList.contains("hidden")) refreshSeats();
     };
   });
