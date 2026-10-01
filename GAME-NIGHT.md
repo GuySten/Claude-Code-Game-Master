@@ -1,0 +1,215 @@
+# Game Night — setting up an adventure for your group
+
+Claude is the Game Master. One person, **the host**, runs the game on their computer;
+everyone else just opens a link in their browser. Players can type or **speak** (English or
+Hebrew), **hear the story read aloud**, and the music follows the scene by itself.
+
+- [One-time setup (host)](#one-time-setup-host)
+- [Each game night (host)](#each-game-night-host)
+- [Message to send your friends](#message-to-send-your-friends)
+- [Player guide](#player-guide) · [מדריך לשחקנים](#מדריך-לשחקנים)
+- [Host cheat sheet](#host-cheat-sheet)
+- [Troubleshooting](#troubleshooting)
+
+---
+
+## One-time setup (host)
+
+You need: a Mac or Linux computer (on Windows, use [WSL](https://learn.microsoft.com/windows/wsl/install)),
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code) signed in, and `git`.
+
+**1. Get the game and install it**
+
+```bash
+git clone https://github.com/GuySten/claude-code-game-master.git
+cd claude-code-game-master
+./install.sh
+```
+
+The installer asks what to install:
+
+- **1) Core only** — pick this unless you plan to import a book. Everything for playing
+  together works: worlds, characters, the online table, voice, music.
+- **2) Core + RAG** — adds importing a PDF/book and smarter memory search. Larger download
+  (PyTorch, CPU-only build). You can add it later with `uv sync --extra rag`.
+
+**2. Get the music library (recommended)**
+
+```bash
+bash tools/gm-music-library.sh fetch
+```
+
+Downloads 25 tracks sorted by mood (tavern, travel, mystery, dread, combat, boss, sad,
+victory…) into `music/`. Claude picks from them automatically. Without it the table still has
+built-in generated sounds for every mood. Credits are shown on screen and in
+`music/CREDITS.md` (the license requires them).
+
+Want your own music? Drop `.mp3`/`.ogg` files into `music/` and put the mood in the file
+name — `battle-drums.mp3`, `tavern-night.ogg`, `creepy-crypt.mp3`. A file named after a
+villain (`grimaldi.mp3`, `grimaldi-boss.mp3`) becomes that villain's theme.
+
+**3. Install a tunnel (only for friends outside your home network)**
+
+Install [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)
+(free, no account; on a Mac: `brew install cloudflared`). It gives your table an `https://`
+link that works from anywhere. **The microphone also needs that https link** — so even
+friends on your Wi-Fi need it if they want to talk instead of type.
+
+---
+
+## Each game night (host)
+
+**1. Start Claude Code in the game folder**
+
+```bash
+cd claude-code-game-master
+git pull            # pick up the latest version
+claude
+```
+
+**2. Start the adventure**
+
+Type `/gm`. Pick **New Adventure** (create a world, import a book, or a quick one-shot) or
+continue a saved campaign. Then tell Claude:
+
+> My friends are joining online tonight.
+
+Claude opens the table and shows you a **link** and a **table code** (like `ember-482`).
+(Manual way: `bash tools/gm-table.sh start`.)
+
+**3. Open the tunnel** (skip if everyone is on your Wi-Fi and will only type)
+
+In a second terminal window:
+
+```bash
+cloudflared tunnel --url http://localhost:8765
+```
+
+It prints a link like `https://something-random.trycloudflare.com`. Keep this window open
+all night — closing it disconnects remote players. The link changes every time you run it.
+
+**4. Send your friends the link and the code** — see the message below.
+
+**5. Join yourself** — open `http://localhost:8765` in your own browser and take a seat like
+everyone else. Keep the Claude Code window open; that's where your GM lives.
+
+**6. Play.** Claude waits for everyone's actions, rolls the dice, keeps the sheets, and
+posts the story to every screen. Talk to Claude in the terminal only for out-of-game things
+("pause", "take it slower", "let's end at the next rest").
+
+> **Tip:** Claude Code asks permission before running commands. When it asks to run
+> `bash tools/...` during the game, choose the option to allow it without asking again, or
+> the story will pause on every turn.
+
+**7. End the night** — tell Claude *"let's stop here for tonight."* It saves the session
+(characters, the world, what happened, the cliffhanger), says goodbye at the table, and
+closes it. Next time: `/gm` → pick the campaign → *"my friends are joining online"* — and
+everyone takes the same seats again.
+
+---
+
+## Message to send your friends
+
+Copy, fill in the link and code, and send:
+
+> 🎲 **D&D tonight!** Open this link in **Chrome, Edge or Safari** (phone or computer):
+> **LINK**
+> Table code: **CODE**
+> Pick a character or make your own (a name and one line about them is enough). Type what
+> you do, or tap 🎤 and say it. Tap 🔊 to hear the story read aloud. Headphones recommended.
+> For Hebrew, tap **עברית** at the top.
+
+> 🎲 **ערב D&D!** פתחו את הקישור ב-**Chrome, Edge או Safari** (בטלפון או במחשב):
+> **LINK**
+> קוד השולחן: **CODE**
+> בחרו דמות או צרו אחת משלכם (מספיקים שם ושורה אחת על הדמות). כתבו מה אתם עושים, או
+> לחצו 🎤 ותגידו את זה. לחצו 🔊 כדי לשמוע את הסיפור בקול. מומלץ אוזניות.
+> לאנגלית לחצו **English** למעלה.
+
+---
+
+## Player guide
+
+1. **Open the link** in Chrome, Edge or Safari and enter the **table code**.
+2. **Choose who you are** — tap a free character, or create one: a name and one line
+   ("a dwarf cleric who lost her faith"). "Nameless traveler" works too — the world will
+   name you.
+3. **Act.** Type what your character does and press Enter — or tap **🎤**, speak, and it
+   sends when you stop talking (untick "Send when I stop talking" to check the text first).
+   Talk the way you'd talk at a table: *"I sneak up behind the guard and try to grab his
+   keys."*
+4. **Listen.** **🔊** reads the story aloud. **🎵** turns the music on/off; the
+   volume, reading speed and voices are in the side panel (tap **Party** on a phone).
+5. **Secrets.** Tick **"Only the GM sees this"** to whisper to the GM. Purple messages are
+   whispers only you can see.
+6. **Language.** **עברית / English** switches the whole page, your microphone, and the
+   language the GM answers you in.
+7. The side panel shows everyone's **HP**. Refreshing the page keeps your seat. To switch
+   devices, tap **Leave seat** first (or ask the host to free it).
+
+## מדריך לשחקנים
+
+1. **פתחו את הקישור** ב-Chrome, Edge או Safari והכניסו את **קוד השולחן**.
+2. **בחרו מי אתם** — לחצו על דמות פנויה, או צרו דמות: שם ושורה אחת ("גמדה כוהנת שאיבדה
+   את אמונתה"). אפשר גם "נווד/ת בלי שם" — העולם כבר ייתן לכם שם.
+3. **פעלו.** כתבו מה הדמות עושה ולחצו Enter — או לחצו **🎤**, דברו, וההודעה תישלח כשתסיימו
+   לדבר (בטלו את "לשלוח כשאני מסיים/ת לדבר" אם אתם רוצים לבדוק את הטקסט קודם). דברו כמו ליד
+   שולחן אמיתי: *"אני מתגנב מאחורי השומר ומנסה לחטוף לו את המפתחות."*
+4. **הקשיבו.** **🔊** מקריא את הסיפור. **🎵** מפעיל ומכבה את המוזיקה; עוצמה, מהירות הקראה
+   וקולות נמצאים בפאנל הצד (בטלפון: לחצו **החבורה**).
+5. **סודות.** סמנו **"רק מנהל המשחק יראה"** כדי ללחוש למנהל המשחק. הודעות סגולות הן לחישות
+   שרק אתם רואים.
+6. **שפה.** **English / עברית** מחליף את כל הדף, את המיקרופון ואת השפה שבה מנהל המשחק עונה
+   לכם.
+7. בפאנל הצד רואים את **נקודות החיים** של כולם. רענון הדף שומר לכם את המקום. כדי לעבור
+   למכשיר אחר, לחצו קודם **עזיבת המושב** (או בקשו מהמארח לפנות אותו).
+
+---
+
+## Host cheat sheet
+
+You rarely need these — Claude runs them — but they're yours to use:
+
+| Command | What it does |
+|---|---|
+| `bash tools/gm-table.sh start` / `stop` | Open / close the table |
+| `bash tools/gm-table.sh status` | Link, code, who's seated, unread actions |
+| `bash tools/gm-table.sh free "Name"` | Free a seat (player switching devices) |
+| `bash tools/gm-table.sh music list` | What plays for each mood, and the enemy themes |
+| `bash tools/gm-table.sh music --mood tavern` | Force a mood's music right now |
+| `bash tools/gm-table.sh music theme "Grimaldi" waltz.mp3` | Give a villain their own track |
+| `bash tools/gm-table.sh music auto off` | Stop Claude from changing the music |
+| `bash tools/gm-player.sh party` | Every player character and their stats |
+| `bash tools/gm-music-library.sh fetch` | Download (or re-download) the music library |
+
+---
+
+## Troubleshooting
+
+**Friends can't open the link.** On another network they need the tunnel's `https://…`
+link, not the Wi-Fi one, and the `cloudflared` window must stay open. On the same Wi-Fi, a
+firewall may block port 8765 — use the tunnel link instead.
+
+**The 🎤 button says it needs a secure link.** Use the tunnel's `https://` link (or
+`localhost` on the host's computer). Firefox can't do voice input — use Chrome, Edge or
+Safari. If the browser asked for microphone permission and it was refused, allow it from
+the icon in the address bar.
+
+**Hebrew is read with an English-sounding voice.** The device has no Hebrew voice installed:
+- Windows: Settings → Time & language → Language & region → add Hebrew (with speech).
+- Mac / iPhone: Settings → Accessibility → Spoken Content → Voices → Hebrew.
+- Android: Settings → Text-to-speech → Google speech engine → install Hebrew voice data.
+
+Then choose it under "Hebrew voice" in the side panel.
+
+**No music.** Tap anywhere on the page once (browsers block sound until you touch the page)
+and check **🎵** is on and the music volume isn't at zero.
+
+**"<Name> is already being played."** That seat is open somewhere else (another tab or
+device). The host runs `bash tools/gm-table.sh free "Name"`.
+
+**"Port already in use."** Something else is on 8765: `bash tools/gm-table.sh start --port 8800`
+(and use 8800 in the tunnel command).
+
+**The GM is quiet.** Claude may be waiting on a permission prompt in the terminal — check
+the Claude Code window. If it seems stuck, tell it: *"keep running the table."*

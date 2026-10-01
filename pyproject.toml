@@ -43,6 +43,10 @@ voice = [
 rag = [
     "sentence-transformers>=2.2.0",
     "chromadb>=0.4.0",
+    # Listed directly (sentence-transformers pulls it in anyway) so the source
+    # below applies: the CPU-only build. The embedding model is tiny and runs
+    # fine on CPU; PyPI's default Linux build bundles several GB of CUDA libraries.
+    "torch>=2.2",
 ]
 
 # Full installation (all features)
@@ -66,6 +70,19 @@ Documentation = "https://github.com/Sstobo/Claude-Code-Game-Master/wiki"
 Repository = "https://github.com/Sstobo/Claude-Code-Game-Master"
 Issues = "https://github.com/Sstobo/Claude-Code-Game-Master/issues"
 Author = "https://www.linkedin.com/in/sean-stobo/"
+
+# PyTorch comes from PyTorch's CPU-only index on Linux and Windows. macOS keeps
+# PyPI's build, which is already CPU/Metal only (the CPU index has no macOS
+# wheels for every release).
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu", marker = "sys_platform != 'darwin'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [build-system]
 requires = ["setuptools>=68.0.0", "wheel"]

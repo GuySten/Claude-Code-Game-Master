@@ -23,11 +23,15 @@ Run this command to install GM Claude dependencies. This runs automatically on f
    if command -v uv &> /dev/null; then
        uv sync --extra rag
    else
-       source .venv/bin/activate && pip install --upgrade pip && pip install -e '.[rag]'
+       source .venv/bin/activate && pip install --upgrade pip
+       # CPU-only PyTorch first (pip ignores pyproject's [tool.uv.sources]); not needed on macOS
+       [ "$(uname -s)" = "Darwin" ] || pip install torch --index-url https://download.pytorch.org/whl/cpu
+       pip install -e '.[rag]'
    fi
    ```
 
-   Note: This installs sentence-transformers and chromadb for document import. First run may download ~500MB of model files.
+   Note: This installs sentence-transformers and chromadb for document import, with the
+   CPU-only build of PyTorch (configured in pyproject.toml; no CUDA download).
 
 4. **Create .env if missing**
    ```bash

@@ -117,6 +117,10 @@ Then launch and play:
 1. Run `claude` to launch Claude Code
 2. Run `/gm` — the harness takes it from there
 
+**Playing with friends on their own computers?** Follow **[GAME-NIGHT.md](GAME-NIGHT.md)** —
+host setup, the link and code to send, a player guide in English and Hebrew, and fixes for
+common problems.
+
 `/gm` is the only command you need. It offers a **New Adventure** — author an original world (`/new-game`), import a book you've dropped in `source-material/` (`/import`), or spin up a quick one-shot — then builds your character and runs the game. First thing it asks once a world exists: **"Who are you in this world?"** — play a character lifted straight from the source, an original of your own, or a nameless traveler who wanders in. The mechanics get figured out behind the scenes.
 
 ### Play together — every player on their own computer
@@ -284,7 +288,7 @@ Installed automatically during setup via [uv](https://docs.astral.sh/uv/):
 
 **Core:** `anthropic` (Claude API client), `pdfplumber` + `pypdf2` (PDF extraction), `python-docx` (Word docs), `python-dotenv` (env loading), `requests` (D&D 5e API).
 
-**RAG (document import):** `sentence-transformers` (embeddings), `chromadb` (vector index for source lookups).
+**RAG (document import):** `sentence-transformers` (embeddings), `chromadb` (vector index for source lookups), and the **CPU-only** build of PyTorch that sentence-transformers runs on. The embedding model is small, so no GPU is needed; uv takes PyTorch from PyTorch's CPU index (see `[tool.uv.sources]` in `pyproject.toml`) instead of PyPI's multi-gigabyte CUDA build. Skip the whole RAG extra (install option 1, or plain `uv sync`) if you never import a book.
 
 ---
 
