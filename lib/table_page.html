@@ -953,6 +953,9 @@
         if (atBottom || !historyLoaded) log.scrollTop = log.scrollHeight;
         const last = r.messages[r.messages.length - 1];
         if (last.kind === "player" && !listening) setStatus(t("considering"));
+        // The music changed: fetch it now instead of on the next 4-second refresh,
+        // so the new track starts with the narration it belongs to.
+        if (historyLoaded && r.messages.some((m) => m.event && /^music/.test(m.event.type))) refreshInfo();
       }
       historyLoaded = true;
     } catch (e) { setStatus(t("reconnecting")); }

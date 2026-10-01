@@ -970,7 +970,9 @@ def _print_messages(messages: List[dict], waiting_on: List[str],
         print("(no new player messages)")
     for m in messages:
         if m["kind"] == "system":
-            print(f"[#{m['id']} JOIN/LEAVE] {m['text']}")
+            kind = str((m.get("event") or {}).get("type", ""))
+            label = "MUSIC" if kind.startswith("music") else "JOIN/LEAVE"
+            print(f"[#{m['id']} {label}] {m['text']}")
         else:
             tags = [LANGS[m["lang"]]] if m.get("lang") in LANGS else []
             if m.get("voice"):
