@@ -231,6 +231,31 @@
   #now-playing { margin-bottom: 6px; }
   #party-toggle { display: none; }
 
+  /* The players' side chat (the GM never sees it): a third column on wide screens,
+     a drawer from the side on narrower ones. */
+  #chat { display: none; flex-direction: column; min-height: 0; background: var(--panel);
+          border-inline-start: 1px solid var(--line); }
+  #chat.open { display: flex; position: fixed; top: 56px; bottom: 0; inset-inline-end: 0;
+               width: min(340px, 100%); z-index: 6; box-shadow: 0 0 24px rgba(0, 0, 0, .25); }
+  #chat h2 { font-size: .95rem; margin: 0; padding: 12px 14px 4px; color: var(--muted);
+             font-weight: normal; text-transform: uppercase; letter-spacing: .08em; }
+  #chat .note { font-size: .78rem; color: var(--muted); padding: 0 14px 6px; }
+  #chat-log { flex: 1; overflow-y: auto; padding: 6px 14px; }
+  .chat-msg { margin: 0 0 8px; font-size: .92rem; }
+  .chat-msg .from { font-weight: bold; font-size: .8rem; color: var(--accent); }
+  .chat-msg.mine .from { color: var(--muted); }
+  #chat form { display: flex; gap: 6px; padding: 8px 10px 12px; border-top: 1px solid var(--line); }
+  #chat input { flex: 1; padding: 8px 10px; }
+  #chat form button { padding: 6px 12px; }
+  #chat-toggle .badge { background: var(--hp-low); color: #fff; border-radius: 9px;
+                        font-size: .72rem; padding: 0 6px; margin-inline-start: 4px; }
+  @media (min-width: 1180px) {
+    #table { grid-template-columns: 1fr 280px 300px; }
+    #chat { display: flex; }
+    #chat.open { position: static; width: auto; box-shadow: none; }
+    #chat-toggle { display: none; }
+  }
+
   @media (max-width: 760px) {
     #table { grid-template-columns: 1fr; }
     aside { display: none; position: fixed; inset: 56px 0 auto 0; max-height: 65vh;
@@ -289,6 +314,7 @@
         <button id="read-toggle" type="button" aria-pressed="false"></button>
         <button class="lang-toggle" type="button"></button>
         <button id="sheet-toggle" type="button" data-i18n="mySheet"></button>
+        <button id="chat-toggle" type="button"><span data-i18n="chatButton"></span><span class="badge hidden" id="chat-unread"></span></button>
         <button id="party-toggle" type="button" data-i18n="party"></button>
         <button id="leave" type="button" data-i18n="leave"></button>
       </div>
@@ -334,6 +360,15 @@
       <select id="voice-he"></select>
     </div>
   </aside>
+  <section id="chat" aria-labelledby="chat-title">
+    <h2 id="chat-title" data-i18n="chatTitle"></h2>
+    <div class="note" data-i18n="chatNote"></div>
+    <div id="chat-log" aria-live="polite"></div>
+    <form id="chat-form">
+      <input id="chat-text" maxlength="500" autocomplete="off" dir="auto" data-i18n-ph="chatPh">
+      <button type="submit" data-i18n="chatSend"></button>
+    </form>
+  </section>
 </section>
 
 <dialog id="places" aria-labelledby="places-title">
@@ -392,6 +427,8 @@
       lvlNoHp: "The GM will set your hit points.", lvlAsi: "Ability score increase: +1 and +1 (pick the same one twice for +2)",
       lvlAsiSkip: "— (I'd rather ask for a feat)", lvlWish: "What do you want from this level? (subclass, spells, a feat…) The GM adds your class features.",
       lvlDone: "⬆ You're level {n}!", lvlBadge: "⬆",
+      chatButton: "💬 Chat", chatTitle: "Table talk", chatNote: "Just the players: the GM can't see this.",
+      chatPh: "Say something to the other players…", chatSend: "Send",
       party: "Party", partyTitle: "The party", placeholder: "What do you do? (type, or tap 🎤 and speak)",
       private: "Only the GM sees this", autoSend: "Send when I stop talking", send: "Send",
       roundYours: "⏳ {t} to act — the GM answers when everyone has acted",
@@ -466,6 +503,8 @@
       lvlNoHp: "מנהל המשחק יקבע את נקודות החיים.", lvlAsi: "שיפור תכונות: ‎+1 ו-‎+1 (בחרו אותה תכונה פעמיים ל-‎+2)",
       lvlAsiSkip: "— (אעדיף לבקש הישג)", lvlWish: "מה תרצו מהדרגה הזו? (תת־מקצוע, לחשים, הישג…) מנהל המשחק מוסיף את יכולות המקצוע.",
       lvlDone: "⬆ עליתם לדרגה {n}!", lvlBadge: "⬆",
+      chatButton: "💬 צ'אט", chatTitle: "שיחת שולחן", chatNote: "רק השחקנים: מנהל המשחק לא רואה את זה.",
+      chatPh: "כתבו משהו לשאר השחקנים…", chatSend: "שליחה",
       party: "החבורה", partyTitle: "החבורה", placeholder: "מה אתם עושים? (הקלידו, או לחצו 🎤 ודברו)",
       private: "רק מנהל המשחק יראה", autoSend: "לשלוח כשאני מסיים/ת לדבר", send: "שליחה",
       roundYours: "⏳ נותרו {t} לפעול — מנהל המשחק עונה כשכולם פעלו",
@@ -1250,6 +1289,61 @@
   }
 
   // ---------------------------------------------------------- the table ---
+  // ------------------------------------------------- the players' side chat ---
+  let chatLast = 0, chatUnread = 0, chatPolling = false;
+  const chatVisible = () => getComputedStyle($("chat")).display !== "none";
+  function addChat(m) {
+    const d = document.createElement("div");
+    d.className = "chat-msg" + (m.pc === me ? " mine" : "");
+    const from = document.createElement("div");
+    from.className = "from"; from.textContent = m.pc;
+    const body = document.createElement("div");
+    body.textContent = m.text; body.dir = dirFor(m.text);
+    d.append(from, body);
+    $("chat-log").appendChild(d);
+  }
+  function setUnread(n) {
+    chatUnread = n;
+    $("chat-unread").textContent = String(n);
+    $("chat-unread").classList.toggle("hidden", !n);
+  }
+  async function pollChat() {
+    try {
+      const r = await api("/api/chat?after=" + chatLast);
+      if (r.ok && r.messages.length) {
+        const log = $("chat-log");
+        const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 60;
+        const first = chatLast === 0;
+        r.messages.forEach((m) => {
+          addChat(m); chatLast = Math.max(chatLast, m.id);
+          if (!first && m.pc !== me && !chatVisible()) setUnread(chatUnread + 1);
+        });
+        if (atBottom || first) log.scrollTop = log.scrollHeight;
+      }
+    } catch (e) {}
+    setTimeout(pollChat, 2000);
+  }
+  $("chat-form").onsubmit = async (ev) => {
+    ev.preventDefault();
+    const text = $("chat-text").value.trim();
+    if (!text) return;
+    const r = await api("/api/chat", { text });
+    if (!r.ok) { setStatus(r.error || "?"); return; }
+    $("chat-text").value = "";
+    if (r.message && r.message.id > chatLast) {
+      addChat(r.message); chatLast = r.message.id;
+      $("chat-log").scrollTop = $("chat-log").scrollHeight;
+    }
+  };
+  $("chat-text").addEventListener("input", () => {
+    $("chat-text").dir = $("chat-text").value.trim() ? dirFor($("chat-text").value) : "auto";
+  });
+  $("chat-toggle").onclick = () => {
+    const open = $("chat").classList.toggle("open");
+    if (open) { setUnread(0); $("party").classList.remove("open"); $("chat-text").focus();
+                $("chat-log").scrollTop = $("chat-log").scrollHeight; }
+  };
+
   function openTable(info) {
     $("join").classList.add("hidden");
     $("table").classList.remove("hidden");
@@ -1257,6 +1351,7 @@
     renderInfo(info);
     if (!polling) {
       polling = true; pollMessages(); setInterval(refreshInfo, 4000);
+      if (!chatPolling) { chatPolling = true; pollChat(); }
       [400, 900, 1500].forEach((ms) => setTimeout(refreshInfo, ms));   // calibrate the clock
     }
   }

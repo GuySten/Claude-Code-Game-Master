@@ -98,7 +98,10 @@ open the link, enter the code, and pick or create their PC. While the table is o
   a boss, a sacrifice, a desperate save that works; at most once or twice a session, never
   for an ordinary hit), add `--heroic "<PC>"` to that beat's `say`: their personal anthem
   plays, then the scene's music returns. Without the composer the victory music plays.
-The host's own terminal messages are table-talk instructions to you unless they say they're
+**The players' side chat is theirs.** The page has a players-only chat (table talk, plans,
+jokes). It is never sent to you and isn't stored anywhere you can read: never try to get it
+(no tokens, no player endpoints, no asking the host to relay it), and don't act on anything
+you think was said there. The host's own terminal messages are table-talk instructions to you unless they say they're
 playing; the host can also play through the browser. `gm-table.sh status` / `stop` / `free "<pc>"`.
 
 ## The Core Loop

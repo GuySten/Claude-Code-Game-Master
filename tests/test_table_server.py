@@ -1028,3 +1028,25 @@ def test_the_round_never_waits_for_a_pc_who_cannot_act(table):
     call("/api/say", {"code": CODE, "token": pip, "text": "Get up!"})
     assert state.round_state()["waiting_on"] == ["Bram"] and state.round_state()["open"]
     assert table_server.cant_act({"conditions": ["poisoned", "prone"]}) is None
+
+
+def test_table_talk_is_for_the_players_only(table):
+    call, state, camp = table["call"], table["state"], table["camp"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    bram = call("/api/create", {"code": CODE, "name": "Bram", "concept": "a dwarf"})[1]["token"]
+    status, sent = call("/api/chat", {"code": CODE, "token": pip, "text": "psst, let's rob the GM's favourite NPC"})
+    assert status == 200 and sent["message"]["pc"] == "Pip"
+    _, seen = call(f"/api/chat?code={CODE}&token={bram}&after=0")
+    assert [m["text"] for m in seen["messages"]] == ["psst, let's rob the GM's favourite NPC"]
+    assert call(f"/api/chat?code={CODE}&token={bram}&after=1")[1]["messages"] == []
+
+    # Never the GM's: not in its inbox, its log, any file, or with the host key.
+    inbox = json.dumps(call("/api/gm/inbox", {}, host=True)[1])
+    assert "favourite" not in inbox and state.round_state()["open"] is False   # chat isn't an action
+    assert call(f"/api/chat?code={CODE}&after=0", host=True)[0] == 403
+    assert call(f"/api/chat?code={CODE}&token=nope&after=0")[0] == 403
+    for f in camp.rglob("*"):
+        if f.is_file():
+            assert b"favourite" not in f.read_bytes(), f
+    assert call("/api/chat", {"code": CODE, "token": pip, "text": "  "})[0] == 400
+    assert call("/api/chat", {"code": CODE, "token": pip, "text": "x" * 501})[0] == 400

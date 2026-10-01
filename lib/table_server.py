@@ -200,6 +200,11 @@ MAX_PENDING_ROLLS = 200
 # A round: once the first player acts, the GM waits until every seated player has
 # acted, or this many seconds (gm-table.sh round <seconds|off>).
 ROUND_SECONDS = 60
+# The players' side chat: kept in memory only, never on disk and never in any
+# GM endpoint, so the GM (and Claude, who can read the campaign's files) can't
+# see it. It clears when the table restarts.
+CHAT_KEEP = 500
+CHAT_TEXT = 500
 # A PC in one of these states can't act, so a round never waits for them.
 CANT_ACT = ("dead", "dying", "unconscious", "incapacitated", "paralyzed", "paralysed",
             "petrified", "stunned", "asleep", "sleeping", "knocked out", "comatose")
@@ -307,6 +312,7 @@ class TableState:
         g = self._read_json(self.gallery_path, {})
         self.shown_foes: List[List[Any]] = [x for x in g.get("foes", []) if isinstance(x, list)]
         self.shown_treasures: List[str] = [x for x in g.get("treasures", []) if isinstance(x, str)]
+        self.chat: List[Dict[str, Any]] = []           # players only; never written to disk
         # Composed music: villains' and bosses' themes and the PCs' anthems are
         # composed in the background (lib/composer.py) when the composer is set up.
         self.music_jobs: List[Dict[str, Any]] = []
@@ -443,6 +449,19 @@ class TableState:
             if why and sheet.get("name"):
                 out[sheet["name"]] = why
         return out
+
+    # --- the players' side chat (the GM is not privy to it) ---
+    def chat_post(self, pc: str, text: str) -> Dict[str, Any]:
+        with self.lock:
+            msg = {"id": (self.chat[-1]["id"] + 1) if self.chat else 1,
+                   "t": round(time.time(), 2), "pc": pc, "text": text}
+            self.chat.append(msg)
+            del self.chat[:-CHAT_KEEP]
+            return dict(msg)
+
+    def chat_since(self, after: int) -> List[Dict[str, Any]]:
+        with self.lock:
+            return [dict(m) for m in self.chat if m["id"] > after]
 
     def gm_read_since_narration(self) -> bool:
         """Has the GM read players' actions since it last narrated to everyone?"""
@@ -1643,6 +1662,14 @@ def make_handler(state: TableState, code: str, host_key: str):
                     after, rev = 0, 0
                 return self._json({"ok": True, "me": me, "rev": state.rev,
                                    "messages": state.since(after, me, rev)})
+            if url.path == "/api/chat":
+                if not me:                      # seated players only: never the host key
+                    return self._err("Take a seat first.", 403)
+                try:
+                    after = int(q.get("after", 0))
+                except ValueError:
+                    after = 0
+                return self._json({"ok": True, "messages": state.chat_since(after)})
             if url.path == "/api/sheet":
                 if not me:
                     return self._err("Take a seat first.", 403)
@@ -1745,6 +1772,16 @@ def make_handler(state: TableState, code: str, host_key: str):
                     return self._err(f"Keep it under {MAX_PLAYER_TEXT} characters.")
                 result = state.edit(me, data.get("id"), text)
                 return self._json(result, 200 if result["ok"] else 409)
+
+            if url.path == "/api/chat":
+                if not me:
+                    return self._err("Take a seat first.", 403)
+                text = " ".join(str(data.get("text", "")).split())
+                if not text:
+                    return self._err("Say something.")
+                if len(text) > CHAT_TEXT:
+                    return self._err(f"Keep it under {CHAT_TEXT} characters.")
+                return self._json({"ok": True, "message": state.chat_post(me, text)})
 
             if url.path == "/api/level-up":
                 if not me:
