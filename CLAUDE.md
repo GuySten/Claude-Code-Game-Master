@@ -58,10 +58,20 @@ open the link, enter the code, and pick or create their PC. While the table is o
   (English/Hebrew). Answer in it — natural Hebrew, not transliteration. Mixed table (`wait`
   prints `Table languages`): post each beat once per language, `say --lang en` and
   `say --lang he`; each player sees only their own. Untagged `say` goes to everyone.
-- **Music.** `gm-table.sh music <track>` sets one shared track for everyone (`music list`
-  shows files in `music/` and the built-in `ambient:wind|rain|storm|cave|fire|dungeon`;
-  any https audio link works too; `music stop`). Change it when the scene's mood changes
-  (arrive at the tavern, combat starts, enter the crypt), never every beat.
+- **Music is automatic — you pick the mood, the table picks the track.** Tag EVERY `say`
+  with the scene's mood: `--mood calm|tavern|travel|mystery|dread|dungeon|combat|boss|sad|
+  storm|victory|silence`. Same mood = the track keeps playing; a new mood switches it
+  (files in `music/` named for the mood, else a built-in sound). The `wait` footer shows
+  the current mood — re-judge it every beat.
+- **Special enemies have their own theme.** When a named villain, boss or recurring foe
+  enters, use `say --theme "<name>"` (exact NPC name) instead of a mood: their personal
+  theme plays (a file assigned with `music theme "<name>" <file>`, one named after them, or
+  a tune generated from their name — always the same one). It holds through
+  combat/dread/boss and ends when you tag a calmer mood. **Bosses get exciting music:**
+  `say --theme "<name>" --boss` (the fast, thundering version of their theme); a fight that
+  escalates mid-way (phase two, true form) → `--mood boss` upgrades the playing theme; a
+  boss with no name → `--mood boss` (epic battle music). Regular foes and mooks: just
+  `--mood combat`. `music list` / `music themes` show what's available.
 The host's own terminal messages are table-talk instructions to you unless they say they're
 playing; the host can also play through the browser. `gm-table.sh status` / `stop` / `free "<pc>"`.
 

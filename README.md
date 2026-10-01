@@ -140,10 +140,17 @@ asides to the GM, whispers back, and live HP bars for the party.
   hear the story read aloud. This uses the browser's own speech engines (Chrome, Edge or
   Safari), so there's nothing to install. The microphone needs an https link (the tunnel
   link) or localhost.
-- **Shared music.** The GM sets one background track for the whole table
-  (`gm-table.sh music tavern.mp3`, any https audio link, or a built-in generated ambience such
-  as `ambient:storm`). Everyone hears it from the same point, it gets quieter while the
-  narration is read aloud, and each player sets their own volume. Same Wi-Fi works out of
+- **Music that follows the story.** Claude tags each beat with the scene's mood (tavern,
+  travel, mystery, dread, combat, boss, sad, victory…) and the table switches to fitting
+  music on its own, for everyone at once — quieter while narration is read aloud, with a
+  volume control per player.
+- **Every special enemy has their own theme**, and **bosses get exciting music**: the same
+  leitmotif, but fast and thundering. Assign a real track to a villain
+  (`gm-table.sh music theme "Grimaldi" clown-waltz.mp3`), name a file after them, or let the
+  table generate a tune from their name.
+- **A starter music library**: `bash tools/gm-music-library.sh fetch` downloads 25 tracks
+  by Kevin MacLeod (incompetech.com, CC BY 4.0, credited on screen), already sorted by mood.
+  With no files at all, built-in generated soundscapes cover every mood. Same Wi-Fi works out of
 the box. For friends elsewhere, run a free tunnel such as
 `cloudflared tunnel --url http://localhost:8765` and share its https link. No extra
 dependencies are needed (Python standard library only).
@@ -232,7 +239,8 @@ The harness is plumbing you can poke at: bash wrappers (`tools/`) → Python man
 | `gm-session.sh` | Session lifecycle, party movement, save/restore |
 | `gm-context.sh` | Assemble scene context (world state + source passages) |
 | `gm-player.sh` | Player stats — health, progression, gold, inventory (every PC; `join`/`party`/`leave` for multiplayer) |
-| `gm-table.sh` | Online table — players join from their own browsers (voice, Hebrew/English, shared music); `wait` / `say` / `music` run the loop |
+| `gm-table.sh` | Online table — players join from their own browsers (voice, Hebrew/English, mood-driven music, enemy themes); `wait` / `say` / `music` run the loop |
+| `gm-music-library.sh` | Download the starter music library into `music/` (sorted by mood, credited) |
 | `gm-npc.sh` | NPCs — creation, updates, mood/goal/voice, party members |
 | `gm-location.sh` | Locations and connections |
 | `gm-plot.sh` | Quest and storyline tracking |

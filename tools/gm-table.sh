@@ -11,7 +11,10 @@
 #   gm-table.sh say "..." --to "<pc>"     Whisper to one player only
 #   gm-table.sh say "..." --image f.png   Attach an image from the campaign's images/
 #   gm-table.sh say "..." --lang he       The Hebrew version of a beat (mixed-language tables)
+#   gm-table.sh say "..." --mood combat   Music follows the scene's mood automatically
+#   gm-table.sh say "..." --theme "Lich" --boss   An enemy's own theme (boss = exciting version)
 #   gm-table.sh music <track>|list|stop   Shared background music for every player
+#   gm-table.sh music theme "<enemy>" [file]      Play / assign an enemy's theme
 #   gm-table.sh free "<pc>"               Free a seat (player switching devices)
 #   gm-table.sh stop                      Close the table
 #   gm-table.sh serve [...]               Run the server in the foreground instead
@@ -65,7 +68,12 @@ case "$ACTION" in
         echo "                                one language's version of a beat)"
         echo "  music <track> [--volume V]    Shared background music: a file in music/, an https"
         echo "                                audio link, or ambient:wind|rain|storm|cave|fire|dungeon"
-        echo "  music list | music stop       What can play / silence"
+        echo "  music list | music stop       What can play (per mood) / silence"
+        echo "  say ... --mood M              Music follows the scene: calm tavern travel mystery dread"
+        echo "                                dungeon combat boss sad storm victory silence"
+        echo "  say ... --theme \"<enemy>\" [--boss]  The enemy's own theme (boss: the exciting one)"
+        echo "  music theme \"<enemy>\" [file]  Play / assign an enemy's theme; music themes lists them"
+        echo "  music auto on|off             Let --mood change the music (default on)"
         echo "  free \"<pc>\"                   Free a seat so a player can rejoin from a new device"
         echo "  stop                          Close the table"
         echo ""

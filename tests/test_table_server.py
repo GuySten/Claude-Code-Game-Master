@@ -195,3 +195,101 @@ def test_music_files_are_served_with_seeking(table):
     with pytest.raises(urllib.error.HTTPError) as denied:
         opener.open(f"{url}/music/Tavern%20Night.ogg?code=nope", timeout=5)
     assert denied.value.code == 403
+
+
+def _touch_music(camp, *names):
+    music = camp / "music"
+    music.mkdir(exist_ok=True)
+    for name in names:
+        (music / name).write_bytes(b"\0" * 2048)
+
+
+def test_say_mood_picks_matching_music_and_only_switches_on_change(table):
+    call, state = table["call"], table["state"]
+    _touch_music(table["camp"], "tavern-pippin.mp3", "battle-drums.ogg")
+    _, body = call("/api/gm/say", {"text": "The inn is warm.", "mood": "tavern"}, host=True)
+    assert body["music"]["src"] == "tavern-pippin.mp3" and body["music"]["mood"] == "tavern"
+    first_id = state.music["id"]
+    _, body = call("/api/gm/say", {"text": "Someone laughs.", "mood": "tavern"}, host=True)
+    assert body["music"] is None and state.music["id"] == first_id   # same mood: no restart
+    _, body = call("/api/gm/say", {"text": "Steel is drawn!", "mood": "combat"}, host=True)
+    assert body["music"]["src"] == "battle-drums.ogg"
+    _, body = call("/api/gm/say", {"text": "Into the crypt.", "mood": "dungeon"}, host=True)
+    assert body["music"]["track"] == "ambient:cave"                  # no file: built-in sound
+    _, body = call("/api/gm/say", {"text": "Hush.", "mood": "silence"}, host=True)
+    assert body["music"]["track"] is None
+    assert call("/api/gm/say", {"text": "x", "mood": "polka"}, host=True)[0] == 400
+
+
+def test_moods_json_overrides_keywords_and_auto_can_be_turned_off(table):
+    call, state = table["call"], table["state"]
+    _touch_music(table["camp"], "track01.mp3")
+    (table["camp"] / "music" / "moods.json").write_text(json.dumps({"calm": ["track01.mp3"]}))
+    assert state.mood_files("calm") == ["track01.mp3"]
+    call("/api/gm/music", {"auto": False}, host=True)
+    _, body = call("/api/gm/say", {"text": "Rest.", "mood": "calm"}, host=True)
+    assert body["music"] is None
+    call("/api/gm/music", {"auto": True}, host=True)
+    _, body = call("/api/gm/say", {"text": "Rest.", "mood": "calm"}, host=True)
+    assert body["music"]["src"] == "track01.mp3"
+
+
+def test_each_enemy_gets_their_own_theme_that_holds_through_the_fight(table):
+    call, state = table["call"], table["state"]
+    _, body = call("/api/gm/say", {"text": "A clown grins.", "theme": "Grimaldi"}, host=True)
+    assert body["music"]["track"] == "theme:Grimaldi" and body["music"]["theme"] == "Grimaldi"
+    assert call("/api/gm/say", {"text": "It attacks!", "mood": "combat"}, host=True)[1]["music"] is None
+    _, body = call("/api/gm/say", {"text": "Another foe.", "theme": "The Hollow King"}, host=True)
+    assert body["music"]["track"] == "theme:The Hollow King"
+    _, body = call("/api/gm/say", {"text": "You won.", "mood": "victory"}, host=True)
+    assert body["music"]["mood"] == "victory" and not body["music"].get("theme")
+
+
+def test_boss_themes_are_the_exciting_version_and_a_fight_can_escalate(table):
+    call = table["call"]
+    _, body = call("/api/gm/say", {"text": "The Lich rises.", "theme": "Lich", "boss": True}, host=True)
+    assert body["music"]["boss"] is True and body["music"]["mood"] == "boss"
+    # Re-mentioning the boss without --boss never calms the music down.
+    assert call("/api/gm/say", {"text": "x", "theme": "Lich"}, host=True)[1]["music"] is None
+
+    _, body = call("/api/gm/say", {"text": "A knight blocks the way.", "theme": "Black Knight"}, host=True)
+    assert not body["music"].get("boss")
+    _, body = call("/api/gm/say", {"text": "He reveals his true form!", "mood": "boss"}, host=True)
+    assert body["music"]["theme"] == "Black Knight" and body["music"]["boss"] is True
+
+    _, body = call("/api/gm/say", {"text": "Thunder.", "mood": "boss"}, host=True)
+    assert body["music"] is None        # still the Black Knight's boss theme
+    call("/api/gm/say", {"text": "Calm.", "mood": "calm"}, host=True)
+    _, body = call("/api/gm/say", {"text": "A nameless horror!", "mood": "boss"}, host=True)
+    assert body["music"]["track"] == "ambient:epic"
+
+
+def test_theme_files_assigned_or_named_after_the_enemy(table):
+    call, state = table["call"], table["state"]
+    _touch_music(table["camp"], "grimaldi.mp3", "grimaldi-boss.mp3", "clown-waltz.ogg")
+    assert state.theme_track("Grimaldi") == "grimaldi.mp3"
+    assert state.theme_track("Grimaldi", boss=True) == "grimaldi-boss.mp3"
+    status, body = call("/api/gm/music", {"theme": "Mordecai", "assign": "clown-waltz"}, host=True)
+    assert status == 200 and body["track"] == "clown-waltz.ogg"
+    assert json.loads((table["camp"] / "music-themes.json").read_text()) == {"Mordecai": "clown-waltz.ogg"}
+    _, body = call("/api/gm/say", {"text": "Mordecai!", "theme": "mordecai"}, host=True)
+    assert body["music"]["src"] == "clown-waltz.ogg"
+    assert call("/api/gm/music", {"theme": "X", "assign": "nope.mp3"}, host=True)[0] == 400
+
+
+def test_starter_library_files_land_in_their_moods(tmp_path):
+    from lib import music_library
+    tracks = music_library.load_library()
+    assert len(tracks) >= 20
+    assert all(t["file"].startswith(t["mood"] + "-") and t["license"] for t in tracks)
+    for t in tracks:
+        mood = t["mood"]
+        other = {m for m in ("calm", "tavern", "travel", "mystery", "dread", "dungeon", "combat",
+                             "boss", "sad", "storm", "victory") if m != mood}
+        tokens = TableState._tokens(t["file"])
+        from lib.table_server import MOODS
+        clash = [m for m in other if tokens & (set(MOODS[m]["keywords"])
+                                               | {k + "s" for k in MOODS[m]["keywords"]})]
+        assert not clash, f"{t['file']} would also play for {clash}"
+    credit = music_library.credit_for(tracks[0]["file"])
+    assert "Kevin MacLeod" in credit and "CC BY 4.0" in credit

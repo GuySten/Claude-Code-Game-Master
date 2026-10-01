@@ -1,0 +1,255 @@
+{
+  "about": "Starter music library for the online table. Fetch it with `bash tools/gm-music-library.sh fetch`. Every file name starts with its mood, so `say --mood <mood>` finds it automatically. Add your own entries in the same shape.",
+  "tracks": [
+    {
+      "file": "calm-thatched-villagers.mp3",
+      "mood": "calm",
+      "title": "Thatched Villagers",
+      "artist": "Kevin MacLeod",
+      "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Thatched%20Villagers.mp3",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com"
+    },
+    {
+      "file": "calm-village-consort.mp3",
+      "mood": "calm",
+      "title": "Village Consort",
+      "artist": "Kevin MacLeod",
+      "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Village%20Consort.mp3",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com"
+    },
+    {
+      "file": "calm-teller-of-the-tales.mp3",
+      "mood": "calm",
+      "title": "Teller of the Tales",
+      "artist": "Kevin MacLeod",
+      "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Teller%20of%20the%20Tales.mp3",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com"
+    },
+    {
+      "file": "tavern-pippin-the-hunchback.mp3",
+      "mood": "tavern",
+      "title": "Pippin the Hunchback",
+      "artist": "Kevin MacLeod",
+      "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Pippin%20the%20Hunchback.mp3",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com"
+    },
+    {
+      "file": "tavern-minstrel-guild.mp3",
+      "mood": "tavern",
+      "title": "Minstrel Guild",
+      "artist": "Kevin MacLeod",
+      "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Minstrel%20Guild.mp3",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com"
+    },
+    {
+      "file": "tavern-achaidh-cheide.mp3",
+      "mood": "tavern",
+      "title": "Achaidh Cheide",
+      "artist": "Kevin MacLeod",
+      "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Achaidh%20Cheide.mp3",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com"
+    },
+    {
+      "file": "travel-crossing-the-chasm.mp3",
+      "mood": "travel",
+      "title": "Crossing the Chasm",
+      "artist": "Kevin MacLeod",
+      "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Crossing%20the%20Chasm.mp3",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com"
+    },
+    {
+      "file": "travel-celtic-impulse.mp3",
+      "mood": "travel",
+      "title": "Celtic Impulse",
+      "artist": "Kevin MacLeod",
+      "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Celtic%20Impulse.mp3",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com"
+    },
+    {
+      "file": "travel-lord-of-the-land.mp3",
+      "mood": "travel",
+      "title": "Lord of the Land",
+      "artist": "Kevin MacLeod",
+      "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Lord%20of%20the%20Land.mp3",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com"
+    },
+    {
+      "file": "mystery-moonlight-hall.mp3",
+      "mood": "mystery",
+      "title": "Moonlight Hall",
+      "artist": "Kevin MacLeod",
+      "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Moonlight%20Hall.mp3",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com"
+    },
+    {
+      "file": "mystery-echoes-of-time.mp3",
+      "mood": "mystery",
+      "title": "Echoes of Time",
+      "artist": "Kevin MacLeod",
+      "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Echoes%20of%20Time.mp3",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com"
+    },
+    {
+      "file": "mystery-curse-of-the-scarab.mp3",
+      "mood": "mystery",
+      "title": "Curse of the Scarab",
+      "artist": "Kevin MacLeod",
+      "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Curse%20of%20the%20Scarab.mp3",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com"
+    },
+    {
+      "file": "dread-darkest-child.mp3",
+      "mood": "dread",
+      "title": "Darkest Child",
+      "artist": "Kevin MacLeod",
+      "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Darkest%20Child.mp3",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com"
+    },
+    {
+      "file": "dread-gathering-darkness.mp3",
+      "mood": "dread",
+      "title": "Gathering Darkness",
+      "artist": "Kevin MacLeod",
+      "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Gathering%20Darkness.mp3",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com"
+    },
+    {
+      "file": "dread-dark-fog.mp3",
+      "mood": "dread",
+      "title": "Dark Fog",
+      "artist": "Kevin MacLeod",
+      "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Dark%20Fog.mp3",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com"
+    },
+    {
+      "file": "dungeon-the-path-of-the-goblin-king.mp3",
+      "mood": "dungeon",
+      "title": "The Path of the Goblin King",
+      "artist": "Kevin MacLeod",
+      "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/The%20Path%20of%20the%20Goblin%20King.mp3",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com"
+    },
+    {
+      "file": "combat-volatile-reaction.mp3",
+      "mood": "combat",
+      "title": "Volatile Reaction",
+      "artist": "Kevin MacLeod",
+      "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Volatile%20Reaction.mp3",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com"
+    },
+    {
+      "file": "combat-clash-defiant.mp3",
+      "mood": "combat",
+      "title": "Clash Defiant",
+      "artist": "Kevin MacLeod",
+      "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Clash%20Defiant.mp3",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com"
+    },
+    {
+      "file": "combat-prelude-and-action.mp3",
+      "mood": "combat",
+      "title": "Prelude and Action",
+      "artist": "Kevin MacLeod",
+      "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Prelude%20and%20Action.mp3",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com"
+    },
+    {
+      "file": "boss-five-armies.mp3",
+      "mood": "boss",
+      "title": "Five Armies",
+      "artist": "Kevin MacLeod",
+      "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Five%20Armies.mp3",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com"
+    },
+    {
+      "file": "boss-killers.mp3",
+      "mood": "boss",
+      "title": "Killers",
+      "artist": "Kevin MacLeod",
+      "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Killers.mp3",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com"
+    },
+    {
+      "file": "sad-heartbreaking.mp3",
+      "mood": "sad",
+      "title": "Heartbreaking",
+      "artist": "Kevin MacLeod",
+      "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Heartbreaking.mp3",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com"
+    },
+    {
+      "file": "sad-lightless-dawn.mp3",
+      "mood": "sad",
+      "title": "Lightless Dawn",
+      "artist": "Kevin MacLeod",
+      "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Lightless%20Dawn.mp3",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com"
+    },
+    {
+      "file": "sad-rains-will-fall.mp3",
+      "mood": "sad",
+      "title": "Rains Will Fall",
+      "artist": "Kevin MacLeod",
+      "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Rains%20Will%20Fall.mp3",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com"
+    },
+    {
+      "file": "victory-heroic-age.mp3",
+      "mood": "victory",
+      "title": "Heroic Age",
+      "artist": "Kevin MacLeod",
+      "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Heroic%20Age.mp3",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com"
+    }
+  ]
+}

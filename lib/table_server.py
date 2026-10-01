@@ -22,6 +22,21 @@ a direct https link to an audio file, or a built-in generated ambience
 (``ambient:wind`` …). Every browser plays it from the same point; each player
 controls only their own volume / mute.
 
+Automatic music: the GM tags narration with the scene's mood
+(``say --mood combat``). The server picks a track for that mood — a file from
+``music/`` whose name carries one of the mood's keywords (``battle-drums.mp3``
+-> combat) or is listed in ``music/moods.json``, else the mood's built-in
+ambience — and switches only when the mood actually changes.
+
+Enemy themes: a special enemy (named villain, boss, recurring foe) gets their
+own music with ``say --theme "Grimaldi"``: a file assigned to them
+(``music theme "Grimaldi" clown-waltz.mp3``, kept in ``<campaign>/music-themes.json``),
+else a file named after them (``grimaldi.mp3``), else a leitmotif the browser
+generates from their name — the same tune every time they return. The theme
+holds through combat/boss/dread moods and gives way when the scene moves on.
+``--boss`` (or a later ``--mood boss``) plays the boss version of the theme:
+the same tune, but fast and thundering (or ``<name>-boss.mp3`` if there is one).
+
 The server is the ONLY writer of the table log, so the GM-side commands talk
 to it over localhost (authenticated with a host key kept in
 ``<campaign>/table/server.json``) rather than touching files directly.
@@ -31,7 +46,8 @@ Files (all under ``<campaign>/table/``):
   seats.json    browser seat token -> player character name
   gm-cursor     id of the last message the GM has read
   langs.json    player character name -> language they play in (en / he)
-  music.json    the shared background track (what, volume, loop, when it started)
+  music.json    the shared background track (what, volume, loop, when it started, mood)
+  settings.json table settings (auto_music on/off)
   server.json   port, table code, host key, pid (written by `serve`)
 """
 
@@ -77,7 +93,62 @@ AMBIENT = {
     "fire": "Crackling hearth (tavern, camp fire, safe rest)",
     "dungeon": "Dark pulsing drone (dread, a monster near, the boss lair)",
     "storm": "Rain with rolling thunder (danger outdoors, sea, climax)",
+    "peaceful": "Soft slow chords (calm, rest, a safe town, a hard-won victory)",
+    "battle": "War drums and a driving bass (combat, chases, the boss fight)",
+    "mystery": "Shimmering tones over a low hum (magic, secrets, investigation)",
+    "epic": "Boss battle (fast and thundering: double-time drums, racing bass, brass hits)",
 }
+# Scene moods the GM tags narration with. Each picks a music file whose name
+# holds one of its keywords (or one listed under it in music/moods.json), else
+# its built-in ambience. "silence" fades the music out.
+MOODS = {
+    "calm": {"ambient": "peaceful", "volume": 0.35,
+             "keywords": ["calm", "peaceful", "peace", "village", "town", "rest", "morning",
+                          "gentle", "relax", "home", "pastoral"],
+             "use": "safe places, rest, quiet conversation, morning in town"},
+    "tavern": {"ambient": "fire", "volume": 0.4,
+               "keywords": ["tavern", "inn", "pub", "festive", "feast", "drinking", "bard",
+                            "lute", "folk"],
+               "use": "taverns, inns, feasts, a lively market"},
+    "travel": {"ambient": "wind", "volume": 0.4,
+               "keywords": ["travel", "journey", "road", "adventure", "exploration", "explore",
+                            "wilderness", "forest", "overworld", "field", "mountain"],
+               "use": "the road, wilderness, exploring the open world"},
+    "mystery": {"ambient": "mystery", "volume": 0.4,
+                "keywords": ["mystery", "mysterious", "magic", "arcane", "investigation",
+                             "puzzle", "ruins", "enchanted", "wonder", "secret"],
+                "use": "magic, secrets, ancient ruins, investigating a clue"},
+    "dread": {"ambient": "dungeon", "volume": 0.45,
+              "keywords": ["dread", "horror", "creepy", "eerie", "suspense", "tension",
+                           "haunted", "ominous", "dark", "scary"],
+              "use": "something is wrong, a monster is near, horror, stealth"},
+    "dungeon": {"ambient": "cave", "volume": 0.45,
+                "keywords": ["dungeon", "cave", "crypt", "underground", "tomb", "catacomb",
+                             "mine", "sewer", "underdark"],
+                "use": "caves, crypts, dungeons, anything underground"},
+    "combat": {"ambient": "battle", "volume": 0.55,
+               "keywords": ["combat", "battle", "fight", "action", "war", "skirmish", "drums",
+                            "chase"],
+               "use": "a fight breaks out, a chase, a desperate escape"},
+    "boss": {"ambient": "epic", "volume": 0.7,
+             "keywords": ["boss", "epic", "climax", "final", "showdown", "dragon"],
+             "use": "the big villain, a dragon, the climax of the arc"},
+    "sad": {"ambient": "rain", "volume": 0.35,
+            "keywords": ["sad", "melancholy", "grief", "funeral", "loss", "sorrow", "lament",
+                         "tragic"],
+            "use": "a death, a loss, a farewell, grief"},
+    "storm": {"ambient": "storm", "volume": 0.5,
+              "keywords": ["storm", "thunder", "sea", "ocean", "sailing", "ship", "tempest"],
+              "use": "storms, the sea, nature turned dangerous"},
+    "victory": {"ambient": "peaceful", "volume": 0.45,
+                "keywords": ["victory", "triumph", "celebration", "heroic", "fanfare", "win",
+                             "glory"],
+                "use": "the fight is won, a triumph, a celebration"},
+}
+SILENCE = "silence"
+# While an enemy's theme plays, these moods mean "still the same encounter".
+THEME_HOLDS_THROUGH = {"combat", "boss", "dread"}
+NAME_STOPWORDS = {"the", "of", "a", "an", "and", "lord", "lady", "sir"}
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CODE_WORDS = ["ember", "raven", "lantern", "goblin", "dragon", "tavern", "rune",
               "owlbear", "mimic", "dagger", "torch", "crypt", "griffin", "potion"]
@@ -117,6 +188,8 @@ class TableState:
         self.langs: Dict[str, str] = self._read_json(self.langs_path, {})
         self.music_path = self.dir / "music.json"
         self.music: Dict[str, Any] = self._read_json(self.music_path, {})
+        self.settings_path = self.dir / "settings.json"
+        self.settings: Dict[str, Any] = self._read_json(self.settings_path, {})
         try:
             self.gm_cursor = int(self.cursor_path.read_text().strip())
         except (OSError, ValueError):
@@ -178,15 +251,131 @@ class TableState:
                     out.append({"track": f.name, "where": str(d)})
         return out
 
+    # --- automatic music by scene mood ---
+    @property
+    def auto_music(self) -> bool:
+        return self.settings.get("auto_music", True) is not False
+
+    def set_auto_music(self, on: bool) -> None:
+        with self.lock:
+            self.settings["auto_music"] = bool(on)
+            tmp = self.settings_path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(self.settings, indent=2), encoding="utf-8")
+            tmp.replace(self.settings_path)
+
+    @staticmethod
+    def _tokens(name: str) -> set:
+        word, out = [], set()
+        for ch in Path(name).stem.lower() + " ":
+            if ch.isalnum():
+                word.append(ch)
+            elif word:
+                out.add("".join(word))
+                word = []
+        return out
+
+    # --- enemy themes ---
+    @property
+    def themes_path(self) -> Path:
+        return self.campaign_dir / "music-themes.json"
+
+    def themes(self) -> Dict[str, str]:
+        data = self._read_json(self.themes_path, {})
+        return data if isinstance(data, dict) else {}
+
+    def assign_theme(self, name: str, track: Optional[str]) -> None:
+        themes = self.themes()
+        key = next((k for k in themes if party_roster._same_name(k, name)), name)
+        if track:
+            themes[key] = track
+        else:
+            themes.pop(key, None)
+        tmp = self.themes_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(themes, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(self.themes_path)
+
+    def theme_track(self, name: str, boss: bool = False) -> str:
+        """The track that is this enemy's theme: an assigned one, else a music
+        file named after them (``<name>-boss.*`` preferred for a boss fight),
+        else their generated leitmotif (theme:<name>)."""
+        for key, track in self.themes().items():
+            if party_roster._same_name(key, name):
+                return track
+        wanted = self._tokens(name + ".x") - NAME_STOPWORDS
+        if wanted:
+            named = [f["track"] for f in self.list_music() if wanted <= self._tokens(f["track"])]
+            bossy = [f for f in named if self._tokens(f) & {"boss", "battle", "fight"}]
+            calm = [f for f in named if f not in bossy]
+            if named:
+                return (bossy or calm)[0] if boss else (calm or bossy)[0]
+        return "theme:" + name
+
+    def apply_theme(self, name: str, boss: bool = False) -> Optional[Dict[str, Any]]:
+        name = " ".join(str(name).split())
+        same = party_roster._same_name(self.music.get("theme"), name) and self.music.get("track")
+        if same and (bool(self.music.get("boss")) == boss or not boss):
+            return None       # already playing (a plain re-mention never calms a boss down)
+        track = self.theme_track(name, boss)
+        if same and track == self.music.get("track") and not track.startswith("theme:"):
+            return None       # a single assigned file has no separate boss version
+        title = f"{name}'s theme"
+        return self.set_music(track, 0.7 if boss else 0.6, True, title,
+                              mood="boss" if boss else "combat", theme=name, boss=boss)
+
+    def mood_files(self, mood: str) -> List[str]:
+        """Music files for a mood: those listed under it in any music/moods.json,
+        otherwise every file whose name carries one of the mood's keywords."""
+        listed = []
+        for d in self.music_dirs():
+            mapping = self._read_json(d / "moods.json", {})
+            for name in (mapping.get(mood) or []) if isinstance(mapping, dict) else []:
+                found = self.find_music(str(name))
+                if found is not None and found.name not in listed:
+                    listed.append(found.name)
+        if listed:
+            return listed
+        keywords = set(MOODS.get(mood, {}).get("keywords", []))
+        keywords |= {k + "s" for k in keywords}
+        return [f["track"] for f in self.list_music() if self._tokens(f["track"]) & keywords]
+
+    def apply_mood(self, mood: str, force: bool = False) -> Optional[Dict[str, Any]]:
+        """Switch the table's music to fit a scene mood. Returns the new music
+        state, or None when nothing changed (same mood, or auto music is off)."""
+        if not force and not self.auto_music:
+            return None
+        current = self.music if self.music.get("track") or self.music.get("mood") else {}
+        if current.get("theme") and current.get("track") and mood in THEME_HOLDS_THROUGH:
+            if mood == "boss" and not current.get("boss"):
+                # The fight escalates: same enemy, their theme's boss version.
+                return self.apply_theme(current["theme"], boss=True)
+            return None    # the enemy's theme carries the rest of the encounter
+        if current.get("mood") == mood and not current.get("theme"):
+            return None
+        if mood == SILENCE:
+            return self.set_music(None, mood=SILENCE)
+        spec = MOODS[mood]
+        files = self.mood_files(mood)
+        if files:
+            fresh = [f for f in files if f != current.get("src")] or files
+            track = secrets.choice(fresh)
+        else:
+            track = "ambient:" + spec["ambient"]
+        return self.set_music(track, spec["volume"], True, None, mood=mood)
+
     def set_music(self, track: Optional[str], volume: float = 0.5,
-                  loop: bool = True, title: Optional[str] = None) -> Dict[str, Any]:
+                  loop: bool = True, title: Optional[str] = None,
+                  mood: Optional[str] = None, theme: Optional[str] = None,
+                  boss: bool = False) -> Dict[str, Any]:
         """Point every browser at one track (None = silence). Returns the state."""
         with self.lock:
             next_id = int(self.music.get("id", 0)) + 1
             if not track:
-                self.music = {"id": next_id, "track": None}
+                self.music = {"id": next_id, "track": None, "mood": mood}
             else:
-                if track.startswith("ambient:"):
+                if track.startswith("theme:"):
+                    kind, src = "theme", track.split(":", 1)[1]
+                    title = title or f"{src}'s theme"
+                elif track.startswith("ambient:"):
                     kind, src = "ambient", track.split(":", 1)[1]
                     title = title or AMBIENT.get(src, src).split(" (")[0]
                 elif track.startswith(("http://", "https://")):
@@ -197,7 +386,16 @@ class TableState:
                     title = title or Path(src).stem.replace("-", " ").replace("_", " ")
                 self.music = {"id": next_id, "track": track, "kind": kind, "src": src,
                               "title": title, "volume": max(0.0, min(1.0, float(volume))),
-                              "loop": bool(loop), "started_at": time.time()}
+                              "loop": bool(loop), "started_at": time.time(), "mood": mood}
+                if theme:
+                    self.music["theme"] = theme
+                if boss:
+                    self.music["boss"] = True
+                if kind == "file":
+                    from music_library import credit_for
+                    credit = credit_for(src, PROJECT_ROOT / "music" / "library.json")
+                    if credit:
+                        self.music["credit"] = credit   # shown on the page (CC BY needs it)
             tmp = self.music_path.with_suffix(".tmp")
             tmp.write_text(json.dumps(self.music, indent=2), encoding="utf-8")
             tmp.replace(self.music_path)
@@ -494,7 +692,8 @@ def make_handler(state: TableState, code: str, host_key: str):
             if path == "/api/gm/inbox":
                 return self._json({"ok": True, "messages": state.gm_unread(mark=True),
                                    "waiting_on": state.waiting_on(),
-                                   "langs": state.seated_langs()})
+                                   "langs": state.seated_langs(),
+                                   "music": state.music, "auto_music": state.auto_music})
             if path == "/api/gm/say":
                 text = str(data.get("text", "")).strip()
                 image = data.get("image")
@@ -515,9 +714,49 @@ def make_handler(state: TableState, code: str, host_key: str):
                 lang = data.get("lang")
                 if lang and lang not in LANGS:
                     return self._err(f"unknown language {lang} (use: {', '.join(LANGS)})")
+                mood = data.get("mood")
+                if mood and mood not in MOODS and mood != SILENCE:
+                    return self._err(f"unknown mood {mood} (use: {', '.join(list(MOODS) + [SILENCE])})")
+                theme = " ".join(str(data.get("theme") or "").split())[:80]
+                # The music changes first, so it is already swelling as the beat is read.
+                # An enemy's theme (an always-explicit choice) wins over the mood.
+                music = None
+                if not to and theme:
+                    music = state.apply_theme(theme, boss=bool(data.get("boss")) or mood == "boss")
+                elif not to and mood:
+                    music = state.apply_mood(mood)
+                if music is not None:
+                    self._announce_music(music)
                 msg = state.append("gm", text, to=to or None, image=image, lang=lang)
-                return self._json({"ok": True, "message": msg})
+                return self._json({"ok": True, "message": msg, "music": music})
             if path == "/api/gm/music":
+                if "auto" in data:
+                    state.set_auto_music(bool(data["auto"]))
+                    return self._json({"ok": True, "auto": state.auto_music})
+                if data.get("theme"):
+                    name = " ".join(str(data["theme"]).split())[:80]
+                    if "assign" in data:
+                        track = data.get("assign")
+                        if track and not str(track).startswith(("http://", "https://")):
+                            found = state.find_music(str(track))
+                            if found is None:
+                                return self._err(f"no music file named {track} in music/")
+                            track = found.name
+                        state.assign_theme(name, track or None)
+                        return self._json({"ok": True, "theme": name,
+                                           "track": state.theme_track(name)})
+                    music = state.apply_theme(name, boss=bool(data.get("boss")))
+                    if music is not None:
+                        self._announce_music(music)
+                    return self._json({"ok": True, "music": music or state.music})
+                if data.get("mood"):
+                    mood = data["mood"]
+                    if mood not in MOODS and mood != SILENCE:
+                        return self._err(f"unknown mood {mood}")
+                    music = state.apply_mood(mood, force=True)
+                    if music is not None:
+                        self._announce_music(music)
+                    return self._json({"ok": True, "music": music or state.music})
                 track = data.get("track")
                 if track in (None, "", "stop", "off", "none"):
                     music = state.set_music(None)
@@ -543,14 +782,24 @@ def make_handler(state: TableState, code: str, host_key: str):
                     return self._err("volume must be a number between 0 and 1")
                 music = state.set_music(track, volume, data.get("loop", True) is not False,
                                         data.get("title"))
-                state.append("system", f"🎵 {music['title']}",
-                             event={"type": "music", "kind": music["kind"], "src": music["src"],
-                                    "title": music["title"]})
+                self._announce_music(music)
                 return self._json({"ok": True, "music": music})
             if path == "/api/gm/free":
                 freed = state.free(str(data.get("pc", "")))
                 return self._json({"ok": True, "freed": freed})
             return self._err("not found", 404)
+
+        def _announce_music(self, music: Dict[str, Any]) -> None:
+            if not music.get("track"):
+                state.append("system", "🎵 The music fades away.", event={"type": "music_stop"})
+                return
+            event = {"type": "music", "kind": music["kind"], "src": music["src"],
+                     "title": music["title"]}
+            if music.get("theme"):
+                event["theme"] = music["theme"]
+            if music.get("boss"):
+                event["boss"] = True
+            state.append("system", f"🎵 {music['title']}", event=event)
 
         def _audio(self, name: str):
             from urllib.parse import unquote
@@ -715,7 +964,8 @@ def _call(campaign_dir: Path, method: str, path: str, data: Optional[dict] = Non
 
 
 def _print_messages(messages: List[dict], waiting_on: List[str],
-                    langs: Optional[Dict[str, str]] = None) -> None:
+                    langs: Optional[Dict[str, str]] = None,
+                    music: Optional[Dict[str, Any]] = None, auto_music: bool = True) -> None:
     if not messages:
         print("(no new player messages)")
     for m in messages:
@@ -738,6 +988,16 @@ def _print_messages(messages: List[dict], waiting_on: List[str],
                   + "  -> post each beat once per language: say --lang he / say --lang en")
         elif used and used[0] != "en":
             print(f"Table language: {LANGS.get(used[0], used[0])} -> narrate in it")
+    if auto_music and music is not None:
+        mood = music.get("mood")
+        playing = music.get("title") if music.get("track") else "silence"
+        if music.get("theme") and music.get("track"):
+            playing += (f" ({'BOSS ' if music.get('boss') else ''}enemy theme — holds through "
+                        f"{'/'.join(sorted(THEME_HOLDS_THROUGH))}"
+                        + ("" if music.get("boss") else "; --mood boss escalates it") + ")")
+        print(f"Scene mood: {mood or '(not set)'} — playing: {playing}. Add --mood to your "
+              f"next say when the scene's feel changes ({', '.join(MOODS)}, {SILENCE}); "
+              f"--theme \"<name>\" when a special enemy enters.")
 
 
 def main() -> None:
@@ -766,11 +1026,24 @@ def main() -> None:
     s.add_argument("--image", help="Attach an image from the campaign's images/ folder")
     s.add_argument("--lang", choices=sorted(LANGS),
                    help="This is the version of the beat for players in this language only")
+    s.add_argument("--mood", choices=list(MOODS) + [SILENCE],
+                   help="The scene's mood; the music follows it (no change if it's the same)")
+    s.add_argument("--theme", metavar="ENEMY",
+                   help="A special enemy enters: play their own theme music")
+    s.add_argument("--boss", action="store_true",
+                   help="With --theme: this is a boss — play the fast, thundering version")
 
     mu = sub.add_parser("music", help="Set the shared background music for every player")
     mu.add_argument("track", nargs="?",
                     help="A file in music/, an https audio link, ambient:<name>, "
-                         "'list' to see choices, or 'stop'")
+                         "'list' to see choices, 'stop', or 'auto on|off'")
+    mu.add_argument("value", nargs="?", help="on/off after 'auto'; the enemy after 'theme'")
+    mu.add_argument("extra", nargs="?",
+                    help="After 'theme <enemy>': the file / https link to make their theme "
+                         "('none' to go back to the generated one)")
+    mu.add_argument("--mood", choices=list(MOODS) + [SILENCE],
+                    help="Play whatever fits this mood (same choice as say --mood)")
+    mu.add_argument("--boss", action="store_true", help="With 'theme <enemy>': the boss version")
     mu.add_argument("--volume", type=float, default=0.5, help="0.0 – 1.0 (default 0.5)")
     mu.add_argument("--no-loop", action="store_true", help="Play once instead of looping")
     mu.add_argument("--title", help="What players see (default: from the file name)")
@@ -804,7 +1077,8 @@ def main() -> None:
 
     if args.action == "inbox":
         r = _call(campaign_dir, "POST", "/api/gm/inbox", {})
-        return _print_messages(r.get("messages", []), r.get("waiting_on", []), r.get("langs"))
+        return _print_messages(r.get("messages", []), r.get("waiting_on", []), r.get("langs"),
+                               r.get("music"), r.get("auto_music", True))
 
     if args.action == "wait":
         deadline = time.time() + args.timeout
@@ -824,13 +1098,15 @@ def main() -> None:
         if not r.get("messages"):
             print(f"(no player messages after {args.timeout}s — run wait again)")
             return
-        return _print_messages(r["messages"], r.get("waiting_on", []), r.get("langs"))
+        return _print_messages(r["messages"], r.get("waiting_on", []), r.get("langs"),
+                               r.get("music"), r.get("auto_music", True))
 
     if args.action == "say":
         text = sys.stdin.read() if args.stdin else (args.text or "")
         r = _call(campaign_dir, "POST", "/api/gm/say",
                   {"text": text.strip(), "to": args.to, "image": args.image,
-                   "lang": args.lang})
+                   "lang": args.lang, "mood": args.mood, "theme": args.theme,
+                   "boss": args.boss})
         if not r.get("ok"):
             sys.exit(f"[ERROR] {r.get('error')}")
         m = r["message"]
@@ -838,20 +1114,75 @@ def main() -> None:
         if m.get("lang"):
             who += f", {LANGS[m['lang']]} speakers only"
         print(f"POSTED #{m['id']}{who}")
+        if r.get("music"):
+            mu_ = r["music"]
+            print(f"MUSIC -> {mu_.get('title') if mu_.get('track') else 'silence'} "
+                  f"(mood: {mu_.get('mood')})")
         return
 
     if args.action == "music":
+        if args.mood:
+            r = _call(campaign_dir, "POST", "/api/gm/music", {"mood": args.mood})
+            if not r.get("ok"):
+                sys.exit(f"[ERROR] {r.get('error')}")
+            m = r["music"]
+            print(f"MUSIC {m.get('title') if m.get('track') else 'stopped'} (mood: {m.get('mood')})")
+            return
+        if args.track == "themes":
+            state = TableState(campaign_dir, str(CampaignManager().world_state_dir))
+            themes = state.themes()
+            print("Enemy themes (say --theme \"<name>\" plays one):")
+            if not themes:
+                print("  none assigned — every enemy gets a generated theme from their name,")
+                print("  or a file in music/ named after them (grimaldi.mp3)")
+            for name, track in themes.items():
+                print(f"  {name:<24} {track}")
+            return
+        if args.track == "theme":
+            if not args.value:
+                sys.exit("Usage: gm-table.sh music theme \"<enemy>\" [file|https-link|none]")
+            if args.extra:
+                r = _call(campaign_dir, "POST", "/api/gm/music",
+                          {"theme": args.value,
+                           "assign": None if args.extra == "none" else args.extra})
+                if not r.get("ok"):
+                    sys.exit(f"[ERROR] {r.get('error')}")
+                print(f"THEME {r['theme']} -> {r['track']}")
+                return
+            r = _call(campaign_dir, "POST", "/api/gm/music", {"theme": args.value, "boss": args.boss})
+            m = r.get("music") or {}
+            print(f"MUSIC {m.get('title')} [{m.get('track')}]")
+            return
+        if args.track == "auto":
+            if args.value not in ("on", "off"):
+                sys.exit("Usage: gm-table.sh music auto on|off")
+            r = _call(campaign_dir, "POST", "/api/gm/music", {"auto": args.value == "on"})
+            print("Automatic music is " + ("ON — say --mood picks the track."
+                                           if r.get("auto") else "OFF — music only changes "
+                                           "when you set it."))
+            return
         if args.track in (None, "list"):
             state = TableState(campaign_dir, str(CampaignManager().world_state_dir))
             current = state.music
             print("Now playing: " + (f"{current.get('title')} [{current.get('track')}]"
-                                     if current.get("track") else "(silence)"))
+                                     if current.get("track") else "(silence)")
+                  + (f" — mood: {current['mood']}" if current.get("mood") else ""))
+            print(f"Automatic music: {'ON' if state.auto_music else 'OFF'} "
+                  f"(say --mood <mood> switches the track when the mood changes)")
+            print("\nMoods (say --mood ...) and what each would play:")
+            for name, spec in MOODS.items():
+                files = state.mood_files(name)
+                plays = ", ".join(files) if files else f"ambient:{spec['ambient']} (built-in)"
+                print(f"  {name:<8} {spec['use']}\n           -> {plays}")
+            print(f"  {SILENCE:<8} fade the music out")
+            print("\nEnemy themes: say --theme \"<name>\" (see: music themes)")
             print("\nBuilt-in ambience (works with no files):")
             for name, desc in AMBIENT.items():
                 print(f"  ambient:{name:<9} {desc}")
             files = state.list_music()
             print("\nMusic files:" if files else
-                  "\nMusic files: (none yet — drop .mp3/.ogg files into music/ to use them)")
+                  "\nMusic files: none yet — run `bash tools/gm-music-library.sh fetch` for a "
+                  "starter library, or drop .mp3/.ogg files into music/")
             for f in files:
                 print(f"  {f['track']}")
             print("\nOr any direct https link to an audio file.")

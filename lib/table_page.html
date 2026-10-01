@@ -239,6 +239,8 @@
       ev_leave: "{pc} steps away from the table.", ev_music_stop: "🎵 The music fades away.",
       amb_wind: "Howling wind", amb_rain: "Steady rain", amb_storm: "Rain with rolling thunder",
       amb_cave: "Dripping cave", amb_fire: "Crackling fire", amb_dungeon: "Dark dungeon drone",
+      amb_peaceful: "Soft chords", amb_battle: "War drums", amb_mystery: "Shimmering mystery",
+      amb_epic: "Boss battle", themeOf: "{name}'s theme", bossThemeOf: "⚔ {name} — boss battle",
     },
     he: {
       title: "השולחן", intro: "מנהל המשחק מחכה לכם. הכניסו את קוד השולחן שקיבלתם מהמארח.",
@@ -269,6 +271,8 @@
       ev_leave: "{pc} קם/ה מהשולחן.", ev_music_stop: "🎵 המוזיקה דועכת.",
       amb_wind: "רוח מייללת", amb_rain: "גשם יורד", amb_storm: "סערה ורעמים",
       amb_cave: "טפטופים במערה", amb_fire: "אש מפצפצת", amb_dungeon: "זמזום אפל של מבוך",
+      amb_peaceful: "אקורדים רכים", amb_battle: "תופי מלחמה", amb_mystery: "מסתורין מנצנץ",
+      amb_epic: "קרב בוס", themeOf: "הנושא של {name}", bossThemeOf: "⚔ {name} — קרב בוס",
     },
   };
   let lang = store.get("lang") || ((navigator.language || "").toLowerCase().startsWith("he") ? "he" : "en");
@@ -428,6 +432,7 @@
 
   function trackTitle(m) {
     if (!m) return "";
+    if (m.theme) return t(m.boss ? "bossThemeOf" : "themeOf").replace("{name}", m.theme);
     if (m.kind === "ambient" && STRINGS.en["amb_" + m.src]) return t("amb_" + m.src);
     return m.title || "";
   }
@@ -443,6 +448,12 @@
     b.setAttribute("aria-pressed", String(musicOn));
     const np = $("now-playing");
     np.textContent = musicState && musicState.track ? t("nowPlaying") + trackTitle(musicState) : t("silence");
+    if (musicState && musicState.track && musicState.credit) {
+      const c = document.createElement("div");
+      c.style.fontSize = ".75rem";
+      c.textContent = "♪ " + musicState.credit;
+      np.appendChild(c);
+    }
   }
   function audioCtx() {
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -515,9 +526,50 @@
     o.connect(g).connect(param); o.start();
     return o;
   }
+  function keep(timers, id) {
+    timers.push(id);
+    if (timers.length > 64) timers.splice(0, timers.length - 64);
+  }
   function every(minMs, maxMs, fn, timers) {
-    const tick = () => { fn(); timers.push(setTimeout(tick, minMs + Math.random() * (maxMs - minMs))); };
-    timers.push(setTimeout(tick, minMs * Math.random()));
+    const tick = () => {
+      if (timers.stopped) return;
+      fn(); keep(timers, setTimeout(tick, minMs + Math.random() * (maxMs - minMs)));
+    };
+    keep(timers, setTimeout(tick, minMs * Math.random()));
+  }
+  // A steady pulse (music): step n fires at t0 + n*stepMs, without drift.
+  function steps(stepMs, fn, timers) {
+    const t0 = performance.now();
+    let n = 0;
+    const tick = () => {
+      if (timers.stopped) return;
+      fn(n++);
+      keep(timers, setTimeout(tick, Math.max(0, t0 + n * stepMs - performance.now())));
+    };
+    tick();
+  }
+  const hz = (midi) => 440 * Math.pow(2, (midi - 69) / 12);
+  function tone(ctx, out, freq, dur, vol, type, cutoff, attack) {
+    const o = ctx.createOscillator(), g = ctx.createGain(), now = ctx.currentTime, a = attack || 0.01;
+    o.type = type || "sine"; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.linearRampToValueAtTime(vol, now + a);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + Math.max(a + 0.05, dur));
+    let node = o;
+    if (cutoff) { node = filt(ctx, "lowpass", cutoff); o.connect(node); }
+    node.connect(g).connect(out);
+    o.start(now); o.stop(now + Math.max(a + 0.05, dur) + 0.1);
+  }
+  const kick = (ctx, out, vol) => blip(ctx, out, 120, 0.35, vol, "sine");
+  const snare = (ctx, out, vol) => burst(ctx, out, 0.16, vol, 3500);
+  const hat = (ctx, out, vol) => burst(ctx, out, 0.035, vol, 9000);
+  const stab = (ctx, out, notes, vol) => notes.forEach((m) => tone(ctx, out, hz(m), 0.35, vol, "sawtooth", 2200, 0.01));
+  // The engine room of a boss fight: four-on-the-floor plus double kicks,
+  // backbeat snare, eighth-note hats.
+  function bossDrums(ctx, out, s16) {
+    if (s16 % 4 === 0 || s16 === 14 || s16 === 15) kick(ctx, out, 0.8);
+    if (s16 === 4 || s16 === 12) snare(ctx, out, 0.45);
+    if (s16 % 2 === 1) hat(ctx, out, 0.12);
   }
   function blip(ctx, out, freq, dur, vol, type) {
     const o = ctx.createOscillator(), g = ctx.createGain(), now = ctx.currentTime;
@@ -571,9 +623,110 @@
       const n = noiseSource(ctx, "brown"), ng = ctx.createGain(); ng.gain.value = 0.15; nodes.push(n);
       n.connect(filt(ctx, "lowpass", 400)).connect(ng).connect(out);
     },
+    peaceful(ctx, out, timers) {
+      const chords = [[48, 52, 55], [45, 48, 52], [41, 45, 48], [43, 47, 50]];  // C  Am  F  G
+      const melody = [72, 74, 76, 79, 81];
+      steps(6000, (n) => {
+        chords[n % 4].forEach((m) => tone(ctx, out, hz(m + 12), 7, 0.07, "triangle", 1400, 2));
+        tone(ctx, out, hz(chords[n % 4][0]), 7, 0.08, "sine", 0, 1.5);
+      }, timers);
+      every(2500, 6000, () => tone(ctx, out, hz(melody[Math.floor(Math.random() * melody.length)]),
+                                   2.5, 0.035, "sine", 0, 0.3), timers);
+    },
+    battle(ctx, out, timers) {
+      const bass = [38, 38, 41, 38, 36, 38, 41, 43];
+      steps(250, (n) => {                                   // eighth notes at 120 bpm
+        const s = n % 16;
+        if (s % 4 === 0 || s === 10) kick(ctx, out, 0.7);
+        if (s === 4 || s === 12) snare(ctx, out, 0.35);
+        if (s >= 14) blip(ctx, out, 180 - (s - 14) * 30, 0.2, 0.35, "sine");
+        if (s % 2 === 0) tone(ctx, out, hz(bass[(s / 2) % 8]), 0.45, 0.12, "sawtooth", 500);
+        if (n % 64 === 0) [50, 53, 57].forEach((m) => tone(ctx, out, hz(m), 15, 0.04, "sawtooth", 900, 3));
+      }, timers);
+    },
+    epic(ctx, out, timers) {
+      // D minor at 156 bpm: racing sixteenth-note bass, brass stabs, a rising
+      // four-chord loop (Dm  Bb  C  A) that keeps climbing tension.
+      const prog = [[50, 53, 57], [46, 50, 53], [48, 52, 55], [45, 49, 52]];
+      const step = 60000 / 156 / 4;
+      steps(step, (n) => {
+        const s16 = n % 16, bar = Math.floor(n / 16) % 4, chord = prog[bar];
+        bossDrums(ctx, out, s16);
+        tone(ctx, out, hz(chord[0] - 12 + (s16 % 4 === 2 ? 12 : 0)), 0.14, 0.13, "sawtooth", 700);
+        if (s16 === 0 || s16 === 6 || s16 === 10) stab(ctx, out, chord, 0.045);
+        if (n % 64 === 0) chord.forEach((m) => tone(ctx, out, hz(m + 12), 9, 0.03, "triangle", 1600, 1.5));
+      }, timers);
+    },
+    mystery(ctx, out, timers, nodes) {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.value = 73.4; g.gain.value = 0.08; o.connect(g).connect(out); o.start(); nodes.push(o);
+      const notes = [74, 77, 79, 81, 84, 86];               // D minor pentatonic, up high
+      every(1500, 3500, () => {
+        const f = hz(notes[Math.floor(Math.random() * notes.length)]);
+        tone(ctx, out, f, 4, 0.04, "sine", 0, 1.2);
+        tone(ctx, out, f + 3, 4, 0.03, "sine", 0, 1.4);      // a slow beat for shimmer
+      }, timers);
+    },
   };
-  function ambientTrack(m) {
-    const ctx = audioCtx(), build = AMBIENCES[m.src];
+
+  // An enemy's own theme: a leitmotif generated from their name, so the same
+  // villain always brings the same tune (until the GM gives them a real track).
+  function seeded(name) {
+    let h = 2166136261;
+    for (const ch of String(name).toLowerCase()) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619); }
+    return () => {
+      h = Math.imul(h ^ (h >>> 15), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909);
+      h ^= h >>> 16; return (h >>> 0) / 4294967296;
+    };
+  }
+  function themeBuilder(name, boss) {
+    const rnd = seeded(name), pick = (a) => a[Math.floor(rnd() * a.length)];
+    const scale = pick([[0, 1, 3, 5, 7, 8, 10], [0, 2, 3, 5, 7, 8, 11], [0, 1, 3, 5, 6, 8, 10],
+                        [0, 2, 3, 6, 7, 8, 11], [0, 2, 3, 5, 7, 9, 10]]);
+    const root = 45 + Math.floor(rnd() * 7);
+    const stepMs = 60000 / (84 + Math.floor(rnd() * 48)) / 2;
+    const lead = pick(["sawtooth", "square", "triangle"]);
+    const cutoff = 1200 + rnd() * 1800, heavy = rnd() < 0.5;
+    const deg = (d) => root + 12 + scale[((d % 7) + 7) % 7] + 12 * Math.floor(d / 7);
+    const motif = Array.from({ length: 8 }, (_, i) => (i > 0 && rnd() < 0.3 ? null : Math.floor(rnd() * 9) - 1));
+    const lift = 1 + Math.floor(rnd() * 3);
+    if (boss) return bossThemeBuilder({ scale, root, stepMs, lead, deg, motif, lift });
+    return (ctx, out, timers) => {
+      steps(stepMs, (n) => {
+        const bar = Math.floor(n / 8) % 4, s = n % 8;
+        const d = motif[s];
+        if (d !== null) tone(ctx, out, hz(deg(d + (bar === 2 ? lift : 0))), stepMs * 1.8 / 1000, 0.07, lead, cutoff);
+        if (s % 4 === 0 || (heavy && s === 6)) kick(ctx, out, 0.55);
+        if (s === 4 && heavy) snare(ctx, out, 0.25);
+        if (s % 2 === 0) tone(ctx, out, hz(root - 12 + (s === 4 ? 7 : 0)), stepMs * 1.6 / 1000, 0.12, "sawtooth", 400);
+        if (s === 0 && bar === 0) [0, 2, 4].forEach((i) => tone(ctx, out, hz(deg(i) - 12), stepMs * 30 / 1000, 0.03, "triangle", 900, 1));
+      }, timers);
+    };
+  }
+  // The SAME tune as the enemy's theme (scale, root, motif), but a boss fight:
+  // much faster, the melody doubled an octave up, pounding drums, a racing
+  // bass and brass stabs, rising a step every phrase for tension.
+  function bossThemeBuilder(th) {
+    const step = Math.min(th.stepMs / 2 * 0.75, 60000 / 150 / 4);   // sixteenths, >= 150 bpm
+    return (ctx, out, timers) => {
+      steps(step, (n) => {
+        const s16 = n % 16, bar = Math.floor(n / 16) % 4, rise = bar === 3 ? th.lift : 0;
+        bossDrums(ctx, out, s16);
+        if (s16 % 2 === 0) {
+          const d = th.motif[s16 / 2];
+          if (d !== null) {
+            tone(ctx, out, hz(th.deg(d + rise)), step * 3 / 1000, 0.07, th.lead, 2600);
+            tone(ctx, out, hz(th.deg(d + rise) + 12), step * 3 / 1000, 0.035, "square", 3200);
+          }
+        }
+        tone(ctx, out, hz(th.root - 12 + (s16 % 4 === 2 ? 12 : 0) + (rise ? th.scale[rise % 7] : 0)),
+             step * 0.9 / 1000, 0.13, "sawtooth", 650);
+        if (s16 === 0 || s16 === 10) stab(ctx, out, [0, 2, 4].map((i) => th.deg(i + rise) - 12), 0.045);
+      }, timers);
+    };
+  }
+  function ambientTrack(m, builder) {
+    const ctx = audioCtx(), build = builder || AMBIENCES[m.src];
     if (!ctx || !build) return null;
     const master = ctx.createGain(), timers = [], nodes = [];
     master.gain.value = 0.0001;
@@ -591,6 +744,7 @@
       setLevel(v) { ramp(v, 0.6); },
       stop() {
         ramp(0, 1.5);
+        timers.stopped = true;
         timers.forEach(clearTimeout); timers.length = 0;
         setTimeout(() => { nodes.forEach((n) => { try { n.stop(); } catch (e) {} }); master.disconnect(); }, 1700);
       },
@@ -604,7 +758,9 @@
     if (!changed) return levelChanged();
     if (track) { track.stop(); track = null; }
     if (!m || !m.track || !musicOn) return;
-    track = m.kind === "ambient" ? ambientTrack(m) : fileTrack(m);
+    track = m.kind === "ambient" ? ambientTrack(m)
+          : m.kind === "theme" ? ambientTrack(m, themeBuilder(m.src, !!m.boss))
+          : fileTrack(m);
   }
 
   // ------------------------------------------------ speak to act (STT) ---
