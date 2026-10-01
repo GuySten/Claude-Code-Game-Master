@@ -5,6 +5,7 @@ Handles NPC creation, updates, and tagging operations
 """
 
 import copy
+import json
 import sys
 from typing import Dict, List, Optional, Any
 from pathlib import Path
@@ -549,6 +550,32 @@ class NPCManager(EntityManager):
             return True
         return False
 
+    def set_companion(self, name: str, owner: str) -> bool:
+        """Make an NPC a player character's companion (a familiar, a pet, a mount):
+        the table paints them at once and shows them on the owner's sheet. An owner
+        of "none" ends it."""
+        import party_roster
+        npcs = self._load_entities(self.npcs_file)
+        key = next((k for k in npcs if k.strip().lower() == name.strip().lower()), None)
+        if key is None:
+            print(f"[ERROR] NPC {name} not found (create them first: gm-npc.sh create)")
+            return False
+        if owner.strip().lower() in ("none", "-", ""):
+            npcs[key].pop("companion_of", None)
+            done = f"{key} is no longer anyone's companion"
+        else:
+            path = party_roster.find_pc(self.campaign_dir, owner)
+            if path is None:
+                print(f"[ERROR] No player character named {owner}")
+                return False
+            pc = json.loads(path.read_text(encoding="utf-8")).get("name", owner)
+            npcs[key]["companion_of"] = pc
+            done = f"{key} is now {pc}'s companion"
+        if self._save_entities(self.npcs_file, npcs):
+            print(f"[SUCCESS] {done}")
+            return True
+        return False
+
     def get_party_members(self) -> Dict[str, Dict]:
         """
         Get all NPCs who are party members.
@@ -993,6 +1020,10 @@ def main():
 
     party_parser = subparsers.add_parser('party', help='List all party members')
 
+    companion_parser = subparsers.add_parser('companion', help="Make an NPC a PC's companion (familiar, pet, mount)")
+    companion_parser.add_argument('name', help='NPC name')
+    companion_parser.add_argument('owner', help='The player character (or "none" to end it)')
+
     subparsers.add_parser('unify-tags',
                           help='Migrate legacy location_tags into tags.locations (one-time per campaign)')
 
@@ -1180,6 +1211,10 @@ def main():
 
     elif args.action == 'promote':
         if not manager.promote_to_party_member(args.name):
+            sys.exit(1)
+
+    elif args.action == 'companion':
+        if not manager.set_companion(args.name, args.owner):
             sys.exit(1)
 
     elif args.action == 'demote':

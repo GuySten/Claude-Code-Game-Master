@@ -5,6 +5,7 @@ way a browser (players) and gm-table.sh (the host) do.
 """
 
 import json
+import os
 import sys
 import threading
 import time
@@ -625,6 +626,48 @@ def test_players_say_how_their_portrait_looks_when_they_join(table):
     state.portrait_pass()
     assert len([p for p in painted if p[0] == "Noa"]) == 1           # once: players can't redo it
     assert call("/api/portrait", {"code": CODE, "token": noa, "sex": "male"})[0] == 404
+
+
+def test_a_familiar_is_painted_at_once_and_shown_on_its_owners_sheet(table):
+    import subprocess
+    import sys as _sys
+    call, state, camp, world = table["call"], table["state"], table["camp"], table["world"]
+    (camp / "images").mkdir(exist_ok=True)
+    (camp / "npcs.json").write_text(json.dumps({"Ember": {"description": "a small grey owl"}}))
+    root = Path(__file__).resolve().parent.parent
+    run = lambda *a: subprocess.run([_sys.executable, str(root / "lib" / "npc_manager.py"), *a],  # noqa: E731
+                                    capture_output=True, text=True, cwd=root,
+                                    env={**os.environ, "GM_WORLD_STATE_BASE": str(world)})
+    assert run("companion", "Ember", "Nobody").returncode != 0           # owners are PCs
+    done = run("companion", "ember", "pip")
+    assert done.returncode == 0 and "Ember is now Pip's companion" in done.stdout
+    assert json.loads((camp / "npcs.json").read_text())["Ember"]["companion_of"] == "Pip"
+
+    def maker(name, campaign_dir):
+        data = json.loads((campaign_dir / "npcs.json").read_text())
+        data[name]["portrait"] = "ember.png"
+        (campaign_dir / "npcs.json").write_text(json.dumps(data))
+        (campaign_dir / "images" / "ember.png").write_bytes(b"\x89PNG")
+        return "ember.png"
+
+    state.portrait_maker = maker
+    assert state.npc_pass() == ["Ember"]                  # at once: no need to be named 3 times
+    shown = [m for m in state.messages if (m.get("event") or {}).get("type") == "npc"][-1]
+    assert shown["event"] == {"type": "npc", "name": "Ember", "of": "Pip"}
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    bram = call("/api/create", {"code": CODE, "name": "Bram", "concept": "a dwarf"})[1]["token"]
+    own = call(f"/api/sheet?code={CODE}&token={pip}&pc=Pip")[1]["sheet"]
+    assert own["companions"] == [{"name": "Ember", "description": "a small grey owl", "portrait": "ember.png"}]
+    theirs = call(f"/api/sheet?code={CODE}&token={bram}&pc=Pip")[1]["sheet"]
+    assert theirs["companions"][0]["name"] == "Ember"          # the party sees the owl too
+    assert "ember.png" not in table_server_strings(own)
+    assert run("companion", "Ember", "none").returncode == 0
+    assert "companion_of" not in json.loads((camp / "npcs.json").read_text())["Ember"]
+
+
+def table_server_strings(sheet):
+    import lib.table_server as ts
+    return ts.sheet_strings(sheet, "he")
 
 
 def test_recurring_npcs_get_portraits_by_themselves(table):

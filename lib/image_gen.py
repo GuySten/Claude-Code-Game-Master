@@ -520,8 +520,45 @@ def sex_of(record: dict) -> str:
     return ""
 
 
+# Words that mark a portrait's subject as a creature, not a person: a familiar, a
+# pet, a summoned beast. Its name ("Old Mother Coil") mustn't make it a person.
+CREATURES = re.compile(
+    r"\b(snakes?|serpents?|vipers?|adders?|cobras?|pythons?|owls?|ravens?|crows?|hawks?|falcons?|"
+    r"eagles?|parrots?|bats?|rats?|mice|mouse|cats?|kittens?|dogs?|hounds?|wolf|wolves|fox|foxes|"
+    r"bears?|horses?|ponies|pony|mules?|donkeys?|boars?|goats?|stags?|deer|elk|oxen|ox|lions?|"
+    r"tigers?|panthers?|leopards?|spiders?|scorpions?|beetles?|frogs?|toads?|lizards?|newts?|"
+    r"salamanders?|octopus|crabs?|fish|eels?|sharks?|weasels?|ferrets?|badgers?|otters?|"
+    r"monkeys?|apes?|drakes?|wyrms?|wyverns?|dragons?|griffons?|griffins?|beasts?|creatures?|"
+    r"animals?|familiars?|imps?|pseudodragons?|sprites?|slimes?|oozes?|golems?|constructs?|"
+    r"נחש|נחשה|ינשוף|עורב|חתול|חתולה|כלב|זאב|שועל|דוב|סוס|עכביש|עטלף|עכברוש|צפרדע|לטאה|דרקון|יצור|חיה)\b",
+    re.IGNORECASE)
+HE_CREATURES = {"נחש": "snake", "נחשה": "snake", "ינשוף": "owl", "עורב": "raven", "חתול": "cat",
+                "חתולה": "cat", "כלב": "dog", "זאב": "wolf", "שועל": "fox", "דוב": "bear", "סוס": "horse",
+                "עכביש": "spider", "עטלף": "bat", "עכברוש": "rat", "צפרדע": "frog", "לטאה": "lizard",
+                "דרקון": "dragon", "יצור": "creature", "חיה": "animal"}
+HUMANOID = re.compile(r"\b(human|man|woman|elf|elven|dwarf|halfling|gnome|orc|half-orc|half-elf|"
+                      r"tiefling|goliath|aasimar|person|girl|boy|lady|lord|king|queen)\b", re.IGNORECASE)
+
+
+def creature_of(record: dict) -> str:
+    """'snake', 'owl'... when the record shows a creature rather than a person
+    (its appearance's species/race first, then its description), else ''."""
+    va = record.get("visual_appearance") if isinstance(record.get("visual_appearance"), dict) else {}
+    kind = " ".join(str(va.get(k) or "") for k in ("species", "race")).strip()
+    for text in (kind, str(record.get("race") or ""),
+                 str(record.get("description") or record.get("concept") or "")):
+        found = CREATURES.search(text)
+        if found and not (text is not kind and HUMANOID.search(text[:found.start()])):
+            word = found.group(0).lower()
+            return HE_CREATURES.get(word, word)        # (the picture model reads English)
+    return ""
+
+
 def portrait_avoid(record: dict) -> str:
-    """What a portrait must not show (the other sex), for the negative prompt."""
+    """What a portrait must not show, for the negative prompt: a person, for a
+    creature; the other sex, for a person."""
+    if creature_of(record):
+        return "human, person, woman, man, girl, boy, humanoid, human face, human skin"
     sex = sex_of(record)
     return SEXES[sex][2] if sex else ""
 
@@ -532,6 +569,15 @@ def portrait_prompt(record: dict) -> str:
     name = record.get("name", "")
     who = " ".join(str(record.get(k) or "").strip() for k in ("race", "class")).strip()
     about = record.get("concept") or record.get("description") or ""
+    creature = creature_of(record)
+    if creature:
+        # What it IS comes first; the name comes last (a name like "Old Mother
+        # Coil" would otherwise make it a woman).
+        a = "an" if creature[0] in "aeiou" else "a"
+        lines = [f"Portrait of {a} {creature}, an animal, not a person" + (f": {about}" if about else "") + "."]
+        lines.append("Close-up of the creature, its head and body, simple softly lit background, no "
+                     f"text. (It is called {name}.)")
+        return " ".join(lines)
     sex = sex_of(record)
     if sex:
         adj, noun, _ = SEXES[sex]

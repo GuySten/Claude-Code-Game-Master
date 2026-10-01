@@ -470,7 +470,8 @@ Copy, fill in the link and code, and send:
     get battle music, and when you do something truly heroic your own anthem may play.
 12. **Pictures** (when the host has them on). Places, villains, bosses and important
     treasures are painted as you meet them, every character gets a portrait, and so does an
-    NPC you keep meeting. ⚔ marks a foe, 💀 a boss (bigger, glowing red), 💎 a treasure. Tap
+    NPC you keep meeting. A familiar, pet or mount is painted as soon as you get it, and
+    appears under *Companions* on your sheet. ⚔ marks a foe, 💀 a boss (bigger, glowing red), 💎 a treasure. Tap
     **🖼** next to the location at the top for the gallery: *Places*, *People*, *Foes*,
     *Treasures*.
 
@@ -548,7 +549,8 @@ Copy, fill in the link and code, and send:
     וקולות נמצאים בפאנל החבורה (בטלפון: לחצו **החבורה**). המוזיקה הולכת אחרי הסצנה; לנבלים יש
     מנגינה משלהם, לבוסים מוזיקת קרב, וכשאתם עושים משהו הרואי באמת, ייתכן שההמנון שלכם יתנגן.
 12. **תמונות** (כשהמארח הפעיל אותן). מקומות, נבלים, בוסים ואוצרות חשובים מצוירים כשאתם פוגשים
-    אותם, לכל דמות יש דיוקן, וגם לדמות משנה שחוזרת שוב ושוב. ⚔ מסמן אויב, 💀 בוס (גדול יותר,
+    אותם, לכל דמות יש דיוקן, וגם לדמות משנה שחוזרת שוב ושוב. בן לוויה (חיית מחמד קסומה, חיה,
+    סוס) מצויר ברגע שהוא מצטרף אליכם, ומופיע תחת *בני לוויה* בדף שלכם. ⚔ מסמן אויב, 💀 בוס (גדול יותר,
     עם זוהר אדום), 💎 אוצר. לחצו **🖼** ליד שם המקום למעלה כדי לפתוח את הגלריה: *מקומות*,
     *דמויות*, *אויבים*, *אוצרות*.
 
@@ -585,6 +587,7 @@ You rarely need these — Claude runs them — but they're yours to use:
 | `bash tools/gm-table.sh music theme "Grimaldi" waltz.mp3` | Give a villain their own track |
 | `bash tools/gm-table.sh music auto off` | Stop Claude from changing the music |
 | `bash tools/gm-player.sh party` | Every player character and their stats |
+| `bash tools/gm-npc.sh companion "Ember" "Noa"` | A PC's familiar, pet or mount: painted at once, shown on their sheet |
 | `bash tools/gm-player.sh xp "Name" +300` | Award XP (raises the level when it's enough; the player is told and levels up from their sheet) |
 | `bash tools/gm-music-library.sh fetch` | Download (or re-download) the music library |
 | `bash tools/gm-image.sh generate --title "Test" --prompt "..."` | Make a picture now (checks the image setup) |

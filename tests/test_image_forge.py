@@ -248,3 +248,20 @@ def test_the_table_loads_the_picture_model_then_the_music_model(monkeypatch):
     monkeypatch.setattr(composer, "start_server", lambda: order.append("music") or True)
     table_server.warm_up()
     assert order == ["pictures", "music"]              # one after the other, not both at once
+
+
+def test_a_creature_is_painted_as_a_creature_whatever_its_name(forge):
+    camp = forge["camp"]
+    (camp / "npcs.json").write_text(json.dumps({
+        "Old Mother Coil": {"description": "a giant ancient snake summoned by Noa"},
+        "Ember": {"description": "Noa's familiar", "visual_appearance": {"species": "owl"}},
+        "Marta": {"description": "a woman who keeps a pet snake"}}))
+    image_gen.generate_portrait("Old Mother Coil", camp)
+    sent = forge["seen"]["requests"][-1]
+    assert sent["prompt"].startswith("Portrait of a snake, an animal, not a person")   # not a woman
+    assert sent["negative_prompt"].startswith("human, person, woman, man")
+    image_gen.generate_portrait("Ember", camp)
+    assert forge["seen"]["requests"][-1]["prompt"].startswith("Portrait of an owl")
+    image_gen.generate_portrait("Marta", camp)                       # a person with a pet snake
+    assert forge["seen"]["requests"][-1]["prompt"].startswith("Character portrait of Marta")
+    assert image_gen.creature_of({"description": "נחשה ענקית"}) == "snake"

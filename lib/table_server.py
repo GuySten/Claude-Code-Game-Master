@@ -1561,8 +1561,17 @@ class TableState:
         fingerprint of the whole sheet, so pages refetch a sheet only when it
         changed; ``sheets=True`` includes the sheets themselves."""
         out = []
+        companions: Dict[str, List[Dict[str, Any]]] = {}
+        for n, r in self._npcs().items():
+            if r.get("companion_of"):
+                companions.setdefault(str(r["companion_of"]).lower(), []).append(
+                    {"name": n, "description": r.get("description", ""),
+                     "portrait": r.get("portrait") if n in self.shown_people else None})
         for path, raw in party_roster.all_pcs(self.campaign_dir):
             c = to_flat(raw)
+            mine = companions.get(str(c.get("name", path.stem)).lower())
+            if mine:
+                c = {**c, "companions": mine}
             hp = c.get("hp") or {}
             sheet_json = json.dumps(c, sort_keys=True, ensure_ascii=False, default=str)
             out.append({
@@ -1963,9 +1972,13 @@ class TableState:
         if not self._art_on(self.portrait_maker):
             return []
         npcs = self._npcs()
-        recurring = sorted(((n, c) for n, c in self.npc_mentions().items()
-                            if c >= NPC_PORTRAIT_MENTIONS and n not in self.shown_people),
-                           key=lambda x: -x[1])
+        # A PC's companion (familiar, pet, mount) or a party member: at once. Others
+        # once the story keeps naming them.
+        close = [(n, 10 ** 6) for n, r in npcs.items()
+                 if (r.get("companion_of") or r.get("is_party_member")) and n not in self.shown_people]
+        recurring = close + sorted(((n, c) for n, c in self.npc_mentions().items()
+                                    if c >= NPC_PORTRAIT_MENTIONS and n not in self.shown_people
+                                    and (n, 10 ** 6) not in close), key=lambda x: -x[1])
         for name, _ in recurring:
             filename = npcs[name].get("portrait")
             if not self._has_image(filename):
@@ -1984,7 +1997,10 @@ class TableState:
                     continue
             self.shown_people.append(name)
             self._save_gallery()
-            self.append("system", f"{name}.", image=filename, event={"type": "npc", "name": name})
+            event = {"type": "npc", "name": name}
+            if npcs[name].get("companion_of"):
+                event["of"] = npcs[name]["companion_of"]
+            self.append("system", f"{name}.", image=filename, event=event)
             return [name]                       # one per pass: the scene's pictures get a turn
         return []
 
@@ -2105,7 +2121,7 @@ class TableState:
 SHEET_TR_SKIP = {"name", "id", "origin", "voice", "portrait", "image", "current_location"}
 # What a player sees of ANOTHER player's character: what the table sees anyway.
 PUBLIC_SHEET_KEYS = ("name", "race", "class", "level", "concept", "pronouns", "portrait",
-                     "hp", "status", "conditions")
+                     "hp", "status", "conditions", "companions")
 
 
 def public_sheet(sheet: Dict[str, Any]) -> Dict[str, Any]:
@@ -2140,6 +2156,8 @@ def sheet_strings(sheet: Dict[str, Any], lang: str = "he") -> List[str]:
                 walk(x)
         elif isinstance(v, dict):
             for k, x in v.items():
+                if k in ("portrait", "image"):
+                    continue
                 if k not in ("name", "title", "item"):
                     add(_pretty_key(k))
                 walk(x)

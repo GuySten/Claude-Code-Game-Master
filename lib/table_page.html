@@ -465,6 +465,7 @@
       mySheet: "📜 My sheet", openSheet: "sheet ›", sheetLoading: "Loading…",
       sheet_hp: "HP", sheet_ac: "AC", sheet_level: "Level", sheet_xp: "XP", sheet_gold: "Gold",
       sheetPublic: "Their abilities, skills, spells and gear are theirs to know.",
+      sheet_companions: "Companions", ev_npc_of: "🖼 {name} — {pc}'s companion",
       sheet_current: "Current", sheet_next_level: "Next level", sheet_max: "Max", sheet_temp: "Temporary",
       xpToGo: "{n} to level {l}", xpReady: "ready to level up",
       sheet_status: "Status", sheet_stats: "Abilities", sheet_skills: "Skills",
@@ -552,6 +553,7 @@
       mySheet: "📜 הדף שלי", openSheet: "דף דמות ›", sheetLoading: "טוען…",
       sheet_hp: "נקודות חיים", sheet_ac: "דרגת שריון", sheet_level: "דרגה", sheet_xp: "ניסיון",
       sheetPublic: "התכונות, המיומנויות, הלחשים והציוד שלהם — רק הם יודעים.",
+      sheet_companions: "בני לוויה", ev_npc_of: "🖼 {name} — בן הלוויה של {pc}",
       sheet_current: "נוכחי", sheet_next_level: "לדרגה הבאה", sheet_max: "מקסימום", sheet_temp: "זמני",
       xpToGo: "עוד {n} לדרגה {l}", xpReady: "מוכנים לעלות דרגה",
       sheet_gold: "זהב", sheet_status: "מצב", sheet_stats: "תכונות", sheet_skills: "מיומנויות",
@@ -1776,10 +1778,25 @@
         [sheetTr.get(prettyKey(k)) || tx(k), typeof v === "object" ? itemLine(v) : v,
          classic ? signed(Math.floor((v - 10) / 2)) : undefined])));
     }
+    if (Array.isArray(s.companions) && s.companions.length) {      // familiars, pets, mounts
+      const ul = document.createElement("ul");
+      ul.className = "companions";
+      s.companions.forEach((c) => {
+        const li = document.createElement("li"); li.dir = "auto";
+        if (c.portrait) {
+          const img = imageEl(c.portrait, 96); img.className = "thumb";
+          img.onclick = () => { $("sheet").close(); openGallery("people", c.name); };
+          li.appendChild(img);
+        }
+        li.append(c.name + (c.description ? " — " + tx(c.description) : ""));
+        ul.appendChild(li);
+      });
+      sec("companions", t("sheet_companions"), ul);
+    }
     const order = ["conditions", "skills", "saves", "features", "spells", "spell_slots", "equipment",
                    "background", "alignment", "pronouns", "traits", "ideals", "bonds", "flaws",
                    "notes", "visual_appearance"];
-    const done = new Set([...SHEET_HIDE, "stats"]);
+    const done = new Set([...SHEET_HIDE, "stats", "companions"]);
     order.forEach((k) => {
       done.add(k);
       let v = s[k];
@@ -2013,7 +2030,8 @@
     let s = t("ev_" + ev.type).replace("{pc}", m.pc || "");
     if (ev.type === "place") return s.replace("{location}", ev.location || "");
     if (ev.type === "foe") return t(ev.boss ? "ev_boss" : "ev_foe").replace("{name}", ev.name || "");
-    if (ev.type === "npc") return t("ev_npc").replace("{name}", ev.name || "");
+    if (ev.type === "npc") return ev.of ? t("ev_npc_of").replace("{name}", ev.name || "").replace("{pc}", ev.of)
+                                        : t("ev_npc").replace("{name}", ev.name || "");
     if (ev.type === "levelready") return s.replace("{level}", ev.level);
     if (ev.type === "loot") return t("ev_loot").replace("{name}", ev.name || "")
       + (ev.owner ? " — " + t("lootFor").replace("{pc}", ev.owner) : "");

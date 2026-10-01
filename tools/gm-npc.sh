@@ -33,6 +33,7 @@ if [ "$#" -lt 1 ]; then
     echo "  promote <name>                          Make NPC a party member"
     echo "  demote <name>                           Remove party member status"
     echo "  party                                   List all party members with HP/AC"
+    echo "  companion <name> <PC>                   A PC's familiar, pet or mount (portrait + on their sheet)"
     echo ""
     echo "=== Party Member Stats (requires promote first) ==="
     echo "  hp <name> <+/-amount>                   Damage/heal party member"
@@ -175,6 +176,14 @@ case "$ACTION" in
     # Party member commands
     promote)
         $PYTHON_CMD "$LIB_DIR/npc_manager.py" promote "$NAME"
+        ;;
+
+    companion)
+        if [ "$#" -ne 1 ]; then
+            echo "Usage: gm-npc.sh companion <name> <player character>   (or: none)"
+            exit 1
+        fi
+        $PYTHON_CMD "$LIB_DIR/npc_manager.py" companion "$NAME" "$1"
         ;;
 
     demote)
