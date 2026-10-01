@@ -10,6 +10,18 @@ character or creates a new one (seated via the same ``join`` path as
 ``gm-table.sh wait`` / ``inbox`` and posts narration back with
 ``gm-table.sh say``. Every browser sees the story live.
 
+Voice: the page uses the browser's own speech engines (Web Speech API) — players
+can speak their actions (push-to-talk) and hear the narration read aloud, in
+English or Hebrew. Each player's language travels with their actions so the GM
+can answer in it; ``say --lang he|en`` posts a language-specific version of a
+beat (each browser shows only its own language's version; untagged = everyone).
+
+Music: ``gm-table.sh music <track>`` sets one shared background track for the
+whole table — an audio file from ``music/`` (project-wide) or ``<campaign>/music/``,
+a direct https link to an audio file, or a built-in generated ambience
+(``ambient:wind`` …). Every browser plays it from the same point; each player
+controls only their own volume / mute.
+
 The server is the ONLY writer of the table log, so the GM-side commands talk
 to it over localhost (authenticated with a host key kept in
 ``<campaign>/table/server.json``) rather than touching files directly.
@@ -18,6 +30,8 @@ Files (all under ``<campaign>/table/``):
   log.jsonl     every message (player actions, GM narration, joins)
   seats.json    browser seat token -> player character name
   gm-cursor     id of the last message the GM has read
+  langs.json    player character name -> language they play in (en / he)
+  music.json    the shared background track (what, volume, loop, when it started)
   server.json   port, table code, host key, pid (written by `serve`)
 """
 
@@ -50,6 +64,21 @@ MAX_BODY = 16 * 1024
 DEFAULT_PORT = 8765
 IMAGE_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
                ".webp": "image/webp", ".gif": "image/gif"}
+LANGS = {"en": "English", "he": "Hebrew"}
+AUDIO_TYPES = {".mp3": "audio/mpeg", ".ogg": "audio/ogg", ".oga": "audio/ogg",
+               ".opus": "audio/ogg", ".m4a": "audio/mp4", ".aac": "audio/aac",
+               ".wav": "audio/wav", ".flac": "audio/flac", ".webm": "audio/webm"}
+# Generated in the browser (Web Audio) — no files needed. Keep in sync with
+# AMBIENCES in table_page.html.
+AMBIENT = {
+    "wind": "Howling wind (travel, mountains, open plains)",
+    "rain": "Steady rain (camp, city at night, melancholy)",
+    "cave": "Low drone with dripping water (caves, ruins, the underdark)",
+    "fire": "Crackling hearth (tavern, camp fire, safe rest)",
+    "dungeon": "Dark pulsing drone (dread, a monster near, the boss lair)",
+    "storm": "Rain with rolling thunder (danger outdoors, sea, climax)",
+}
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CODE_WORDS = ["ember", "raven", "lantern", "goblin", "dragon", "tavern", "rune",
               "owlbear", "mimic", "dagger", "torch", "crypt", "griffin", "potion"]
 
@@ -84,6 +113,10 @@ class TableState:
                 except ValueError:
                     continue
         self.seats: Dict[str, str] = self._read_json(self.seats_path, {})
+        self.langs_path = self.dir / "langs.json"
+        self.langs: Dict[str, str] = self._read_json(self.langs_path, {})
+        self.music_path = self.dir / "music.json"
+        self.music: Dict[str, Any] = self._read_json(self.music_path, {})
         try:
             self.gm_cursor = int(self.cursor_path.read_text().strip())
         except (OSError, ValueError):
@@ -101,9 +134,80 @@ class TableState:
         tmp.write_text(json.dumps(self.seats, indent=2), encoding="utf-8")
         tmp.replace(self.seats_path)
 
+    def set_lang(self, pc: str, lang: Optional[str]) -> None:
+        if lang not in LANGS or not pc:
+            return
+        with self.lock:
+            if self.langs.get(pc) == lang:
+                return
+            self.langs[pc] = lang
+            tmp = self.langs_path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(self.langs, indent=2), encoding="utf-8")
+            tmp.replace(self.langs_path)
+
+    def seated_langs(self) -> Dict[str, str]:
+        """Language of every seated player (English when never stated)."""
+        with self.lock:
+            return {name: self.langs.get(name, "en")
+                    for name in dict.fromkeys(self.seats.values())}
+
+    # --- music ---
+    def music_dirs(self) -> List[Path]:
+        return [self.campaign_dir / "music", PROJECT_ROOT / "music"]
+
+    def find_music(self, name: str) -> Optional[Path]:
+        """A music file by (case-insensitive) file name or name without extension."""
+        wanted = Path(str(name)).name.lower()
+        for d in self.music_dirs():
+            if not d.is_dir():
+                continue
+            for f in sorted(d.iterdir()):
+                if f.is_file() and f.suffix.lower() in AUDIO_TYPES and \
+                        wanted in (f.name.lower(), f.stem.lower()):
+                    return f
+        return None
+
+    def list_music(self) -> List[Dict[str, str]]:
+        out, seen = [], set()
+        for d in self.music_dirs():
+            if not d.is_dir():
+                continue
+            for f in sorted(d.iterdir()):
+                if f.is_file() and f.suffix.lower() in AUDIO_TYPES and f.name.lower() not in seen:
+                    seen.add(f.name.lower())
+                    out.append({"track": f.name, "where": str(d)})
+        return out
+
+    def set_music(self, track: Optional[str], volume: float = 0.5,
+                  loop: bool = True, title: Optional[str] = None) -> Dict[str, Any]:
+        """Point every browser at one track (None = silence). Returns the state."""
+        with self.lock:
+            next_id = int(self.music.get("id", 0)) + 1
+            if not track:
+                self.music = {"id": next_id, "track": None}
+            else:
+                if track.startswith("ambient:"):
+                    kind, src = "ambient", track.split(":", 1)[1]
+                    title = title or AMBIENT.get(src, src).split(" (")[0]
+                elif track.startswith(("http://", "https://")):
+                    kind, src = "url", track
+                    title = title or Path(urlparse(track).path).stem or "Music"
+                else:
+                    kind, src = "file", Path(track).name
+                    title = title or Path(src).stem.replace("-", " ").replace("_", " ")
+                self.music = {"id": next_id, "track": track, "kind": kind, "src": src,
+                              "title": title, "volume": max(0.0, min(1.0, float(volume))),
+                              "loop": bool(loop), "started_at": time.time()}
+            tmp = self.music_path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(self.music, indent=2), encoding="utf-8")
+            tmp.replace(self.music_path)
+            return dict(self.music)
+
     # --- messages ---
     def append(self, kind: str, text: str, pc: Optional[str] = None,
-               to: Optional[str] = None, image: Optional[str] = None) -> Dict[str, Any]:
+               to: Optional[str] = None, image: Optional[str] = None,
+               lang: Optional[str] = None, voice: bool = False,
+               event: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         with self.lock:
             msg = {"id": (self.messages[-1]["id"] + 1) if self.messages else 1,
                    "ts": _now(), "kind": kind, "text": text}
@@ -113,6 +217,12 @@ class TableState:
                 msg["to"] = to
             if image:
                 msg["image"] = image
+            if lang in LANGS:
+                msg["lang"] = lang
+            if voice:
+                msg["voice"] = True
+            if event:
+                msg["event"] = event   # lets each browser word the notice in its language
             self.messages.append(msg)
             with open(self.log_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps(msg, ensure_ascii=False) + "\n")
@@ -279,6 +389,10 @@ def make_handler(state: TableState, code: str, host_key: str):
             q = {k: v[0] for k, v in parse_qs(url.query).items()}
             if url.path in ("/", "/index.html"):
                 return self._send(200, page.encode("utf-8"), "text/html; charset=utf-8")
+            if url.path.startswith("/music/"):
+                if not self._code_ok(q.get("code")):
+                    return self._err("bad table code", 403)
+                return self._audio(url.path[len("/music/"):])
             if url.path.startswith("/images/"):
                 if not self._code_ok(q.get("code")):
                     return self._err("bad table code", 403)
@@ -288,16 +402,19 @@ def make_handler(state: TableState, code: str, host_key: str):
                     return self._err("host only", 403)
                 if url.path == "/api/gm/pending":
                     return self._json({"ok": True,
-                                       "unread": len(state.gm_unread(mark=False)),
-                                       "waiting_on": state.waiting_on(),
-                                       "seated": sorted(set(state.seats.values()))})
+                                   "unread": len(state.gm_unread(mark=False)),
+                                   "waiting_on": state.waiting_on(),
+                                   "seated": sorted(set(state.seats.values())),
+                                   "langs": state.seated_langs()})
                 return self._err("not found", 404)
             if not self._code_ok(q.get("code")):
                 return self._err("bad table code", 403)
             me = state.pc_for(q.get("token"))
             if url.path == "/api/info":
                 return self._json({"ok": True, "me": me, "party": state.party(),
-                                   "waiting_on": state.waiting_on(), **state.overview()})
+                                   "waiting_on": state.waiting_on(),
+                                   "music": state.music, "server_now": time.time(),
+                                   **state.overview()})
             if url.path == "/api/messages":
                 try:
                     after = int(q.get("after", 0))
@@ -323,7 +440,7 @@ def make_handler(state: TableState, code: str, host_key: str):
                 result = state.claim(str(data.get("pc", "")))
                 if result["ok"]:
                     state.append("system", f"{result['pc']} takes their seat at the table.",
-                                 pc=result["pc"])
+                                 pc=result["pc"], event={"type": "seat"})
                 return self._json(result, 200 if result["ok"] else 409)
 
             if url.path == "/api/create":
@@ -339,7 +456,8 @@ def make_handler(state: TableState, code: str, host_key: str):
                 if result["ok"]:
                     line = f"A new player joins: {created['pc']}"
                     line += f" — {concept}." if concept else "."
-                    state.append("system", line, pc=created["pc"])
+                    state.append("system", line, pc=created["pc"],
+                                 event={"type": "join", "concept": concept})
                 return self._json(result, 200 if result["ok"] else 409)
 
             me = state.pc_for(data.get("token"))
@@ -352,20 +470,31 @@ def make_handler(state: TableState, code: str, host_key: str):
                 if len(text) > MAX_PLAYER_TEXT:
                     return self._err(f"Keep it under {MAX_PLAYER_TEXT} characters.")
                 private = bool(data.get("private"))
-                msg = state.append("player", text, pc=me, to=me if private else None)
+                lang = data.get("lang") if data.get("lang") in LANGS else None
+                state.set_lang(me, lang)
+                msg = state.append("player", text, pc=me, to=me if private else None,
+                                   lang=lang, voice=bool(data.get("voice")))
                 return self._json({"ok": True, "message": msg})
+
+            if url.path == "/api/lang":
+                if not me:
+                    return self._err("Take a seat first.", 403)
+                state.set_lang(me, data.get("lang"))
+                return self._json({"ok": True})
 
             if url.path == "/api/leave":
                 name = state.release(str(data.get("token", "")))
                 if name:
-                    state.append("system", f"{name} steps away from the table.", pc=name)
+                    state.append("system", f"{name} steps away from the table.", pc=name,
+                                 event={"type": "leave"})
                 return self._json({"ok": True})
             return self._err("not found", 404)
 
         def _gm(self, path: str, data: Dict[str, Any]):
             if path == "/api/gm/inbox":
                 return self._json({"ok": True, "messages": state.gm_unread(mark=True),
-                                   "waiting_on": state.waiting_on()})
+                                   "waiting_on": state.waiting_on(),
+                                   "langs": state.seated_langs()})
             if path == "/api/gm/say":
                 text = str(data.get("text", "")).strip()
                 image = data.get("image")
@@ -383,12 +512,92 @@ def make_handler(state: TableState, code: str, host_key: str):
                     if path_ is None:
                         return self._err(f"no player character named {to}")
                     to = (party_roster._read(path_) or {}).get("name", to)
-                msg = state.append("gm", text, to=to or None, image=image)
+                lang = data.get("lang")
+                if lang and lang not in LANGS:
+                    return self._err(f"unknown language {lang} (use: {', '.join(LANGS)})")
+                msg = state.append("gm", text, to=to or None, image=image, lang=lang)
                 return self._json({"ok": True, "message": msg})
+            if path == "/api/gm/music":
+                track = data.get("track")
+                if track in (None, "", "stop", "off", "none"):
+                    music = state.set_music(None)
+                    state.append("system", "🎵 The music fades away.",
+                                 event={"type": "music_stop"})
+                    return self._json({"ok": True, "music": music})
+                track = str(track).strip()
+                if track.startswith("ambient:"):
+                    if track.split(":", 1)[1] not in AMBIENT:
+                        return self._err("unknown ambience; choose from: "
+                                         + ", ".join("ambient:" + a for a in AMBIENT))
+                elif track.startswith(("http://", "https://")):
+                    pass
+                else:
+                    found = state.find_music(track)
+                    if found is None:
+                        return self._err(f"no music file named {track} in music/ "
+                                         f"(gm-table.sh music list)")
+                    track = found.name
+                try:
+                    volume = float(data.get("volume", 0.5))
+                except (TypeError, ValueError):
+                    return self._err("volume must be a number between 0 and 1")
+                music = state.set_music(track, volume, data.get("loop", True) is not False,
+                                        data.get("title"))
+                state.append("system", f"🎵 {music['title']}",
+                             event={"type": "music", "kind": music["kind"], "src": music["src"],
+                                    "title": music["title"]})
+                return self._json({"ok": True, "music": music})
             if path == "/api/gm/free":
                 freed = state.free(str(data.get("pc", "")))
                 return self._json({"ok": True, "freed": freed})
             return self._err("not found", 404)
+
+        def _audio(self, name: str):
+            from urllib.parse import unquote
+            path = state.find_music(unquote(name))
+            if path is None:
+                return self._err("not found", 404)
+            size = path.stat().st_size
+            ctype = AUDIO_TYPES[path.suffix.lower()]
+            start, end = 0, size - 1
+            rng = self.headers.get("Range", "")
+            partial = rng.startswith("bytes=")
+            if partial:
+                try:
+                    a, b = rng[6:].split(",")[0].split("-")
+                    if a:
+                        start = int(a)
+                        end = int(b) if b else size - 1
+                    else:                      # suffix range: the last N bytes
+                        start = max(0, size - int(b))
+                    end = min(end, size - 1)
+                    if start > end:
+                        raise ValueError
+                except ValueError:
+                    self.send_response(416)
+                    self.send_header("Content-Range", f"bytes */{size}")
+                    self.end_headers()
+                    return
+            length = end - start + 1
+            self.send_response(206 if partial else 200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Accept-Ranges", "bytes")
+            self.send_header("Content-Length", str(length))
+            if partial:
+                self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+            self.end_headers()
+            with open(path, "rb") as f:
+                f.seek(start)
+                remaining = length
+                while remaining > 0:
+                    chunk = f.read(min(65536, remaining))
+                    if not chunk:
+                        break
+                    try:
+                        self.wfile.write(chunk)
+                    except (BrokenPipeError, ConnectionResetError):
+                        return
+                    remaining -= len(chunk)
 
         def _image(self, name: str):
             name = Path(name).name
@@ -505,17 +714,30 @@ def _call(campaign_dir: Path, method: str, path: str, data: Optional[dict] = Non
         sys.exit(f"[ERROR] Could not reach the table server: {e.reason}")
 
 
-def _print_messages(messages: List[dict], waiting_on: List[str]) -> None:
+def _print_messages(messages: List[dict], waiting_on: List[str],
+                    langs: Optional[Dict[str, str]] = None) -> None:
     if not messages:
         print("(no new player messages)")
     for m in messages:
         if m["kind"] == "system":
             print(f"[#{m['id']} JOIN/LEAVE] {m['text']}")
         else:
-            aside = " (private, to GM only)" if m.get("to") else ""
-            print(f"[#{m['id']} {m.get('pc', '?')}{aside}] {m['text']}")
+            tags = [LANGS[m["lang"]]] if m.get("lang") in LANGS else []
+            if m.get("voice"):
+                tags.append("spoken")
+            if m.get("to"):
+                tags.append("private, to GM only")
+            tag = f" ({', '.join(tags)})" if tags else ""
+            print(f"[#{m['id']} {m.get('pc', '?')}{tag}] {m['text']}")
     if waiting_on:
         print(f"Still waiting on: {', '.join(waiting_on)}")
+    if langs:
+        used = sorted(set(langs.values()))
+        if len(used) > 1:
+            print("Table languages: " + ", ".join(f"{pc}={LANGS.get(l, l)}" for pc, l in langs.items())
+                  + "  -> post each beat once per language: say --lang he / say --lang en")
+        elif used and used[0] != "en":
+            print(f"Table language: {LANGS.get(used[0], used[0])} -> narrate in it")
 
 
 def main() -> None:
@@ -542,6 +764,16 @@ def main() -> None:
     s.add_argument("--stdin", action="store_true", help="Read the narration from stdin")
     s.add_argument("--to", help="Whisper to one player character only")
     s.add_argument("--image", help="Attach an image from the campaign's images/ folder")
+    s.add_argument("--lang", choices=sorted(LANGS),
+                   help="This is the version of the beat for players in this language only")
+
+    mu = sub.add_parser("music", help="Set the shared background music for every player")
+    mu.add_argument("track", nargs="?",
+                    help="A file in music/, an https audio link, ambient:<name>, "
+                         "'list' to see choices, or 'stop'")
+    mu.add_argument("--volume", type=float, default=0.5, help="0.0 – 1.0 (default 0.5)")
+    mu.add_argument("--no-loop", action="store_true", help="Play once instead of looping")
+    mu.add_argument("--title", help="What players see (default: from the file name)")
 
     f = sub.add_parser("free", help="Free a player's seat so they can rejoin from another device")
     f.add_argument("pc")
@@ -564,13 +796,15 @@ def main() -> None:
         print(f"  On this computer:   {info['local_url']}")
         print(f"  Same Wi-Fi/network: {info['lan_url']}")
         print(f"  Table code:         {info['code']}")
-        print(f"  Seated players:     {', '.join(pending.get('seated') or []) or '(nobody yet)'}")
+        langs = pending.get("langs") or {}
+        seated = [f"{pc} ({LANGS.get(langs.get(pc, 'en'), '?')})" for pc in pending.get("seated") or []]
+        print(f"  Seated players:     {', '.join(seated) or '(nobody yet)'}")
         print(f"  Unread actions:     {pending.get('unread', 0)}")
         return
 
     if args.action == "inbox":
         r = _call(campaign_dir, "POST", "/api/gm/inbox", {})
-        return _print_messages(r.get("messages", []), r.get("waiting_on", []))
+        return _print_messages(r.get("messages", []), r.get("waiting_on", []), r.get("langs"))
 
     if args.action == "wait":
         deadline = time.time() + args.timeout
@@ -590,17 +824,47 @@ def main() -> None:
         if not r.get("messages"):
             print(f"(no player messages after {args.timeout}s — run wait again)")
             return
-        return _print_messages(r["messages"], r.get("waiting_on", []))
+        return _print_messages(r["messages"], r.get("waiting_on", []), r.get("langs"))
 
     if args.action == "say":
         text = sys.stdin.read() if args.stdin else (args.text or "")
         r = _call(campaign_dir, "POST", "/api/gm/say",
-                  {"text": text.strip(), "to": args.to, "image": args.image})
+                  {"text": text.strip(), "to": args.to, "image": args.image,
+                   "lang": args.lang})
         if not r.get("ok"):
             sys.exit(f"[ERROR] {r.get('error')}")
         m = r["message"]
-        print(f"POSTED #{m['id']}" + (f" (whisper to {m['to']})" if m.get("to") else
-                                       " to the whole table"))
+        who = f" (whisper to {m['to']})" if m.get("to") else " to the whole table"
+        if m.get("lang"):
+            who += f", {LANGS[m['lang']]} speakers only"
+        print(f"POSTED #{m['id']}{who}")
+        return
+
+    if args.action == "music":
+        if args.track in (None, "list"):
+            state = TableState(campaign_dir, str(CampaignManager().world_state_dir))
+            current = state.music
+            print("Now playing: " + (f"{current.get('title')} [{current.get('track')}]"
+                                     if current.get("track") else "(silence)"))
+            print("\nBuilt-in ambience (works with no files):")
+            for name, desc in AMBIENT.items():
+                print(f"  ambient:{name:<9} {desc}")
+            files = state.list_music()
+            print("\nMusic files:" if files else
+                  "\nMusic files: (none yet — drop .mp3/.ogg files into music/ to use them)")
+            for f in files:
+                print(f"  {f['track']}")
+            print("\nOr any direct https link to an audio file.")
+            return
+        track = None if args.track in ("stop", "off", "none") else args.track
+        r = _call(campaign_dir, "POST", "/api/gm/music",
+                  {"track": track, "volume": args.volume, "loop": not args.no_loop,
+                   "title": args.title})
+        if not r.get("ok"):
+            sys.exit(f"[ERROR] {r.get('error')}")
+        m = r["music"]
+        print(f"MUSIC {m['title']} ({m['track']}, volume {m['volume']})" if m.get("track")
+              else "MUSIC stopped")
         return
 
     if args.action == "free":

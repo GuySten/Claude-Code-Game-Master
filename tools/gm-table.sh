@@ -10,6 +10,8 @@
 #   gm-table.sh say --stdin               ...reading the narration from stdin
 #   gm-table.sh say "..." --to "<pc>"     Whisper to one player only
 #   gm-table.sh say "..." --image f.png   Attach an image from the campaign's images/
+#   gm-table.sh say "..." --lang he       The Hebrew version of a beat (mixed-language tables)
+#   gm-table.sh music <track>|list|stop   Shared background music for every player
 #   gm-table.sh free "<pc>"               Free a seat (player switching devices)
 #   gm-table.sh stop                      Close the table
 #   gm-table.sh serve [...]               Run the server in the foreground instead
@@ -46,7 +48,7 @@ case "$ACTION" in
         echo "Friends elsewhere: run a tunnel (see: gm-table.sh help) and share its https link."
         ;;
 
-    "serve"|"status"|"wait"|"inbox"|"say"|"free"|"stop")
+    "serve"|"status"|"wait"|"inbox"|"say"|"music"|"free"|"stop")
         $PYTHON_CMD "$LIB_DIR/table_server.py" "$ACTION" "$@"
         ;;
 
@@ -59,7 +61,11 @@ case "$ACTION" in
         echo "  wait [--all] [--timeout S]    Wait for player actions (--all: until everyone acted)"
         echo "  inbox                         Unread player actions, without waiting"
         echo "  say \"<text>\" [--to PC] [--image FILE] | say --stdin"
-        echo "                                Post narration (or a whisper / an illustration)"
+        echo "        [--lang en|he]          Post narration (or a whisper / an illustration /"
+        echo "                                one language's version of a beat)"
+        echo "  music <track> [--volume V]    Shared background music: a file in music/, an https"
+        echo "                                audio link, or ambient:wind|rain|storm|cave|fire|dungeon"
+        echo "  music list | music stop       What can play / silence"
         echo "  free \"<pc>\"                   Free a seat so a player can rejoin from a new device"
         echo "  stop                          Close the table"
         echo ""
@@ -71,6 +77,10 @@ case "$ACTION" in
         echo "        ngrok http 8765                                     (free account)"
         echo "        tailscale funnel 8765                               (Tailscale users)"
         echo "    Anyone with the link still needs the table code to sit down."
+        echo ""
+        echo "Voice: players can speak their actions (🎤) and hear the story read aloud (🔊), in"
+        echo "English or Hebrew. The microphone needs https or localhost — on another computer,"
+        echo "use the tunnel's https link (even on the same Wi-Fi). Chrome, Edge or Safari."
         ;;
 esac
 

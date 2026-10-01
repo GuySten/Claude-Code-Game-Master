@@ -51,7 +51,8 @@ def table(tmp_path):
         except urllib.error.HTTPError as e:
             return e.code, json.loads(e.read())
 
-    yield {"call": call, "world": world, "camp": camp, "state": state}
+    yield {"call": call, "world": world, "camp": camp, "state": state,
+           "base": base, "opener": opener}
     httpd.shutdown()
     httpd.server_close()
 
@@ -134,3 +135,63 @@ def test_the_log_survives_a_server_restart(table):
     reloaded = TableState(table["camp"], str(table["world"]))
     assert [m["text"] for m in reloaded.messages][-1] == "Onward."
     assert reloaded.pc_for(pip) == "Pip"
+
+
+def test_each_player_language_reaches_the_gm_and_lang_beats_are_tagged(table):
+    call = table["call"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    bram = call("/api/create", {"code": CODE, "name": "Bram"})[1]["token"]
+    call("/api/say", {"code": CODE, "token": pip, "text": "I open the door.", "lang": "en"})
+    call("/api/say", {"code": CODE, "token": bram, "text": "אני מדליק לפיד", "lang": "he",
+                      "voice": True})
+    _, inbox = call("/api/gm/inbox", {}, host=True)
+    spoken = [m for m in inbox["messages"] if m["kind"] == "player"]
+    assert [(m["pc"], m.get("lang"), m.get("voice", False)) for m in spoken] == [
+        ("Pip", "en", False), ("Bram", "he", True)]
+    assert inbox["langs"] == {"Pip": "en", "Bram": "he"}
+
+    status, body = call("/api/gm/say", {"text": "הלפיד מאיר את המסדרון.", "lang": "he"}, host=True)
+    assert status == 200 and body["message"]["lang"] == "he"
+    assert call("/api/gm/say", {"text": "x", "lang": "fr"}, host=True)[0] == 400
+
+    call("/api/lang", {"code": CODE, "token": pip, "lang": "he"})
+    assert table["state"].seated_langs()["Pip"] == "he"
+
+
+def test_music_is_shared_by_every_player(table):
+    call = table["call"]
+    _, info = call(f"/api/info?code={CODE}")
+    assert not info["music"].get("track")
+
+    status, body = call("/api/gm/music", {"track": "ambient:storm", "volume": 0.4}, host=True)
+    assert status == 200 and body["music"]["kind"] == "ambient"
+    _, info = call(f"/api/info?code={CODE}")
+    assert info["music"]["src"] == "storm" and info["music"]["volume"] == 0.4
+    assert info["server_now"] >= info["music"]["started_at"]
+
+    assert call("/api/gm/music", {"track": "ambient:polka"}, host=True)[0] == 400
+    assert call("/api/gm/music", {"track": "missing.mp3"}, host=True)[0] == 400
+    assert call("/api/gm/music", {"track": "https://example.com/a.ogg"}, host=True)[0] == 200
+    assert call("/api/gm/music", {"track": "stop"}, host=True)[1]["music"]["track"] is None
+    assert call("/api/gm/music", {"track": "ambient:wind"})[0] == 403  # players can't
+
+
+def test_music_files_are_served_with_seeking(table):
+    music = table["camp"] / "music"
+    music.mkdir()
+    (music / "Tavern Night.ogg").write_bytes(bytes(range(256)) * 4)
+    call = table["call"]
+    status, body = call("/api/gm/music", {"track": "tavern night"}, host=True)
+    assert status == 200 and body["music"]["src"] == "Tavern Night.ogg"
+    assert body["music"]["title"] == "Tavern Night"
+
+    opener, url = table["opener"], table["base"]
+    req = urllib.request.Request(f"{url}/music/Tavern%20Night.ogg?code={CODE}",
+                                 headers={"Range": "bytes=256-511"})
+    with opener.open(req, timeout=5) as resp:
+        assert resp.status == 206
+        assert resp.headers["Content-Range"] == "bytes 256-511/1024"
+        assert resp.read() == bytes(range(256))
+    with pytest.raises(urllib.error.HTTPError) as denied:
+        opener.open(f"{url}/music/Tavern%20Night.ogg?code=nope", timeout=5)
+    assert denied.value.code == 403

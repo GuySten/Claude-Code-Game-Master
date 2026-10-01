@@ -89,3 +89,7 @@ index.html
 # Remotion demo video (local build workspace — entire folder ignored)
 video/
 world-state/archive/
+
+# Table music (user-provided audio for the online table)
+music/*
+!music/README.md

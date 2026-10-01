@@ -171,8 +171,15 @@ choice into the play pack's `room`/`hook` and build the opening around **that** 
    `cloudflared tunnel --url http://localhost:8765` (no account) or `ngrok http 8765`, and
    share the https link it prints. (`gm-table.sh help` lists these.)
 2. Players pick an existing PC or create one in the browser (it lands in `players/`).
-3. Run the table loop from CLAUDE.md → "Online table": `wait` → resolve + persist → `say`.
-4. Ending: `gm-session.sh end ...` as usual, `say` a closing line, then `gm-table.sh stop`.
+3. Set the opening mood for everyone: `bash tools/gm-table.sh music list`, then
+   `gm-table.sh music <track>` (a built-in `ambient:*` works with no files).
+4. Run the table loop from CLAUDE.md → "Online table": `wait` → resolve + persist → `say`
+   (in each player's language — see "Voice & language").
+   Tell players: 🎤 to speak their action, 🔊 to hear the story, עברית/English to switch
+   language. Voice needs Chrome, Edge or Safari, and the https tunnel link (not the plain
+   Wi-Fi link) on any computer other than the host's.
+5. Ending: `gm-session.sh end ...` as usual, `say` a closing line, `music stop`, then
+   `gm-table.sh stop`.
 
 ---
 

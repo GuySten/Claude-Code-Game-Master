@@ -51,6 +51,17 @@ open the link, enter the code, and pick or create their PC. While the table is o
    "only the GM sees this" aside arrives marked `(private, to GM only)` — answer it with
    `--to`. Illustrations: `say "…" --image <file in images/>`.
 4. Go back to 1. A new player joining arrives as a JOIN line: welcome them in the fiction.
+- **Voice & language.** Players may speak their actions (lines tagged `spoken`: expect
+  speech-to-text slips — read for intent, never mock a transcription) and hear the narration
+  read aloud, so write `say` text for the ear too: no HP bars, tables or box art there, short
+  sentences, dice as one plain line. Each action is tagged with the player's language
+  (English/Hebrew). Answer in it — natural Hebrew, not transliteration. Mixed table (`wait`
+  prints `Table languages`): post each beat once per language, `say --lang en` and
+  `say --lang he`; each player sees only their own. Untagged `say` goes to everyone.
+- **Music.** `gm-table.sh music <track>` sets one shared track for everyone (`music list`
+  shows files in `music/` and the built-in `ambient:wind|rain|storm|cave|fire|dungeon`;
+  any https audio link works too; `music stop`). Change it when the scene's mood changes
+  (arrive at the tavern, combat starts, enter the crypt), never every beat.
 The host's own terminal messages are table-talk instructions to you unless they say they're
 playing; the host can also play through the browser. `gm-table.sh status` / `stop` / `free "<pc>"`.
 

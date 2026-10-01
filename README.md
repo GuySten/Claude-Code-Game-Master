@@ -133,7 +133,17 @@ bash tools/gm-table.sh start      # or just tell /gm "my friends want to join"
 It prints a link and a table code. Friends open the link in any browser (phone works),
 enter the code, and pick a hero or create their own. They type what they do; Claude reads
 everyone's actions, rolls, and posts the narration to every screen. It also handles private
-asides to the GM, whispers back, and live HP bars for the party. Same Wi-Fi works out of
+asides to the GM, whispers back, and live HP bars for the party.
+
+- **Talk instead of type.** Players tap 🎤 and speak their action, in **English or Hebrew**
+  (the page switches fully to Hebrew, right-to-left, with one tap), and can turn on 🔊 to
+  hear the story read aloud. This uses the browser's own speech engines (Chrome, Edge or
+  Safari), so there's nothing to install. The microphone needs an https link (the tunnel
+  link) or localhost.
+- **Shared music.** The GM sets one background track for the whole table
+  (`gm-table.sh music tavern.mp3`, any https audio link, or a built-in generated ambience such
+  as `ambient:storm`). Everyone hears it from the same point, it gets quieter while the
+  narration is read aloud, and each player sets their own volume. Same Wi-Fi works out of
 the box. For friends elsewhere, run a free tunnel such as
 `cloudflared tunnel --url http://localhost:8765` and share its https link. No extra
 dependencies are needed (Python standard library only).
@@ -222,7 +232,7 @@ The harness is plumbing you can poke at: bash wrappers (`tools/`) → Python man
 | `gm-session.sh` | Session lifecycle, party movement, save/restore |
 | `gm-context.sh` | Assemble scene context (world state + source passages) |
 | `gm-player.sh` | Player stats — health, progression, gold, inventory (every PC; `join`/`party`/`leave` for multiplayer) |
-| `gm-table.sh` | Online table — players join from their own browsers; `wait` / `say` run the loop |
+| `gm-table.sh` | Online table — players join from their own browsers (voice, Hebrew/English, shared music); `wait` / `say` / `music` run the loop |
 | `gm-npc.sh` | NPCs — creation, updates, mood/goal/voice, party members |
 | `gm-location.sh` | Locations and connections |
 | `gm-plot.sh` | Quest and storyline tracking |
