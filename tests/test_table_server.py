@@ -606,3 +606,37 @@ def test_the_host_makes_natural_voices_for_seated_players(table):
         assert r.status == 200
     assert not list((table["camp"] / "table" / "tts").glob("*.part"))
     assert table_tts.VOICES["he-IL-HilaNeural"][0] == "he"
+
+
+def test_sheets_follow_the_story_like_the_party_panel(table):
+    call, camp = table["call"], table["camp"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    sheet_path = camp / "character.json"
+    sheet = json.loads(sheet_path.read_text())
+    sheet.update({"stats": {"str": 8, "dex": 17}, "skills": {"stealth": 5}, "hp": {"current": 10, "max": 10}})
+    sheet_path.write_text(json.dumps(sheet))
+
+    _, info = call(f"/api/info?code={CODE}&token={pip}")
+    rev = info["party"][0]["sheet_rev"]
+    assert "sheet" not in info["party"][0]                 # summaries only in the polled info
+    _, got = call(f"/api/sheet?code={CODE}&token={pip}&pc=Pip")
+    assert got["rev"] == rev and list(got["sheet"]["stats"]) == ["str", "dex"]   # sheet's own order
+
+    # The GM's turn: the hit is recorded before it's narrated -> still the old sheet.
+    call("/api/say", {"code": CODE, "token": pip, "text": "I sneak past."})
+    call("/api/gm/inbox", {}, host=True)
+    sheet["hp"]["current"] = 4
+    sheet_path.write_text(json.dumps(sheet))
+    _, got = call(f"/api/sheet?code={CODE}&token={pip}&pc=Pip")
+    assert got["rev"] == rev and got["sheet"]["hp"]["current"] == 10
+
+    # Narrated: the new sheet, and the page can still fetch the one it's showing.
+    _, said = call("/api/gm/say", {"text": "The guard spots Pip."}, host=True)
+    _, info = call(f"/api/info?code={CODE}&token={pip}")
+    new_rev = info["party"][0]["sheet_rev"]
+    assert new_rev != rev and info["narration_id"] == said["message"]["id"]
+    assert call(f"/api/sheet?code={CODE}&token={pip}&pc=Pip")[1]["sheet"]["hp"]["current"] == 4
+    assert call(f"/api/sheet?code={CODE}&token={pip}&pc=Pip&rev={new_rev}")[1]["rev"] == new_rev
+
+    assert call(f"/api/sheet?code={CODE}&token=nope&pc=Pip")[0] == 403
+    assert call(f"/api/sheet?code={CODE}&token={pip}&pc=Nobody")[0] == 404

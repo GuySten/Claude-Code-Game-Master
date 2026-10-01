@@ -56,6 +56,7 @@ Files (all under ``<campaign>/table/``):
 """
 
 import argparse
+import hashlib
 import hmac
 import json
 import os
@@ -679,7 +680,7 @@ class TableState:
                      # The sheets as the players last saw them. The GM records
                      # every change BEFORE narrating it, so without this the HP
                      # bars would give the outcome away before the story does.
-                     "party": self.party()}
+                     "party": self.party(sheets=True)}
 
     def set_stage(self, stage: str) -> bool:
         with self.lock:
@@ -795,14 +796,50 @@ class TableState:
             if before is None:
                 out.append(pc)
             else:
-                out.append({**before, "claimed": pc["claimed"], "lead": pc["lead"]})
+                out.append({**{k: v for k, v in before.items() if k != "sheet"},
+                            "claimed": pc["claimed"], "lead": pc["lead"]})
         return out
 
-    def party(self) -> List[Dict[str, Any]]:
+    def last_narration(self, viewer: Optional[str]) -> int:
+        """Id of the newest GM message this viewer can see. The page holds sheet
+        changes until it has that message, so HP never moves ahead of the story."""
+        with self.lock:
+            for m in reversed(self.messages):
+                if m["kind"] == "gm" and self.visible_to(m, viewer):
+                    return m["id"]
+        return 0
+
+    def sheet(self, viewer: Optional[str], name: str, rev: Optional[str] = None
+              ) -> Optional[Dict[str, Any]]:
+        """A PC's full character sheet: the version with revision ``rev`` (the
+        page asks for the one its party panel is showing — during the GM's turn
+        that can still be the sheet from before the turn), else the version this
+        viewer's party panel would show now."""
+        live = [p for p in self.party(sheets=True) if party_roster._same_name(p["name"], name)]
+        with self.lock:
+            held = [p for p in ((self.turn or {}).get("party") or [])
+                    if party_roster._same_name(p["name"], name)]
+        versions = live + held
+        if not versions:
+            return None
+        shown = next((p for p in self.party_for(viewer)
+                      if party_roster._same_name(p["name"], name)), None)
+        for want in (rev, shown and shown.get("sheet_rev")):
+            for v in versions:
+                if want and v.get("sheet_rev") == want:
+                    return {"name": v["name"], "rev": v["sheet_rev"], "sheet": v["sheet"]}
+        v = live[0] if live else versions[0]
+        return {"name": v["name"], "rev": v["sheet_rev"], "sheet": v["sheet"]}
+
+    def party(self, sheets: bool = False) -> List[Dict[str, Any]]:
+        """The PCs, summarised for the party panel. Each carries ``sheet_rev``, a
+        fingerprint of the whole sheet, so pages refetch a sheet only when it
+        changed; ``sheets=True`` includes the sheets themselves."""
         out = []
         for path, raw in party_roster.all_pcs(self.campaign_dir):
             c = to_flat(raw)
             hp = c.get("hp") or {}
+            sheet_json = json.dumps(c, sort_keys=True, ensure_ascii=False, default=str)
             out.append({
                 "name": c.get("name", path.stem),
                 "lead": path.name == party_roster.LEAD_FILE,
@@ -813,7 +850,10 @@ class TableState:
                 "status": c.get("status", "alive"),
                 "conditions": c.get("conditions", []),
                 "claimed": self.claimed_by_anyone(c.get("name", "")),
+                "sheet_rev": hashlib.sha1(sheet_json.encode("utf-8")).hexdigest()[:12],
             })
+            if sheets:          # (a copy, in the sheet's own order: STR DEX CON...)
+                out[-1]["sheet"] = json.loads(json.dumps(c, ensure_ascii=False, default=str))
         return out
 
     def overview(self) -> Dict[str, Any]:
@@ -912,6 +952,7 @@ def make_handler(state: TableState, code: str, host_key: str):
                                    "waiting_on": state.waiting_on(),
                                    "music": state.music, "server_now": time.time(),
                                    "progress": state.progress(), "tts": state.tts_ready(),
+                                   "narration_id": state.last_narration(me),
                                    **state.overview()})
             if url.path == "/api/messages":
                 try:
@@ -921,6 +962,13 @@ def make_handler(state: TableState, code: str, host_key: str):
                     after, rev = 0, 0
                 return self._json({"ok": True, "me": me, "rev": state.rev,
                                    "messages": state.since(after, me, rev)})
+            if url.path == "/api/sheet":
+                if not me:
+                    return self._err("Take a seat first.", 403)
+                found = state.sheet(me, q.get("pc", ""), q.get("rev"))
+                if found is None:
+                    return self._err("No such character.", 404)
+                return self._json({"ok": True, **found})
             if url.path == "/api/tts":
                 if not me:
                     return self._err("Take a seat first.", 403)

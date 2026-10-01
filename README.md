@@ -154,6 +154,10 @@ asides to the GM, whispers back, and live HP bars for the party.
 - **Fair dice, in public.** With the table open, the table itself rolls (the OS random
   source) and shows every roll to everyone the moment the GM sees it, with the DC or AC
   fixed in the same command, before the dice land. Secret rolls are announced too.
+- **The story, told as it happens.** Narration appears a few words at a time, in step with
+  the voice when it's read aloud, and the party panel follows it: a PC's HP changes when the
+  story reaches their name. Players can open any character's full sheet (📜), which follows
+  the story the same way.
 - **Talk instead of type.** Players tap 🎤 and speak their action, in **English or Hebrew**
   (the page switches fully to Hebrew, right-to-left, with one tap), and can turn on 🔊 to
   hear the story read aloud. Hebrew is read by a natural neural voice that the host's

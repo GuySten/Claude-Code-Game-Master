@@ -238,8 +238,15 @@ Copy, fill in the link and code, and send:
    everyone the moment the GM sees it — who rolled, for what, and the DC or AC, which is
    set before the dice land ("🎯 Pip — Stealth · DC 15 · 🎲 [12] + 5 = 17 ✓"). A secret
    roll (say, a hidden enemy) shows up as "the GM rolled in secret".
-9. The side panel shows everyone's **HP**. Refreshing the page keeps your seat. To switch
-   devices, tap **Leave seat** first (or ask the host to free it).
+9. **The story is told as it happens.** New narration appears a few words at a time, in step
+   with the voice when 🔊 is on. Tap it to see the rest at once. The side panel shows
+   everyone's **HP**, and it changes with the story: a hit lands on your HP bar when the text
+   reaches your name, not before.
+10. **Your character sheet.** Tap **📜 My sheet**, or any character in the side panel, for
+   the full sheet: abilities, skills, features, spells, equipment, conditions. It updates
+   with the story too, and what just changed flashes.
+11. Refreshing the page keeps your seat. To switch devices, tap **Leave seat** first (or ask
+   the host to free it).
 
 ## מדריך לשחקנים
 
@@ -265,8 +272,14 @@ Copy, fill in the link and code, and send:
    המשחק רואה אותה — מי הטיל, בשביל מה, ודרגת הקושי או דרגת השריון, שנקבעת לפני שהקובייה
    נוחתת ("🎯 Pip — התגנבות · דרגת קושי 15 · 🎲 [12] + 5 = 17 ✓"). הטלה סודית (למשל אויב
    נסתר) מופיעה כ"מנהל המשחק הטיל קובייה בסתר".
-9. בפאנל הצד רואים את **נקודות החיים** של כולם. רענון הדף שומר לכם את המקום. כדי לעבור
-   למכשיר אחר, לחצו קודם **עזיבת המושב** (או בקשו מהמארח לפנות אותו).
+9. **הסיפור מסופר בזמן אמת.** קטע חדש מופיע מילה אחרי מילה, ובקצב הקול כש-🔊 פועל. לחצו
+   עליו כדי לראות את כולו מיד. בפאנל הצד רואים את **נקודות החיים** של כולם, והן משתנות יחד
+   עם הסיפור: מכה נוחתת על פס החיים שלכם כשהטקסט מגיע לשם שלכם, לא לפני כן.
+10. **דף הדמות.** לחצו **📜 הדף שלי**, או על כל דמות בפאנל הצד, כדי לראות את הדף המלא:
+   תכונות, מיומנויות, יכולות, לחשים, ציוד ומצבים. גם הוא מתעדכן יחד עם הסיפור, ומה שהשתנה
+   מהבהב.
+11. רענון הדף שומר לכם את המקום. כדי לעבור למכשיר אחר, לחצו קודם **עזיבת המושב** (או בקשו
+   מהמארח לפנות אותו).
 
 ---
 

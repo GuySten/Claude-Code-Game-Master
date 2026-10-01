@@ -127,6 +127,47 @@
   .bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; margin: 4px 0; }
   .bar > div { height: 100%; background: var(--hp); }
   .pc .meta { font-size: .8rem; color: var(--muted); }
+  .pc { cursor: pointer; border-radius: 6px; }
+  .pc:hover, .pc:focus-visible { background: var(--me); outline: none; }
+  .pc .open-sheet { float: inline-end; font-size: .75rem; color: var(--muted); }
+  .bar > div { transition: width .9s ease; }
+  /* A PC's card changes the moment the story reaches them. */
+  .pc.hurt { animation: hurt 1.6s ease-out; }
+  .pc.healed { animation: healed 1.6s ease-out; }
+  @keyframes hurt { from { background: color-mix(in srgb, var(--hp-low) 35%, transparent); } }
+  @keyframes healed { from { background: color-mix(in srgb, var(--hp) 35%, transparent); } }
+  /* Narration being told: tap it to show the rest at once. */
+  .msg.revealing { cursor: pointer; }
+  .msg.queued { display: none; }
+
+  /* The character sheet */
+  dialog#sheet { width: min(600px, calc(100% - 24px)); max-height: 88vh; padding: 0;
+                 border: 1px solid var(--line); border-radius: 12px;
+                 background: var(--panel); color: var(--ink); }
+  dialog#sheet::backdrop { background: rgba(0, 0, 0, .45); }
+  .sheet-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;
+                padding: 12px 16px 8px; border-bottom: 1px solid var(--line);
+                position: sticky; top: 0; background: var(--panel); z-index: 1; }
+  .sheet-head h2 { margin: 0; font-size: 1.3rem; }
+  .sheet-head .sub { color: var(--muted); font-size: .9rem; }
+  .sheet-head button { border: 0; background: none; font-size: 1.2rem; padding: 2px 6px; }
+  #sheet-body { padding: 10px 16px 18px; }
+  .sheet-sec { margin: 12px 0 0; border-radius: 6px; }
+  .sheet-sec h3 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em;
+                  color: var(--muted); margin: 0 0 6px; font-weight: normal; }
+  .sheet-sec.changed { animation: healed 2s ease-out; }
+  .sheet-sec.changed.down { animation: hurt 2s ease-out; }
+  .boxes { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 8px; }
+  .box { border: 1px solid var(--line); border-radius: 8px; text-align: center; padding: 6px 4px; }
+  .box .k { font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .box .v { font-size: 1.25rem; font-weight: bold; font-variant-numeric: tabular-nums; }
+  .box .m { font-size: .8rem; color: var(--muted); }
+  .sheet-sec ul { margin: 0; padding-inline-start: 1.2em; }
+  .sheet-sec li { margin: 2px 0; }
+  dl.kv { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; margin: 0; }
+  dl.kv dt { color: var(--muted); }
+  dl.kv dd { margin: 0; font-variant-numeric: tabular-nums; }
+  .sheet-held { font-size: .8rem; color: var(--muted); margin-top: 4px; }
   .voice-settings { margin-top: 14px; font-size: .85rem; }
   .voice-settings label { margin: 8px 0 2px; }
   .voice-settings select { width: 100%; }
@@ -189,6 +230,7 @@
         <button id="music-toggle" type="button" aria-pressed="true"></button>
         <button id="read-toggle" type="button" aria-pressed="false"></button>
         <button class="lang-toggle" type="button"></button>
+        <button id="sheet-toggle" type="button" data-i18n="mySheet"></button>
         <button id="party-toggle" type="button" data-i18n="party"></button>
         <button id="leave" type="button" data-i18n="leave"></button>
       </div>
@@ -236,6 +278,14 @@
   </aside>
 </section>
 
+<dialog id="sheet" aria-labelledby="sheet-title">
+  <div class="sheet-head">
+    <div><h2 id="sheet-title" dir="auto"></h2><div class="sub" id="sheet-sub" dir="auto"></div></div>
+    <button id="sheet-close" type="button" aria-label="✕">✕</button>
+  </div>
+  <div id="sheet-body"></div>
+</dialog>
+
 <script>
 (function () {
   "use strict";
@@ -257,6 +307,15 @@
       create: "Join as this character", nameless: "Just a nameless traveler",
       nameRequired: "Give your character a name.", badCode: "That code didn't work.",
       leave: "Leave seat", leaveConfirm: "Give up your seat? You can take it again afterwards.",
+      mySheet: "📜 My sheet", openSheet: "sheet ›", sheetLoading: "Loading…",
+      sheet_hp: "HP", sheet_ac: "AC", sheet_level: "Level", sheet_xp: "XP", sheet_gold: "Gold",
+      sheet_status: "Status", sheet_stats: "Abilities", sheet_skills: "Skills",
+      sheet_saves: "Saving throws", sheet_features: "Features", sheet_spells: "Spells",
+      sheet_spell_slots: "Spell slots", sheet_equipment: "Equipment", sheet_conditions: "Conditions",
+      sheet_concept: "Who they are", sheet_background: "Background", sheet_alignment: "Alignment",
+      sheet_traits: "Traits", sheet_ideals: "Ideals", sheet_bonds: "Bonds", sheet_flaws: "Flaws",
+      sheet_notes: "Notes", sheet_visual_appearance: "Appearance", sheet_pronouns: "Pronouns",
+      sheet_more: "More",
       party: "Party", partyTitle: "The party", placeholder: "What do you do? (type, or tap 🎤 and speak)",
       private: "Only the GM sees this", autoSend: "Send when I stop talking", send: "Send",
       playingAs: "Playing as", waiting: "Waiting on: ", considering: "The GM is considering…",
@@ -307,6 +366,15 @@
       create: "הצטרפו בדמות הזו", nameless: "סתם נווד/ת בלי שם",
       nameRequired: "תנו שם לדמות.", badCode: "הקוד לא עבד.",
       leave: "עזיבת המושב", leaveConfirm: "לפנות את המושב? אפשר לחזור אליו אחר כך.",
+      mySheet: "📜 הדף שלי", openSheet: "דף דמות ›", sheetLoading: "טוען…",
+      sheet_hp: "נקודות חיים", sheet_ac: "דרגת שריון", sheet_level: "דרגה", sheet_xp: "ניסיון",
+      sheet_gold: "זהב", sheet_status: "מצב", sheet_stats: "תכונות", sheet_skills: "מיומנויות",
+      sheet_saves: "הטלות הצלה", sheet_features: "יכולות", sheet_spells: "לחשים",
+      sheet_spell_slots: "משבצות לחשים", sheet_equipment: "ציוד", sheet_conditions: "מצבים",
+      sheet_concept: "מי הדמות", sheet_background: "רקע", sheet_alignment: "נטייה",
+      sheet_traits: "תכונות אופי", sheet_ideals: "אידיאלים", sheet_bonds: "קשרים",
+      sheet_flaws: "חולשות", sheet_notes: "הערות", sheet_visual_appearance: "מראה",
+      sheet_pronouns: "לשון פנייה", sheet_more: "עוד",
       party: "החבורה", partyTitle: "החבורה", placeholder: "מה אתם עושים? (הקלידו, או לחצו 🎤 ודברו)",
       private: "רק מנהל המשחק יראה", autoSend: "לשלוח כשאני מסיים/ת לדבר", send: "שליחה",
       playingAs: "משחקים בתור", waiting: "מחכים ל: ", considering: "מנהל המשחק חושב…",
@@ -518,16 +586,30 @@
   }
   // One queue for both kinds of voice, played in order: the device's own
   // (speechSynthesis) and the host's natural ones (an <audio> per sentence).
+  // ``hooks`` (optional) follows the telling: start(item, seconds) as each
+  // sentence begins, end(item) as it ends, done() after the last. Each item
+  // knows which share of the text it covers (f0..f1), so the words on screen
+  // keep pace with the voice. Returns how many sentences were queued.
   let speechQ = [], speechGen = 0, speaking = false, curAudio = null, curUtter = null;
-  function speak(text) {
+  function speak(text, hooks) {
     const rate = parseFloat($("rate").value) || 1;
-    speechChunks(text).forEach((chunk) => {
+    const chunks = speechChunks(text);
+    const total = chunks.reduce((n, c) => n + c.length, 0) || 1;
+    let cum = 0;
+    const items = [];
+    chunks.forEach((chunk) => {
+      const f0 = cum / total;
+      cum += chunk.length;
       const l = isHebrew(chunk) ? "he" : "en";
       const said = cleanForSpeech(chunk, l);
-      if (said) speechQ.push({ l, said, rate });
+      if (said) items.push({ l, said, rate, hooks, f0, f1: cum / total });
     });
+    if (items.length) items[items.length - 1].last = true;
+    speechQ.push(...items);
     if (!speaking) nextSpeech();
+    return items.length;
   }
+  const estSeconds = (item) => item.said.length / (14 * item.rate);   // a voice says ~14 chars/s
   function ttsUrl(said, voice) {
     return "/api/tts?code=" + encodeURIComponent(code) + "&token=" + encodeURIComponent(token || "")
       + "&voice=" + encodeURIComponent(voice) + "&text=" + encodeURIComponent(said);
@@ -542,7 +624,12 @@
     speaking = true; setDuck(true);
     const gen = speechGen;
     let finished = false;
-    const done = () => { if (!finished && gen === speechGen) { finished = true; nextSpeech(); } };
+    const done = () => {
+      if (finished || gen !== speechGen) return;
+      finished = true;
+      if (item.hooks) { item.hooks.end(item); if (item.last) item.hooks.done(); }
+      nextSpeech();
+    };
     const v = pickVoice(item.l);
     if (v && v.online) playOnline(item, v.online, done, gen);
     else speakLocal(item, v && v.local, done);
@@ -560,6 +647,11 @@
       speakLocal(item, localVoice(item.l), done);
     };
     a.onended = () => { if (curAudio === a) curAudio = null; done(); };
+    a.onplaying = () => {
+      if (item.hooks && gen === speechGen)
+        item.hooks.start(item, isFinite(a.duration) && a.duration > 0 ? a.duration / a.playbackRate
+                                                                     : estSeconds(item));
+    };
     a.onerror = fallBack;
     a.play().catch((e) => {
       if (e && e.name === "NotAllowedError") {    // no tap on the page yet: wait for one
@@ -579,12 +671,14 @@
     if (voice) u.voice = voice;
     else if (item.l === "he" && voices.length && !warnedNoHe) { warnedNoHe = true; setStatus(t("noHeVoice"), true); }
     u.rate = item.rate;
+    u.onstart = () => { if (item.hooks) item.hooks.start(item, estSeconds(item)); };
     u.onend = u.onerror = done;
     curUtter = u;                       // (Chrome drops events of utterances it garbage-collects)
     synth.speak(u);
   }
   function stopSpeaking() {
     speechGen++; speechQ = []; speaking = false;
+    reveals.filter((r) => r.spoken).forEach(finishReveal);   // its voice is gone: show it all
     if (curAudio) { curAudio.pause(); curAudio = null; }
     if (synth) synth.cancel();
     curUtter = null;
@@ -1081,29 +1175,314 @@
     $("campaign").textContent = info.campaign || t("title");
     document.title = info.campaign || t("title");
     $("where").textContent = [info.location, info.time].filter(Boolean).join(" · ");
-    const list = $("party-list");
-    list.textContent = "";
-    info.party.forEach((pc) => {
+    partyLive = info.party || [];
+    narrationGate = info.narration_id || 0;
+    syncParty();
+    const waiting = info.waiting_on || [];
+    if (!listening && !noticeShowing()) setStatus(waiting.length ? t("waiting") + waiting.join(", ") : "");
+  }
+  async function refreshInfo() { renderInfo(await api("/api/info")); }
+
+  // ---------------------------------------- the party, in step with the story ---
+  // The server already holds sheet changes back during the GM's turn. Here they
+  // wait for the story itself: a PC's card (and sheet) changes when the narration
+  // being told reaches their name, or when it ends — never ahead of the words.
+  let partyLive = [], narrationGate = 0, lastNarrSeen = 0, partySig = "";
+  const partyShown = new Map();        // name -> the version on screen now
+  const hpPct = (pc) => pc.hp_max ? Math.max(0, Math.min(100, 100 * pc.hp / pc.hp_max)) : 0;
+  function mentions(text, name) {
+    if (!text || !name) return false;
+    const words = [name, ...name.split(/[\s,]+/).filter((w) => w.length >= 3)];
+    return words.some((w) => /[A-Za-z]/.test(w)
+      ? new RegExp("(^|[^A-Za-z])" + w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(?![A-Za-z])", "i").test(text)
+      : text.includes(w));
+  }
+  function syncParty() {
+    const behind = narrationGate > lastNarrSeen;   // released for a beat we haven't received yet
+    const told = reveals.map(revealedText).join("\n");
+    renderParty(partyLive.map((pc) => {
+      const shown = partyShown.get(pc.name);
+      if (!shown || shown.sheet_rev === pc.sheet_rev) return pc;
+      const hold = behind || (reveals.length && !mentions(told, pc.name));
+      return hold ? { ...shown, claimed: pc.claimed, lead: pc.lead } : pc;
+    }));
+  }
+  function renderParty(list) {
+    const sig = lang + "|" + me + "|" + list.map((p) => [p.name, p.sheet_rev, p.claimed, p.lead, p.hp].join("/")).join("|");
+    if (sig === partySig) return;
+    partySig = sig;
+    const box = $("party-list");
+    box.textContent = "";
+    list.forEach((pc) => {
+      const before = partyShown.get(pc.name);
       const d = document.createElement("div");
       d.className = "pc";
-      const pct = pc.hp_max ? Math.max(0, Math.min(100, 100 * pc.hp / pc.hp_max)) : 0;
+      d.tabIndex = 0;
+      d.setAttribute("role", "button");
+      const pct = hpPct(pc);
       const color = pct <= 25 ? "var(--hp-low)" : pct <= 50 ? "var(--hp-mid)" : "var(--hp)";
       const tags = [pc.lead ? t("lead") : "", pc.name === me ? t("you") : "",
                     !pc.claimed && pc.name !== me ? t("emptySeat") : ""].filter(Boolean);
       const status = pc.status && pc.status !== "alive" ? pc.status.toUpperCase() : "";
       const conds = (pc.conditions || []).join(", ");
-      d.innerHTML = `<div><span class="name" dir="auto">${esc(pc.name)}</span>` +
+      const from = before ? hpPct(before) : pct;
+      d.innerHTML = `<div><span class="open-sheet">${esc(t("openSheet"))}</span>` +
+        `<span class="name" dir="auto">${esc(pc.name)}</span>` +
         tags.map((x) => `<span class="tag">${esc(x)}</span>`).join("") + `</div>` +
-        `<div class="bar"><div style="width:${pct}%;background:${color}"></div></div>` +
+        `<div class="bar"><div style="width:${from}%;background:${color}"></div></div>` +
         `<div class="meta" dir="auto">HP ${esc(pc.hp)}/${esc(pc.hp_max)} · ${t("lvl")} ${esc(pc.level)} ` +
         `${esc([pc.race, pc.class].filter(Boolean).join(" "))}` +
         `${status ? " · " + esc(status) : ""}${conds ? " · " + esc(conds) : ""}</div>`;
-      list.appendChild(d);
+      if (from !== pct) requestAnimationFrame(() => requestAnimationFrame(() => {
+        d.querySelector(".bar > div").style.width = pct + "%";
+      }));
+      if (before && before.hp !== pc.hp) d.classList.add(pc.hp < before.hp ? "hurt" : "healed");
+      d.onclick = () => openSheet(pc.name);
+      d.onkeydown = (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); openSheet(pc.name); } };
+      box.appendChild(d);
+      partyShown.set(pc.name, pc);
     });
-    const waiting = info.waiting_on || [];
-    if (!listening && !noticeShowing()) setStatus(waiting.length ? t("waiting") + waiting.join(", ") : "");
+    refreshSheet();
   }
-  async function refreshInfo() { renderInfo(await api("/api/info")); }
+
+  // ------------------------------------------------- the character sheet ---
+  let sheetFor = null, sheetShownRev = null;
+  const sheetCache = new Map();        // sheet_rev -> sheet
+  function openSheet(name) {
+    sheetFor = name; sheetShownRev = null;
+    const dlg = $("sheet");
+    $("sheet-title").textContent = name;
+    $("sheet-sub").textContent = "";
+    $("sheet-body").textContent = t("sheetLoading");
+    if (!dlg.open) { if (dlg.showModal) dlg.showModal(); else dlg.setAttribute("open", ""); }
+    $("party").classList.remove("open");
+    refreshSheet();
+  }
+  async function refreshSheet() {
+    const dlg = $("sheet");
+    if (!sheetFor || !dlg.open) return;
+    const shown = partyShown.get(sheetFor);
+    const rev = shown && shown.sheet_rev;
+    if (rev && rev === sheetShownRev) return;
+    let sheet = rev && sheetCache.get(rev);
+    let got = rev;
+    if (!sheet) {
+      const want = sheetFor;
+      const r = await api("/api/sheet?pc=" + encodeURIComponent(want) + (rev ? "&rev=" + rev : ""));
+      if (!r.ok || want !== sheetFor) return;
+      sheet = r.sheet; got = r.rev;
+      sheetCache.set(r.rev, sheet);
+      const now = partyShown.get(sheetFor);       // the panel moved on while we waited
+      if (now && now.sheet_rev !== r.rev && rev) return refreshSheet();
+    }
+    const first = sheetShownRev === null;
+    sheetShownRev = got;
+    renderSheet(sheet, first);
+  }
+  const SHEET_HIDE = new Set(["name", "id", "origin", "voice", "portrait", "image", "current_location",
+                              "hp", "ac", "level", "xp", "gold", "status", "race", "class", "concept"]);
+  const SIX = ["str", "dex", "con", "int", "wis", "cha", "strength", "dexterity", "constitution",
+               "intelligence", "wisdom", "charisma"];
+  function label(k) {
+    const key = "sheet_" + k;
+    const l = t(key);
+    return l && l !== key ? l : String(k).replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+  }
+  const signed = (v) => typeof v === "number" ? (v >= 0 ? "+" : "") + v : String(v);
+  function itemLine(o) {
+    if (o === null || typeof o !== "object") return String(o);
+    const name = o.name || o.title || o.item || "";
+    const rest = Object.entries(o)
+      .filter(([k, v]) => !["name", "title", "item"].includes(k) && v !== null && v !== "" && v !== false)
+      .map(([k, v]) => (k === "qty" || k === "quantity" || k === "count") ? "×" + v
+        : typeof v === "object" ? label(k) + ": " + (Array.isArray(v) ? v.map(itemLine).join(", ") : itemLine(v))
+        : v === true ? label(k) : label(k) + ": " + v);
+    return [name, rest.join(", ")].filter(Boolean).join(" — ");
+  }
+  function sheetValue(v, sign) {
+    if (v === null || v === undefined || v === "") return null;
+    if (Array.isArray(v)) {
+      if (!v.length) return null;
+      const ul = document.createElement("ul");
+      v.forEach((x) => { const li = document.createElement("li"); li.dir = "auto"; li.textContent = itemLine(x); ul.appendChild(li); });
+      return ul;
+    }
+    if (typeof v === "object") {
+      const keys = Object.keys(v).filter((k) => v[k] !== null && v[k] !== "" &&
+                                                !(Array.isArray(v[k]) && !v[k].length));
+      if (!keys.length) return null;
+      const dl = document.createElement("dl");
+      dl.className = "kv";
+      keys.forEach((k) => {
+        const dt = document.createElement("dt"); dt.textContent = label(k);
+        const dd = document.createElement("dd"); dd.dir = "auto";
+        const x = v[k];
+        dd.textContent = typeof x === "object" ? (Array.isArray(x) ? x.map(itemLine).join(", ") : itemLine(x))
+                                               : sign ? signed(x) : String(x);
+        dl.append(dt, dd);
+      });
+      return dl;
+    }
+    const div = document.createElement("div");
+    div.dir = "auto";
+    div.textContent = String(v);
+    return div;
+  }
+  function boxes(pairs) {
+    const g = document.createElement("div");
+    g.className = "boxes";
+    pairs.forEach(([k, v, m]) => {
+      const b = document.createElement("div");
+      b.className = "box";
+      b.innerHTML = `<div class="k">${esc(k)}</div><div class="v" dir="ltr">${esc(v)}</div>` +
+                    (m !== undefined ? `<div class="m" dir="ltr">${esc(m)}</div>` : "");
+      g.appendChild(b);
+    });
+    return g;
+  }
+  function renderSheet(s, first) {
+    const body = $("sheet-body");
+    const before = new Map([...body.querySelectorAll(".sheet-sec")].map((x) => [x.dataset.key, x.textContent]));
+    body.textContent = "";
+    $("sheet-title").textContent = s.name || sheetFor;
+    $("sheet-sub").textContent = [s.race, s.class, s.level != null ? t("lvl") + " " + s.level : ""]
+      .filter(Boolean).join(" · ") + (s.concept ? " — " + s.concept : "");
+    const sec = (key, title, content) => {
+      if (!content) return;
+      const d = document.createElement("section");
+      d.className = "sheet-sec"; d.dataset.key = key;
+      if (title) { const h = document.createElement("h3"); h.textContent = title; d.appendChild(h); }
+      d.appendChild(content);
+      body.appendChild(d);
+    };
+    const hp = s.hp || {};
+    const vit = [];
+    if (hp.max !== undefined || hp.current !== undefined)
+      vit.push([t("sheet_hp"), `${hp.current ?? "?"}/${hp.max ?? "?"}`, hp.temp ? `+${hp.temp}` : undefined]);
+    if (s.ac !== undefined) vit.push([t("sheet_ac"), s.ac]);
+    if (s.level !== undefined) vit.push([t("sheet_level"), s.level]);
+    if (s.xp !== undefined) vit.push([t("sheet_xp"), typeof s.xp === "object" ? itemLine(s.xp) : s.xp]);
+    if (s.gold !== undefined) vit.push([t("sheet_gold"), s.gold]);
+    if (s.status && s.status !== "alive") vit.push([t("sheet_status"), String(s.status).toUpperCase()]);
+    if (vit.length) sec("vitals", "", boxes(vit));
+    const stats = s.stats && typeof s.stats === "object" ? Object.entries(s.stats) : [];
+    if (stats.length) {
+      const classic = stats.every(([k, v]) => SIX.includes(k.toLowerCase()) && typeof v === "number");
+      sec("stats", t("sheet_stats"), boxes(stats.map(([k, v]) =>
+        [k, typeof v === "object" ? itemLine(v) : v,
+         classic ? signed(Math.floor((v - 10) / 2)) : undefined])));
+    }
+    const order = ["conditions", "skills", "saves", "features", "spells", "spell_slots", "equipment",
+                   "background", "alignment", "pronouns", "traits", "ideals", "bonds", "flaws",
+                   "notes", "visual_appearance"];
+    const done = new Set([...SHEET_HIDE, "stats"]);
+    order.forEach((k) => {
+      done.add(k);
+      sec(k, label(k), sheetValue(s[k], k === "skills" || k === "saves"));
+    });
+    const more = {};
+    Object.keys(s).forEach((k) => { if (!done.has(k)) more[k] = s[k]; });
+    sec("more", label("more"), sheetValue(more));
+    if (!first) {                       // what the story just changed, flashed
+      body.querySelectorAll(".sheet-sec").forEach((x) => {
+        const was = before.get(x.dataset.key);
+        if (was !== x.textContent) x.classList.add("changed");   // (or new)
+      });
+    }
+  }
+  $("sheet-close").onclick = () => $("sheet").close();
+  $("sheet").addEventListener("click", (ev) => { if (ev.target === $("sheet")) $("sheet").close(); });
+  $("sheet").addEventListener("close", () => { sheetFor = null; });
+  $("sheet-toggle").onclick = () => { if (me) openSheet(me); };
+
+  // ------------------------------------------ narration, revealed as told ---
+  // New narration appears a few words at a time — in step with the voice when
+  // it's read aloud — and one beat at a time. Tap it to see the rest at once.
+  const reveals = [];                  // oldest first; only the first one is moving
+  const REVEAL_CPS = 45;               // characters per second, when not read aloud
+  let revealTimer = null, revealLast = 0;
+  function revealedText(r) { return r.nodes.map((x) => x.node.data).join(""); }
+  function startReveal(m, el) {
+    const body = el.querySelector(".body");
+    if (!body) return null;
+    const nodes = [];
+    const walk = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+    let n;
+    while ((n = walk.nextNode())) nodes.push({ node: n, full: n.data });
+    const len = nodes.reduce((sum, x) => sum + x.full.length, 0);
+    if (len < 2) return null;
+    const r = { id: m.id, el, nodes, len, pos: 0, target: null, cps: REVEAL_CPS,
+                spoken: false, started: false, headAt: 0, extras: [...el.querySelectorAll("img, .tr-note")] };
+    r.extras.forEach((x) => x.classList.add("hidden"));
+    el.classList.add("revealing");
+    if (reveals.length) el.classList.add("queued");
+    el.setAttribute("aria-busy", "true");
+    el.addEventListener("click", () => finishReveal(r));
+    setReveal(r, 0);
+    reveals.push(r);
+    if (!revealTimer) { revealLast = performance.now(); revealTimer = setInterval(tickReveal, 50); }
+    return r;
+  }
+  function setReveal(r, p) {
+    let off = 0;
+    r.nodes.forEach((x) => {
+      const k = Math.max(0, Math.min(x.full.length, p - off));
+      if (x.node.data.length !== k) x.node.data = x.full.slice(0, k);
+      off += x.full.length;
+    });
+  }
+  function revealHooks(r) {
+    return {
+      start(item, secs) {
+        r.started = true;
+        r.pos = Math.max(r.pos, item.f0 * r.len);
+        r.target = Math.max(r.pos, item.f1 * r.len);
+        r.cps = Math.max(4, (r.target - r.pos) / Math.max(0.3, secs));
+      },
+      end(item) {
+        r.pos = Math.max(r.pos, item.f1 * r.len);
+        r.target = r.pos;
+        if (reveals[0] === r) { setReveal(r, Math.floor(r.pos)); syncParty(); }
+      },
+      done() { finishReveal(r); },
+    };
+  }
+  function tickReveal() {
+    const now = performance.now();
+    const dt = Math.min(0.25, (now - revealLast) / 1000);
+    revealLast = now;
+    const r = reveals[0];
+    if (!r) { clearInterval(revealTimer); revealTimer = null; return; }
+    if (!r.headAt) { r.headAt = now; r.el.classList.remove("queued"); }
+    // Read aloud, but the voice never started (sound blocked?): type it out instead.
+    if (r.spoken && !r.started && now - r.headAt > 4000) r.spoken = false;
+    const log = $("log");
+    const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
+    if (r.spoken) {
+      if (r.target === null) return;
+      r.pos = Math.min(r.target, r.pos + r.cps * dt);
+    } else {
+      r.pos = Math.min(r.len, r.pos + REVEAL_CPS * dt);
+    }
+    const before = revealedText(r).length;
+    setReveal(r, Math.floor(r.pos));
+    if (atBottom) log.scrollTop = log.scrollHeight;
+    if (!r.spoken && r.pos >= r.len) return finishReveal(r);
+    if (revealedText(r).length !== before) syncParty();
+  }
+  function finishReveal(r) {
+    const i = reveals.indexOf(r);
+    if (i < 0) return;
+    reveals.splice(i, 1);
+    r.nodes.forEach((x) => { x.node.data = x.full; });
+    r.extras.forEach((x) => x.classList.remove("hidden"));
+    r.el.classList.remove("revealing", "queued");
+    r.el.removeAttribute("aria-busy");
+    const log = $("log");
+    if (log.scrollHeight - log.scrollTop - log.clientHeight < 200) log.scrollTop = log.scrollHeight;
+    syncParty();
+  }
+  function finishAllReveals() { reveals.slice().forEach(finishReveal); }
 
   // A GM beat posted for one language only is shown to players of that language.
   const shownToMe = (m) => !(m.kind === "gm" && m.lang && m.lang !== lang);
@@ -1186,6 +1565,8 @@
     if (d) $("log").appendChild(d);
   }
   function updateMessage(m) {
+    const going = reveals.find((r) => r.id === m.id);
+    if (going) finishReveal(going);
     const old = msgEls.get(m.id);
     const fresh = renderMessage(m);
     if (old && fresh) old.replaceWith(fresh);
@@ -1358,6 +1739,8 @@
   }
 
   function rerenderLog() {
+    finishAllReveals();
+    partySig = "";
     $("log").textContent = "";
     msgEls.clear();
     allMessages.forEach(addMessage);
@@ -1380,8 +1763,12 @@
         const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
         r.messages.forEach((m) => {
           allMessages.push(m); addMessage(m); lastId = Math.max(lastId, m.id);
-          // Only NEW narration is read aloud — not the history loaded on arrival.
-          if (historyLoaded && readAloud && m.kind === "gm" && m.text && shownToMe(m)) speak(m.text);
+          if (m.kind === "gm") lastNarrSeen = Math.max(lastNarrSeen, m.id);
+          // Only NEW narration is told (revealed, and read aloud) — not the history.
+          if (historyLoaded && m.kind === "gm" && shownToMe(m) && msgEls.get(m.id)) {
+            const r = startReveal(m, msgEls.get(m.id));
+            if (readAloud && m.text && speak(m.text, r ? revealHooks(r) : null) && r) r.spoken = true;
+          }
         });
         if (atBottom || !historyLoaded) log.scrollTop = log.scrollHeight;
         if (r.messages.some((m) => m.kind === "gm")) refreshEditable();
