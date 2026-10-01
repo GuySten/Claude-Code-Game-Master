@@ -293,3 +293,88 @@ def test_starter_library_files_land_in_their_moods(tmp_path):
         assert not clash, f"{t['file']} would also play for {clash}"
     credit = music_library.credit_for(tracks[0]["file"])
     assert "Kevin MacLeod" in credit and "CC BY 4.0" in credit
+
+
+def test_progress_follows_the_gms_turn_and_learns_how_long_it_takes(table):
+    call, state = table["call"], table["state"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    assert call(f"/api/info?code={CODE}")[1]["progress"] == {"state": "idle"}
+    call("/api/say", {"code": CODE, "token": pip, "text": "I open the door."})
+    assert call(f"/api/info?code={CODE}")[1]["progress"] == {"state": "queued"}
+
+    call("/api/gm/inbox", {}, host=True)                       # the GM reads: turn starts
+    prog = call(f"/api/info?code={CODE}")[1]["progress"]
+    assert prog["state"] == "working" and prog["stage"] == "reading"
+    assert prog["estimate"] == 45                               # no history yet
+    assert call("/api/gm/activity", {"stage": "dice"}, host=True)[1]["ok"]
+    assert call(f"/api/info?code={CODE}")[1]["progress"]["stage"] == "dice"
+    assert not call("/api/gm/activity", {"stage": "hacking"}, host=True)[1]["ok"]
+    assert call("/api/gm/activity", {"stage": "dice"})[0] == 403  # players can't
+
+    state.turn["started_at"] -= 30                              # pretend it took 30 s
+    call("/api/gm/say", {"text": "Whisper.", "to": "Pip"}, host=True)
+    assert call(f"/api/info?code={CODE}")[1]["progress"]["state"] == "working"  # not the beat
+    call("/api/gm/say", {"text": "The door creaks open."}, host=True)
+    assert call(f"/api/info?code={CODE}")[1]["progress"] == {"state": "idle"}
+    assert state.turn_times and 29 <= state.turn_times[-1] <= 32
+    assert json.loads((table["camp"] / "table" / "turn-times.json").read_text()) == state.turn_times
+
+    # The next turn's estimate comes from that history.
+    call("/api/say", {"code": CODE, "token": pip, "text": "I step in."})
+    call("/api/gm/inbox", {}, host=True)
+    assert 29 <= call(f"/api/info?code={CODE}")[1]["progress"]["estimate"] <= 32
+
+
+def test_a_mixed_language_turn_ends_when_every_language_has_its_version(table):
+    call = table["call"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    noa = call("/api/create", {"code": CODE, "name": "Noa"})[1]["token"]
+    call("/api/lang", {"code": CODE, "token": noa, "lang": "he"})
+    call("/api/say", {"code": CODE, "token": pip, "text": "Go.", "lang": "en"})
+    call("/api/gm/inbox", {}, host=True)
+    call("/api/gm/say", {"text": "English beat.", "lang": "en"}, host=True)
+    prog = call(f"/api/info?code={CODE}")[1]["progress"]
+    assert prog["state"] == "working" and prog["stage"] == "translating"
+    assert prog["langs_done"] == ["en"]
+    call("/api/gm/say", {"text": "קטע בעברית.", "lang": "he"}, host=True)
+    assert call(f"/api/info?code={CODE}")[1]["progress"] == {"state": "idle"}
+
+
+def test_turn_estimate_is_the_median_of_recent_turns(table):
+    state = table["state"]
+    state.turn_times = [10, 200, 30, 40, 20]
+    assert state.turn_estimate() == 30
+    state.turn_times = [10, 20, 30, 40]
+    assert state.turn_estimate() == 25
+
+
+def test_the_claude_code_hook_reports_the_gms_stage(table, monkeypatch):
+    import subprocess
+    import time as _time
+    from pathlib import Path
+    hook = Path(__file__).resolve().parent.parent / ".claude" / "hooks" / "table-progress.sh"
+    port = int(table["base"].rsplit(":", 1)[1])
+    (table["camp"] / "table" / "server.json").write_text(
+        json.dumps({"port": port, "host_key": HOST_KEY}))
+    call = table["call"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    call("/api/say", {"code": CODE, "token": pip, "text": "Attack!"})
+    call("/api/gm/inbox", {}, host=True)
+
+    def run(command, expect):
+        payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
+        done = subprocess.run(["bash", str(hook)], input=payload, text=True, capture_output=True,
+                              env={"PATH": "/usr/bin:/bin:/usr/local/bin",
+                                   "GM_WORLD_STATE_BASE": str(table["world"])}, timeout=10)
+        assert done.returncode == 0 and done.stdout == ""     # never blocks the tool
+        for _ in range(40):                                     # the report is sent async
+            if table["state"].turn["stage"] == expect:
+                break
+            _time.sleep(0.05)
+        _time.sleep(0.3)                                        # and nothing else follows
+        return table["state"].turn["stage"]
+
+    assert run("uv run python lib/dice.py 1d20+5", "dice") == "dice"
+    assert run("bash tools/gm-player.sh hp Pip -3", "sheets") == "sheets"
+    assert run("bash tools/gm-table.sh say 'x'", "sheets") == "sheets"   # say/wait don't count
+    assert run("ls -la", "sheets") == "sheets"                  # unrelated commands: nothing

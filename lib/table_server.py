@@ -48,6 +48,7 @@ Files (all under ``<campaign>/table/``):
   langs.json    player character name -> language they play in (en / he)
   music.json    the shared background track (what, volume, loop, when it started, mood)
   settings.json table settings (auto_music on/off)
+  turn-times.json how long the GM's last turns took (drives the players' progress bar)
   server.json   port, table code, host key, pid (written by `serve`)
 """
 
@@ -146,6 +147,12 @@ MOODS = {
                 "use": "the fight is won, a triumph, a celebration"},
 }
 SILENCE = "silence"
+# What the GM can be doing during a turn (reported by .claude/hooks/table-progress.sh
+# as the GM's tools run). Browsers word each one in their own language.
+STAGES = ("reading", "lore", "dice", "sheets", "moving", "threads", "image", "translating")
+DEFAULT_TURN_SECONDS = 45      # the estimate before this table has any history
+TURN_HISTORY = 12              # turns the estimate is based on
+STALE_TURN_SECONDS = 20 * 60   # a turn the GM never answered stops counting
 # While an enemy's theme plays, these moods mean "still the same encounter".
 THEME_HOLDS_THROUGH = {"combat", "boss", "dread"}
 NAME_STOPWORDS = {"the", "of", "a", "an", "and", "lord", "lady", "sir"}
@@ -190,6 +197,11 @@ class TableState:
         self.music: Dict[str, Any] = self._read_json(self.music_path, {})
         self.settings_path = self.dir / "settings.json"
         self.settings: Dict[str, Any] = self._read_json(self.settings_path, {})
+        self.turn_times_path = self.dir / "turn-times.json"
+        times = self._read_json(self.turn_times_path, [])
+        self.turn_times: List[float] = [float(t) for t in times if isinstance(t, (int, float))] \
+            if isinstance(times, list) else []
+        self.turn: Optional[Dict[str, Any]] = None
         try:
             self.gm_cursor = int(self.cursor_path.read_text().strip())
         except (OSError, ValueError):
@@ -422,6 +434,8 @@ class TableState:
             if event:
                 msg["event"] = event   # lets each browser word the notice in its language
             self.messages.append(msg)
+            if kind == "gm" and not to:
+                self._gm_spoke(lang if lang in LANGS else None)
             with open(self.log_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps(msg, ensure_ascii=False) + "\n")
             return msg
@@ -445,7 +459,69 @@ class TableState:
             if mark and self.messages:
                 self.gm_cursor = self.messages[-1]["id"]
                 self.cursor_path.write_text(str(self.gm_cursor))
+                if any(m["kind"] == "player" for m in unread):
+                    self._start_turn()
             return unread
+
+    # --- the GM's turn (what the players' progress bar shows) ---
+    def turn_estimate(self) -> float:
+        """Seconds the GM usually takes: the median of the last turns."""
+        if not self.turn_times:
+            return float(DEFAULT_TURN_SECONDS)
+        times = sorted(self.turn_times[-TURN_HISTORY:])
+        mid = len(times) // 2
+        return times[mid] if len(times) % 2 else (times[mid - 1] + times[mid]) / 2
+
+    def _start_turn(self) -> None:
+        """The GM just read players' actions: a turn starts (caller holds the lock)."""
+        now = time.time()
+        if self.turn and now - self.turn["started_at"] < STALE_TURN_SECONDS:
+            return            # still answering the earlier actions
+        langs = {self.langs.get(n, "en") for n in self.seats.values()} or {"en"}
+        self.turn = {"started_at": now, "start_id": self.messages[-1]["id"],
+                     "estimate": round(self.turn_estimate(), 1),
+                     "stage": "reading", "stage_at": now,
+                     "langs_needed": sorted(langs), "langs_done": []}
+
+    def set_stage(self, stage: str) -> bool:
+        with self.lock:
+            if not self.turn or stage not in STAGES:
+                return False
+            self.turn["stage"], self.turn["stage_at"] = stage, time.time()
+            return True
+
+    def _gm_spoke(self, lang: Optional[str]) -> None:
+        """Narration went out (caller holds the lock). The turn ends once every
+        language at the table has its version of the beat."""
+        if not self.turn:
+            return
+        done = set(self.turn["langs_done"])
+        done |= {lang} if lang else set(self.turn["langs_needed"])
+        self.turn["langs_done"] = sorted(done)
+        if not set(self.turn["langs_needed"]) <= done:
+            self.turn["stage"], self.turn["stage_at"] = "translating", time.time()
+            return
+        took = time.time() - self.turn["started_at"]
+        self.turn = None
+        if 1 <= took <= STALE_TURN_SECONDS:
+            self.turn_times = (self.turn_times + [round(took, 1)])[-TURN_HISTORY:]
+            tmp = self.turn_times_path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(self.turn_times), encoding="utf-8")
+            tmp.replace(self.turn_times_path)
+
+    def progress(self) -> Dict[str, Any]:
+        """What the players' progress bar needs: is the GM working, since when,
+        how long it usually takes, what it's doing — or are actions queued."""
+        with self.lock:
+            if self.turn and time.time() - self.turn["started_at"] < STALE_TURN_SECONDS:
+                t = self.turn
+                return {"state": "working", "started_at": t["started_at"],
+                        "start_id": t["start_id"], "estimate": t["estimate"],
+                        "stage": t["stage"], "stage_at": t["stage_at"],
+                        "langs_done": t["langs_done"]}
+            queued = any(m["id"] > self.gm_cursor and m["kind"] == "player"
+                         for m in self.messages)
+            return {"state": "queued" if queued else "idle"}
 
     def waiting_on(self) -> List[str]:
         """Seated PCs who have not acted since the GM last spoke."""
@@ -612,6 +688,7 @@ def make_handler(state: TableState, code: str, host_key: str):
                 return self._json({"ok": True, "me": me, "party": state.party(),
                                    "waiting_on": state.waiting_on(),
                                    "music": state.music, "server_now": time.time(),
+                                   "progress": state.progress(),
                                    **state.overview()})
             if url.path == "/api/messages":
                 try:
@@ -784,6 +861,8 @@ def make_handler(state: TableState, code: str, host_key: str):
                                         data.get("title"))
                 self._announce_music(music)
                 return self._json({"ok": True, "music": music})
+            if path == "/api/gm/activity":
+                return self._json({"ok": state.set_stage(str(data.get("stage", "")))})
             if path == "/api/gm/free":
                 freed = state.free(str(data.get("pc", "")))
                 return self._json({"ok": True, "freed": freed})

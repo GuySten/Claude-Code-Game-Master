@@ -72,6 +72,21 @@
   .msg h3 { margin: .2em 0 .4em; font-size: 1.05rem; }
   .msg code { font-family: ui-monospace, Menlo, monospace; font-size: .9em; }
   #status { padding: 4px 16px; font-size: .85rem; color: var(--muted); min-height: 1.6em; }
+  /* The GM's turn: what it's doing and roughly how long is left. */
+  #progress { padding: 8px 16px 2px; }
+  #progress .label { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+                     font-size: .9rem; }
+  #progress .eta { color: var(--muted); font-size: .85rem; }
+  #progress .track { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden;
+                     margin-top: 6px; }
+  #progress .fill { height: 100%; width: 0; background: var(--accent); border-radius: 3px;
+                    transition: width .5s linear; }
+  #progress.indeterminate .fill { width: 30%; transition: none;
+                                  animation: progress-slide 1.6s ease-in-out infinite; }
+  @keyframes progress-slide { from { margin-inline-start: -30%; } to { margin-inline-start: 100%; } }
+  @media (prefers-reduced-motion: reduce) {
+    #progress.indeterminate .fill { animation: none; width: 100%; opacity: .35; }
+  }
   form#say { border-top: 1px solid var(--line); padding: 10px 16px 14px; }
   .input-row { display: flex; gap: 8px; align-items: stretch; }
   .input-row textarea { resize: none; height: 64px; }
@@ -161,6 +176,11 @@
       </div>
     </header>
     <div id="log" aria-live="polite"></div>
+    <div id="progress" class="hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100"
+         aria-live="polite">
+      <div class="label"><span id="progress-what"></span><span class="eta" id="progress-eta"></span></div>
+      <div class="track"><div class="fill"></div></div>
+    </div>
     <div id="status"></div>
     <form id="say">
       <div class="input-row">
@@ -235,6 +255,14 @@
       voiceEn: "English voice", voiceHe: "Hebrew voice", auto: "Automatic", other: "עברית",
       musicOn: "🎵 Music", musicOff: "🔇 Music", musicVol: "Music volume",
       nowPlaying: "Now playing: ", silence: "No music right now", tapForMusic: "Tap anywhere to start the music.",
+      st_reading: "📖 The GM is reading everyone's actions", st_lore: "📚 The GM is consulting the lore",
+      st_dice: "🎲 The GM is rolling dice", st_sheets: "📜 The GM is updating the character sheets",
+      st_moving: "🗺️ The GM is moving the party", st_threads: "🕸️ The GM is weaving story threads",
+      st_image: "🎨 The GM is painting the scene", st_writing: "✍️ The GM is writing the story",
+      st_translating: "🌐 The GM is writing your language's version",
+      etaLeft: "about {t} left", etaLonger: "taking a little longer than usual",
+      sec: "{n} sec", min: "{n} min", sent: "✉️ Sent — the GM will pick it up in a moment",
+      sentWaiting: "✉️ Sent — waiting for {names}",
       ev_seat: "{pc} takes their seat at the table.", ev_join: "A new player joins: {pc}",
       ev_leave: "{pc} steps away from the table.", ev_music_stop: "🎵 The music fades away.",
       amb_wind: "Howling wind", amb_rain: "Steady rain", amb_storm: "Rain with rolling thunder",
@@ -267,6 +295,14 @@
       voiceEn: "קול באנגלית", voiceHe: "קול בעברית", auto: "אוטומטי", other: "English",
       musicOn: "🎵 מוזיקה", musicOff: "🔇 מוזיקה", musicVol: "עוצמת המוזיקה",
       nowPlaying: "מתנגן עכשיו: ", silence: "אין מוזיקה כרגע", tapForMusic: "הקישו במקום כלשהו כדי להפעיל את המוזיקה.",
+      st_reading: "📖 מנהל המשחק קורא את הפעולות של כולם", st_lore: "📚 מנהל המשחק מעיין בספרי הידע",
+      st_dice: "🎲 מנהל המשחק מטיל קוביות", st_sheets: "📜 מנהל המשחק מעדכן את דפי הדמויות",
+      st_moving: "🗺️ מנהל המשחק מזיז את החבורה", st_threads: "🕸️ מנהל המשחק טווה חוטי עלילה",
+      st_image: "🎨 מנהל המשחק מצייר את הסצנה", st_writing: "✍️ מנהל המשחק כותב את הסיפור",
+      st_translating: "🌐 מנהל המשחק כותב את הגרסה בשפה שלך",
+      etaLeft: "עוד בערך {t}", etaLonger: "לוקח קצת יותר זמן מהרגיל",
+      sec: "{n} שניות", min: "{n} דקות", sent: "✉️ נשלח — מנהל המשחק יקרא את זה עוד רגע",
+      sentWaiting: "✉️ נשלח — מחכים ל{names}",
       ev_seat: "{pc} מתיישב/ת ליד השולחן.", ev_join: "שחקן/ית חדש/ה מצטרף/ת: {pc}",
       ev_leave: "{pc} קם/ה מהשולחן.", ev_music_stop: "🎵 המוזיקה דועכת.",
       amb_wind: "רוח מייללת", amb_rain: "גשם יורד", amb_storm: "סערה ורעמים",
@@ -859,6 +895,9 @@
       return showSeats(info);
     }
     applyMusic(info.music, info.server_now);
+    progressState = info.progress || { state: "idle" };
+    waitingOn = info.waiting_on || [];
+    updateProgress();
     $("campaign").textContent = info.campaign || t("title");
     document.title = info.campaign || t("title");
     $("where").textContent = [info.location, info.time].filter(Boolean).join(" · ");
@@ -898,8 +937,57 @@
     return s;
   }
 
+  // ---------------------------------------------------- the GM's turn ---
+  // The server says when the GM started on the players' actions, how long its
+  // turns usually take (the median of the last ones) and what it is doing right
+  // now (reported by a Claude Code hook as its tools run). The bar fills toward
+  // that estimate and never pretends: past it, it says the turn is running long.
+  let progressState = { state: "idle" }, waitingOn = [], lastGmId = 0, mySentId = 0, mySentAt = 0;
+  const serverNow = () => (Date.now() + skew) / 1000;
+  function fmtWait(secs) {
+    if (secs >= 90) return t("min").replace("{n}", String(Math.round(secs / 60)));
+    const n = secs > 10 ? Math.round(secs / 5) * 5 : Math.max(1, Math.round(secs));
+    return t("sec").replace("{n}", String(n));
+  }
+  function showProgress(what, eta, pct) {
+    const box = $("progress");
+    box.classList.remove("hidden");
+    box.classList.toggle("indeterminate", pct == null);
+    $("progress-what").textContent = what;
+    $("progress-eta").textContent = eta || "";
+    box.querySelector(".fill").style.width = pct == null ? "" : pct.toFixed(1) + "%";
+    if (pct == null) box.removeAttribute("aria-valuenow");
+    else box.setAttribute("aria-valuenow", String(Math.round(pct)));
+  }
+  function updateProgress() {
+    const p = progressState;
+    if (p.state === "working" && lastGmId <= p.start_id) {
+      const now = serverNow(), elapsed = Math.max(0, now - p.started_at);
+      const est = Math.max(5, p.estimate || 45);
+      // No tool has run for a while: the GM is composing the narration itself.
+      let stage = p.stage || "reading";
+      if (stage !== "translating" && now - (p.stage_at || p.started_at) > 8) stage = "writing";
+      const pct = elapsed < est ? 95 * elapsed / est
+                                : 95 + 4 * (1 - Math.exp(-(elapsed - est) / est));
+      const left = est - elapsed;
+      showProgress(t("st_" + stage), left > 3 ? t("etaLeft").replace("{t}", fmtWait(left))
+                                              : t("etaLonger"), pct);
+      return;
+    }
+    // My action is in, but the GM hasn't started on it yet.
+    if (mySentId && lastGmId < mySentId && Date.now() - mySentAt < 15 * 60 * 1000) {
+      const others = waitingOn.filter((n) => n !== me);
+      showProgress(others.length ? t("sentWaiting").replace("{names}", others.join(", "))
+                                 : t("sent"), "", null);
+      return;
+    }
+    $("progress").classList.add("hidden");
+  }
+  setInterval(updateProgress, 500);
+
   function addMessage(m) {
     if (!shownToMe(m)) return;
+    if (m.kind === "gm" && !m.to) lastGmId = Math.max(lastGmId, m.id);
     const d = document.createElement("div");
     d.className = "msg " + m.kind + (m.to ? " whisper" : "") + (m.pc === me && m.kind === "player" ? " mine" : "");
     if (m.kind === "system") {
@@ -952,7 +1040,7 @@
         });
         if (atBottom || !historyLoaded) log.scrollTop = log.scrollHeight;
         const last = r.messages[r.messages.length - 1];
-        if (last.kind === "player" && !listening) setStatus(t("considering"));
+        updateProgress();
         // The music changed: fetch it now instead of on the next 4-second refresh,
         // so the new track starts with the narration it belongs to.
         if (historyLoaded && r.messages.some((m) => m.event && /^music/.test(m.event.type))) refreshInfo();
@@ -967,6 +1055,11 @@
     if (!text) return;
     $("send").disabled = true;
     const r = await api("/api/say", { text, private: $("private").checked, lang, voice: spoke });
+    if (r.ok && r.message && !r.message.to) {
+      mySentId = r.message.id; mySentAt = Date.now();
+      updateProgress();
+      setTimeout(refreshInfo, 1200);        // catch the GM starting on it quickly
+    }
     $("send").disabled = false;
     if (!r.ok) { setStatus(r.error || "?"); if (r.error === "Take a seat first.") refreshInfo(); return; }
     $("text").value = "";
@@ -1015,7 +1108,7 @@
       lang = lang === "he" ? "en" : "he";
       store.set("lang", lang);
       applyLang();
-      if (me) { api("/api/lang", { lang }); rerenderLog(); }
+      if (me) { api("/api/lang", { lang }); rerenderLog(); refreshInfo(); updateProgress(); }
       if (!$("seat-cards").classList.contains("hidden")) refreshSeats();
     };
   });

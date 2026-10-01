@@ -201,7 +201,11 @@ Copy, fill in the link and code, and send:
    whispers only you can see.
 6. **Language.** **עברית / English** switches the whole page, your microphone, and the
    language the GM answers you in.
-7. The side panel shows everyone's **HP**. Refreshing the page keeps your seat. To switch
+7. **While the GM works**, a bar above the text box shows what it's doing (reading your
+   actions, rolling dice, updating the sheets, writing the story) and roughly how long is
+   left. The estimate comes from how long this table's GM really took on recent turns, so it
+   gets more accurate as you play.
+8. The side panel shows everyone's **HP**. Refreshing the page keeps your seat. To switch
    devices, tap **Leave seat** first (or ask the host to free it).
 
 ## מדריך לשחקנים
@@ -218,7 +222,10 @@ Copy, fill in the link and code, and send:
    שרק אתם רואים.
 6. **שפה.** **English / עברית** מחליף את כל הדף, את המיקרופון ואת השפה שבה מנהל המשחק עונה
    לכם.
-7. בפאנל הצד רואים את **נקודות החיים** של כולם. רענון הדף שומר לכם את המקום. כדי לעבור
+7. **בזמן שמנהל המשחק עובד**, פס מעל תיבת הטקסט מראה מה הוא עושה (קורא את הפעולות, מטיל
+   קוביות, מעדכן את הדפים, כותב את הסיפור) וכמה זמן נשאר בערך. ההערכה מבוססת על כמה זמן
+   מנהל המשחק של השולחן הזה באמת לקח בתורות האחרונים, כך שהיא נעשית מדויקת יותר במהלך המשחק.
+8. בפאנל הצד רואים את **נקודות החיים** של כולם. רענון הדף שומר לכם את המקום. כדי לעבור
    למכשיר אחר, לחצו קודם **עזיבת המושב** (או בקשו מהמארח לפנות אותו).
 
 ---
