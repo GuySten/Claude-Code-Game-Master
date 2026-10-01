@@ -2,6 +2,7 @@
 name: dungeon-architect
 description: Generate dungeon room structures (background). Use PROACTIVELY when players enter caves, ruins, or underground complexes that lack room definitions. Queries RAG for source material, generates room JSON with exits, monsters, and features.
 tools: Bash, Read
+model: sonnet
 color: purple
 ---
 

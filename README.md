@@ -199,6 +199,7 @@ Under the hood, `/gm` calls these for you — you never have to run them yoursel
 | `/world-check` | Validate campaign consistency |
 | `/reset` | Clear campaign state |
 | `/setup` | Verify/fix installation |
+| `/models` | Choose which Claude models run the GM and its helpers (recommended / budget / premium) |
 | `/help` | Full command reference |
 
 ### On-Demand Skills
@@ -245,6 +246,7 @@ The harness is plumbing you can poke at: bash wrappers (`tools/`) → Python man
 | `gm-player.sh` | Player stats — health, progression, gold, inventory (every PC; `join`/`party`/`leave` for multiplayer) |
 | `gm-table.sh` | Online table — players join from their own browsers (voice, Hebrew/English, mood-driven music, enemy themes); `wait` / `say` / `music` run the loop |
 | `gm-music-library.sh` | Download the starter music library into `music/` (sorted by mood, credited) |
+| `gm-models.sh` | Model presets: which Claude model plays the GM and each helper agent |
 | `gm-npc.sh` | NPCs — creation, updates, mood/goal/voice, party members |
 | `gm-location.sh` | Locations and connections |
 | `gm-plot.sh` | Quest and storyline tracking |

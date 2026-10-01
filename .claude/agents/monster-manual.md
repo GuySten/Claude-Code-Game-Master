@@ -2,6 +2,7 @@
 name: monster-manual
 description: D&D 5e COMBAT STATS expert (NOT narrative/personality). Use PROACTIVELY when players encounter creatures, need stat blocks (AC, HP, attacks), or GM asks about monster abilities. Fetches official creature data from D&D 5e API. For NPC BACKSTORY/PERSONALITY, use npc-builder instead.
 tools: Bash, WebFetch
+model: haiku
 color: red
 ---
 

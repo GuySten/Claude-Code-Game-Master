@@ -2,6 +2,7 @@
 name: world-builder
 description: Interactive campaign world builder that creates content like a neural network expanding from the current location. Builds iteratively through dialogue with the user, focusing on deep connections between existing world elements.
 tools: Bash, Read, Write
+model: sonnet
 color: orange
 ---
 

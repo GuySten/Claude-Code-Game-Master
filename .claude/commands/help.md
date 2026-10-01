@@ -30,6 +30,7 @@ Display all available commands and tools.
   /reset           Clear campaign for fresh start
   /world-check     Validate campaign consistency
   /setup           Run installation (usually auto-detected)
+  /models          Choose which Claude models run the game
   /help            This help message
 
 ================================================================

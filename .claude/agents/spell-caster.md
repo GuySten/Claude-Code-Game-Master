@@ -2,6 +2,7 @@
 name: spell-caster
 description: D&D 5e spells, magic schools, conditions, and damage types expert. Use PROACTIVELY when players cast spells, ask about spell details, need spell lists by level/school, or check magical effects. Provides comprehensive spell data including components, duration, range, and effects.
 tools: Bash, WebFetch
+model: haiku
 color: purple
 ---
 

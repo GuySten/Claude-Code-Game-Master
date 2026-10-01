@@ -2,6 +2,7 @@
 name: plot-weaver
 description: Silent, RAG-grounded story-planner. Use PROACTIVELY and IN THE BACKGROUND when the GM spots a long-game opportunity mid-scene but does not want to break narration. Develops ONE grounded, DORMANT story thread woven into the existing world, persists it (a plot + a linked clock + a surfacing trigger), and returns a single line. No chatter, no narration.
 tools: Bash, Read
+model: sonnet
 color: green
 ---
 

@@ -2,6 +2,7 @@
 name: scene-illustrator
 description: Diegetic scene-image generator. Use PROACTIVELY (and in the BACKGROUND) at any beat with visual/emotional charge — new location, monster/boss reveal, big loot, a styled player flourish, a comic beat, a haunting vista. Takes the GM's one-line beat brief, applies the locked art style + character appearances, generates the image, and returns the file:// link. No chatter.
 tools: Bash, Read
+model: haiku
 color: purple
 ---
 

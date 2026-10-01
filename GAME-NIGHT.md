@@ -48,7 +48,21 @@ Want your own music? Drop `.mp3`/`.ogg` files into `music/` and put the mood in 
 name — `battle-drums.mp3`, `tavern-night.ogg`, `creepy-crypt.mp3`. A file named after a
 villain (`grimaldi.mp3`, `grimaldi-boss.mp3`) becomes that villain's theme.
 
-**3. Install a tunnel (only for friends outside your home network)**
+**3. Choose the models (optional — the recommended set is already on)**
+
+```bash
+bash tools/gm-models.sh            # see what runs where
+bash tools/gm-models.sh recommended   # or: budget · premium · inherit
+```
+
+Or type `/models` inside Claude Code and pick from a menu. **Recommended** = Opus as the GM,
+Sonnet for story helpers, Haiku for quick lookups, Opus for book import — the best balance
+of story quality, speed and cost. **Budget** = Sonnet GM, Haiku helpers. **Premium** = Opus
+almost everywhere. It applies from the next Claude Code session (or switch the GM now with
+`/model opus`). With friends waiting on every reply, `/fast` makes the GM answer faster
+(same model, higher price).
+
+**4. Install a tunnel (only for friends outside your home network)**
 
 Install [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)
 (free, no account; on a Mac: `brew install cloudflared`). It gives your table an `https://`
@@ -181,6 +195,7 @@ You rarely need these — Claude runs them — but they're yours to use:
 | `bash tools/gm-table.sh music auto off` | Stop Claude from changing the music |
 | `bash tools/gm-player.sh party` | Every player character and their stats |
 | `bash tools/gm-music-library.sh fetch` | Download (or re-download) the music library |
+| `bash tools/gm-models.sh [preset]` | Which models run the game (recommended · budget · premium · inherit) |
 
 ---
 

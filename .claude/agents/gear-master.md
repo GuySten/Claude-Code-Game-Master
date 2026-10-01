@@ -2,6 +2,7 @@
 name: gear-master
 description: D&D 5e equipment, armor, weapons, and magic items expert. Use PROACTIVELY when players shop for gear, ask about item stats, need weapon details, or check magic item properties. Fetches official equipment data from API including costs, weight, damage, AC bonuses, and special properties. Master of ALL equipment truths.
 tools: Bash, WebFetch
+model: haiku
 color: blue
 ---
 

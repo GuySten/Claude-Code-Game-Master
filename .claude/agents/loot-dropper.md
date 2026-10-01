@@ -2,6 +2,7 @@
 name: loot-dropper
 description: Intelligent loot generation agent. Use PROACTIVELY when generating treasure, shop inventory, or random item rewards. Selects appropriate items based on rarity, party level, and context using pre-built loot tables.
 tools: Bash, Read
+model: haiku
 color: treasure-gold
 ---
 

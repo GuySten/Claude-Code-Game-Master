@@ -2,6 +2,7 @@
 name: rules-master
 description: D&D 5e rules, mechanics, and judgments expert. Use PROACTIVELY when rule questions arise, mechanics need clarification, or GM needs official rulings. Provides authoritative interpretations with context and reasoning. Master of game mechanics, combat rules, ability checks, and edge cases.
 tools: Bash, WebFetch
+model: sonnet
 color: gold
 ---
 
