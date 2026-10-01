@@ -30,6 +30,8 @@ if [ "$#" -lt 1 ]; then
     echo "                                 --character and describe the altered look in the prompt."
     echo "  portrait <name>            - Draw a PC's or NPC's portrait and save it on their record"
     echo "  location <name>            - Paint a location and save the picture on its record"
+    echo "  enemy <name> [--boss] [--look T] - A foe's portrait (--boss: the epic version)"
+    echo "  item <name> [--look T] [--owner PC] - A picture of an important piece of loot"
     echo "  appearance <name>          - Print a character's visual_appearance bible line (PC or NPC)"
     echo "  chronicler                 - Show this campaign's in-world chronicler"
     echo "      --name <text>            Set the chronicler's name"
@@ -130,6 +132,21 @@ case "$ACTION" in
         SHORT_URI=$(echo "$RESULT" | $PYTHON_CMD -c "import sys,json,pathlib; d=json.load(sys.stdin); print(pathlib.Path(d.get('short_path') or d['path']).resolve().as_uri())")
         FILE=$(echo "$RESULT" | $PYTHON_CMD -c "import sys,json; print(json.load(sys.stdin)['image'])")
         success "Picture of $NAME saved on the location ($FILE)"
+        echo "  open: $SHORT_URI"
+        ;;
+
+    enemy|item)
+        require_active_campaign
+        KIND="$ACTION"
+        if [ -z "$1" ]; then
+            error "Usage: gm-image.sh enemy \"<foe>\" [--boss] [--look \"...\"]  |  gm-image.sh item \"<treasure>\" [--look \"...\"] [--owner \"<PC>\"]"
+            exit 1
+        fi
+        NAME="$1"; shift
+        RESULT=$($PYTHON_CMD "$LIB_DIR/image_gen.py" "--$KIND" "$NAME" "$@" --json) || exit $?
+        SHORT_URI=$(echo "$RESULT" | $PYTHON_CMD -c "import sys,json,pathlib; d=json.load(sys.stdin); print(pathlib.Path(d.get('short_path') or d['path']).resolve().as_uri())")
+        FILE=$(echo "$RESULT" | $PYTHON_CMD -c "import sys,json; print(json.load(sys.stdin)['image'])")
+        success "Picture of $NAME saved ($FILE)"
         echo "  open: $SHORT_URI"
         ;;
 

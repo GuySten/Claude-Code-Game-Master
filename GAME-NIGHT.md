@@ -218,6 +218,13 @@ has described, the table paints it in the background and shows it to everyone. T
 next to the location name at the top of the page to see it again, along with every place
 you've been. The GM can paint any place with `bash tools/gm-image.sh location "<name>"`.
 
+**Foes and treasures.** When a notable enemy steps in, the table paints them and shows them
+as their music starts. A boss gets an epic portrait with a red glow, and when a fight turns
+into a boss fight the boss version is painted. Important loot (a magic sword, an artifact) is
+painted when it's found, shown with a gold glow, and appears beside the item on the owner's
+character sheet. All of it is collected in the 🖼 gallery, which has Places, Foes and
+Treasures tabs.
+
 To keep characters on-model, every PC and NPC needs a stored appearance. Ask the GM *"write
 appearances for everyone in the party"*: characters created on the join page don't have one yet.
 

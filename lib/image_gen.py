@@ -34,6 +34,7 @@ import base64
 import urllib.error
 import urllib.request
 from pathlib import Path
+from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -551,6 +552,104 @@ def generate_location_image(name: str, campaign_dir=None, quality: str = DEFAULT
     return {**out, "image": filename, "name": key}
 
 
+# --------------------------------------------------- foes and treasures ----
+# Kept per campaign, so a foe or treasure is painted once and reused:
+#   bestiary.json  {name: {"portrait": file, "boss_portrait": file, "look": text}}
+#   treasures.json {name: {"image": file, "look": text, "owner": pc}}
+def _load(path: Path) -> dict:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _save(path: Path, data: dict) -> None:
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(path)
+
+
+def _entry(table: dict, name: str):
+    """The key in ``table`` matching ``name`` case-insensitively, else None."""
+    return next((k for k in table if k.strip().lower() == str(name).strip().lower()), None)
+
+
+def enemy_art(name: str, boss: bool, campaign_dir) -> str:
+    """The stored portrait of this foe (the boss one for a boss), or ""."""
+    table = _load(Path(campaign_dir) / "bestiary.json")
+    key = _entry(table, name)
+    rec = table.get(key) or {}
+    f = rec.get("boss_portrait" if boss else "portrait") or ""
+    return f if f and (Path(campaign_dir) / "images" / f).is_file() else ""
+
+
+def treasure_art(name: str, campaign_dir) -> str:
+    table = _load(Path(campaign_dir) / "treasures.json")
+    rec = table.get(_entry(table, name)) or {}
+    f = rec.get("image") or ""
+    return f if f and (Path(campaign_dir) / "images" / f).is_file() else ""
+
+
+def enemy_prompt(name: str, about: str, boss: bool) -> str:
+    who = f"{name}" + (f", {about.rstrip('.')}" if about else "")
+    if boss:
+        return (f"Epic boss portrait of {who}. The climactic villain of the story: towering, "
+                "terrifying and magnificent, seen from a low heroic angle, dramatic backlight and "
+                "blazing rim light, swirling ominous energy, cinematic composition, intricate "
+                "detail, no text.")
+    return (f"Menacing portrait of {who}. A dangerous foe seen up close and ready to strike: "
+            "low angle, harsh rim lighting, intimidating expression, rich detail, no text.")
+
+
+def generate_enemy_portrait(name: str, campaign_dir=None, boss: bool = False, look: str = "",
+                            quality: Optional[str] = None) -> dict:
+    """Paint a foe — an epic version for a boss — in the campaign's style. Uses the
+    NPC's record (description, stored appearance) when the foe is a known NPC."""
+    campaign_dir = Path(campaign_dir or resolve_campaign_dir() or ".")
+    found = _find_character(name, campaign_dir)
+    rec = found[2] if found else {}
+    about = look or rec.get("description") or rec.get("concept") or ""
+    out = generate_image(enemy_prompt(rec.get("name", name), about, boss),
+                         title=f"{'boss' if boss else 'foe'} {name}",
+                         quality=quality or ("high" if boss else DEFAULT_QUALITY), size="1024x1536",
+                         characters=[rec["name"]] if found else None, campaign_dir=campaign_dir)
+    filename = Path(out["path"]).name
+    path = campaign_dir / "bestiary.json"
+    table = _load(path)
+    key = _entry(table, name) or " ".join(str(name).split())
+    table.setdefault(key, {})["boss_portrait" if boss else "portrait"] = filename
+    if look:
+        table[key]["look"] = look
+    _save(path, table)
+    return {**out, "image": filename, "name": key, "boss": boss}
+
+
+def item_prompt(name: str, look: str) -> str:
+    return (f"Treasure art of {name}" + (f": {look.rstrip('.')}" if look else "") + ". The object "
+            "alone as the hero of the picture, on a dark backdrop with dramatic light, fine "
+            "craftsmanship, glowing with magic if it is magical, rich detail, no text.")
+
+
+def generate_item_image(name: str, campaign_dir=None, look: str = "", owner: str = "",
+                        quality: str = DEFAULT_QUALITY) -> dict:
+    """Paint an important piece of loot and keep it in treasures.json."""
+    campaign_dir = Path(campaign_dir or resolve_campaign_dir() or ".")
+    out = generate_image(item_prompt(name, look), title=f"treasure {name}", quality=quality,
+                         size="1024x1024", campaign_dir=campaign_dir)
+    filename = Path(out["path"]).name
+    path = campaign_dir / "treasures.json"
+    table = _load(path)
+    key = _entry(table, name) or " ".join(str(name).split())
+    table.setdefault(key, {})["image"] = filename
+    if look:
+        table[key]["look"] = look
+    if owner:
+        table[key]["owner"] = owner
+    _save(path, table)
+    return {**out, "image": filename, "name": key}
+
+
 def _openai_generate(final_prompt: str, api_key: str, model: str, quality: str, size: str) -> bytes:
     payload = json.dumps({
         "model": model,
@@ -619,6 +718,11 @@ def main() -> None:
                         help="Draw this PC's or NPC's portrait and save it on their record")
     parser.add_argument("--location", metavar="NAME",
                         help="Paint this location and save the picture on its record")
+    parser.add_argument("--enemy", metavar="NAME", help="Paint a foe's portrait (--boss: epic)")
+    parser.add_argument("--item", metavar="NAME", help="Paint an important piece of loot")
+    parser.add_argument("--boss", action="store_true", help="With --enemy: the boss portrait")
+    parser.add_argument("--look", default="", help="With --enemy/--item: what it looks like")
+    parser.add_argument("--owner", default="", help="With --item: who has it")
     parser.add_argument("--appearance", metavar="NAME",
                         help="Print one character's visual_appearance bible line and exit")
     parser.add_argument("--quality", default=DEFAULT_QUALITY, choices=["low", "medium", "high", "auto"])
@@ -649,6 +753,20 @@ def main() -> None:
             print(f"[ERROR] {e}", file=sys.stderr)
             sys.exit(1)
         print(json.dumps(out) if args.json else f"Picture of {out['name']}: {out['path']}")
+        return
+
+    if args.enemy is not None or args.item is not None:
+        try:
+            if args.enemy is not None:
+                out = generate_enemy_portrait(args.enemy, boss=args.boss, look=args.look,
+                                              quality=None if args.quality == DEFAULT_QUALITY else args.quality)
+            else:
+                out = generate_item_image(args.item, look=args.look, owner=args.owner,
+                                          quality=args.quality)
+        except ImageGenError as e:
+            print(f"[ERROR] {e}", file=sys.stderr)
+            sys.exit(1)
+        print(json.dumps(out) if args.json else f"{out['name']}: {out['path']}")
         return
 
     if args.appearance is not None:

@@ -275,6 +275,15 @@ class TableState:
         self.portrait_wake = threading.Event()
         self.portrait_maker = None            # tests plug in a fake: (name, campaign_dir) -> filename
         self.place_maker = None               # ditto, for places
+        self.foe_maker = None                 # ditto: (name, campaign_dir, boss, look) -> filename
+        self.item_maker = None                # ditto: (name, campaign_dir, look, owner) -> filename
+        # Foes and treasures to show: queued by the GM's say, posted when painted.
+        self.art_jobs: List[Dict[str, Any]] = []
+        self.enemy_looks: Dict[str, str] = {}
+        self.gallery_path = self.dir / "gallery.json"
+        g = self._read_json(self.gallery_path, {})
+        self.shown_foes: List[List[Any]] = [x for x in g.get("foes", []) if isinstance(x, list)]
+        self.shown_treasures: List[str] = [x for x in g.get("treasures", []) if isinstance(x, str)]
         # Places the party has been (only their pictures are shown: no spoilers).
         self.places_path = self.dir / "places.json"
         visited = self._read_json(self.places_path, {}).get("visited", [])
@@ -412,8 +421,10 @@ class TableState:
         if same and track == self.music.get("track") and not track.startswith("theme:"):
             return None       # a single assigned file has no separate boss version
         title = f"{name}'s theme"
-        return self.set_music(track, 0.7 if boss else 0.6, True, title,
-                              mood="boss" if boss else "combat", theme=name, boss=boss)
+        music = self.set_music(track, 0.7 if boss else 0.6, True, title,
+                               mood="boss" if boss else "combat", theme=name, boss=boss)
+        self.show_foe(name, boss)          # and their portrait (the boss one when it escalates)
+        return music
 
     def mood_files(self, mood: str) -> List[str]:
         """Music files for a mood: those listed under it in any music/moods.json,
@@ -1160,6 +1171,115 @@ class TableState:
         self.append("system", f"{key}.", image=filename, event={"type": "place", "location": key})
         return key
 
+    # --- foes and treasures: painted once, shown when they appear ---
+    def show_foe(self, name: str, boss: bool = False, look: str = "") -> None:
+        name = " ".join(str(name).split())
+        if look:
+            self.enemy_looks[name] = look
+        if [name, boss] in self.shown_foes or any(
+                j["kind"] == "foe" and j["name"] == name and j["boss"] == boss for j in self.art_jobs):
+            return
+        self.art_jobs.append({"kind": "foe", "name": name, "boss": boss,
+                              "look": look or self.enemy_looks.get(name, "")})
+        self.portrait_wake.set()
+
+    def show_loot(self, name: str, look: str = "", owner: str = "") -> None:
+        name = " ".join(str(name).split())[:80]
+        if name and name not in self.shown_treasures and not any(
+                j["kind"] == "loot" and j["name"] == name for j in self.art_jobs):
+            self.art_jobs.append({"kind": "loot", "name": name, "look": look, "owner": owner})
+            self.portrait_wake.set()
+
+    def _save_gallery(self) -> None:
+        with self.lock:
+            tmp = self.gallery_path.with_suffix(".tmp")
+            tmp.write_text(json.dumps({"foes": self.shown_foes, "treasures": self.shown_treasures},
+                                      indent=2, ensure_ascii=False), encoding="utf-8")
+            tmp.replace(self.gallery_path)
+
+    def _post_art(self, job: Dict[str, Any], filename: str) -> None:
+        if job["kind"] == "foe":
+            self.shown_foes.append([job["name"], job["boss"]])
+            self.append("system", f"{job['name']}.", image=filename,
+                        event={"type": "foe", "name": job["name"], "boss": job["boss"]})
+        else:
+            self.shown_treasures.append(job["name"])
+            event = {"type": "loot", "name": job["name"]}
+            if job.get("owner"):
+                event["owner"] = job["owner"]
+            self.append("system", f"{job['name']}.", pc=job.get("owner") or None,
+                        image=filename, event=event)
+        self._save_gallery()
+
+    def _take(self, job: Dict[str, Any]) -> bool:
+        """Claim a job (the request thread and the art worker both run passes)."""
+        with self.lock:
+            if job.get("taken") or job not in self.art_jobs:
+                return False
+            job["taken"] = True
+            return True
+
+    def _finish(self, job: Dict[str, Any], filename: Optional[str]) -> None:
+        with self.lock:
+            if job in self.art_jobs:
+                self.art_jobs.remove(job)
+        if filename:
+            self._post_art(job, filename)
+
+    def art_pass(self, ready_only: bool = False) -> List[str]:
+        """Show the queued foes and treasures: at once when already painted (a foe
+        met before), else paint them first (not when ``ready_only``). With no image
+        source the jobs are simply dropped: the game goes on in words."""
+        import image_gen
+        done = []
+        for job in list(self.art_jobs):
+            if not self._take(job):
+                continue
+            if job["kind"] == "foe":
+                have = image_gen.enemy_art(job["name"], job["boss"], self.campaign_dir)
+            else:
+                have = image_gen.treasure_art(job["name"], self.campaign_dir)
+            if not have:
+                maker = self.foe_maker if job["kind"] == "foe" else self.item_maker
+                if ready_only:
+                    job["taken"] = False                # the worker paints it
+                    continue
+                if not self._art_on(maker):
+                    self._finish(job, None)             # no pictures tonight
+                    continue
+                try:
+                    if job["kind"] == "foe":
+                        have = (maker(job["name"], self.campaign_dir, job["boss"], job["look"])
+                                if maker else image_gen.generate_enemy_portrait(
+                                    job["name"], self.campaign_dir, job["boss"], job["look"])["image"])
+                    else:
+                        have = (maker(job["name"], self.campaign_dir, job["look"], job["owner"])
+                                if maker else image_gen.generate_item_image(
+                                    job["name"], self.campaign_dir, job["look"], job["owner"])["image"])
+                except Exception as e:
+                    print(f"[art] {job['name']}: {e}", flush=True)
+                    self._finish(job, None)
+                    continue
+            self._finish(job, have)
+            done.append(job["name"])
+        return done
+
+    def gallery(self) -> Dict[str, List[Dict[str, Any]]]:
+        """What the players have seen: foes met and treasures found (newest first)."""
+        import image_gen
+        foes, treasures = [], []
+        for name, boss in reversed(self.shown_foes):
+            f = image_gen.enemy_art(name, boss, self.campaign_dir)
+            if f:
+                foes.append({"name": name, "image": f, "boss": bool(boss)})
+        table = image_gen._load(self.campaign_dir / "treasures.json")
+        for name in reversed(self.shown_treasures):
+            f = image_gen.treasure_art(name, self.campaign_dir)
+            if f:
+                rec = table.get(image_gen._entry(table, name)) or {}
+                treasures.append({"name": name, "image": f, "owner": rec.get("owner") or ""})
+        return {"foes": foes, "treasures": treasures}
+
     def places(self) -> List[Dict[str, str]]:
         """Pictures of the places the party has been, newest visit first."""
         try:
@@ -1210,7 +1330,7 @@ class TableState:
         while True:
             self.portrait_wake.wait(30)
             self.portrait_wake.clear()
-            for job in (self.place_pass, self.portrait_pass):     # the scene first
+            for job in (self.place_pass, self.art_pass, self.portrait_pass):   # the scene first
                 try:
                     job()
                 except Exception as e:
@@ -1306,7 +1426,7 @@ def make_handler(state: TableState, code: str, host_key: str):
                                    "waiting_on": state.waiting_on(),
                                    "music": state.music, "server_now": time.time(),
                                    "progress": state.progress(), "tts": state.tts_ready(),
-                                   "places": state.places(),
+                                   "places": state.places(), **state.gallery(),
                                    "narration_id": state.last_narration(me),
                                    **state.overview()})
             if url.path == "/api/messages":
@@ -1472,6 +1592,8 @@ def make_handler(state: TableState, code: str, host_key: str):
                 if mood and mood not in MOODS and mood != SILENCE:
                     return self._err(f"unknown mood {mood} (use: {', '.join(list(MOODS) + [SILENCE])})")
                 theme = " ".join(str(data.get("theme") or "").split())[:80]
+                if theme and data.get("look"):
+                    state.enemy_looks[theme] = " ".join(str(data["look"]).split())[:300]
                 # The music changes first, so it is already swelling as the beat is read.
                 # An enemy's theme (an always-explicit choice) wins over the mood.
                 music = None
@@ -1482,6 +1604,11 @@ def make_handler(state: TableState, code: str, host_key: str):
                 if music is not None:
                     self._announce_music(music)
                 msg = state.append("gm", text, to=to or None, image=image, lang=lang)
+                loot = " ".join(str(data.get("loot") or "").split())
+                if loot and not to:
+                    state.show_loot(loot, " ".join(str(data.get("loot_look") or "").split())[:300],
+                                    " ".join(str(data.get("loot_for") or "").split())[:60])
+                state.art_pass(ready_only=True)   # a foe met before shows up with the beat
                 warning = None
                 seated = state.seated_langs()
                 table_langs = set(seated.values())
@@ -1942,6 +2069,11 @@ def _print_messages(messages: List[dict], waiting_on: List[str],
                       f"(gm-player.sh), honouring what they asked if the rules allow, and "
                       f"celebrate it in the story.")
                 continue
+            if kind in ("foe", "loot"):
+                what = ("BOSS" if m["event"].get("boss") else "FOE") if kind == "foe" else "LOOT"
+                print(f"[#{m['id']} {what} PICTURE] {m['event'].get('name')} — shown to the table "
+                      f"({m.get('image')}).")
+                continue
             if kind == "place":
                 print(f"[#{m['id']} PLACE] The table painted {m['event'].get('location')} and "
                       f"showed everyone ({m.get('image')}) — no need to illustrate its "
@@ -2035,6 +2167,10 @@ def main() -> None:
 
     s.add_argument("--boss", action="store_true",
                    help="With --theme: this is a boss — play the fast, thundering version")
+    s.add_argument("--look", help="With --theme: what the foe looks like (for their portrait)")
+    s.add_argument("--loot", metavar="ITEM", help="Important loot is found: paint it for the table")
+    s.add_argument("--loot-look", help="With --loot: what it looks like")
+    s.add_argument("--loot-for", metavar="PC", help="With --loot: who takes it")
 
     mu = sub.add_parser("music", help="Set the shared background music for every player")
     mu.add_argument("track", nargs="?",
@@ -2140,7 +2276,8 @@ def main() -> None:
         r = _call(campaign_dir, "POST", "/api/gm/say",
                   {"text": text.strip(), "to": args.to, "image": args.image,
                    "lang": args.lang, "mood": args.mood, "theme": args.theme,
-                   "boss": args.boss})
+                   "boss": args.boss, "look": args.look, "loot": args.loot,
+                   "loot_look": args.loot_look, "loot_for": args.loot_for})
         if not r.get("ok"):
             sys.exit(f"[ERROR] {r.get('error')}")
         m = r["message"]

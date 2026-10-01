@@ -801,3 +801,96 @@ def test_important_places_are_painted_when_the_party_arrives(table):
     _, info = call(f"/api/info?code={CODE}&token={pip}")
     assert info["places"] == [{"name": "The Sunken Crypt", "image": "place-1.png"}]
     assert TableState(camp, str(table["world"])).visited == ["The Rusty Tankard", "The Sunken Crypt"]
+
+
+def _fake_painters(state, camp):
+    painted = []
+
+    def paint(kind, name, boss=False):
+        painted.append((kind, name, boss))
+        (camp / "images").mkdir(exist_ok=True)
+        fname = f"{kind}-{len(painted)}.png"
+        (camp / "images" / fname).write_bytes(b"png")
+        return fname
+
+    def foe(name, campaign_dir, boss, look):
+        f = paint("foe", name, boss)
+        path = campaign_dir / "bestiary.json"
+        data = json.loads(path.read_text()) if path.exists() else {}
+        data.setdefault(name, {})["boss_portrait" if boss else "portrait"] = f
+        path.write_text(json.dumps(data))
+        return f
+
+    def item(name, campaign_dir, look, owner):
+        f = paint("loot", name)
+        path = campaign_dir / "treasures.json"
+        data = json.loads(path.read_text()) if path.exists() else {}
+        data[name] = {"image": f, "owner": owner}
+        path.write_text(json.dumps(data))
+        return f
+
+    state.foe_maker, state.item_maker = foe, item
+    return painted
+
+
+def test_foes_bosses_and_loot_are_shown_to_the_table(table):
+    call, state, camp = table["call"], table["state"], table["camp"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    painted = _fake_painters(state, camp)
+
+    call("/api/gm/say", {"text": "A clown steps out.", "theme": "Grimaldi", "look": "rotting ringmaster"},
+         host=True)
+    assert state.art_jobs and state.art_jobs[0]["look"] == "rotting ringmaster"
+    assert state.art_pass() == ["Grimaldi"]
+    assert state.messages[-1]["event"] == {"type": "foe", "name": "Grimaldi", "boss": False}
+    call("/api/gm/say", {"text": "He laughs again.", "theme": "Grimaldi"}, host=True)
+    assert state.art_pass() == []                          # same foe: not shown twice
+
+    # The fight escalates: the boss portrait.
+    call("/api/gm/say", {"text": "He grows to fill the tent!", "mood": "boss"}, host=True)
+    assert state.art_pass() == ["Grimaldi"] and painted[-1] == ("foe", "Grimaldi", True)
+    assert state.messages[-1]["event"]["boss"] is True
+
+    # Loot, for Pip.
+    call("/api/gm/say", {"text": "In the chest: a blade of dawn.", "loot": "Sword of Dawn",
+                         "loot_look": "sunsteel", "loot_for": "Pip"}, host=True)
+    assert state.art_pass() == ["Sword of Dawn"]
+    assert state.messages[-1]["event"] == {"type": "loot", "name": "Sword of Dawn", "owner": "Pip"}
+    _, info = call(f"/api/info?code={CODE}&token={pip}")
+    assert [f["boss"] for f in info["foes"]] == [True, False]
+    assert info["treasures"] == [{"name": "Sword of Dawn", "image": "loot-3.png", "owner": "Pip"}]
+
+    # A new table later: a foe met before is shown with the beat itself, no repaint.
+    fresh = TableState(camp, str(table["world"]))
+    fresh.shown_foes = []
+    fresh.show_foe("Grimaldi", True)
+    assert fresh.art_pass(ready_only=True) == ["Grimaldi"] and len(painted) == 3
+
+
+def test_the_game_plays_in_words_without_any_image_source(table, monkeypatch):
+    """No OpenAI key, no Forge: every picture feature stands down quietly."""
+    import image_gen
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("IMAGE_BACKEND", raising=False)
+    assert image_gen.images_status()[0] is False
+    call, state, camp = table["call"], table["state"], table["camp"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    (camp / "locations.json").write_text(json.dumps({"The Crypt": {"position": "under the chapel"}}))
+    overview = json.loads((camp / "campaign-overview.json").read_text())
+    overview["player_position"]["current_location"] = "The Crypt"
+    (camp / "campaign-overview.json").write_text(json.dumps(overview))
+    tok = call("/api/create", {"code": CODE, "name": "Bram", "concept": "a dwarf"})[1]["token"]
+
+    status, _ = call("/api/gm/say", {"text": "The boss rises!", "theme": "Lich", "boss": True,
+                                     "loot": "Crown of Bone", "loot_for": "Bram"}, host=True)
+    assert status == 200
+    assert state.place_pass(now=10**9) is None
+    assert state.portrait_pass(now=10**9) == []
+    assert state.art_pass() == [] and state.art_jobs == []          # dropped, not stuck
+    assert not any(m.get("image") for m in state.messages)
+    _, info = call(f"/api/info?code={CODE}&token={tok}")
+    assert info["places"] == [] and info["foes"] == [] and info["treasures"] == []
+    assert all(p["portrait"] is None for p in info["party"])
+    _, sheet = call(f"/api/sheet?code={CODE}&token={pip}&pc=Pip")
+    assert sheet["ok"] and "portrait" not in sheet["sheet"]
+    assert state.music.get("theme") == "Lich"                       # the music still works

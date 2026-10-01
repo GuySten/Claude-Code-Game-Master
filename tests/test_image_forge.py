@@ -148,3 +148,29 @@ def test_places_are_painted_and_kept_on_the_location(forge):
     assert saved["The Crooked Lantern"]["image"] == out["image"]
     with pytest.raises(image_gen.ImageGenError, match="No location"):
         image_gen.generate_location_image("Atlantis", camp)
+
+
+def test_foes_bosses_and_treasures_are_painted_and_kept(forge):
+    camp = forge["camp"]
+    (camp / "npcs.json").write_text(json.dumps({"Grimaldi": {"description": "a rotting circus ringmaster"}}))
+    foe = image_gen.generate_enemy_portrait("grimaldi", camp)
+    sent = forge["seen"]["requests"][-1]
+    assert "Menacing portrait of Grimaldi, a rotting circus ringmaster" in sent["prompt"]
+    assert (sent["width"], sent["height"], sent["steps"]) == (832, 1216, 6)
+    boss = image_gen.generate_enemy_portrait("Grimaldi", camp, boss=True)
+    sent = forge["seen"]["requests"][-1]
+    assert "Epic boss portrait" in sent["prompt"] and sent["steps"] == 8      # bosses: high quality
+    assert image_gen.enemy_art("GRIMALDI", False, camp) == foe["image"]
+    assert image_gen.enemy_art("grimaldi", True, camp) == boss["image"]
+    assert image_gen.enemy_art("Goblin", False, camp) == ""
+
+    image_gen.generate_enemy_portrait("Cave Troll", camp, look="moss-covered, one tusk")
+    assert "Cave Troll, moss-covered, one tusk" in forge["seen"]["requests"][-1]["prompt"]
+
+    item = image_gen.generate_item_image("Sword of Dawn", camp, look="a sunsteel blade", owner="Pip")
+    sent = forge["seen"]["requests"][-1]
+    assert "Treasure art of Sword of Dawn: a sunsteel blade" in sent["prompt"]
+    assert (sent["width"], sent["height"]) == (1024, 1024)
+    assert json.loads((camp / "treasures.json").read_text())["Sword of Dawn"] == {
+        "image": item["image"], "look": "a sunsteel blade", "owner": "Pip"}
+    assert image_gen.treasure_art("sword of dawn", camp) == item["image"]

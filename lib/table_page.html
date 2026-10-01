@@ -146,6 +146,18 @@
   #sheet-body .portrait.big { float: none; width: 100%; margin: 4px 0 8px; cursor: zoom-out; }
   .msg.system img { max-width: 260px; margin: 6px auto 0; }
   .msg.system.place img { max-width: min(560px, 100%); }
+  .msg.system.foe img { max-width: min(300px, 80%); border: 2px solid var(--hp-low); }
+  .msg.system.boss img { max-width: min(380px, 90%); border: 2px solid var(--hp-low);
+                         box-shadow: 0 0 18px 4px color-mix(in srgb, var(--hp-low) 55%, transparent); }
+  .msg.system.boss { color: var(--hp-low); font-weight: bold; font-style: normal; letter-spacing: .04em; }
+  .msg.system.loot img { max-width: min(280px, 75%); border: 2px solid #c9a227;
+                         box-shadow: 0 0 14px 2px rgba(201, 162, 39, .45); }
+  .gallery-tabs { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+  .gallery-tabs button[aria-pressed="true"] { border-color: var(--accent); }
+  #place-big.tall { max-height: 62vh; width: auto; max-width: 100%; margin: 0 auto; }
+  .sheet-sec li img.thumb { width: 34px; height: 34px; object-fit: cover; border-radius: 6px;
+                             vertical-align: middle; margin-inline-end: 6px; cursor: zoom-in;
+                             border: 1px solid #c9a227; }
   header .where button { border: 0; background: none; padding: 0 4px; font-size: .95rem; }
   dialog#places { width: min(760px, calc(100% - 24px)); max-height: 90vh; padding: 0;
                   border: 1px solid var(--line); border-radius: 12px;
@@ -326,6 +338,7 @@
     <button id="places-close" type="button" aria-label="✕">✕</button>
   </div>
   <div class="places-body">
+    <div class="gallery-tabs" id="gallery-tabs"></div>
     <img id="place-big" alt="">
     <div id="place-name" dir="auto"></div>
     <div id="place-list"></div>
@@ -413,7 +426,9 @@
       rolledNote: "Rolled with fair dice: 4d6 for each ability, lowest die dropped. Change the name and concept if you like, then Create — the table sees what you rolled.",
       rolledHp: "HP", rolledAc: "AC",
       ev_levelup: "⬆ {pc} reaches level {level}", ev_portrait: "🖼 {pc}'s portrait",
-      ev_place: "🖼 {location}", placesTitle: "Places you've been", placeShow: "See this place",
+      ev_place: "🖼 {location}", placesTitle: "Gallery", placeShow: "Places, foes and treasures",
+      ev_foe: "⚔ {name}", ev_boss: "💀 {name}", ev_loot: "💎 {name}", lootFor: "for {pc}",
+      galPlaces: "🗺 Places", galFoes: "⚔ Foes", galTreasures: "💎 Treasures",
       ev_seat: "{pc} takes their seat at the table.", ev_join: "A new player joins: {pc}",
       ev_leave: "{pc} steps away from the table.", ev_music_stop: "🎵 The music fades away.",
       amb_wind: "Howling wind", amb_rain: "Steady rain", amb_storm: "Rain with rolling thunder",
@@ -482,7 +497,9 @@
       rolledNote: "הוטל בקוביות הוגנות: 4d6 לכל תכונה, הקובייה הנמוכה נזרקת. שנו את השם והתיאור אם תרצו ולחצו צור — השולחן יראה מה הטלתם.",
       rolledHp: "נק״ח", rolledAc: "דרגת שריון",
       ev_levelup: "⬆ {pc} עולה לדרגה {level}", ev_portrait: "🖼 הדיוקן של {pc}",
-      ev_place: "🖼 {location}", placesTitle: "מקומות שביקרתם בהם", placeShow: "הצג את המקום",
+      ev_place: "🖼 {location}", placesTitle: "גלריה", placeShow: "מקומות, אויבים ואוצרות",
+      ev_foe: "⚔ {name}", ev_boss: "💀 {name}", ev_loot: "💎 {name}", lootFor: "של {pc}",
+      galPlaces: "🗺 מקומות", galFoes: "⚔ אויבים", galTreasures: "💎 אוצרות",
       ev_seat: "{pc} מתיישב/ת ליד השולחן.", ev_join: "שחקן/ית חדש/ה מצטרף/ת: {pc}",
       ev_leave: "{pc} קם/ה מהשולחן.", ev_music_stop: "🎵 המוזיקה דועכת.",
       amb_wind: "רוח מייללת", amb_rain: "גשם יורד", amb_storm: "סערה ורעמים",
@@ -1249,12 +1266,11 @@
     $("campaign").textContent = info.campaign || t("title");
     document.title = info.campaign || t("title");
     $("where").textContent = [info.location, info.time].filter(Boolean).join(" · ");
-    knownPlaces = info.places || [];
-    if (knownPlaces.length) {
-      const here = knownPlaces.find((p) => p.name === info.location);
+    gallery = { places: info.places || [], foes: info.foes || [], treasures: info.treasures || [] };
+    if (gallery.places.length || gallery.foes.length || gallery.treasures.length) {
       const b = document.createElement("button");
       b.type = "button"; b.textContent = "🖼"; b.title = t("placeShow");
-      b.onclick = () => openPlaces(here ? here.name : knownPlaces[0].name);
+      b.onclick = () => gallery.places.length ? openGallery("places", info.location) : openGallery();
       $("where").appendChild(b);
     }
     partyLive = info.party || [];
@@ -1474,6 +1490,17 @@
     const more = {};
     Object.keys(s).forEach((k) => { if (!done.has(k)) more[k] = s[k]; });
     sec("more", label("more"), sheetValue(more));
+    // A treasure that has a picture shows it beside the item.
+    const eq = body.querySelector('.sheet-sec[data-key="equipment"]');
+    if (eq) eq.querySelectorAll("li").forEach((li) => {
+      const text = li.textContent.toLowerCase();
+      const tr = gallery.treasures.find((x) => text.includes(x.name.toLowerCase()));
+      if (!tr) return;
+      const img = imageEl(tr.image);
+      img.className = "thumb";
+      img.onclick = () => { $("sheet").close(); openGallery("treasures", tr.name); };
+      li.prepend(img);
+    });
     if (sheetLevelUp && sheetFor === me) body.prepend(levelUpForm(sheetLevelUp, s));
     if (!first) {                       // what the story just changed, flashed
       body.querySelectorAll(".sheet-sec").forEach((x) => {
@@ -1535,24 +1562,40 @@
     };
     return box;
   }
-  // Pictures of the places the party has been (the server lists only visited ones).
-  let knownPlaces = [];
-  function openPlaces(name) {
-    if (!knownPlaces.length) return;
+  // The gallery: places the party has been, foes met, treasures found (the server
+  // lists only what the players have already seen, so nothing is spoiled).
+  let gallery = { places: [], foes: [], treasures: [] };
+  function openGallery(tab, name) {
+    const tabs = ["places", "foes", "treasures"].filter((k) => gallery[k].length);
+    if (!tabs.length) return;
+    tab = tabs.includes(tab) ? tab : tabs[0];
+    const items = gallery[tab];
+    const label = (p) => p.name + (p.owner ? " — " + t("lootFor").replace("{pc}", p.owner) : "")
+                         + (p.boss ? " 💀" : "");
     const show = (p) => {
       $("place-big").src = imageUrl(p.image);
-      $("place-name").textContent = p.name;
+      $("place-big").className = tab === "places" ? "" : "tall";
+      $("place-name").textContent = label(p);
       [...$("place-list").children].forEach((b) => b.setAttribute("aria-current", String(b.dataset.name === p.name)));
     };
+    $("gallery-tabs").textContent = "";
+    if (tabs.length > 1) tabs.forEach((k) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = t({ places: "galPlaces", foes: "galFoes", treasures: "galTreasures" }[k]);
+      b.setAttribute("aria-pressed", String(k === tab));
+      b.onclick = () => openGallery(k);
+      $("gallery-tabs").appendChild(b);
+    });
     $("place-list").textContent = "";
-    if (knownPlaces.length > 1) knownPlaces.forEach((p) => {
+    if (items.length > 1) items.forEach((p) => {
       const b = document.createElement("button");
       b.type = "button"; b.dataset.name = p.name;
-      b.innerHTML = `<img alt="" loading="lazy" src="${esc(imageUrl(p.image))}"><span dir="auto">${esc(p.name)}</span>`;
+      b.innerHTML = `<img alt="" loading="lazy" src="${esc(imageUrl(p.image))}"><span dir="auto">${esc(label(p))}</span>`;
       b.onclick = () => show(p);
       $("place-list").appendChild(b);
     });
-    show(knownPlaces.find((p) => p.name === name) || knownPlaces[0]);
+    show(items.find((p) => p.name === name) || items[0]);
     const dlg = $("places");
     if (!dlg.open) { if (dlg.showModal) dlg.showModal(); else dlg.setAttribute("open", ""); }
   }
@@ -1661,6 +1704,9 @@
     if (ev.type === "music") return "🎵 " + trackTitle(ev);
     let s = t("ev_" + ev.type).replace("{pc}", m.pc || "");
     if (ev.type === "place") return s.replace("{location}", ev.location || "");
+    if (ev.type === "foe") return t(ev.boss ? "ev_boss" : "ev_foe").replace("{name}", ev.name || "");
+    if (ev.type === "loot") return t("ev_loot").replace("{name}", ev.name || "")
+      + (ev.owner ? " — " + t("lootFor").replace("{pc}", ev.owner) : "");
     if (ev.type === "levelup") {
       s = s.replace("{level}", ev.level);
       if (ev.hp_gain) s += ` · ${t("rolledHp")} +${ev.hp_gain}`;
@@ -1868,10 +1914,13 @@
       d.dir = dirFor(d.textContent);
       if (m.image) {
         const img = imageEl(m.image);
-        if ((m.event || {}).type === "place") {
-          d.classList.add("place");
+        const ev = m.event || {};
+        const tab = { place: "places", foe: "foes", loot: "treasures" }[ev.type];
+        if (tab) {
+          d.classList.add(ev.type === "foe" && ev.boss ? "boss" : ev.type);
+          if (ev.type === "foe") d.classList.add("foe");
           img.style.cursor = "zoom-in";
-          img.onclick = () => openPlaces((m.event || {}).location);
+          img.onclick = () => openGallery(tab, ev.location || ev.name);
         }
         d.appendChild(img);
       }
