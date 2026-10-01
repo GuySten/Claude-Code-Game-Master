@@ -448,9 +448,10 @@ Copy, fill in the link and code, and send:
 
 **Your character**
 
-9. **Your sheet.** Tap **📜 My sheet**, or any character in the party panel, for the full
-   sheet: portrait, abilities, skills, features, spells, equipment (with pictures of special
-   treasures) and conditions. It follows the story too, and whatever just changed flashes. It's
+9. **Your sheet.** Tap **📜 My sheet** (or your name in the party panel) for your full sheet:
+   portrait, abilities, skills, features, spells, equipment (with pictures of special
+   treasures) and conditions. Another player's character shows only what the party sees of
+   them (portrait, race, class, level, HP, conditions): their sheet is theirs. It follows the story too, and whatever just changed flashes. It's
    in your language: in Hebrew, skills, abilities, classes, races and conditions are always in
    Hebrew, and the rest of what's written on it is translated (the very first time that can
    take a few seconds).
@@ -527,8 +528,10 @@ Copy, fill in the link and code, and send:
 
 **הדמות שלכם**
 
-9. **הדף שלכם.** לחצו **📜 הדף שלי**, או על כל דמות בפאנל החבורה, כדי לראות את הדף המלא: דיוקן,
-   תכונות, מיומנויות, יכולות, לחשים, ציוד (עם תמונות של אוצרות מיוחדים) ומצבים. גם הוא
+9. **הדף שלכם.** לחצו **📜 הדף שלי** (או על השם שלכם בפאנל החבורה) כדי לראות את הדף המלא שלכם:
+   דיוקן, תכונות, מיומנויות, יכולות, לחשים, ציוד (עם תמונות של אוצרות מיוחדים) ומצבים. דמות של
+   שחקן אחר מראה רק את מה שהחבורה רואה (דיוקן, גזע, מקצוע, דרגה, נקודות חיים, מצבים): הדף שלה
+   שייך לה. גם הוא
    מתעדכן יחד עם הסיפור, ומה שהשתנה עכשיו מהבהב. הדף בשפה שלכם: בעברית, מיומנויות, תכונות,
    מקצועות, גזעים ומצבים תמיד בעברית, ושאר מה שכתוב בו מתורגם (בפעם הראשונה זה עשוי לקחת כמה
    שניות).

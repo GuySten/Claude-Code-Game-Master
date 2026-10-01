@@ -806,6 +806,32 @@ def test_a_ready_level_up_is_announced_once(table):
     assert again.announce_level_ups() == []
 
 
+def test_players_see_only_their_own_full_sheet(table):
+    call, state, camp = table["call"], table["state"], table["camp"]
+    path = camp / "character.json"
+    sheet = json.loads(path.read_text())
+    sheet.update({"race": "Halfling", "class": "Rogue", "level": 3, "skills": {"stealth": 7},
+                  "spells": ["Minor Illusion"], "equipment": ["Cursed Ring"], "notes": "owes the guild",
+                  "stats": {"dex": 17}, "conditions": ["poisoned"]})
+    path.write_text(json.dumps(sheet))
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    bram = call("/api/create", {"code": CODE, "name": "Bram", "concept": "a dwarf"})[1]["token"]
+
+    own = call(f"/api/sheet?code={CODE}&token={pip}&pc=Pip")[1]
+    assert own["sheet"]["notes"] == "owes the guild" and not own.get("public")
+    theirs = call(f"/api/sheet?code={CODE}&token={bram}&pc=Pip")[1]
+    assert theirs["public"] is True
+    assert theirs["sheet"]["race"] == "Halfling" and theirs["sheet"]["conditions"] == ["poisoned"]
+    for secret in ("skills", "spells", "equipment", "notes", "stats"):
+        assert secret not in theirs["sheet"], secret
+    # Nor through the sheet's translations.
+    call("/api/lang", {"code": CODE, "token": bram, "lang": "he"})
+    state.narrator_ask = lambda system, prompt: json.dumps({k: "ע:" + v for k, v in json.loads(prompt).items()})
+    assert wait_for(lambda: not call(f"/api/sheet-tr?code={CODE}&token={bram}&pc=Pip")[1]["pending"])
+    words = call(f"/api/sheet-tr?code={CODE}&token={bram}&pc=Pip")[1]["tr"]
+    assert "Halfling" in words and "Cursed Ring" not in words and "owes the guild" not in words
+
+
 def test_players_level_up_from_their_sheet(table):
     call, state, camp = table["call"], table["state"], table["camp"]
     path = camp / "character.json"

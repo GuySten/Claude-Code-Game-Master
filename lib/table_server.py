@@ -1491,8 +1491,11 @@ class TableState:
 
     def sheet_for(self, viewer: Optional[str], name: str, rev: Optional[str] = None
                   ) -> Optional[Dict[str, Any]]:
-        """sheet(), plus — on the viewer's OWN sheet — what levelling up offers."""
+        """sheet(), plus — on the viewer's OWN sheet — what levelling up offers.
+        Someone else's character shows only what the party can see of them."""
         found = self.sheet(viewer, name, rev)
+        if found and not (viewer and party_roster._same_name(viewer, found["name"])):
+            found = {**found, "sheet": public_sheet(found["sheet"]), "public": True}
         if found and viewer and party_roster._same_name(viewer, found["name"]):
             live = party_roster.find_pc(self.campaign_dir, found["name"])
             if live is not None:
@@ -1516,7 +1519,7 @@ class TableState:
         (``pending`` until they land); without a model the sheet stays as written."""
         import narrator
         lang = self.langs.get(viewer, "en") if viewer else "en"
-        found = self.sheet(viewer, name)
+        found = self.sheet_for(viewer, name)          # (another's: only what's public)
         if found is None:
             return None
         if lang == "en":
@@ -2102,6 +2105,14 @@ class TableState:
 
 
 SHEET_TR_SKIP = {"name", "id", "origin", "voice", "portrait", "image", "current_location"}
+# What a player sees of ANOTHER player's character: what the table sees anyway.
+PUBLIC_SHEET_KEYS = ("name", "race", "class", "level", "concept", "pronouns", "portrait",
+                     "hp", "status", "conditions")
+
+
+def public_sheet(sheet: Dict[str, Any]) -> Dict[str, Any]:
+    """Another player's character: no abilities, skills, spells, gear or notes."""
+    return {k: sheet[k] for k in PUBLIC_SHEET_KEYS if k in sheet}
 
 
 def _pretty_key(k: Any) -> str:

@@ -464,6 +464,7 @@
       leave: "Leave seat", leaveConfirm: "Give up your seat? You can take it again afterwards.",
       mySheet: "📜 My sheet", openSheet: "sheet ›", sheetLoading: "Loading…",
       sheet_hp: "HP", sheet_ac: "AC", sheet_level: "Level", sheet_xp: "XP", sheet_gold: "Gold",
+      sheetPublic: "Their abilities, skills, spells and gear are theirs to know.",
       sheet_current: "Current", sheet_next_level: "Next level", sheet_max: "Max", sheet_temp: "Temporary",
       xpToGo: "{n} to level {l}", xpReady: "ready to level up",
       sheet_status: "Status", sheet_stats: "Abilities", sheet_skills: "Skills",
@@ -550,6 +551,7 @@
       leave: "עזיבת המושב", leaveConfirm: "לפנות את המושב? אפשר לחזור אליו אחר כך.",
       mySheet: "📜 הדף שלי", openSheet: "דף דמות ›", sheetLoading: "טוען…",
       sheet_hp: "נקודות חיים", sheet_ac: "דרגת שריון", sheet_level: "דרגה", sheet_xp: "ניסיון",
+      sheetPublic: "התכונות, המיומנויות, הלחשים והציוד שלהם — רק הם יודעים.",
       sheet_current: "נוכחי", sheet_next_level: "לדרגה הבאה", sheet_max: "מקסימום", sheet_temp: "זמני",
       xpToGo: "עוד {n} לדרגה {l}", xpReady: "מוכנים לעלות דרגה",
       sheet_gold: "זהב", sheet_status: "מצב", sheet_stats: "תכונות", sheet_skills: "מיומנויות",
@@ -1574,7 +1576,7 @@
   }
 
   // ------------------------------------------------- the character sheet ---
-  let sheetFor = null, sheetShownRev = null, sheetLevelUp = null;
+  let sheetFor = null, sheetShownRev = null, sheetLevelUp = null, sheetPublic = false;
   const sheetCache = new Map();        // sheet_rev -> sheet
   function openSheet(name) {
     sheetFor = name; sheetShownRev = null;
@@ -1600,6 +1602,7 @@
       if (!r.ok || want !== sheetFor) return;
       sheet = r.sheet; got = r.rev;
       sheetLevelUp = r.level_up || null;
+      sheetPublic = !!r.public;
       sheetCache.set(r.rev, sheet);
       const now = partyShown.get(sheetFor);       // the panel moved on while we waited
       if (now && now.sheet_rev !== r.rev && rev) return refreshSheet();
@@ -1798,6 +1801,11 @@
       li.prepend(img);
     });
     if (sheetLevelUp && sheetFor === me) body.prepend(levelUpForm(sheetLevelUp, s));
+    if (sheetFor !== me) {               // another player's: only what the party sees
+      const note = document.createElement("p");
+      note.className = "muted"; note.textContent = t("sheetPublic");
+      body.appendChild(note);
+    }
     if (!first) {                       // what the story just changed, flashed
       body.querySelectorAll(".sheet-sec").forEach((x) => {
         const was = before.get(x.dataset.key);
