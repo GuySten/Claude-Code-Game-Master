@@ -247,6 +247,15 @@
   #chat form { display: flex; gap: 6px; padding: 8px 10px 12px; border-top: 1px solid var(--line); }
   #chat input { flex: 1; padding: 8px 10px; }
   #chat form button { padding: 6px 12px; }
+  .chat-tabs { display: flex; gap: 4px; padding: 10px 10px 0; }
+  .chat-tabs button { flex: 1; padding: 6px 8px; font-size: .85rem; }
+  .chat-tabs button[aria-pressed="true"] { border-color: var(--accent); }
+  #narrator-pane, #talk-pane { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+  #narrator-log { flex: 1; overflow-y: auto; padding: 6px 14px; }
+  .nar-q { margin: 8px 0 2px; font-size: .88rem; color: var(--muted); }
+  .nar-a { margin: 0 0 8px; padding: 8px 10px; border-radius: 8px; background: var(--gm);
+           border: 1px solid var(--line); font-size: .92rem; white-space: pre-line; }
+  .nar-a.thinking { color: var(--muted); font-style: italic; }
   #chat-toggle .badge { background: var(--hp-low); color: #fff; border-radius: 9px;
                         font-size: .72rem; padding: 0 6px; margin-inline-start: 4px; }
   @media (min-width: 1180px) {
@@ -361,13 +370,27 @@
     </div>
   </aside>
   <section id="chat" aria-labelledby="chat-title">
-    <h2 id="chat-title" data-i18n="chatTitle"></h2>
-    <div class="note" data-i18n="chatNote"></div>
-    <div id="chat-log" aria-live="polite"></div>
-    <form id="chat-form">
-      <input id="chat-text" maxlength="500" autocomplete="off" dir="auto" data-i18n-ph="chatPh">
-      <button type="submit" data-i18n="chatSend"></button>
-    </form>
+    <div class="chat-tabs">
+      <button type="button" id="tab-talk" aria-pressed="true" data-i18n="chatTitle"></button>
+      <button type="button" id="tab-narrator" aria-pressed="false" data-i18n="narTitle"></button>
+    </div>
+    <div id="talk-pane">
+      <h2 id="chat-title" class="hidden" data-i18n="chatTitle"></h2>
+      <div class="note" data-i18n="chatNote"></div>
+      <div id="chat-log" aria-live="polite"></div>
+      <form id="chat-form">
+        <input id="chat-text" maxlength="500" autocomplete="off" dir="auto" data-i18n-ph="chatPh">
+        <button type="submit" data-i18n="chatSend"></button>
+      </form>
+    </div>
+    <div id="narrator-pane" class="hidden">
+      <div class="note" data-i18n="narNote"></div>
+      <div id="narrator-log" aria-live="polite"></div>
+      <form id="narrator-form">
+        <input id="narrator-text" maxlength="400" autocomplete="off" dir="auto" data-i18n-ph="narPh">
+        <button type="submit" data-i18n="narAsk"></button>
+      </form>
+    </div>
   </section>
 </section>
 
@@ -427,8 +450,11 @@
       lvlNoHp: "The GM will set your hit points.", lvlAsi: "Ability score increase: +1 and +1 (pick the same one twice for +2)",
       lvlAsiSkip: "— (I'd rather ask for a feat)", lvlWish: "What do you want from this level? (subclass, spells, a feat…) The GM adds your class features.",
       lvlDone: "⬆ You're level {n}!", lvlBadge: "⬆",
-      chatButton: "💬 Chat", chatTitle: "Table talk", chatNote: "Just the players: the GM can't see this.",
+      chatButton: "💬 Chat", chatNote: "Just the players: the GM can't see this.",
       chatPh: "Say something to the other players…", chatSend: "Send",
+      chatTitle: "💬 Table talk", narTitle: "📖 Narrator", narAsk: "Ask", narThinking: "📖 Remembering…",
+      narNote: "Forgot something? Ask about the story so far. The narrator only remembers what you've seen; it can't change the game, and only you see this.",
+      narPh: "Who gave us the key? What did the oracle say?…",
       party: "Party", partyTitle: "The party", placeholder: "What do you do? (type, or tap 🎤 and speak)",
       private: "Only the GM sees this", autoSend: "Send when I stop talking", send: "Send",
       roundYours: "⏳ {t} to act — the GM answers when everyone has acted",
@@ -503,8 +529,11 @@
       lvlNoHp: "מנהל המשחק יקבע את נקודות החיים.", lvlAsi: "שיפור תכונות: ‎+1 ו-‎+1 (בחרו אותה תכונה פעמיים ל-‎+2)",
       lvlAsiSkip: "— (אעדיף לבקש הישג)", lvlWish: "מה תרצו מהדרגה הזו? (תת־מקצוע, לחשים, הישג…) מנהל המשחק מוסיף את יכולות המקצוע.",
       lvlDone: "⬆ עליתם לדרגה {n}!", lvlBadge: "⬆",
-      chatButton: "💬 צ'אט", chatTitle: "שיחת שולחן", chatNote: "רק השחקנים: מנהל המשחק לא רואה את זה.",
+      chatButton: "💬 צ'אט", chatNote: "רק השחקנים: מנהל המשחק לא רואה את זה.",
       chatPh: "כתבו משהו לשאר השחקנים…", chatSend: "שליחה",
+      chatTitle: "💬 שיחת שולחן", narTitle: "📖 המספר", narAsk: "שאלו", narThinking: "📖 נזכר…",
+      narNote: "שכחתם משהו? שאלו על הסיפור עד עכשיו. המספר זוכר רק מה שראיתם; הוא לא יכול לשנות את המשחק, ורק אתם רואים את זה.",
+      narPh: "מי נתן לנו את המפתח? מה אמרה האורקל?…",
       party: "החבורה", partyTitle: "החבורה", placeholder: "מה אתם עושים? (הקלידו, או לחצו 🎤 ודברו)",
       private: "רק מנהל המשחק יראה", autoSend: "לשלוח כשאני מסיים/ת לדבר", send: "שליחה",
       roundYours: "⏳ נותרו {t} לפעול — מנהל המשחק עונה כשכולם פעלו",
@@ -1290,7 +1319,7 @@
 
   // ---------------------------------------------------------- the table ---
   // ------------------------------------------------- the players' side chat ---
-  let chatLast = 0, chatUnread = 0, chatPolling = false;
+  let chatLast = 0, chatUnread = 0, chatPolling = false, chatLoaded = false;
   const chatVisible = () => getComputedStyle($("chat")).display !== "none";
   function addChat(m) {
     const d = document.createElement("div");
@@ -1310,10 +1339,11 @@
   async function pollChat() {
     try {
       const r = await api("/api/chat?after=" + chatLast);
+      const first = !chatLoaded;              // the history on arrival isn't "unread"
+      if (r.ok) chatLoaded = true;
       if (r.ok && r.messages.length) {
         const log = $("chat-log");
         const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 60;
-        const first = chatLast === 0;
         r.messages.forEach((m) => {
           addChat(m); chatLast = Math.max(chatLast, m.id);
           if (!first && m.pc !== me && !chatVisible()) setUnread(chatUnread + 1);
@@ -1338,6 +1368,52 @@
   $("chat-text").addEventListener("input", () => {
     $("chat-text").dir = $("chat-text").value.trim() ? dirFor($("chat-text").value) : "auto";
   });
+  // The Narrator: private reminders of the story so far.
+  function showChatTab(which) {
+    $("tab-talk").setAttribute("aria-pressed", String(which === "talk"));
+    $("tab-narrator").setAttribute("aria-pressed", String(which === "narrator"));
+    $("talk-pane").classList.toggle("hidden", which !== "talk");
+    $("narrator-pane").classList.toggle("hidden", which !== "narrator");
+    (which === "talk" ? $("chat-text") : $("narrator-text")).focus();
+  }
+  $("tab-talk").onclick = () => showChatTab("talk");
+  $("tab-narrator").onclick = () => showChatTab("narrator");
+  function addNarrator(q, a, thinking) {
+    const qd = document.createElement("div");
+    qd.className = "nar-q"; qd.textContent = "❓ " + q; qd.dir = dirFor(q);
+    const ad = document.createElement("div");
+    ad.className = "nar-a" + (thinking ? " thinking" : "");
+    ad.textContent = a; ad.dir = dirFor(a);
+    $("narrator-log").append(qd, ad);
+    $("narrator-log").scrollTop = $("narrator-log").scrollHeight;
+    return ad;
+  }
+  let narratorLoaded = false;
+  async function loadNarrator() {
+    if (narratorLoaded) return;
+    narratorLoaded = true;
+    const r = await api("/api/narrator");
+    if (r.ok) r.entries.forEach((e) => addNarrator(e.q, e.a));
+  }
+  $("narrator-form").onsubmit = async (ev) => {
+    ev.preventDefault();
+    const q = $("narrator-text").value.trim();
+    if (!q) return;
+    $("narrator-text").value = "";
+    const btn = $("narrator-form").querySelector("button");
+    btn.disabled = true;
+    const ad = addNarrator(q, t("narThinking"), true);
+    const r = await api("/api/narrator", { question: q });
+    btn.disabled = false;
+    ad.classList.remove("thinking");
+    ad.textContent = r.ok ? r.entry.a : (r.error || "?");
+    ad.dir = dirFor(ad.textContent);
+    $("narrator-log").scrollTop = $("narrator-log").scrollHeight;
+  };
+  $("narrator-text").addEventListener("input", () => {
+    $("narrator-text").dir = $("narrator-text").value.trim() ? dirFor($("narrator-text").value) : "auto";
+  });
+
   $("chat-toggle").onclick = () => {
     const open = $("chat").classList.toggle("open");
     if (open) { setUnread(0); $("party").classList.remove("open"); $("chat-text").focus();
@@ -1351,7 +1427,7 @@
     renderInfo(info);
     if (!polling) {
       polling = true; pollMessages(); setInterval(refreshInfo, 4000);
-      if (!chatPolling) { chatPolling = true; pollChat(); }
+      if (!chatPolling) { chatPolling = true; pollChat(); loadNarrator(); }
       [400, 900, 1500].forEach((ms) => setTimeout(refreshInfo, ms));   // calibrate the clock
     }
   }

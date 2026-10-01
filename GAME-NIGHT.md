@@ -366,7 +366,9 @@ Copy, fill in the link and code, and send:
 5. **Secrets.** Tick **"Only the GM sees this"** to whisper to the GM. Purple messages are
    whispers only you can see. **Table talk** (the chat column, or **💬 Chat** on a smaller
    screen) is just for the players: plan, joke, argue. The GM never sees it. It isn't saved,
-   so it clears when the host restarts the table.
+   so it clears when the host restarts the table. Forgot who gave you the key, or what the
+   oracle said? Ask the **📖 Narrator** tab beside it. It answers from what *you* have seen
+   in the story so far, privately, and it can't change the game or reveal secrets.
 6. **Language.** **עברית / English** switches the whole page, your microphone, and the
    language the GM answers you in. You read everything in your language: the story, and
    the other players' actions too — the GM translates them (marked 🌐; tap
@@ -416,7 +418,9 @@ Copy, fill in the link and code, and send:
 5. **סודות.** סמנו **"רק מנהל המשחק יראה"** כדי ללחוש למנהל המשחק. הודעות סגולות הן לחישות
    שרק אתם רואים. **שיחת שולחן** (עמודת הצ'אט, או **💬 צ'אט** במסך קטן) היא רק לשחקנים:
    לתכנן, לצחוק, להתווכח. מנהל המשחק לא רואה אותה. היא לא נשמרת, ולכן נמחקת כשהמארח מפעיל
-   את השולחן מחדש.
+   את השולחן מחדש. שכחתם מי נתן לכם את המפתח, או מה אמרה האורקל? שאלו את לשונית
+   **📖 המספר** שלידה. הוא עונה ממה *שאתם* ראיתם בסיפור עד עכשיו, בפרטיות, ולא יכול לשנות את
+   המשחק או לגלות סודות.
 6. **שפה.** **English / עברית** מחליף את כל הדף, את המיקרופון ואת השפה שבה מנהל המשחק עונה
    לכם. הכול מופיע בשפה שלכם: הסיפור, וגם הפעולות של השחקנים האחרים — מנהל המשחק מתרגם אותן
    (מסומן ב-🌐; לחצו **הצג מקור** כדי לראות מה הם כתבו).

@@ -313,6 +313,11 @@ class TableState:
         self.shown_foes: List[List[Any]] = [x for x in g.get("foes", []) if isinstance(x, list)]
         self.shown_treasures: List[str] = [x for x in g.get("treasures", []) if isinstance(x, str)]
         self.chat: List[Dict[str, Any]] = []           # players only; never written to disk
+        # The Narrator (lib/narrator.py): each player's private questions and answers.
+        self.narrator_log: Dict[str, List[Dict[str, Any]]] = {}
+        self.narrator_busy: set = set()
+        self.narrator_slots = threading.Semaphore(2)
+        self.narrator_ask = None                        # tests plug in a fake model
         # Composed music: villains' and bosses' themes and the PCs' anthems are
         # composed in the background (lib/composer.py) when the composer is set up.
         self.music_jobs: List[Dict[str, Any]] = []
@@ -462,6 +467,32 @@ class TableState:
     def chat_since(self, after: int) -> List[Dict[str, Any]]:
         with self.lock:
             return [dict(m) for m in self.chat if m["id"] > after]
+
+    # --- the Narrator: reminds a player of the story so far (private, read-only) ---
+    def narrator_question(self, pc: str, question: str) -> Dict[str, Any]:
+        import narrator
+        with self.lock:
+            if pc in self.narrator_busy:
+                return {"ok": False, "error": "One question at a time."}
+            self.narrator_busy.add(pc)
+        try:
+            lang = self.langs.get(pc, "en")
+            lines = narrator.story_lines(self.since(0, pc), pc, lang)
+            shown = self.sheet(pc, pc)
+            history = [{"q": x["q"], "a": x["a"]} for x in self.narrator_log.get(pc, [])]
+            prompt = narrator.build_prompt(lines, shown and shown["sheet"], self.party_for(pc),
+                                           self.overview().get("location"), history, question, pc)
+            with self.narrator_slots:
+                got = narrator.answer(question, lines, prompt, lang, ask=self.narrator_ask)
+            entry = {"id": len(self.narrator_log.get(pc, [])) + 1, "t": round(time.time(), 2),
+                     "q": question, "a": got["answer"], "source": got["source"]}
+            with self.lock:
+                self.narrator_log.setdefault(pc, []).append(entry)
+                del self.narrator_log[pc][:-50]
+            return {"ok": True, "entry": entry}
+        finally:
+            with self.lock:
+                self.narrator_busy.discard(pc)
 
     def gm_read_since_narration(self) -> bool:
         """Has the GM read players' actions since it last narrated to everyone?"""
@@ -1662,6 +1693,10 @@ def make_handler(state: TableState, code: str, host_key: str):
                     after, rev = 0, 0
                 return self._json({"ok": True, "me": me, "rev": state.rev,
                                    "messages": state.since(after, me, rev)})
+            if url.path == "/api/narrator":
+                if not me:
+                    return self._err("Take a seat first.", 403)
+                return self._json({"ok": True, "entries": state.narrator_log.get(me, [])})
             if url.path == "/api/chat":
                 if not me:                      # seated players only: never the host key
                     return self._err("Take a seat first.", 403)
@@ -1782,6 +1817,15 @@ def make_handler(state: TableState, code: str, host_key: str):
                 if len(text) > CHAT_TEXT:
                     return self._err(f"Keep it under {CHAT_TEXT} characters.")
                 return self._json({"ok": True, "message": state.chat_post(me, text)})
+
+            if url.path == "/api/narrator":
+                if not me:
+                    return self._err("Take a seat first.", 403)
+                question = " ".join(str(data.get("question", "")).split())[:400]
+                if not question:
+                    return self._err("Ask something.")
+                result = state.narrator_question(me, question)
+                return self._json(result, 200 if result["ok"] else 429)
 
             if url.path == "/api/level-up":
                 if not me:

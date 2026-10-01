@@ -1050,3 +1050,54 @@ def test_table_talk_is_for_the_players_only(table):
             assert b"favourite" not in f.read_bytes(), f
     assert call("/api/chat", {"code": CODE, "token": pip, "text": "  "})[0] == 400
     assert call("/api/chat", {"code": CODE, "token": pip, "text": "x" * 501})[0] == 400
+
+
+def test_the_narrator_remembers_only_what_this_player_saw(table):
+    import narrator
+    call, state = table["call"], table["state"]
+    state.set_round_seconds(0)
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    bram = call("/api/create", {"code": CODE, "name": "Bram", "concept": "a dwarf"})[1]["token"]
+    call("/api/lang", {"code": CODE, "token": pip, "lang": "en"})
+    call("/api/gm/say", {"text": "Old Marta hands you a brass key.", "lang": "en"}, host=True)
+    call("/api/gm/say", {"text": "מרתה הזקנה נותנת לכם מפתח.", "lang": "he"}, host=True)
+    call("/api/gm/say", {"text": "Bram, you notice Marta is lying.", "to": "Bram"}, host=True)
+    call("/api/gm/roll", {"notation": "1d20", "why": "assassin", "secret": True}, host=True)
+    call("/api/say", {"code": CODE, "token": pip, "text": "I pocket the key."})
+    seen = {}
+
+    def ask(system, prompt):
+        seen["system"], seen["prompt"] = system, prompt
+        return "Old Marta gave it to you."
+
+    state.narrator_ask = ask
+    log_before = (table["camp"] / "table" / "log.jsonl").read_text(encoding="utf-8")
+    status, body = call("/api/narrator", {"code": CODE, "token": pip, "question": "Who gave us the key?"})
+    assert status == 200 and body["entry"]["a"] == "Old Marta gave it to you."
+    p = seen["prompt"]
+    assert "Old Marta hands you a brass key." in p and "I pocket the key." in p
+    assert "מרתה" not in p                       # the other language's version
+    assert "lying" not in p                      # someone else's whisper
+    assert "assassin" not in p                   # a secret roll
+    assert "Who gave us the key?" in p and "never" in seen["system"].lower()
+    assert "Answer in English" in seen["system"]
+
+    # Private, and it changes nothing.
+    assert (table["camp"] / "table" / "log.jsonl").read_text(encoding="utf-8") == log_before
+    assert call(f"/api/narrator?code={CODE}&token={pip}")[1]["entries"][0]["q"] == "Who gave us the key?"
+    assert call(f"/api/narrator?code={CODE}&token={bram}")[1]["entries"] == []
+    assert call(f"/api/narrator?code={CODE}", host=True)[0] == 403
+    assert "Marta gave" not in json.dumps(call("/api/gm/inbox", {}, host=True)[1])
+
+    # Follow-ups carry the conversation; with no model, the story's own lines.
+    call("/api/narrator", {"code": CODE, "token": pip, "question": "And what did I do with it?"})
+    assert "Earlier, Pip asked: Who gave us the key?" in seen["prompt"]
+
+    def broken(system, prompt):
+        raise RuntimeError("offline")
+
+    state.narrator_ask = broken
+    got = call("/api/narrator", {"code": CODE, "token": pip, "question": "brass key"})[1]["entry"]
+    assert got["source"] == "recall" and "Old Marta hands you a brass key." in got["a"]
+    lines = narrator.story_lines(state.since(0, "Pip"), "Pip", "en")
+    assert narrator.recall(lines, "zeppelin?", "en").startswith("I couldn't find")
