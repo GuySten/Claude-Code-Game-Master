@@ -68,6 +68,15 @@
          display: flex; justify-content: space-between; gap: 8px; }
   .who button { border: 0; background: none; padding: 0 4px; font-size: .9rem; color: var(--muted); }
   .tr-note { font-size: .78rem; color: var(--muted); margin-top: 4px; }
+  /* The public dice log: every roll the table makes, with its DC/AC. */
+  .msg.roll { background: transparent; border: 1px dashed var(--line); max-width: 560px;
+              padding: 6px 12px; font-size: .92rem; }
+  .msg.roll .goal { color: var(--muted); font-size: .85rem; }
+  .msg.roll .dice { font-variant-numeric: tabular-nums; }
+  .msg.roll .total { font-weight: bold; font-size: 1.05rem; }
+  .msg.roll .ok { color: var(--hp); font-weight: bold; }
+  .msg.roll .bad { color: var(--hp-low); font-weight: bold; }
+  .msg.roll .nat { font-weight: bold; color: var(--accent); }
   .tr-note button { border: 0; background: none; padding: 0; color: var(--accent);
                     font-size: inherit; text-decoration: underline; cursor: pointer; }
   .msg.translating .body { opacity: .65; }
@@ -267,6 +276,9 @@
       etaLeft: "about {t} left", etaLonger: "taking a little longer than usual",
       sec: "{n} sec", min: "{n} min", sent: "✉️ Sent — the GM will pick it up in a moment",
       sentWaiting: "✉️ Sent — waiting for {names}",
+      rollDC: "DC", rollAC: "AC", rollSuccess: "✓ Success", rollFailure: "✗ Failure",
+      rollNat20: "⚔ Natural 20!", rollNat1: "💀 Natural 1!", rollDropped: "dropped",
+      rollSecret: "🎲 The GM rolled in secret", rollBy: "the GM",
       trFrom: "🌐 Translated from {lang}", trShowOriginal: "show original",
       trShowTranslation: "show translation", trWaiting: "🌐 Translating…",
       lang_en: "English", lang_he: "Hebrew",
@@ -310,6 +322,9 @@
       etaLeft: "עוד בערך {t}", etaLonger: "לוקח קצת יותר זמן מהרגיל",
       sec: "{n} שניות", min: "{n} דקות", sent: "✉️ נשלח — מנהל המשחק יקרא את זה עוד רגע",
       sentWaiting: "✉️ נשלח — מחכים ל{names}",
+      rollDC: "דרגת קושי", rollAC: "דרגת שריון", rollSuccess: "✓ הצלחה", rollFailure: "✗ כישלון",
+      rollNat20: "⚔ 20 טבעי!", rollNat1: "💀 1 טבעי!", rollDropped: "נזרק",
+      rollSecret: "🎲 מנהל המשחק הטיל קובייה בסתר", rollBy: "מנהל המשחק",
       trFrom: "🌐 תורגם מ{lang}", trShowOriginal: "הצג מקור",
       trShowTranslation: "הצג תרגום", trWaiting: "🌐 מתרגם…",
       lang_en: "אנגלית", lang_he: "עברית",
@@ -1087,12 +1102,51 @@
     else if (fresh) $("log").appendChild(fresh);
   }
 
+  // A roll the TABLE made (players see it the moment the GM does). Its DC/AC
+  // arrived in the same request as the roll, so it was fixed before the dice landed.
+  function renderRoll(m, d) {
+    const ev = m.event || {};
+    if (ev.secret) { d.textContent = t("rollSecret"); return; }
+    const r = ev.roll || {};
+    const why = (ev.why_tr || {})[lang] || ev.why || "";
+    const head = document.createElement("div");
+    head.className = "goal";
+    head.textContent = "🎯 " + [m.pc || t("rollBy"), why].filter(Boolean).join(" — ")
+      + (r.target != null ? ` · ${t(r.target_label === "AC" ? "rollAC" : "rollDC")} ${r.target}` : "");
+    head.dir = dirFor(head.textContent);
+    // The sum is an isolated left-to-right block (math reads that way in both
+    // languages); the words around it follow the reader's language, each in its
+    // own isolate so Hebrew never pulls the numbers out of order.
+    const line = document.createElement("div");
+    line.className = "dice";
+    line.dir = lang === "he" ? "rtl" : "ltr";
+    const mod = r.modifier ? ` ${r.modifier > 0 ? "+" : "−"} ${Math.abs(r.modifier)}` : "";
+    const math = document.createElement("bdi");
+    math.dir = "ltr";
+    math.innerHTML = `🎲 ${esc(r.notation || "")}: [${esc((r.rolls || []).join("+"))}]`
+      + `${esc(mod)} = <span class="total">${esc(r.total)}</span>`;
+    line.appendChild(math);
+    const word = (text, cls) => {
+      const w = document.createElement("bdi");
+      if (cls) w.className = cls;
+      w.textContent = text;
+      line.append("  ", w);
+    };
+    if ((r.discarded || []).length) word(`(${t("rollDropped")} ${r.discarded.join(", ")})`, "goal");
+    if (r.natural === 20 || r.natural === 1) word(t(r.natural === 20 ? "rollNat20" : "rollNat1"), "nat");
+    if (r.outcome) word(t(r.outcome === "success" ? "rollSuccess" : "rollFailure"),
+                        r.outcome === "success" ? "ok" : "bad");
+    d.append(head, line);
+  }
+
   function renderMessage(m) {
     if (!shownToMe(m)) return null;
     if (m.kind === "gm" && !m.to) lastGmId = Math.max(lastGmId, m.id);
     const d = document.createElement("div");
     d.className = "msg " + m.kind + (m.to ? " whisper" : "") + (m.pc === me && m.kind === "player" ? " mine" : "");
-    if (m.kind === "system") {
+    if (m.kind === "roll") {
+      renderRoll(m, d);
+    } else if (m.kind === "system") {
       d.textContent = systemText(m);
       d.dir = dirFor(d.textContent);
     } else {

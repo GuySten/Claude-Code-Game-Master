@@ -151,6 +151,9 @@ asides to the GM, whispers back, and live HP bars for the party.
 - **Everyone reads one language.** Each player sees the whole table — the story and
   every other player's actions — in their own language (English or Hebrew); Claude
   translates the actions as part of its turn, and the original is a tap away.
+- **Fair dice, in public.** With the table open, the table itself rolls (the OS random
+  source) and shows every roll to everyone the moment the GM sees it, with the DC or AC
+  fixed in the same command, before the dice land. Secret rolls are announced too.
 - **Talk instead of type.** Players tap 🎤 and speak their action, in **English or Hebrew**
   (the page switches fully to Hebrew, right-to-left, with one tap), and can turn on 🔊 to
   hear the story read aloud. This uses the browser's own speech engines (Chrome, Edge or

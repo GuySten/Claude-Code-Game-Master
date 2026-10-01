@@ -482,6 +482,50 @@ class TableState:
         latin = sum(1 for ch in text if ch.isascii() and ch.isalpha())
         return "he" if he > latin else "en"
 
+    # --- the public dice log: the table rolls, everyone sees ---
+    def roll(self, spec: Dict[str, Any]) -> Dict[str, Any]:
+        """Roll for the GM and show it to every player at once — with its DC/AC,
+        which is part of the same request, so it is fixed before the dice land.
+        A secret roll is announced (players see that the GM rolled), and its
+        result kept in table/secret-rolls.jsonl."""
+        import dice
+        notation = str(spec.get("notation", "")).strip()
+        try:
+            result = dice.DiceRoller().roll(notation)
+        except ValueError as e:
+            return {"ok": False, "error": str(e)}
+        target = spec.get("target")
+        try:
+            target = int(target) if target is not None else None
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "the DC/AC must be a number"}
+        label = "AC" if spec.get("target_label") == "AC" else "DC"
+        roll = {"notation": notation, "rolls": result.get("kept") or result.get("rolls") or [],
+                "discarded": result.get("discarded") or [],
+                "modifier": result.get("modifier", 0), "total": result["total"],
+                "natural": dice.natural(result), "target": target, "target_label": label,
+                "outcome": dice.judge(result, target)}
+        why = " ".join(str(spec.get("why") or "").split())[:120] or None
+        why_tr = {l: " ".join(str(t).split())[:120] for l, t in (spec.get("why_tr") or {}).items()
+                  if l in LANGS and str(t).strip()}
+        pc = " ".join(str(spec.get("pc") or "").split())[:60] or None
+        secret = bool(spec.get("secret"))
+        with self.lock:
+            msg_id = (self.messages[-1]["id"] + 1) if self.messages else 1
+        if secret:
+            with open(self.dir / "secret-rolls.jsonl", "a", encoding="utf-8") as f:
+                f.write(json.dumps({"id": msg_id, "ts": _now(), "pc": pc, "why": why,
+                                    "roll": roll}, ensure_ascii=False) + "\n")
+            msg = self.append("roll", "", pc=pc, event={"secret": True})
+        else:
+            event = {"roll": roll, "why": why}
+            if why_tr:
+                event["why_tr"] = why_tr
+            msg = self.append("roll", "", pc=pc, event=event)
+        self.set_stage("dice")
+        return {"ok": True, "result": result, "roll": roll, "message_id": msg["id"],
+                "secret": secret}
+
     def needs_translation(self, ids: Optional[List[int]] = None) -> List[Dict[str, Any]]:
         """Public player actions that some seated player can't read yet:
         [{id, pc, from, to: [langs], text}] — at a mixed table, or when someone writes
@@ -989,6 +1033,9 @@ def make_handler(state: TableState, code: str, host_key: str):
                                         data.get("title"))
                 self._announce_music(music)
                 return self._json({"ok": True, "music": music})
+            if path == "/api/gm/roll":
+                result = state.roll(data)
+                return self._json(result, 200 if result.get("ok") else 400)
             if path == "/api/gm/translate":
                 updated = state.translate(data.get("translations") or {})
                 return self._json({"ok": True, "updated": updated,
@@ -1224,6 +1271,34 @@ def _start_server(campaign_dir: Path, base: str, port: int, bind: str,
         sys.exit(f"[ERROR] The table server did not start: {state} (log above).")
     print("\nPlayers: open the link and enter the table code.")
     print("Friends elsewhere: run a tunnel (see: gm-table.sh help) and share its https link.")
+
+
+def roll_at_table(spec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Have the open table roll (lib/dice.py calls this). None when no table is
+    open for the active campaign — then the caller rolls locally as before."""
+    try:
+        camp = CampaignManager().get_active_campaign_dir()
+    except Exception:
+        return None
+    if camp is None:
+        return None
+    info = _server_info(Path(camp).resolve())
+    if not info or not _alive(info.get("pid")):
+        return None
+    req = urllib.request.Request(
+        f"http://127.0.0.1:{info['port']}/api/gm/roll", method="POST",
+        data=json.dumps(spec).encode("utf-8"),
+        headers={"X-Host-Key": info["host_key"], "Content-Type": "application/json"})
+    try:
+        with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(req, timeout=10) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        try:
+            return json.loads(e.read().decode("utf-8"))
+        except ValueError:
+            return {"ok": False, "error": f"HTTP {e.code}"}
+    except (urllib.error.URLError, OSError):
+        return None          # table unreachable: roll locally rather than fail the game
 
 
 def _wrong_campaign_hint(campaign_dir: Path, base: str) -> Optional[str]:

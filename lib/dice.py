@@ -6,7 +6,10 @@ Supports standard notation: 1d20, 3d6+2, 2d20kh1 (advantage), etc.
 
 import random
 import re
-from typing import List, Tuple, Dict
+from typing import List, Optional, Tuple, Dict
+
+# The operating system's random source: unpredictable, never seeded, fair.
+_rng = random.SystemRandom()
 
 # Import colors for formatted output
 try:
@@ -66,7 +69,7 @@ class DiceRoller:
             if sides < 1:
                 raise ValueError(f"Invalid die size: d{sides} (must be at least 1)")
             modifier = int(match.group(4)) if match.group(4) else 0
-            rolls = sorted([random.randint(1, sides) for _ in range(count)], reverse=True)
+            rolls = sorted([_rng.randint(1, sides) for _ in range(count)], reverse=True)
             kept = rolls[:keep]
             return {
                 'notation': notation,
@@ -85,7 +88,7 @@ class DiceRoller:
             if sides < 1:
                 raise ValueError(f"Invalid die size: d{sides} (must be at least 1)")
             modifier = int(match.group(4)) if match.group(4) else 0
-            rolls = sorted([random.randint(1, sides) for _ in range(count)])
+            rolls = sorted([_rng.randint(1, sides) for _ in range(count)])
             kept = rolls[:keep]
             return {
                 'notation': notation,
@@ -105,7 +108,7 @@ class DiceRoller:
                 raise ValueError(f"Invalid die size: d{sides} (must be at least 1)")
             modifier = int(match.group(3)) if match.group(3) else 0
 
-            rolls = [random.randint(1, sides) for _ in range(count)]
+            rolls = [_rng.randint(1, sides) for _ in range(count)]
             total = sum(rolls) + modifier
             
             result = {
@@ -179,24 +182,92 @@ def roll_formatted(notation: str) -> str:
     return _roller.format_result(result)
 
 
+def natural(result: Dict) -> Optional[int]:
+    """20 or 1 when a single d20 decided the roll (advantage/disadvantage: the kept die)."""
+    if not re.match(r"\d+d20(k[hl]1)?\b", result.get("notation", "").replace(" ", "")):
+        return None
+    dice = result.get("kept") if result.get("type") in ("advantage", "disadvantage") \
+        else result.get("rolls")
+    if not dice or len(dice) != 1:
+        return None
+    return dice[0] if dice[0] in (1, 20) else None
+
+
+def judge(result: Dict, target: Optional[int]) -> Optional[str]:
+    """'success' / 'failure' against a DC or AC set BEFORE the roll (meet or beat it).
+    A natural 20 always succeeds and a natural 1 always fails."""
+    if target is None:
+        return None
+    nat = natural(result)
+    if nat == 20:
+        return "success"
+    if nat == 1:
+        return "failure"
+    return "success" if result["total"] >= target else "failure"
+
+
+def describe(result: Dict, target: Optional[int], label: str = "DC") -> str:
+    """The roll line plus its verdict, for the terminal."""
+    line = DiceRoller().format_result(result)
+    if result.get("type") in ("advantage", "disadvantage") and natural(result):
+        line += " ⚔️ NATURAL 20!" if natural(result) == 20 else " 💀 NATURAL 1!"
+    verdict = judge(result, target)
+    if target is not None:
+        line += f"  vs {label} {target} — " + ("✓ SUCCESS" if verdict == "success" else "✗ FAILURE")
+    return line
+
+
 def main():
-    """CLI interface for dice rolling"""
+    """CLI: roll dice. With an online table open, the TABLE rolls them and shows
+    every roll to every player, with its DC/AC — fixed before the dice land."""
+    import argparse
     import sys
-    
-    if len(sys.argv) < 2:
-        print("Usage: dice.py <notation>")
-        print("Examples: 1d20, 3d6+2, 2d20kh1 (advantage), 2d20kl1 (disadvantage)")
-        sys.exit(1)
-    
+
+    parser = argparse.ArgumentParser(
+        description="Roll dice: 1d20+5, 3d6+2, 2d20kh1+3 (advantage), 2d20kl1 (disadvantage)")
+    parser.add_argument("notation")
+    target = parser.add_mutually_exclusive_group()
+    target.add_argument("--dc", type=int, help="Difficulty class, set before rolling")
+    target.add_argument("--ac", type=int, help="Armor class (attack rolls), set before rolling")
+    parser.add_argument("--for", dest="pc", help="Who is rolling (a PC or NPC name)")
+    parser.add_argument("--why", help="What the roll is for: 'Stealth', 'dagger damage'...")
+    parser.add_argument("--why-he", help="The same, in Hebrew (shown to Hebrew players)")
+    parser.add_argument("--why-en", help="The same, in English (shown to English players)")
+    parser.add_argument("--secret", action="store_true",
+                        help="A hidden roll: players see that the GM rolled, not the result")
+    parser.add_argument("--local", action="store_true",
+                        help="Roll here even if a table is open (not shown to players)")
+    args = parser.parse_args()
+
     roller = DiceRoller()
-    notation = sys.argv[1]
-    
     try:
-        result = roller.roll(notation)
-        print(roller.format_result(result))
+        roller.roll(args.notation)          # validate before anything is announced
     except ValueError as e:
         print(f"Error: {e}")
         sys.exit(1)
+    label = "AC" if args.ac is not None else "DC"
+    goal = args.ac if args.ac is not None else args.dc
+
+    if not args.local:
+        try:
+            from table_server import roll_at_table
+        except ImportError:
+            roll_at_table = None
+        shown = roll_at_table({
+            "notation": args.notation, "target": goal, "target_label": label,
+            "pc": args.pc, "why": args.why,
+            "why_tr": {k: v for k, v in (("he", args.why_he), ("en", args.why_en)) if v},
+            "secret": args.secret}) if roll_at_table else None
+        if shown is not None:
+            if not shown.get("ok"):
+                print(f"Error: {shown.get('error')}")
+                sys.exit(1)
+            print(describe(shown["result"], goal, label))
+            print("   (rolled by the table — every player saw it"
+                  + (", as a secret roll)" if args.secret else ")"))
+            return
+
+    print(describe(roller.roll(args.notation), goal, label))
 
 
 def _utf8_console() -> None:

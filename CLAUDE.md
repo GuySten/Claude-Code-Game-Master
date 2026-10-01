@@ -141,15 +141,26 @@ outcome is genuinely certain (trivial, or literally impossible).
   good outcome. The dice are why the world feels real.
 - Show the math in narration: `🎲 STR check: 14 + 3 = 17 vs DC 15 — ✓`.
 
-`uv run python lib/dice.py "[notation]"` — `1d20+5`, `2d20kh1+3` (advantage),
-`2d20kl1` (disadvantage), `3d6`. One roll per command. Never inline dice.
+`uv run python lib/dice.py "[notation]" [--dc N | --ac N] --for "<who>" --why "<what>"`
+— `1d20+5`, `2d20kh1+3` (advantage), `2d20kl1` (disadvantage), `3d6`. One roll per
+command. Never inline dice, never invent a number.
+- **The DC (or the target's AC) goes IN the roll command** — decided before the dice
+  land, never after seeing them: `dice.py "1d20+5" --dc 15 --for Pip --why Stealth`;
+  attacks `--ac 14`; damage/initiative have no target: `--for Pip --why "dagger damage"`.
+  The command prints the verdict (✓/✗, natural 20/1); narrate exactly that.
+- **With the online table open, the TABLE rolls** and shows every roll to every player
+  the moment you see it ("🎯 Pip — Stealth · DC 15 / 🎲 [12] + 5 = 17 ✓"). So: no silent
+  re-rolls (a re-roll only when a rule grants one, and say which); at a mixed table add
+  `--why-he "<Hebrew>"` (or `--why-en`). An NPC's hidden roll (an ambusher's Stealth):
+  `--secret` — players see that you rolled, not the result. Your narration's numbers
+  must match the posted roll.
 **Player-rolls mode:** scene context reports it. When ON, the player CHOOSES the
 roll; you still run the dice. Stop at the decision point and present it as a menu:
   1. Roll a <Stat> check with <+X stat / +Y other> bonuses. Target of <Z> or higher.
   Or something else... (a different action — which may itself demand its own roll).
 Spell out the stat, every applicable bonus, and the target DC. Do NOT ask the player
 to report a number — their choice is to COMMIT to the roll. Once they do: (1) narrate
-the START of the attempt, (2) run `uv run python lib/dice.py "1d20+<total>"` and show
+the START of the attempt, (2) run `uv run python lib/dice.py "1d20+<total>" --dc <Z> --for <PC>` and show
 the result line clearly, (3) narrate the outcome true to the roll (nat 20 fantastic,
 nat 1 horrible, meet/beat target = success). You roll hidden/NPC dice the same way. Player toggles
 anytime via `bash tools/gm-session.sh dice on|off|toggle` or natural language

@@ -477,3 +477,47 @@ def test_hp_changes_wait_for_the_narration_that_explains_them(table):
 
     PlayerManager(str(world)).modify_hp("Pip", +2)          # outside a turn: live, as before
     assert hp(pip)["Pip"] == 6
+
+
+def test_the_table_rolls_in_public_with_the_dc_fixed_first(table):
+    call, state = table["call"], table["state"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    status, body = call("/api/gm/roll", {"notation": "1d20+5", "target": 15, "target_label": "DC",
+                                         "pc": "Pip", "why": "Stealth",
+                                         "why_tr": {"he": "התגנבות"}}, host=True)
+    assert status == 200 and body["ok"]
+    roll = body["roll"]
+    assert roll["total"] == roll["rolls"][0] + 5 and roll["target"] == 15
+    assert roll["outcome"] == ("success" if roll["rolls"][0] == 20 or
+                               (roll["rolls"][0] != 1 and roll["total"] >= 15) else "failure")
+
+    # Every player sees it, DC and all, as it happens.
+    _, seen = call(f"/api/messages?code={CODE}&token={pip}&after=0")
+    shown = [m for m in seen["messages"] if m["kind"] == "roll"][-1]
+    assert shown["event"]["roll"] == roll and shown["event"]["why_tr"] == {"he": "התגנבות"}
+
+    # A secret roll is announced, but its result never reaches the players.
+    _, body = call("/api/gm/roll", {"notation": "1d20+7", "why": "the assassin's Stealth",
+                                    "secret": True}, host=True)
+    assert body["ok"] and body["secret"]
+    _, seen = call(f"/api/messages?code={CODE}&token={pip}&after=0")
+    secret = [m for m in seen["messages"] if m["kind"] == "roll"][-1]
+    assert secret["event"] == {"secret": True} and "assassin" not in json.dumps(secret)
+    kept = (table["camp"] / "table" / "secret-rolls.jsonl").read_text(encoding="utf-8")
+    assert "assassin" in kept and str(body["roll"]["total"]) in kept
+
+    assert call("/api/gm/roll", {"notation": "banana"}, host=True)[0] == 400
+    assert call("/api/gm/roll", {"notation": "1d20"})[0] == 403      # players can't roll as the GM
+
+
+def test_dice_natural_and_judge():
+    from lib import dice
+    assert dice.natural({"notation": "1d20+5", "type": "standard", "rolls": [20]}) == 20
+    assert dice.natural({"notation": "2d20kh1+3", "type": "advantage", "kept": [1],
+                         "rolls": [1, 1]}) == 1
+    assert dice.natural({"notation": "2d6", "type": "standard", "rolls": [1, 1]}) is None
+    assert dice.natural({"notation": "1d200", "type": "standard", "rolls": [20]}) is None
+    assert dice.judge({"notation": "1d20+9", "type": "standard", "rolls": [1], "total": 10}, 5) == "failure"
+    assert dice.judge({"notation": "1d20", "type": "standard", "rolls": [20], "total": 20}, 30) == "success"
+    assert dice.judge({"notation": "1d20+2", "type": "standard", "rolls": [13], "total": 15}, 15) == "success"
+    assert dice.judge({"notation": "2d6", "type": "standard", "rolls": [3, 4], "total": 7}, None) is None

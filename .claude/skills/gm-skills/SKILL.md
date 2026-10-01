@@ -17,7 +17,7 @@ The DC ladder below is 5e — use it only when the scene-context KIT block says 
 **Don't roll for:** trivial tasks, impossible tasks, routine professional work, or anything with no meaningful consequence for failure.
 
 ## Process
-1. Declare the DC BEFORE rolling. 2. Roll `uv run python lib/dice.py "1d20+[mod]"` (or via `game_core.resolve_check`). 3. Narrate by margin.
+1. Declare the DC BEFORE rolling — it goes in the roll itself: `uv run python lib/dice.py "1d20+[mod]" --dc [DC] --for "[PC]" --why "[skill]"` (at an open table the players see the DC and the roll together). 2. Read the printed verdict. 3. Narrate by margin.
 
 ## DC ladder
 Trivial 5 · Easy 10 · Moderate 15 · Hard 20 · Very Hard 25 · Nearly Impossible 30.

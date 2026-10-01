@@ -231,7 +231,11 @@ Copy, fill in the link and code, and send:
    actions, rolling dice, updating the sheets, writing the story) and roughly how long is
    left. The estimate comes from how long this table's GM really took on recent turns, so it
    gets more accurate as you play.
-8. The side panel shows everyone's **HP**. Refreshing the page keeps your seat. To switch
+8. **Every die roll is public.** The table itself rolls the dice and shows each roll to
+   everyone the moment the GM sees it — who rolled, for what, and the DC or AC, which is
+   set before the dice land ("🎯 Pip — Stealth · DC 15 · 🎲 [12] + 5 = 17 ✓"). A secret
+   roll (say, a hidden enemy) shows up as "the GM rolled in secret".
+9. The side panel shows everyone's **HP**. Refreshing the page keeps your seat. To switch
    devices, tap **Leave seat** first (or ask the host to free it).
 
 ## מדריך לשחקנים
@@ -252,7 +256,11 @@ Copy, fill in the link and code, and send:
 7. **בזמן שמנהל המשחק עובד**, פס מעל תיבת הטקסט מראה מה הוא עושה (קורא את הפעולות, מטיל
    קוביות, מעדכן את הדפים, כותב את הסיפור) וכמה זמן נשאר בערך. ההערכה מבוססת על כמה זמן
    מנהל המשחק של השולחן הזה באמת לקח בתורות האחרונים, כך שהיא נעשית מדויקת יותר במהלך המשחק.
-8. בפאנל הצד רואים את **נקודות החיים** של כולם. רענון הדף שומר לכם את המקום. כדי לעבור
+8. **כל הטלת קובייה גלויה.** השולחן עצמו מטיל את הקוביות ומראה כל הטלה לכולם ברגע שמנהל
+   המשחק רואה אותה — מי הטיל, בשביל מה, ודרגת הקושי או דרגת השריון, שנקבעת לפני שהקובייה
+   נוחתת ("🎯 Pip — התגנבות · דרגת קושי 15 · 🎲 [12] + 5 = 17 ✓"). הטלה סודית (למשל אויב
+   נסתר) מופיעה כ"מנהל המשחק הטיל קובייה בסתר".
+9. בפאנל הצד רואים את **נקודות החיים** של כולם. רענון הדף שומר לכם את המקום. כדי לעבור
    למכשיר אחר, לחצו קודם **עזיבת המושב** (או בקשו מהמארח לפנות אותו).
 
 ---
