@@ -40,7 +40,8 @@ def resolve_campaign_dir(world_state_dir: str = "world-state"):
 def appearance_line(name: str, campaign_dir=None) -> str:
     """Return the 'character bible' line for a character by name.
 
-    Looks up the active PC (character.json) first, then NPCs (npcs.json), and
+    Looks up the player characters (character.json, then players/*.json)
+    first, then NPCs (npcs.json), and
     renders the canonical visual_appearance block as one prompt-ready line.
     Returns "" if the name is unknown or has no appearance authored yet.
     """
@@ -49,16 +50,12 @@ def appearance_line(name: str, campaign_dir=None) -> str:
         return ""
     campaign_dir = Path(campaign_dir)
 
-    # PC first.
-    char_path = campaign_dir / "character.json"
-    if char_path.exists():
-        try:
-            char = json.loads(char_path.read_text(encoding="utf-8"))
-            if str(char.get("name", "")).strip().lower() == name.strip().lower():
-                return va_mod.format_line(char.get("name", name),
-                                          char.get("visual_appearance"))
-        except (OSError, ValueError):
-            pass
+    # PCs first (the lead, then any other players' characters).
+    import party_roster
+    for _path, char in party_roster.all_pcs(campaign_dir):
+        if str(char.get("name", "")).strip().lower() == name.strip().lower():
+            return va_mod.format_line(char.get("name", name),
+                                      char.get("visual_appearance"))
 
     # Then NPCs (case-insensitive key match).
     npcs_path = campaign_dir / "npcs.json"

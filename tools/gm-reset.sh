@@ -50,7 +50,7 @@ STORY_FILES=(
     world-tick-log.json
     loremaster-cache.json
 )
-STORY_DIRS=(saves fallen characters)
+STORY_DIRS=(saves fallen characters players departed)
 
 show_usage() {
     echo "Usage: gm-reset.sh <action> [--yes]"

@@ -21,14 +21,44 @@ case "$ACTION" in
         ;;
 
     "save-json")
-        # Save character from JSON data
+        # Save character from JSON data. --join seats it as another player's PC.
+        JOIN_FLAG=""
+        if [ "$1" = "--join" ]; then JOIN_FLAG="--join"; shift; fi
         CHARACTER_JSON="$*"
         if [ -z "$CHARACTER_JSON" ]; then
-            echo "Usage: gm-player.sh save-json '<json_data>'"
+            echo "Usage: gm-player.sh save-json [--join] '<json_data>'"
             echo "Example: gm-player.sh save-json '{\"name\":\"Thorin\",\"race\":\"Dwarf\",\"class\":\"Fighter\",\"level\":1}'"
+            echo "         --join adds the sheet as another player's character (multiplayer)"
             exit 1
         fi
-        $PYTHON_CMD "$PROJECT_ROOT/features/character-creation/save_character.py" "$CHARACTER_JSON"
+        $PYTHON_CMD "$PROJECT_ROOT/features/character-creation/save_character.py" $JOIN_FLAG "$CHARACTER_JSON"
+        ;;
+
+    "join")
+        # Multiplayer: seat another player's character (same three doors as onboard).
+        if [ -z "$1" ]; then
+            echo "Usage: gm-player.sh join canon <npc_name>"
+            echo "       gm-player.sh join original <name> [\"one-line concept\"]"
+            echo "       gm-player.sh join nameless"
+            echo ""
+            echo "Adds another player's PC to the table (players/<name>.json); the lead PC stays."
+            exit 1
+        fi
+        $PYTHON_CMD "$LIB_DIR/identity_onboarding.py" onboard "$@" --join
+        ;;
+
+    "party")
+        # Every player character at the table, lead first (--json for full sheets).
+        $PYTHON_CMD "$LIB_DIR/player_manager.py" party "$@"
+        ;;
+
+    "leave")
+        if [ -z "$1" ]; then
+            echo "Usage: gm-player.sh leave <character_name>"
+            echo "A player leaves the table: their PC is archived to departed/."
+            exit 1
+        fi
+        $PYTHON_CMD "$LIB_DIR/player_manager.py" leave "$@"
         ;;
 
     "onboard")
@@ -88,7 +118,7 @@ case "$ACTION" in
 
     "vital")
         if [ -z "$1" ]; then
-            echo "Usage: gm-player.sh vital <vital_name> [<+/-amount> | set <value>]"
+            echo "Usage: gm-player.sh vital <vital_name> [<+/-amount> | set <value>] [--name <pc>]"
             echo "Example: gm-player.sh vital vigor -2      (spend 2 vigor)"
             echo "Example: gm-player.sh vital corruption +1 (gain 1 corruption)"
             echo "Example: gm-player.sh vital vigor set 5   (set vigor to 5)"
@@ -131,8 +161,9 @@ case "$ACTION" in
 
     "become")
         if [ -z "$1" ]; then
-            echo "Usage: gm-player.sh become <party_member_name>"
+            echo "Usage: gm-player.sh become <party_member_name> [--for <fallen_pc_name>]"
             echo "Take over a party member as the active PC (Death Protocol hand-off)."
+            echo "Multiplayer: --for names whose PC is being replaced (default: the lead PC)."
             echo "Archives the fallen PC to the campaign's fallen/ dir."
             exit 1
         fi
@@ -212,26 +243,30 @@ case "$ACTION" in
         echo "Usage: gm-player.sh <action> [args]"
         echo ""
         echo "Actions:"
-        echo "  show [name] [--json]         - Show summary (or full record with --json)"
+        echo "  show [name] [--json]         - Show summary (all PCs if no name; full record with --json)"
+        echo "  party [--json]               - Every player character at the table (multiplayer)"
+        echo "  join <mode> [args]           - Seat another player's PC (canon <npc> | original <name> [concept] | nameless)"
+        echo "  leave <name>                 - Another player leaves; their PC is archived to departed/"
         echo "  get <name>                   - Get full character JSON"
         echo "  list                         - List all player IDs"
         echo "  onboard <mode> [args]        - Identity-first entry (canon <npc> | original <name> [concept] | nameless; --replace to swap PCs)"
-        echo "  set <name>                   - Set character as current active PC"
+        echo "  set <name>                   - Set character as current active (lead) PC"
         echo "  xp <name> +<amount>          - Award XP to character"
         echo "  award [name] --tier T        - Spectacle XP for a clever/effective/unique/punishing beat (T=minor|major|legendary; --reason \"...\"; co-awards followers)"
         echo "  hp <name> <+/-amount>        - Modify character HP"
         echo "  vital <vital> <+/-N|set N>   - Read/change a kit vital (vigor, corruption, ...)"
         echo "  kill <name> [--cause ...]    - Mark PC dead (then run Death Protocol)"
         echo "  revive <name> [--hp N]       - Bring a dead PC back (--reason \"...\"; HP defaults to 1)"
-        echo "  become <party_member>        - Take over a party member as the active PC"
+        echo "  become <party_member> [--for <pc>] - Take over a party member (replaces the lead, or <pc>)"
         echo "  gold <name> [+/-amount]      - Modify or show character gold"
         echo "  inventory [name] [action]    - Manage inventory (add/remove/list; defaults to active PC + list)"
         echo "  condition <name> <action>    - Manage conditions (add/remove/list)"
         echo "  loot <name> --gold X --items - Batch add items + gold at once"
         echo "  level-check <name>           - Check XP and level status"
-        echo "  save-json '<json>'           - Save complete character from JSON"
+        echo "  save-json [--join] '<json>'  - Save complete character from JSON (--join: another player's PC)"
         echo ""
-        echo "Note: Character is stored in the active campaign's character.json"
+        echo "Note: The lead PC is stored in the active campaign's character.json;"
+        echo "      other players' PCs in players/<name>.json. Every <name> picks the PC."
         ;;
 esac
 

@@ -148,6 +148,12 @@ class CampaignManager:
                 except (json.JSONDecodeError, IOError) as e:
                     print(f"[WARNING] Could not read character for {campaign_dir.name}: {e}", file=sys.stderr)
 
+            # Other players' characters (multiplayer campaigns only)
+            import party_roster
+            extras = party_roster.extra_pcs(campaign_dir)
+            if extras:
+                campaign_info["other_players"] = [d.get("name", p.stem) for p, d in extras]
+
             campaigns.append(campaign_info)
 
         return campaigns
@@ -322,6 +328,12 @@ class CampaignManager:
                     info["character"] = to_flat(json.load(f))
             except (json.JSONDecodeError, IOError) as e:
                 print(f"[WARNING] Could not read character for {name}: {e}", file=sys.stderr)
+
+        # Other players' characters (multiplayer campaigns only)
+        import party_roster
+        extras = party_roster.extra_pcs(campaign_path)
+        if extras:
+            info["other_players"] = [to_flat(d) for _p, d in extras]
 
         # Count NPCs, locations, etc.
         for filename in ["npcs.json", "locations.json", "facts.json"]:
@@ -509,6 +521,9 @@ def main():
                 if "character" in c:
                     char = c["character"]
                     char_info = f"{char['name']} ({char['race']} {char['class']} L{char['level']})"
+                    others = c.get("other_players") or []
+                    if others:
+                        char_info += f" +{len(others)} player{'s' if len(others) > 1 else ''}"
                 sessions = c.get("session_count", 0)
                 print(f"{marker} {c['name']:20}{char_info:25}{sessions}")
             print()

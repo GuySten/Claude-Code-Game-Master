@@ -87,9 +87,11 @@ class WorldStats:
                     if plot_type in PLOT_TYPES:
                         counts[f"plots_{plot_type}"] += 1
 
-        # Characters (single character.json per campaign)
-        if self.character_file.exists():
-            counts["characters"] = 1
+        # Characters (the lead character.json + any other players' PCs)
+        import party_roster
+        n_pcs = len(party_roster.all_pcs(self.world_state_dir))
+        if n_pcs:
+            counts["characters"] = n_pcs
 
         # Sessions
         session_log = self.world_state_dir / "session-log.md"
@@ -176,15 +178,16 @@ class WorldStats:
             details["active_plots"] = active_plots
             details["plots_total"] = len(plots)
 
-        # Characters (single character.json per campaign)
-        if self.character_file.exists():
-            char_data = self.json_ops.load_json("character.json")
+        # Characters (the lead character.json + any other players' PCs)
+        import party_roster
+        pcs = party_roster.all_pcs(self.world_state_dir)
+        if pcs:
             details["characters"] = [{
                 "name": char_data.get("name", "Unknown"),
                 "level": char_data.get("level", 1),
                 "race": char_data.get("race", "Unknown"),
                 "class": char_data.get("class", "Unknown")
-            }]
+            } for _path, char_data in pcs]
 
         return details
 

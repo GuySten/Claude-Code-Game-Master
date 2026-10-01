@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from entity_manager import EntityManager, npcs_present
 from character_schema import to_flat
+import party_roster
 from schemas import PLOT_TYPE_SORT
 from world_kit import WorldKit
 
@@ -364,11 +365,11 @@ class SessionManager(EntityManager):
 
         self.json_ops.save_json(self.campaign_file, campaign)
 
-        # Update the active character's location if a sheet exists
-        if self.character_file.exists():
-            char_data = to_flat(self.json_ops.load_json("character.json"))
+        # Update every player character's location (the party moves together)
+        for path, raw in party_roster.all_pcs(self.campaign_dir):
+            char_data = to_flat(raw)
             char_data['current_location'] = location
-            self.json_ops.save_json("character.json", char_data)
+            self.json_ops.save_json(str(path), char_data)
 
         result = {
             "previous_location": old_location,
@@ -855,19 +856,21 @@ class SessionManager(EntityManager):
                 flag = "  ⚠ FULL — a beat is due" if cur >= mx else ""
                 lines.append(f"{clock_name}: [{bar}] {cur}/{mx}{flag}")
 
-        # --- Character ---
+        # --- Character(s) ---
+        pcs = [to_flat(raw) for _, raw in party_roster.all_pcs(self.campaign_dir)]
         lines.append("")
-        lines.append("--- CHARACTER ---")
-        char = None
-        if self.character_file.exists():
-            import json as _json
-            try:
-                with open(self.character_file, 'r', encoding='utf-8') as f:
-                    char = to_flat(_json.load(f))
-            except (ValueError, IOError):
-                pass
+        if len(pcs) > 1:
+            lines.append(f"--- PLAYER CHARACTERS ({len(pcs)} players at the table) ---")
+            lines.append("Each PC is a different human player. Address them by character "
+                         "name, give every player a turn, and pass the PC's name to every "
+                         "gm-player.sh call.")
+        else:
+            lines.append("--- CHARACTER ---")
 
-        if char:
+        for idx, char in enumerate(pcs or [None]):
+            if char is None:
+                lines.append("No character found.")
+                continue
             name = char.get('name', 'Unknown')
             level = char.get('level', 1)
             race = char.get('race', '?')
@@ -884,10 +887,11 @@ class SessionManager(EntityManager):
             gold = char.get('gold', 0)
             conditions = char.get('conditions', [])
             cond_str = ', '.join(conditions) if conditions else '(none)'
-            lines.append(f"{name} - Level {level} {race} {cls} | HP: {hp_cur}/{hp_max} | AC: {ac} | XP: {xp_val} | Gold: {gold}")
+            seat = "" if len(pcs) == 1 else ("[lead] " if idx == 0 else "[player] ")
+            status = char.get('status')
+            status_str = f" | {status.upper()}" if status in ('dying', 'dead') else ""
+            lines.append(f"{seat}{name} - Level {level} {race} {cls} | HP: {hp_cur}/{hp_max} | AC: {ac} | XP: {xp_val} | Gold: {gold}{status_str}")
             lines.append(f"Conditions: {cond_str}")
-        else:
-            lines.append("No character found.")
 
         # --- Party Members ---
         lines.append("")
@@ -1462,18 +1466,37 @@ class SessionManager(EntityManager):
         return history[-count:] if history else []
 
     def _load_all_characters(self) -> Dict[str, Any]:
-        """Load the active PC for a snapshot, keyed 'character'."""
-        if self.character_file.exists():
-            return {"character": self.json_ops.load_json("character.json")}
-        return {}
+        """Load every PC for a snapshot: the lead keyed 'character', the other
+        players' PCs under 'players' (filename -> sheet). 'players' is always
+        present alongside a lead so a restore puts the table back exactly."""
+        if not self.character_file.exists():
+            return {}
+        players = {path.name: data
+                   for path, data in party_roster.extra_pcs(self.campaign_dir)}
+        return {"character": self.json_ops.load_json("character.json"),
+                "players": players}
 
     def _restore_characters(self, characters: Dict[str, Any]) -> None:
-        """Restore the active PC from a snapshot."""
+        """Restore the PCs from a snapshot. Snapshots that predate multiplayer
+        carry no 'players' key and leave players/ untouched."""
         import json
 
         if 'character' in characters:
             with open(self.character_file, 'w', encoding='utf-8') as f:
                 json.dump(characters['character'], f, indent=2)
+        players = characters.get('players')
+        if isinstance(players, dict):
+            pdir = party_roster.players_dir(self.campaign_dir)
+            if pdir.is_dir():
+                for stale in pdir.glob("*.json"):
+                    stale.unlink()
+            for filename, sheet in players.items():
+                fname = Path(str(filename)).name
+                if not fname.endswith(".json") or not isinstance(sheet, dict):
+                    continue
+                pdir.mkdir(parents=True, exist_ok=True)
+                with open(pdir / fname, 'w', encoding='utf-8') as f:
+                    json.dump(sheet, f, indent=2)
 
     def _find_save(self, name: str) -> Optional[Path]:
         """Find a save file by name or partial match.

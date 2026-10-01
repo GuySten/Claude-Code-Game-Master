@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from entity_manager import EntityManager
 from character_schema import to_flat
+import party_roster
 
 
 def _default_vitals() -> Dict[str, Any]:
@@ -120,6 +121,44 @@ class IdentityOnboarding(EntityManager):
             npcs[npc_name]["became_pc"] = True
             self.json_ops.save_json("npcs.json", npcs)
 
+    def join(self, mode: str, **kw) -> Dict[str, Any]:
+        """Seat ANOTHER player's character at the table (multiplayer).
+
+        Same three doors as onboard. With no lead PC yet this is just onboard;
+        otherwise the new PC is written to players/<slug>.json and the lead is
+        left alone. Names must be unique across the table.
+        """
+        if not self.json_ops.load_json("character.json"):
+            return self.onboard(mode, **kw)
+
+        char = self.build(mode, **kw)
+        if char is None:
+            return {"success": False,
+                    "error": f'no NPC named "{kw.get("npc_name", "")}" in this campaign'}
+        flat = to_flat(char)
+        name = flat.get("name", "")
+        if mode == "nameless":
+            # Several strangers may walk in; keep each one addressable.
+            base, n = name, 2
+            while party_roster.find_pc(self.campaign_dir, name) is not None:
+                name, n = f"{base} ({n})", n + 1
+            flat["name"] = name
+        elif party_roster.find_pc(self.campaign_dir, name) is not None:
+            return {"success": False,
+                    "error": f'a player character named "{name}" is already at the table'}
+
+        overview = self.json_ops.load_json("campaign-overview.json") or {}
+        location = overview.get("player_position", {}).get("current_location")
+        if location:
+            flat.setdefault("current_location", location)
+        path = party_roster.extra_path_for(self.campaign_dir, name)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if not self.json_ops.save_json(str(path), flat):
+            return {"success": False, "error": f"failed to save players/{path.name}"}
+        if char.get("origin") == "canon":
+            self._mark_as_pc(name)
+        return {"success": True, "character": flat, "archived": None, "seat": "player"}
+
     def onboard(self, mode: str, replace: bool = False, **kw) -> Dict[str, Any]:
         """Build + persist an identity, wiring it in the way become() wires a swap.
 
@@ -131,7 +170,8 @@ class IdentityOnboarding(EntityManager):
         if existing and not replace:
             who = existing.get("name", "an existing character")
             return {"success": False,
-                    "error": f'this campaign already plays "{who}" — pass --replace to hand the story to someone new'}
+                    "error": f'this campaign already plays "{who}" — pass --replace to hand the story '
+                             f'to someone new, or --join to seat another player alongside them'}
 
         char = self.build(mode, **kw)
         if char is None:
@@ -159,7 +199,7 @@ class IdentityOnboarding(EntityManager):
             from opening_seed import reseed_opening
             reseed_opening(str(self.campaign_dir), saved)
 
-        return {"success": True, "character": saved, "archived": archived}
+        return {"success": True, "character": saved, "archived": archived, "seat": "lead"}
 
 
 _SUMMARY_KEYS = ('name', 'race', 'class', 'level', 'hp', 'ac', 'stats',
@@ -179,8 +219,11 @@ def main():
                          help='canon: the NPC to play · original: the character name')
     onboard.add_argument('concept', nargs='?', default='',
                          help='original: a one-line concept')
-    onboard.add_argument('--replace', action='store_true',
-                         help='hand the story to a new PC (archives the current one to fallen/)')
+    seat = onboard.add_mutually_exclusive_group()
+    seat.add_argument('--replace', action='store_true',
+                      help='hand the story to a new PC (archives the current one to fallen/)')
+    seat.add_argument('--join', action='store_true',
+                      help="seat another player's character alongside the existing PC(s)")
 
     from cli_output import wants_json, strip_json_flag, emit, emit_error
     json_mode = wants_json()
@@ -205,7 +248,10 @@ def main():
     else:
         kw = {}
 
-    result = manager.onboard(args.mode, replace=args.replace, **kw)
+    if args.join:
+        result = manager.join(args.mode, **kw)
+    else:
+        result = manager.onboard(args.mode, replace=args.replace, **kw)
     if not result['success']:
         sys.exit(emit_error(result['error'], json_mode))
 
@@ -214,9 +260,12 @@ def main():
     if result['archived']:
         summary['archived'] = result['archived']
     hp = saved.get('hp') or {}
+    summary['seat'] = result.get('seat', 'lead')
     message = (f"✓ {saved.get('name', 'Unknown')} enters the world "
                f"({saved.get('origin', 'original')} · level {saved.get('level', 1)} · "
                f"HP {hp.get('current', '?')}/{hp.get('max', '?')})")
+    if result.get('seat') == 'player':
+        message += "\n  Joins the table as another player's character."
     if result['archived']:
         message += f"\nArchived the outgoing hero to: {result['archived']}"
     emit(summary, message=message, json_mode=json_mode)

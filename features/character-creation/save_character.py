@@ -3,6 +3,8 @@
 Save D&D character to world-state JSON files
 Handles complete character creation with proper calculations
 Supports multi-campaign system (saves to active campaign's character.json)
+Multiplayer: --join seats the sheet as another player's PC (players/<slug>.json);
+re-saving a sheet whose name matches an existing PC updates that PC in place.
 """
 
 import json
@@ -15,6 +17,7 @@ lib_path = Path(__file__).parent.parent.parent / "lib"
 sys.path.insert(0, str(lib_path))
 
 from campaign_manager import CampaignManager
+import party_roster
 from world_kit import WorldKit
 import visual_appearance as va_mod
 
@@ -104,8 +107,9 @@ def create_character_id(name):
     """Convert character name to file-safe ID"""
     return name.lower().replace(' ', '-').replace("'", '').replace('"', '')
 
-def save_character(character_data):
-    """Save character to campaign's character.json file"""
+def save_character(character_data, join=False):
+    """Save character to campaign's character.json file (or, with ``join``, to
+    players/<slug>.json as another player's character)."""
 
     # The active kit decides which derivations are legitimate. 5e hit dice and
     # saving throws belong to dnd5e; every other world declares its own.
@@ -176,8 +180,18 @@ def save_character(character_data):
 
     # Determine save path based on campaign system
     if campaign_mgr.get_active():
-        # New format: save to character.json in campaign folder
-        file_path = campaign_dir / "character.json"
+        # New format: character.json in the campaign folder is the lead PC.
+        # A sheet that already belongs to a PC at the table updates that PC;
+        # --join seats a NEW sheet as another player's character.
+        lead_file = campaign_dir / "character.json"
+        existing = party_roster.find_pc(campaign_dir, character['name'])
+        if existing is not None:
+            file_path = existing
+        elif join and lead_file.exists():
+            file_path = party_roster.extra_path_for(campaign_dir, character['name'])
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+        else:
+            file_path = lead_file
     else:
         # Legacy format: save to characters/<name>.json
         characters_dir = Path("world-state/characters")
@@ -203,8 +217,12 @@ def save_character(character_data):
 def main():
     """CLI interface for character saving"""
     
+    join = '--join' in sys.argv[1:]
+    if join:
+        sys.argv = [a for a in sys.argv if a != '--join']
+
     if len(sys.argv) < 2:
-        print("Usage: save_character.py '<character_json>' or save_character.py --stdin")
+        print("Usage: save_character.py [--join] '<character_json>' or save_character.py [--join] --stdin")
         print("Example: save_character.py '{\"name\":\"Thorin\",\"race\":\"Dwarf\",\"class\":\"Fighter\",\"level\":1,\"stats\":{\"str\":16,\"dex\":12,\"con\":15,\"int\":10,\"wis\":13,\"cha\":8}}'")
         sys.exit(1)
     
@@ -217,7 +235,7 @@ def main():
             character_json = sys.argv[1]
         
         character_data = json.loads(character_json)
-        result = save_character(character_data)
+        result = save_character(character_data, join=join)
         
         print(json.dumps(result, indent=2))
         
