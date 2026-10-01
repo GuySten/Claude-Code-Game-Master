@@ -452,9 +452,9 @@ Copy, fill in the link and code, and send:
    portrait, abilities, skills, features, spells, equipment (with pictures of special
    treasures) and conditions. Another player's character shows only what the party sees of
    them (portrait, race, class, level, HP, conditions): their sheet is theirs. It follows the story too, and whatever just changed flashes. It's
-   in your language: in Hebrew, skills, abilities, classes, races and conditions are always in
-   Hebrew, and the rest of what's written on it is translated (the very first time that can
-   take a few seconds).
+   in your language, whichever language it was written in: anything else on it is translated
+   (the very first time that can take a few seconds), and in Hebrew, skills, abilities,
+   classes, races and conditions are always in Hebrew.
 10. **Levelling up.** When you earn a level (the GM awards the XP), the story tells you and
     **⬆** appears next to your name. Your sheet shows your XP as *300 / 900*. Open it and tap
     **Level up**: roll your hit die at the table (or take the average), pick your
@@ -532,9 +532,9 @@ Copy, fill in the link and code, and send:
    דיוקן, תכונות, מיומנויות, יכולות, לחשים, ציוד (עם תמונות של אוצרות מיוחדים) ומצבים. דמות של
    שחקן אחר מראה רק את מה שהחבורה רואה (דיוקן, גזע, מקצוע, דרגה, נקודות חיים, מצבים): הדף שלה
    שייך לה. גם הוא
-   מתעדכן יחד עם הסיפור, ומה שהשתנה עכשיו מהבהב. הדף בשפה שלכם: בעברית, מיומנויות, תכונות,
-   מקצועות, גזעים ומצבים תמיד בעברית, ושאר מה שכתוב בו מתורגם (בפעם הראשונה זה עשוי לקחת כמה
-   שניות).
+   מתעדכן יחד עם הסיפור, ומה שהשתנה עכשיו מהבהב. הדף בשפה שלכם, לא משנה באיזו שפה הוא נכתב: מה
+   שכתוב בשפה אחרת מתורגם (בפעם הראשונה זה עשוי לקחת כמה שניות), ובעברית מיומנויות, תכונות,
+   מקצועות, גזעים ומצבים תמיד בעברית.
 10. **עלייה בדרגה.** כשאתם מרוויחים דרגה (מנהל המשחק מעניק את נקודות הניסיון), הסיפור מודיע
     לכם ומופיע **⬆** ליד השם שלכם. הדף מראה את הניסיון כ־*300 / 900*. פתחו אותו ולחצו **עלייה
     בדרגה**: הטילו את קוביית החיים ליד השולחן (או קחו את הממוצע), בחרו שיפורי תכונות כשהמקצוע

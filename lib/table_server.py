@@ -1522,9 +1522,7 @@ class TableState:
         found = self.sheet_for(viewer, name)          # (another's: only what's public)
         if found is None:
             return None
-        if lang == "en":
-            return {"tr": {}, "pending": False}
-        strings = sheet_strings(found["sheet"])
+        strings = sheet_strings(found["sheet"], lang)
         with self.lock:
             known = self._sheet_tr(lang)
             tr = {s: known[s] for s in strings if s in known}
@@ -2121,15 +2119,17 @@ def _pretty_key(k: Any) -> str:
     return s[:1].upper() + s[1:]
 
 
-def sheet_strings(sheet: Dict[str, Any]) -> List[str]:
-    """The English words a player sees on a sheet: its values and the labels of its
-    keys (numbers, dice and all-Hebrew text left out). A phrase that mixes the two
-    ("Fire Bolt (קרן אש, 1d10)") is in: it comes back all in the reader's language."""
+def sheet_strings(sheet: Dict[str, Any], lang: str = "he") -> List[str]:
+    """What a ``lang`` reader would find in another language on a sheet: its values
+    and the labels of its keys (numbers and dice left out). For Hebrew, whatever has
+    English words; for English, whatever has Hebrew. A phrase that mixes the two
+    ("Fire Bolt (קרן אש, 1d10)") is in either way: it comes back all in ``lang``."""
     out: List[str] = []
+    foreign = re.compile(r"[\u0590-\u05FF]") if lang == "en" else re.compile(r"[A-Za-z]{2,}")
 
     def add(s: Any) -> None:
         s = str(s).strip()
-        if s and len(s) <= 800 and re.search(r"[A-Za-z]{2,}", s):
+        if s and len(s) <= 800 and foreign.search(s):
             out.append(s)
 
     def walk(v: Any) -> None:

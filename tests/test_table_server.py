@@ -1504,6 +1504,31 @@ def test_sheet_strings_are_the_words_a_player_reads():
     for s in ("Halfling", "Race", "Spell slots", "Stealth", "Shortsword", "Damage", "Thieves' tools", "Str",
               "Fire Bolt (קרן אש, 1d10)"):                  # a mixed phrase: translated whole
         assert s in got, s
+    # An English reader: what's in Hebrew (or mixed) gets translated the other way.
+    sheet = {"race": "Halfling", "features": ["נשיפת דרקון: 2d6"], "spells": ["Fire Bolt (קרן אש, 1d10)"],
+             "equipment": ["Shortsword"]}
+    assert table_server.sheet_strings(sheet, "en") == ["נשיפת דרקון: 2d6", "Fire Bolt (קרן אש, 1d10)"]
+
+
+def test_an_english_reader_gets_the_hebrew_on_a_sheet_in_english(table):
+    call, state, camp = table["call"], table["state"], table["camp"]
+    path = camp / "character.json"
+    sheet = json.loads(path.read_text())
+    sheet.update({"features": ["נשיפת דרקון: 2d6, פעם במנוחה"], "spells": ["Light"]})
+    path.write_text(json.dumps(sheet))
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    seen = []
+
+    def ask(system, prompt):
+        seen.append(system)
+        return json.dumps({k: "Dragon Breath: 2d6, once per rest" for k in json.loads(prompt)})
+
+    state.narrator_ask = ask
+    state.cards_warmed.add("Pip")
+    assert wait_for(lambda: not call(f"/api/sheet-tr?code={CODE}&token={pip}&pc=Pip")[1]["pending"])
+    tr = call(f"/api/sheet-tr?code={CODE}&token={pip}&pc=Pip")[1]["tr"]
+    assert tr == {"נשיפת דרקון: 2d6, פעם במנוחה": "Dragon Breath: 2d6, once per rest"}
+    assert "into English" in seen[0]
 
 
 def test_the_host_wrapper_knows_every_table_command():

@@ -156,8 +156,8 @@ again remember about tell said say name called mean happened happen""".split())
 
 
 TRANSLATE_RULES = """You translate the text of a tabletop role-playing game's character sheet \
-from English into {lang}. Some strings already mix in {lang} words: give those entirely in \
-{lang} too, without repeating anything. You get a JSON object of numbered strings, like {{"1": "Stealth", \
+into {lang} (from English or Hebrew). Some strings mix the two languages: give those entirely \
+in {lang}, without repeating anything. You get a JSON object of numbered strings, like {{"1": "Stealth", \
 "2": "Fire Bolt (1d10)"}}. Reply with ONLY a JSON object with the same numbers, each mapped to \
 its translation, like {{"1": "...", "2": "..."}}. Translate every one. Use the usual {lang} terms \
 of role-playing games (Dungeons & Dragons) where they exist. Keep numbers, dice (1d8+2) and \
@@ -170,7 +170,7 @@ def translate(strings: List[str], lang: str,
     """{english: translation} for ``strings`` (character-sheet text) — what the
     model answered; {} for English, with no model, or on an unreadable answer."""
     source = "test" if ask else backend()
-    if lang == "en" or not strings or source == "off":
+    if not strings or source == "off":
         return {}
     system = TRANSLATE_RULES.format(lang=LANG_NAMES.get(lang, lang))
     # Numbered: the answer comes back by number, so a phrase the model retypes a

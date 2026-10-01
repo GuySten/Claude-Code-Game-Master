@@ -1673,7 +1673,7 @@
   let sheetShown = null, sheetTrTimer = null;
   async function loadSheetTr(name, tries = 0) {
     clearTimeout(sheetTrTimer);
-    if (lang === "en" || sheetFor !== name) return;
+    if (sheetFor !== name) return;
     const r = await api("/api/sheet-tr?pc=" + encodeURIComponent(name));
     if (!r.ok || sheetFor !== name) return;
     let added = 0;
@@ -2594,7 +2594,11 @@
       sheetTr.clear();
       loreCards.clear();
       applyLang();
-      if (me) { api("/api/lang", { lang }); rerenderLog(); refreshInfo(); updateProgress(); fitTextDir(); }
+      if (me) {
+        api("/api/lang", { lang }).then(() => { if (sheetFor && $("sheet").open) loadSheetTr(sheetFor); });
+        rerenderLog(); refreshInfo(); updateProgress(); fitTextDir();
+        if (sheetShown && $("sheet").open) renderSheet(sheetShown, true);   // its words, now in this language
+      }
       if (!$("seat-cards").classList.contains("hidden")) refreshSeats();
     };
   });
