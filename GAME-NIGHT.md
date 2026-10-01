@@ -220,8 +220,10 @@ Copy, fill in the link and code, and send:
    Talk the way you'd talk at a table: *"I sneak up behind the guard and try to grab his
    keys."* Typo, or the microphone misheard you? Tap **✏️** on your message to fix it —
    you can until the GM answers it.
-4. **Listen.** **🔊** reads the story aloud. **🎵** turns the music on/off; the
-   volume, reading speed and voices are in the side panel (tap **Party** on a phone).
+4. **Listen.** **🔊** reads the story aloud. Hebrew is read by a natural voice that the
+   host's computer makes (🌐 Hila or Avri); English uses your device's voice. **🎵**
+   turns the music on/off. The volume, reading speed and voices are in the side panel (tap
+   **Party** on a phone).
 5. **Secrets.** Tick **"Only the GM sees this"** to whisper to the GM. Purple messages are
    whispers only you can see.
 6. **Language.** **עברית / English** switches the whole page, your microphone, and the
@@ -248,8 +250,9 @@ Copy, fill in the link and code, and send:
    לדבר (בטלו את "לשלוח כשאני מסיים/ת לדבר" אם אתם רוצים לבדוק את הטקסט קודם). דברו כמו ליד
    שולחן אמיתי: *"אני מתגנב מאחורי השומר ומנסה לחטוף לו את המפתחות."* טעות הקלדה, או
    שהמיקרופון לא הבין אתכם? לחצו **✏️** על ההודעה כדי לתקן — אפשר עד שמנהל המשחק עונה עליה.
-4. **הקשיבו.** **🔊** מקריא את הסיפור. **🎵** מפעיל ומכבה את המוזיקה; עוצמה, מהירות הקראה
-   וקולות נמצאים בפאנל הצד (בטלפון: לחצו **החבורה**).
+4. **הקשיבו.** **🔊** מקריא את הסיפור. את העברית מקריא קול טבעי שהמחשב של המארח מייצר
+   (🌐 הילה או אברי); אנגלית מוקראת בקול של המכשיר. **🎵** מפעיל ומכבה את המוזיקה. עוצמה,
+   מהירות הקראה וקולות נמצאים בפאנל הצד (בטלפון: לחצו **החבורה**).
 5. **סודות.** סמנו **"רק מנהל המשחק יראה"** כדי ללחוש למנהל המשחק. הודעות סגולות הן לחישות
    שרק אתם רואים.
 6. **שפה.** **English / עברית** מחליף את כל הדף, את המיקרופון ואת השפה שבה מנהל המשחק עונה
@@ -298,12 +301,15 @@ firewall may block port 8765 — use the tunnel link instead.
 Safari. If the browser asked for microphone permission and it was refused, allow it from
 the icon in the address bar.
 
-**Hebrew is read with an English-sounding voice.** The device has no Hebrew voice installed:
+**Hebrew is read with an English-sounding voice.** The table normally reads Hebrew with a
+natural voice made on the host's computer. That needs the host to be online and to have
+pulled the update (`git pull`, then restart the table; `uv` installs `edge-tts` by itself).
+Check that "Hebrew voice" in the side panel offers 🌐 Hila / Avri. If the page says the
+online voice isn't reachable, it uses the device's own voice and tries again two minutes
+later. To give a device its own Hebrew voice as a backup:
 - Windows: Settings → Time & language → Language & region → add Hebrew (with speech).
 - Mac / iPhone: Settings → Accessibility → Spoken Content → Voices → Hebrew.
 - Android: Settings → Text-to-speech → Google speech engine → install Hebrew voice data.
-
-Then choose it under "Hebrew voice" in the side panel.
 
 **No music.** Tap anywhere on the page once (browsers block sound until you touch the page)
 and check **🎵** is on and the music volume isn't at zero.

@@ -8,6 +8,7 @@ import json
 import threading
 import urllib.error
 import urllib.request
+import urllib.parse
 from http.server import ThreadingHTTPServer
 
 import pytest
@@ -563,3 +564,45 @@ def test_players_can_fix_their_action_until_the_gm_answers(table):
     call("/api/gm/say", {"text": "The lock clicks open."}, host=True)
     status, body = call("/api/edit", {"code": CODE, "token": pip, "id": mid, "text": "Never mind."})
     assert status == 409 and body["reason"] == "answered"
+
+
+def test_the_host_makes_natural_voices_for_seated_players(table):
+    import table_tts
+    call, state = table["call"], table["state"]
+    made = []
+
+    def engine(text, voice, dest):
+        made.append((text, voice))
+        dest.write_bytes(b"ID3fake-mp3:" + text.encode("utf-8"))
+
+    state.tts_engine = engine
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    assert call(f"/api/info?code={CODE}&token={pip}")[1]["tts"] is True
+    q = urllib.parse.urlencode({"code": CODE, "token": pip, "voice": "he-IL-HilaNeural",
+                                "text": "סוף ההרפתקה. תודה ששיחקתם!"})
+    opener = table["opener"]
+    with opener.open(f"{table['base']}/api/tts?{q}", timeout=5) as r:
+        assert r.headers["Content-Type"] == "audio/mpeg"
+        assert r.read() == "ID3fake-mp3:סוף ההרפתקה. תודה ששיחקתם!".encode("utf-8")
+    with opener.open(f"{table['base']}/api/tts?{q}", timeout=5) as r:
+        r.read()
+    assert made == [("סוף ההרפתקה. תודה ששיחקתם!", "he-IL-HilaNeural")]   # made once, cached
+
+    # Seated players only, known voices only.
+    assert call("/api/tts?" + q.replace(f"token={pip}", "token=nope"))[0] == 403
+    assert call("/api/tts?" + q.replace("he-IL-HilaNeural", "evil"))[0] == 400
+
+    # The service is down: 503 (pages use their own voice), cached audio still plays.
+    def broken(text, voice, dest):
+        raise OSError("no internet")
+
+    state.tts_engine = broken
+    other = urllib.parse.urlencode({"code": CODE, "token": pip, "voice": "he-IL-AvriNeural",
+                                    "text": "שלום"})
+    status, body = call("/api/tts?" + other)
+    assert status == 503 and "didn't answer" in body["error"]
+    assert call(f"/api/info?code={CODE}&token={pip}")[1]["tts"] is False
+    with opener.open(f"{table['base']}/api/tts?{q}", timeout=5) as r:
+        assert r.status == 200
+    assert not list((table["camp"] / "table" / "tts").glob("*.part"))
+    assert table_tts.VOICES["he-IL-HilaNeural"][0] == "he"

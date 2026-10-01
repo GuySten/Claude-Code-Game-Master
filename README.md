@@ -156,9 +156,12 @@ asides to the GM, whispers back, and live HP bars for the party.
   fixed in the same command, before the dice land. Secret rolls are announced too.
 - **Talk instead of type.** Players tap 🎤 and speak their action, in **English or Hebrew**
   (the page switches fully to Hebrew, right-to-left, with one tap), and can turn on 🔊 to
-  hear the story read aloud. This uses the browser's own speech engines (Chrome, Edge or
-  Safari), so there's nothing to install. The microphone needs an https link (the tunnel
-  link) or localhost.
+  hear the story read aloud. Hebrew is read by a natural neural voice that the host's
+  computer makes (Microsoft's free online voices, via `edge-tts`), because most devices
+  have no Hebrew voice of their own; English uses the device's voice. Players can pick
+  either kind for either language, and if the host is offline the page falls back to the
+  device's voice. The microphone uses the browser's speech recognition (Chrome, Edge or
+  Safari) and needs an https link (the tunnel link) or localhost.
 - **Music that follows the story.** Claude tags each beat with the scene's mood (tavern,
   travel, mystery, dread, combat, boss, sad, victory…) and the table switches to fitting
   music on its own, for everyone at once — quieter while narration is read aloud, with a

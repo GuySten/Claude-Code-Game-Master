@@ -75,6 +75,7 @@ from urllib.parse import parse_qs, urlparse
 sys.path.insert(0, str(Path(__file__).parent))
 
 import party_roster
+import table_tts
 from campaign_manager import CampaignManager
 from character_schema import to_flat
 
@@ -222,6 +223,10 @@ class TableState:
         self.turn_times: List[float] = [float(t) for t in times if isinstance(t, (int, float))] \
             if isinstance(times, list) else []
         self.turn: Optional[Dict[str, Any]] = None
+        # Natural read-aloud voices made here (lib/table_tts.py); tests plug in a fake.
+        self.tts_dir = self.dir / "tts"
+        self.tts_engine = None
+        self.tts_down_until = 0.0
         # Actions corrected AFTER the GM read them: id -> the text the GM read.
         self.corrections: Dict[int, str] = {}
         try:
@@ -480,6 +485,26 @@ class TableState:
             return [m for m in self.messages
                     if (m["id"] > after or (rev and m.get("rev", 0) > rev))
                     and self.visible_to(m, pc)]
+
+    # --- natural read-aloud voices ---
+    def tts_ready(self) -> bool:
+        return ((self.tts_engine is not None or table_tts.installed())
+                and time.time() >= self.tts_down_until)
+
+    def speech(self, text: str, voice: str) -> Path:
+        """The mp3 of one chunk of narration. When the voice service fails, pages
+        fall back to their own voices and it isn't asked again for a minute
+        (already-made audio is still served)."""
+        engine = self.tts_engine
+        if time.time() < self.tts_down_until:
+            def engine(*_):
+                raise table_tts.Unavailable("the online voice is unreachable; retrying shortly")
+        try:
+            return table_tts.synthesize(text, voice, self.tts_dir, engine)
+        except table_tts.Unavailable:
+            if time.time() >= self.tts_down_until:
+                self.tts_down_until = time.time() + 60
+            raise
 
     def answered(self, msg: Dict[str, Any]) -> bool:
         """Has the GM narrated since this action (publicly, or to its player)?
@@ -886,7 +911,7 @@ def make_handler(state: TableState, code: str, host_key: str):
                 return self._json({"ok": True, "me": me, "party": state.party_for(me),
                                    "waiting_on": state.waiting_on(),
                                    "music": state.music, "server_now": time.time(),
-                                   "progress": state.progress(),
+                                   "progress": state.progress(), "tts": state.tts_ready(),
                                    **state.overview()})
             if url.path == "/api/messages":
                 try:
@@ -896,6 +921,16 @@ def make_handler(state: TableState, code: str, host_key: str):
                     after, rev = 0, 0
                 return self._json({"ok": True, "me": me, "rev": state.rev,
                                    "messages": state.since(after, me, rev)})
+            if url.path == "/api/tts":
+                if not me:
+                    return self._err("Take a seat first.", 403)
+                try:
+                    path = state.speech(q.get("text", ""), q.get("voice", ""))
+                except ValueError as e:
+                    return self._err(str(e))
+                except table_tts.Unavailable as e:
+                    return self._err(str(e), 503)
+                return self._serve_file(path, "audio/mpeg", cache=True)
             return self._err("not found", 404)
 
         def do_POST(self):
@@ -1130,8 +1165,11 @@ def make_handler(state: TableState, code: str, host_key: str):
             path = state.find_music(unquote(name))
             if path is None:
                 return self._err("not found", 404)
+            return self._serve_file(path, AUDIO_TYPES[path.suffix.lower()])
+
+        def _serve_file(self, path: Path, ctype: str, cache: bool = False):
+            """A file, with byte ranges (audio seeking; Safari insists on them)."""
             size = path.stat().st_size
-            ctype = AUDIO_TYPES[path.suffix.lower()]
             start, end = 0, size - 1
             rng = self.headers.get("Range", "")
             partial = rng.startswith("bytes=")
@@ -1156,6 +1194,8 @@ def make_handler(state: TableState, code: str, host_key: str):
             self.send_header("Content-Type", ctype)
             self.send_header("Accept-Ranges", "bytes")
             self.send_header("Content-Length", str(length))
+            if cache:                      # same text + voice = same audio
+                self.send_header("Cache-Control", "private, max-age=86400")
             if partial:
                 self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
             self.end_headers()

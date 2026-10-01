@@ -271,6 +271,8 @@
       micDenied: "The microphone is blocked. Allow it from the icon in the address bar, then try again.",
       noHeVoice: "No Hebrew voice on this device, so Hebrew is read with the default voice. You can add one in your system's language settings.",
       noTts: "This browser can't read aloud.",
+      onlineVoice: "natural, online",
+      onlineVoiceFailed: "The natural online voice isn't reachable right now — using this device's voice.",
       speed: "Reading speed", slower: "Slower", normal: "Normal", faster: "Faster",
       voiceEn: "English voice", voiceHe: "Hebrew voice", auto: "Automatic", other: "עברית",
       musicOn: "🎵 Music", musicOff: "🔇 Music", musicVol: "Music volume",
@@ -319,6 +321,8 @@
       micDenied: "הגישה למיקרופון חסומה. אפשרו אותה דרך הסמל בשורת הכתובת ונסו שוב.",
       noHeVoice: "אין קול עברי מותקן במכשיר, לכן העברית מוקראת בקול ברירת המחדל. אפשר להוסיף קול בהגדרות השפה של המערכת.",
       noTts: "הדפדפן הזה לא יודע להקריא.",
+      onlineVoice: "טבעי, מקוון",
+      onlineVoiceFailed: "הקול הטבעי המקוון לא זמין כרגע — מקריא בקול של המכשיר.",
       speed: "מהירות הקראה", slower: "לאט", normal: "רגיל", faster: "מהר",
       voiceEn: "קול באנגלית", voiceHe: "קול בעברית", auto: "אוטומטי", other: "English",
       musicOn: "🎵 מוזיקה", musicOff: "🔇 מוזיקה", musicVol: "עוצמת המוזיקה",
@@ -435,6 +439,14 @@
     const vl = (v.lang || "").toLowerCase().replace("_", "-");
     return l === "he" ? (vl.startsWith("he") || vl.startsWith("iw")) : vl.startsWith("en");
   });
+  // Natural voices the HOST makes (lib/table_tts.py): the same on every device,
+  // and the only Hebrew voice many devices have (Chrome on Windows ships none).
+  const ONLINE_VOICES = {
+    he: [["he-IL-HilaNeural", "Hila"], ["he-IL-AvriNeural", "Avri"]],
+    en: [["en-US-AriaNeural", "Aria"], ["en-US-GuyNeural", "Guy"]],
+  };
+  let ttsOk = false, ttsDownUntil = 0;
+  const onlineUsable = () => ttsOk && Date.now() >= ttsDownUntil;
   function fillVoiceMenus() {
     ["en", "he"].forEach((l) => {
       const sel = $("voice-" + l);
@@ -444,23 +456,38 @@
       const auto = document.createElement("option");
       auto.value = ""; auto.textContent = t("auto");
       sel.appendChild(auto);
+      if (ttsOk) ONLINE_VOICES[l].forEach(([id, name]) => {
+        const o = document.createElement("option");
+        o.value = "@" + id; o.textContent = `🌐 ${name} (${t("onlineVoice")})`;
+        sel.appendChild(o);
+      });
       voicesFor(l).forEach((v) => {
         const o = document.createElement("option");
         o.value = v.name; o.textContent = `${v.name} (${v.lang})`;
         sel.appendChild(o);
       });
-      sel.value = voicesFor(l).some((v) => v.name === saved) ? saved : "";
+      sel.value = [...sel.options].some((o) => o.value === saved) ? saved : "";
     });
   }
   if (synth) { loadVoices(); synth.addEventListener && synth.addEventListener("voiceschanged", loadVoices); }
-  function pickVoice(l) {
+  function localVoice(l) {
     const list = voicesFor(l);
-    const saved = store.get("voice." + l);
-    const chosen = list.find((v) => v.name === saved);
+    const chosen = list.find((v) => v.name === store.get("voice." + l));
     if (chosen) return chosen;
     const rank = (v) => (/natural|neural|online|google|premium|enhanced/i.test(v.name) ? 0 : 1)
                         + (l === "en" && !/en-us/i.test(v.lang) ? 0.5 : 0);
     return list.slice().sort((a, b) => rank(a) - rank(b))[0] || null;
+  }
+  // Automatic: Hebrew uses the host's natural voice (device Hebrew voices are rare
+  // and robotic); English uses the device's voice, or the host's when it has none.
+  function pickVoice(l) {
+    const saved = store.get("voice." + l) || "";
+    if (saved.startsWith("@") && onlineUsable()) return { online: saved.slice(1) };
+    const local = saved && !saved.startsWith("@") ? voicesFor(l).find((v) => v.name === saved) : null;
+    if (local) return { local };
+    if (onlineUsable() && (l === "he" || !voicesFor(l).length)) return { online: ONLINE_VOICES[l][0][0] };
+    const best = localVoice(l);
+    return best ? { local: best } : null;
   }
   const isHebrew = (s) => (s.match(/[֐-׿]/g) || []).length > (s.match(/[A-Za-z]/g) || []).length;
   function cleanForSpeech(s, l) {
@@ -489,27 +516,80 @@
     });
     return out;
   }
+  // One queue for both kinds of voice, played in order: the device's own
+  // (speechSynthesis) and the host's natural ones (an <audio> per sentence).
+  let speechQ = [], speechGen = 0, speaking = false, curAudio = null, curUtter = null;
   function speak(text) {
-    if (!synth) { setStatus(t("noTts"), true); return; }
     const rate = parseFloat($("rate").value) || 1;
     speechChunks(text).forEach((chunk) => {
       const l = isHebrew(chunk) ? "he" : "en";
       const said = cleanForSpeech(chunk, l);
-      if (!said) return;
-      const u = new SpeechSynthesisUtterance(said);
-      u.lang = l === "he" ? "he-IL" : "en-US";
-      const v = pickVoice(l);
-      if (v) u.voice = v;
-      else if (l === "he" && voices.length && !warnedNoHe) { warnedNoHe = true; setStatus(t("noHeVoice"), true); }
-      u.rate = rate;
-      u.onstart = () => setDuck(true);
-      u.onend = u.onerror = () => setTimeout(() => {
-        if (!synth.speaking && !synth.pending) setDuck(false);
-      }, 250);
-      synth.speak(u);
+      if (said) speechQ.push({ l, said, rate });
     });
+    if (!speaking) nextSpeech();
   }
-  function stopSpeaking() { if (synth) synth.cancel(); setDuck(false); }
+  function ttsUrl(said, voice) {
+    return "/api/tts?code=" + encodeURIComponent(code) + "&token=" + encodeURIComponent(token || "")
+      + "&voice=" + encodeURIComponent(voice) + "&text=" + encodeURIComponent(said);
+  }
+  function nextSpeech() {
+    const item = speechQ.shift();
+    if (!item) {
+      speaking = false;
+      setTimeout(() => { if (!speaking) setDuck(false); }, 250);
+      return;
+    }
+    speaking = true; setDuck(true);
+    const gen = speechGen;
+    let finished = false;
+    const done = () => { if (!finished && gen === speechGen) { finished = true; nextSpeech(); } };
+    const v = pickVoice(item.l);
+    if (v && v.online) playOnline(item, v.online, done, gen);
+    else speakLocal(item, v && v.local, done);
+  }
+  function playOnline(item, voice, done, gen) {
+    const a = new Audio(ttsUrl(item.said, voice));
+    a.defaultPlaybackRate = a.playbackRate = item.rate;
+    a.preservesPitch = true;
+    curAudio = a;
+    const fallBack = () => {           // the host can't reach the voice service: use ours
+      if (gen !== speechGen || a.dataset.failed) return;
+      a.dataset.failed = "1";
+      ttsDownUntil = Date.now() + 120000;
+      setStatus(t("onlineVoiceFailed"), true);
+      speakLocal(item, localVoice(item.l), done);
+    };
+    a.onended = () => { if (curAudio === a) curAudio = null; done(); };
+    a.onerror = fallBack;
+    a.play().catch((e) => {
+      if (e && e.name === "NotAllowedError") {    // no tap on the page yet: wait for one
+        document.addEventListener("pointerdown", () => { if (gen === speechGen) a.play().catch(fallBack); },
+                                  { once: true });
+      } else if (!e || e.name !== "AbortError") fallBack();
+    });
+    // Have the host make the next sentence while this one plays: no gap between them.
+    const next = speechQ[0];
+    const nv = next && pickVoice(next.l);
+    if (nv && nv.online) fetch(ttsUrl(next.said, nv.online)).catch(() => {});
+  }
+  function speakLocal(item, voice, done) {
+    if (!synth) { setStatus(t("noTts"), true); return done(); }
+    const u = new SpeechSynthesisUtterance(item.said);
+    u.lang = item.l === "he" ? "he-IL" : "en-US";
+    if (voice) u.voice = voice;
+    else if (item.l === "he" && voices.length && !warnedNoHe) { warnedNoHe = true; setStatus(t("noHeVoice"), true); }
+    u.rate = item.rate;
+    u.onend = u.onerror = done;
+    curUtter = u;                       // (Chrome drops events of utterances it garbage-collects)
+    synth.speak(u);
+  }
+  function stopSpeaking() {
+    speechGen++; speechQ = []; speaking = false;
+    if (curAudio) { curAudio.pause(); curAudio = null; }
+    if (synth) synth.cancel();
+    curUtter = null;
+    setDuck(false);
+  }
   function updateReadToggle() {
     const b = $("read-toggle");
     b.textContent = readAloud ? t("readOn") : t("readOff");
@@ -994,6 +1074,7 @@
       return showSeats(info);
     }
     applyMusic(info.music, info.server_now);
+    if (!!info.tts !== ttsOk) { ttsOk = !!info.tts; fillVoiceMenus(); }
     progressState = info.progress || { state: "idle" };
     waitingOn = info.waiting_on || [];
     updateProgress();
@@ -1350,7 +1431,7 @@
     store.set("read", readAloud ? "1" : "0");
     updateReadToggle();
     if (!readAloud) stopSpeaking();
-    else if (synth) speak(lang === "he" ? "ההקראה פועלת." : "Reading aloud is on.");
+    else speak(lang === "he" ? "ההקראה פועלת." : "Reading aloud is on.");
   };
   $("music-toggle").onclick = () => {
     musicOn = !musicOn;
