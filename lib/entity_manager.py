@@ -52,11 +52,14 @@ class EntityManager:
     to ensure consistent campaign directory handling and JSON operations.
     """
 
-    def __init__(self, world_state_dir: str = None):
+    def __init__(self, world_state_dir: str = None, campaign_dir=None):
         """Initialize the entity manager with campaign context.
 
         Args:
             world_state_dir: Base world state directory. Defaults to "world-state".
+            campaign_dir: Work on this campaign instead of the active one (a
+                long-running process such as the online table must keep writing
+                to its own campaign even if the active campaign changes).
 
         Raises:
             RuntimeError: If no active campaign is set.
@@ -65,7 +68,7 @@ class EntityManager:
         self.campaign_mgr = CampaignManager(base_dir)
 
         # Get the active campaign directory
-        active_dir = self.campaign_mgr.get_active_campaign_dir()
+        active_dir = campaign_dir or self.campaign_mgr.get_active_campaign_dir()
 
         if active_dir is None:
             raise RuntimeError("No active campaign. Run /new-game or /import first.")

@@ -31,8 +31,8 @@ def _default_vitals() -> Dict[str, Any]:
 
 
 class IdentityOnboarding(EntityManager):
-    def __init__(self, world_state_dir: str = None):
-        super().__init__(world_state_dir)
+    def __init__(self, world_state_dir: str = None, campaign_dir=None):
+        super().__init__(world_state_dir, campaign_dir)
 
     def from_canon(self, npc_name: str) -> Optional[Dict[str, Any]]:
         """Lift a canon character from npcs.json (stats from a sheet if present, voice from context).

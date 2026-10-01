@@ -603,7 +603,9 @@ class TableState:
 
     def create_pc(self, mode: str, name: str, concept: str) -> Dict[str, Any]:
         from identity_onboarding import IdentityOnboarding
-        onboarding = IdentityOnboarding(self.base)
+        # Always THIS table's campaign — never whichever campaign happens to be
+        # active now (the host may have switched since the table opened).
+        onboarding = IdentityOnboarding(self.base, campaign_dir=self.campaign_dir)
         if mode == "nameless":
             result = onboarding.join("nameless")
         else:
@@ -726,6 +728,11 @@ def make_handler(state: TableState, code: str, host_key: str):
                     return self._err("Give your character a name.")
                 created = state.create_pc(mode, name, concept)
                 if not created["ok"]:
+                    existing = party_roster.find_pc(state.campaign_dir, name) if name else None
+                    if existing is not None and not state.claimed_by_anyone(name):
+                        created["error"] = (f"{name} is already at the table with an empty seat — "
+                                            f"pick them in the list above to play them.")
+                        created["existing"] = name
                     return self._json(created, 409)
                 result = state.claim(created["pc"])
                 if result["ok"]:
@@ -861,6 +868,11 @@ def make_handler(state: TableState, code: str, host_key: str):
                                         data.get("title"))
                 self._announce_music(music)
                 return self._json({"ok": True, "music": music})
+            if path == "/api/gm/shutdown":
+                # Graceful stop on every platform (no Unix signals needed).
+                self._json({"ok": True})
+                threading.Thread(target=self.server.shutdown, daemon=True).start()
+                return
             if path == "/api/gm/activity":
                 return self._json({"ok": state.set_stage(str(data.get("stage", "")))})
             if path == "/api/gm/free":
@@ -968,13 +980,119 @@ def _server_info(campaign_dir: Path) -> Optional[Dict[str, Any]]:
 
 
 def _alive(pid: Optional[int]) -> bool:
-    if not pid:
-        return False
+    """Is that process still running? (Never signals it: on Windows os.kill(pid, 0)
+    would send it a Ctrl-C.)"""
     try:
-        os.kill(int(pid), 0)
-        return True
-    except (OSError, ValueError):
+        pid = int(pid)
+    except (TypeError, ValueError):
         return False
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return False
+        try:
+            code = ctypes.c_ulong()
+            return bool(kernel32.GetExitCodeProcess(handle, ctypes.byref(code))) \
+                and code.value == 259                       # STILL_ACTIVE
+        finally:
+            kernel32.CloseHandle(handle)
+    try:
+        os.kill(pid, 0)
+        return True
+    except PermissionError:
+        return True        # running, under another user
+    except OSError:
+        return False
+
+
+def _open_tables(base: str) -> List[tuple]:
+    """(campaign_dir, server info) for every table that is open right now, in any
+    campaign — the host may have switched campaigns since one was opened."""
+    out = []
+    campaigns = Path(base) / "campaigns"
+    if not campaigns.is_dir():
+        return out
+    for info_path in sorted(campaigns.glob("*/table/server.json")):
+        camp = info_path.parent.parent.resolve()
+        info = _server_info(camp)
+        if info and _alive(info.get("pid")):
+            out.append((camp, info))
+    return out
+
+
+def _stop_server(campaign_dir: Path, info: Dict[str, Any]) -> bool:
+    """Close one table: ask it to shut down, else end the process."""
+    pid = info.get("pid")
+    try:
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{info['port']}/api/gm/shutdown", method="POST", data=b"{}",
+            headers={"X-Host-Key": info.get("host_key", ""), "Content-Type": "application/json"})
+        urllib.request.build_opener(urllib.request.ProxyHandler({})).open(req, timeout=5).read()
+    except (OSError, ValueError, KeyError):
+        pass
+    for _ in range(50):
+        if not _alive(pid):
+            break
+        time.sleep(0.1)
+    if _alive(pid):
+        try:
+            os.kill(int(pid), signal.SIGTERM)   # on Windows this ends the process
+        except (OSError, ValueError):
+            pass
+        for _ in range(30):
+            if not _alive(pid):
+                break
+            time.sleep(0.1)
+    (table_dir(campaign_dir) / "server.json").unlink(missing_ok=True)
+    return not _alive(pid)
+
+
+def _start_server(campaign_dir: Path, base: str, port: int, bind: str,
+                  code: Optional[str]) -> None:
+    """Open the table in the background (detached, so it outlives this command),
+    on Windows, macOS and Linux alike."""
+    import subprocess
+    tdir = table_dir(campaign_dir)
+    tdir.mkdir(parents=True, exist_ok=True)
+    (tdir / "server.json").unlink(missing_ok=True)
+    args = [sys.executable, str(Path(__file__).resolve()), "serve", "--port", str(port),
+            "--bind", bind] + (["--code", code] if code else [])
+    env = dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8")
+    kwargs: Dict[str, Any] = {"stdin": subprocess.DEVNULL, "env": env,
+                              "cwd": str(Path.cwd())}
+    if os.name == "nt":
+        kwargs["creationflags"] = (subprocess.CREATE_NEW_PROCESS_GROUP
+                                   | getattr(subprocess, "DETACHED_PROCESS", 0x8)
+                                   | getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    else:
+        kwargs["start_new_session"] = True
+    with open(tdir / "server.log", "w", encoding="utf-8") as log:
+        proc = subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT, **kwargs)
+    for _ in range(100):
+        if (tdir / "server.json").exists() or proc.poll() is not None:
+            break
+        time.sleep(0.1)
+    time.sleep(0.2)
+    print((tdir / "server.log").read_text(encoding="utf-8", errors="replace").rstrip())
+    if not (tdir / "server.json").exists():
+        sys.exit("[ERROR] The table server did not start (see the log above).")
+    print("\nPlayers: open the link and enter the table code.")
+    print("Friends elsewhere: run a tunnel (see: gm-table.sh help) and share its https link.")
+
+
+def _wrong_campaign_hint(campaign_dir: Path, base: str) -> Optional[str]:
+    others = [(c, i) for c, i in _open_tables(base) if c != campaign_dir]
+    if not others:
+        return None
+    camp, _info = others[0]
+    return (f"[ERROR] The table is open for campaign '{camp.name}', but the active campaign is "
+            f"'{campaign_dir.name}' — players are seeing '{camp.name}'.\n"
+            f"  Move the table to this campaign (same link and code): bash tools/gm-table.sh start\n"
+            f"  Or switch back: bash tools/gm-campaign.sh switch {camp.name}")
 
 
 def serve(port: int, bind: str, code: Optional[str]) -> None:
@@ -986,10 +1104,15 @@ def serve(port: int, bind: str, code: Optional[str]) -> None:
     code = (code or f"{secrets.choice(CODE_WORDS)}-{secrets.randbelow(900) + 100}").lower()
     host_key = secrets.token_urlsafe(24)
     state = TableState(campaign_dir, base)
-    httpd = ThreadingHTTPServer((bind, port), make_handler(state, code, host_key))
+    try:
+        httpd = ThreadingHTTPServer((bind, port), make_handler(state, code, host_key))
+    except OSError as e:
+        sys.exit(f"[ERROR] Port {port} is not available ({e.strerror or e}). Another table or "
+                 f"program is using it — try: bash tools/gm-table.sh start --port {port + 1}")
     httpd.daemon_threads = True
     lan = _lan_ip()
-    record = {"port": port, "bind": bind, "code": code, "host_key": host_key,
+    record = {"campaign": campaign_dir.name, "port": port, "bind": bind, "code": code,
+              "host_key": host_key,
               "pid": os.getpid(), "started": _now(),
               "local_url": f"http://localhost:{port}/",
               "lan_url": f"http://{lan}:{port}/"}
@@ -1008,7 +1131,10 @@ def serve(port: int, bind: str, code: Optional[str]) -> None:
 
     def _shutdown(*_):
         threading.Thread(target=httpd.shutdown, daemon=True).start()
-    signal.signal(signal.SIGTERM, _shutdown)
+    try:
+        signal.signal(signal.SIGTERM, _shutdown)
+    except (ValueError, OSError, AttributeError):
+        pass
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
@@ -1023,7 +1149,8 @@ def serve(port: int, bind: str, code: Optional[str]) -> None:
 def _call(campaign_dir: Path, method: str, path: str, data: Optional[dict] = None) -> dict:
     info = _server_info(campaign_dir)
     if not info or not _alive(info.get("pid")):
-        sys.exit("[ERROR] The table is not open. Start it with: bash tools/gm-table.sh start")
+        hint = _wrong_campaign_hint(campaign_dir, str(CampaignManager().world_state_dir))
+        sys.exit(hint or "[ERROR] The table is not open. Start it with: bash tools/gm-table.sh start")
     req = urllib.request.Request(
         f"http://127.0.0.1:{info['port']}{path}", method=method,
         data=json.dumps(data).encode("utf-8") if data is not None else None,
@@ -1085,6 +1212,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Online table for remote players")
     sub = parser.add_subparsers(dest="action")
 
+    st = sub.add_parser("start", help="Open the table in the background (moves an open table "
+                                       "to the active campaign)")
+    st.add_argument("--port", type=int, help=f"default {DEFAULT_PORT} (or the open table's)")
+    st.add_argument("--bind", default="0.0.0.0")
+    st.add_argument("--code", help="Table code (default: the open table's, else random)")
+
     p = sub.add_parser("serve", help="Run the table server in the foreground")
     p.add_argument("--port", type=int, default=DEFAULT_PORT)
     p.add_argument("--bind", default="0.0.0.0", help="Address to listen on (default all)")
@@ -1138,12 +1271,27 @@ def main() -> None:
     if args.action == "serve":
         return serve(args.port, args.bind, args.code)
 
-    campaign_dir, _ = _active_campaign()
+    campaign_dir, base = _active_campaign()
+
+    if args.action == "start":
+        info = _server_info(campaign_dir)
+        if info and _alive(info.get("pid")):
+            args.action = "status"           # already open for this campaign
+        else:
+            port, code = args.port, args.code
+            for other, other_info in _open_tables(base):
+                # One table at a time: move it here, keeping its link and code.
+                print(f"Moving the table from campaign '{other.name}' to '{campaign_dir.name}'...")
+                _stop_server(other, other_info)
+                port = port or other_info.get("port")
+                code = code or other_info.get("code")
+            return _start_server(campaign_dir, base, port or DEFAULT_PORT, args.bind, code)
 
     if args.action == "status":
         info = _server_info(campaign_dir)
         if not info or not _alive(info.get("pid")):
-            print("The table is closed. Open it with: bash tools/gm-table.sh start")
+            print(_wrong_campaign_hint(campaign_dir, base)
+                  or "The table is closed. Open it with: bash tools/gm-table.sh start")
             return
         pending = _call(campaign_dir, "GET", "/api/gm/pending")
         print(f"TABLE OPEN (pid {info['pid']}) for campaign '{campaign_dir.name}'")
@@ -1285,17 +1433,15 @@ def main() -> None:
         return
 
     if args.action == "stop":
-        info = _server_info(campaign_dir)
-        if not info or not _alive(info.get("pid")):
+        tables = _open_tables(base)          # whichever campaign it was opened for
+        (table_dir(campaign_dir) / "server.json").unlink(missing_ok=True)
+        if not tables:
             print("The table is already closed.")
-            (table_dir(campaign_dir) / "server.json").unlink(missing_ok=True)
             return
-        os.kill(int(info["pid"]), signal.SIGTERM)
-        for _ in range(50):
-            if not _alive(info["pid"]):
-                break
-            time.sleep(0.1)
-        print("The table is closed.")
+        for camp, info in tables:
+            ok = _stop_server(camp, info)
+            print("The table is closed." if ok else
+                  f"[WARNING] Could not stop the table server (pid {info.get('pid')}).")
         return
 
     parser.print_help()

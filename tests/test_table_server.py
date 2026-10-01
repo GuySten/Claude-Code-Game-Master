@@ -378,3 +378,25 @@ def test_the_claude_code_hook_reports_the_gms_stage(table, monkeypatch):
     assert run("bash tools/gm-player.sh hp Pip -3", "sheets") == "sheets"
     assert run("bash tools/gm-table.sh say 'x'", "sheets") == "sheets"   # say/wait don't count
     assert run("ls -la", "sheets") == "sheets"                  # unrelated commands: nothing
+
+
+def test_new_characters_join_the_tables_campaign_even_after_a_campaign_switch(table):
+    world = table["world"]
+    other = world / "campaigns" / "other"
+    other.mkdir()
+    (other / "campaign-overview.json").write_text(json.dumps({"campaign_name": "Other"}))
+    (world / "active-campaign.txt").write_text("other")       # the host switched campaigns
+    status, body = table["call"]("/api/create", {"code": CODE, "name": "Asterisk",
+                                                  "concept": "A tough barbarian"})
+    assert status == 200 and body["pc"] == "Asterisk"
+    assert (table["camp"] / "players" / "asterisk.json").exists()
+    assert not (other / "character.json").exists()
+
+
+def test_creating_an_unclaimed_existing_name_points_at_the_list(table):
+    call = table["call"]
+    call("/api/create", {"code": CODE, "name": "Bram"})
+    call("/api/leave", {"code": CODE, "token": table["state"].claim("Pip")["token"]})
+    table["state"].free("Bram")
+    status, body = call("/api/create", {"code": CODE, "name": "bram"})
+    assert status == 409 and body["existing"] == "bram" and "pick them in the list" in body["error"]

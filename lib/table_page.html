@@ -872,7 +872,7 @@
   async function seat(path, body) {
     $("seat-error").textContent = "";
     const r = await api(path, body);
-    if (!r.ok) { $("seat-error").textContent = r.error || "?"; return; }
+    if (!r.ok) { $("seat-error").textContent = r.error || "?"; refreshSeats(); return; }
     token = r.token; me = r.pc; store.set("token", token);
     api("/api/lang", { lang });
     openTable(await api("/api/info"));
@@ -1113,6 +1113,10 @@
     };
   });
   async function refreshSeats() { const info = await api("/api/info"); if (info.ok) showSeats(info); }
+  // Keep the "who are you" list current while choosing (someone may join meanwhile).
+  setInterval(() => {
+    if (!me && code && !$("seat-cards").classList.contains("hidden")) refreshSeats();
+  }, 4000);
   $("leave").onclick = async () => {
     if (!confirm(t("leaveConfirm"))) return;
     await api("/api/leave", {});
