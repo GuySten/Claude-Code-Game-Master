@@ -55,7 +55,9 @@ Enumerated from `os.environ.get` across `lib/` and `tools/`:
 
 | Variable | Read by | Effect |
 |---|---|---|
-| `OPENAI_API_KEY` | `image_gen`, `session_manager` | the **only** gate on scene images. Absent → the session brief says DISABLED |
+| `OPENAI_API_KEY` | `image_gen`, `session_manager` | turns scene images on through OpenAI. With neither this nor `IMAGE_BACKEND=forge` the session brief says DISABLED |
+| `IMAGE_BACKEND` | `image_gen`, `session_manager` | `openai` · `forge` (a local Stable Diffusion WebUI Forge / AUTOMATIC1111 with `--api`, free) · `off`. Default: `openai` when a key is set, else `off` |
+| `FORGE_URL`, `FORGE_MODEL`, `FORGE_STEPS`, `FORGE_CFG`, `FORGE_SAMPLER`, `FORGE_SCHEDULER`, `FORGE_LANDSCAPE`/`PORTRAIT`/`SQUARE`, `FORGE_TIMEOUT` | `image_gen` | local Forge tuning; defaults suit DreamShaper XL Lightning (GAME-NIGHT.md → 5. Pictures) |
 | `OPENAI_IMAGE_MODEL` | `image_gen` | default `gpt-image-2` |
 | `OPENAI_IMAGE_QUALITY` | `image_gen` | default `medium` |
 | `OPENAI_IMAGE_SIZE` | `image_gen` | default `1536x1024` |

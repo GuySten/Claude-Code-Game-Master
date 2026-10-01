@@ -68,10 +68,8 @@ case "$ACTION" in
             exit 1
         fi
 
-        if ! check_env OPENAI_API_KEY; then
-            error "OPENAI_API_KEY not set. Add it to .env (OPENAI_API_KEY=sk-...) to enable images."
-            exit 1
-        fi
+        # (image_gen.py checks the image source — OpenAI key or local Forge — and
+        # prints an actionable error if there is none.)
 
         # image_gen.py emits a JSON result on success; capture it.
         RESULT=$($PYTHON_CMD "$LIB_DIR/image_gen.py" \
@@ -93,7 +91,11 @@ case "$ACTION" in
         # (the deep campaign path wraps in the terminal, which breaks the click target).
         success "Image generated: ${TITLE:-untitled}"
         echo "  open: $SHORT_URI"
-        echo "  est cost: \$$COST ($QUALITY $SIZE)"
+        if [ "$COST" = "0.000" ]; then
+            echo "  made locally (free)"
+        else
+            echo "  est cost: \$$COST ($QUALITY $SIZE)"
+        fi
         ;;
 
     chronicler)

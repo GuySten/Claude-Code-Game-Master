@@ -689,10 +689,18 @@ class SessionManager(EntityManager):
                          "NOT list numbered choices. The player drives freely. "
                          "(Toggle: /gm choices on|off)")
 
-        # --- Scene images (gpt-image-2): only available when a key is configured ---
-        if os.environ.get("OPENAI_API_KEY"):
-            lines.append("Scene images: ENABLED — illustrate GENEROUSLY and with glee "
-                         "(images cost ~$0.04; lean toward YES). New location, monster/boss "
+        # --- Scene images: OpenAI (key) or a local Forge (IMAGE_BACKEND=forge) ---
+        try:
+            from image_gen import images_status
+            images_on, image_source, image_why = images_status()
+        except Exception as e:                      # never break the session brief
+            images_on, image_source, image_why = False, "off", f"image setup error: {e}"
+        if images_on:
+            cost_note = ("images are free here (a local model, ~30-60 s each: always in the "
+                         "background)" if image_source == "forge"
+                         else "images cost ~$0.04")
+            lines.append(f"Scene images: ENABLED ({image_why}) — illustrate GENEROUSLY and with glee "
+                         f"({cost_note}; lean toward YES). New location, monster/boss "
                          "reveal, big loot, a styled flourish, a funny beat, a quiet vista — "
                          "any beat with a real visual or emotional charge earns one. Present "
                          "it DIEGETICALLY: frame the picture as an artifact made by an in-world "
@@ -718,7 +726,7 @@ class SessionManager(EntityManager):
                              "illustrate and persist it with `bash tools/gm-image.sh "
                              "chronicler --name \"...\" --style \"...\" --persona \"...\"`.")
         else:
-            lines.append("Scene images: DISABLED (no OPENAI_API_KEY) — do NOT call gm-image.sh "
+            lines.append(f"Scene images: DISABLED ({image_why}) — do NOT call gm-image.sh "
                          "and do NOT mention images; narrate in text only.")
 
         # --- Narrative Voice (write the prose in the world's authorial voice) ---

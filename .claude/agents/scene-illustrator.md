@@ -63,6 +63,6 @@ chronicler's voice. Nothing else.
 
 - NEVER put game UI, HUD, health bars, or text/letters in the image (say so in the prompt).
 - Be explicit over clever — a long concrete prompt beats a short evocative one.
-- If images are DISABLED (no OPENAI_API_KEY) or a moderation block hits, report it
+- If images are DISABLED (no image source: no OPENAI_API_KEY, no running local Forge) or a moderation block hits, report it
   plainly and stop. To clear a moderation block, soften the gore nouns in the
   scene — NEVER the locked style words.

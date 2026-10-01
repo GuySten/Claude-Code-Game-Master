@@ -1,4 +1,12 @@
-"""image_gen.py — GM scene illustration via OpenAI gpt-image-2.
+"""image_gen.py — GM scene illustration via OpenAI gpt-image-2, or a local model.
+
+Image sources (``IMAGE_BACKEND`` in .env):
+  openai — OpenAI gpt-image-2 (needs OPENAI_API_KEY; the default when a key is set)
+  forge  — a local Stable Diffusion WebUI Forge (or AUTOMATIC1111) started with
+           --api: free, private, runs on the host's own GPU. FORGE_* settings tune
+           it (defaults suit an SDXL "Lightning" model such as DreamShaper XL
+           Lightning on a 6 GB laptop GPU; see GAME-NIGHT.md → Pictures).
+  off    — no images (the default with no key).
 
 The GM calls this at high-impact beats (new location, boss reveal, big loot) to
 show the player a real image. The image is saved into the active campaign's
@@ -199,6 +207,123 @@ class ImageGenError(Exception):
     """Raised for user-correctable failures (missing key, moderation, bad request)."""
 
 
+# --------------------------------------------------------------- sources ----
+def backend() -> str:
+    """'openai', 'forge' or 'off' — from IMAGE_BACKEND, else whether a key is set."""
+    chosen = os.environ.get("IMAGE_BACKEND", "").strip().lower()
+    if chosen in ("forge", "a1111", "automatic1111", "sdwebui", "local"):
+        return "forge"
+    if chosen in ("off", "none", "no"):
+        return "off"
+    if chosen == "openai":
+        return "openai"
+    return "openai" if os.environ.get("OPENAI_API_KEY") else "off"
+
+
+def forge_url() -> str:
+    return os.environ.get("FORGE_URL", "http://127.0.0.1:7860").rstrip("/")
+
+
+def _forge_open(req, timeout):
+    # A local server: never route it through a proxy configured for the internet.
+    return urllib.request.build_opener(urllib.request.ProxyHandler({})).open(req, timeout=timeout)
+
+
+def images_status(probe: bool = True):
+    """(enabled, backend, why) — what the session brief tells the GM."""
+    b = backend()
+    if b == "off":
+        return False, b, ("no image source: add OPENAI_API_KEY, or run a local Forge "
+                          "and set IMAGE_BACKEND=forge in .env")
+    if b == "openai":
+        if not os.environ.get("OPENAI_API_KEY"):
+            return False, b, "IMAGE_BACKEND=openai but OPENAI_API_KEY is not set"
+        return True, b, "OpenAI gpt-image-2"
+    if not probe:
+        return True, b, f"local Forge at {forge_url()}"
+    try:
+        with _forge_open(urllib.request.Request(forge_url() + "/sdapi/v1/sd-models"), 3) as r:
+            models = json.loads(r.read().decode("utf-8")) or []
+    except (urllib.error.URLError, OSError, ValueError):
+        return False, b, (f"Forge isn't answering at {forge_url()} — start it (run.bat) "
+                          f"with --api, then images turn on")
+    if not models:
+        return False, b, "Forge is running but has no model — put one in models/Stable-diffusion"
+    return True, b, f"local Forge at {forge_url()}"
+
+
+# Requested size (OpenAI terms) -> the size the local model is good at.
+def _forge_dims(size: str):
+    try:
+        w, h = (int(x) for x in str(size).lower().split("x"))
+    except ValueError:
+        w, h = 1536, 1024
+    key, default = (("FORGE_LANDSCAPE", "1216x832") if w > h else
+                    ("FORGE_PORTRAIT", "832x1216") if h > w else ("FORGE_SQUARE", "1024x1024"))
+    try:
+        fw, fh = (int(x) for x in os.environ.get(key, default).lower().split("x"))
+    except ValueError:
+        fw, fh = (int(x) for x in default.split("x"))
+    return fw, fh
+
+
+FORGE_NEGATIVE = ("text, words, letters, watermark, signature, logo, frame, border, lowres, "
+                  "blurry, jpeg artifacts, deformed, disfigured, extra fingers, extra limbs, "
+                  "bad hands, bad anatomy")
+
+
+def _forge_generate(prompt: str, quality: str, size: str):
+    """One image from the local Forge/AUTOMATIC1111 API -> (png bytes, model, WxH)."""
+    w, h = _forge_dims(size)
+    steps = int(os.environ.get("FORGE_STEPS", "6"))
+    if quality == "low":
+        steps = max(3, steps - 2)
+    elif quality == "high":
+        steps += 2
+    payload = {
+        "prompt": prompt,
+        "negative_prompt": os.environ.get("FORGE_NEGATIVE", FORGE_NEGATIVE),
+        "steps": steps,
+        "cfg_scale": float(os.environ.get("FORGE_CFG", "2")),
+        "sampler_name": os.environ.get("FORGE_SAMPLER", "DPM++ SDE"),
+        "scheduler": os.environ.get("FORGE_SCHEDULER", "Karras"),
+        "width": w, "height": h, "seed": -1, "batch_size": 1, "n_iter": 1,
+        "send_images": True, "save_images": False,
+    }
+    model = os.environ.get("FORGE_MODEL", "").strip()
+    if model:
+        payload["override_settings"] = {"sd_model_checkpoint": model}
+        payload["override_settings_restore_afterwards"] = False
+    req = urllib.request.Request(forge_url() + "/sdapi/v1/txt2img",
+                                 data=json.dumps(payload).encode("utf-8"),
+                                 headers={"Content-Type": "application/json"}, method="POST")
+    try:
+        # The first image also loads the model: slow on a laptop GPU.
+        with _forge_open(req, int(os.environ.get("FORGE_TIMEOUT", "600"))) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        detail = ""
+        try:
+            detail = json.loads(e.read().decode("utf-8")).get("detail") or ""
+        except Exception:
+            pass
+        if e.code == 404:
+            raise ImageGenError("Forge has no API at " + forge_url() + " — add --api to "
+                                "COMMANDLINE_ARGS in webui-user.bat and restart it.") from e
+        raise ImageGenError(f"Forge error {e.code}: {detail or 'request failed'} "
+                            "(out of GPU memory? see GAME-NIGHT.md → Pictures)") from e
+    except (urllib.error.URLError, OSError) as e:
+        raise ImageGenError(f"Can't reach Forge at {forge_url()} — is it running (with --api)? "
+                            f"({getattr(e, 'reason', e)})") from e
+    try:
+        b64 = body["images"][0]
+        if "," in b64[:64]:
+            b64 = b64.split(",", 1)[1]          # a data: URI
+        return base64.b64decode(b64), "forge:" + (model or "current model"), f"{w}x{h}"
+    except (KeyError, IndexError, TypeError, ValueError) as e:
+        raise ImageGenError("Forge answered without an image.") from e
+
+
 def inject_appearances(prompt: str, characters, campaign_dir=None) -> str:
     """Append each named character's canonical look to the prompt. Idempotent.
 
@@ -255,10 +380,13 @@ def generate_image(prompt: str, *, title: str = "", quality: str = DEFAULT_QUALI
     Returns {path, rel_path, cost, model, quality, size, title}. Raises
     ImageGenError for actionable problems (no campaign, no key, moderation).
     """
+    source = backend()
     api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
+    if source == "off" or (source == "openai" and not api_key):
         raise ImageGenError(
-            "OPENAI_API_KEY not set. Add it to .env (OPENAI_API_KEY=sk-...) to enable images."
+            "No image source. Add OPENAI_API_KEY=sk-... to .env, or run a local Stable "
+            "Diffusion WebUI Forge with --api and set IMAGE_BACKEND=forge in .env "
+            "(GAME-NIGHT.md → Pictures)."
         )
 
     campaign_dir = resolve_campaign_dir()
@@ -273,6 +401,44 @@ def generate_image(prompt: str, *, title: str = "", quality: str = DEFAULT_QUALI
                                 style_lock=style_lock, appearance_lock=appearance_lock,
                                 chronicler=chronicler)
 
+    if source == "forge":
+        image_bytes, model, size = _forge_generate(final_prompt, quality, size)
+        cost = 0.0
+    else:
+        image_bytes = _openai_generate(final_prompt, api_key, model, quality, size)
+        cost = estimate_cost(quality, size)
+
+    images_dir = Path(campaign_dir) / "images"
+    out_path = _next_path(images_dir, title)
+    out_path.write_bytes(image_bytes)
+
+    record = {
+        "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "file": out_path.name,
+        "title": title,
+        "model": model,
+        "quality": quality,
+        "size": size,
+        "est_cost_usd": cost,
+        "chronicler": (chronicler or {}).get("name"),
+        "prompt": final_prompt[:500],
+    }
+    _log_generation(images_dir, record)
+
+    short = _short_link(out_path, campaign_dir)
+    return {
+        "path": str(out_path),
+        "rel_path": os.path.relpath(out_path, Path.cwd()),
+        "short_path": str(short) if short else str(out_path),
+        "cost": cost,
+        "model": model,
+        "quality": quality,
+        "size": size,
+        "title": title,
+    }
+
+
+def _openai_generate(final_prompt: str, api_key: str, model: str, quality: str, size: str) -> bytes:
     payload = json.dumps({
         "model": model,
         "prompt": final_prompt,
@@ -301,39 +467,9 @@ def generate_image(prompt: str, *, title: str = "", quality: str = DEFAULT_QUALI
 
     try:
         b64 = body["data"][0]["b64_json"]
-        image_bytes = base64.b64decode(b64)
+        return base64.b64decode(b64)
     except (KeyError, IndexError, ValueError) as e:
         raise ImageGenError("Unexpected response from image API (no image data).") from e
-
-    images_dir = Path(campaign_dir) / "images"
-    out_path = _next_path(images_dir, title)
-    out_path.write_bytes(image_bytes)
-
-    cost = estimate_cost(quality, size)
-    record = {
-        "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "file": out_path.name,
-        "title": title,
-        "model": model,
-        "quality": quality,
-        "size": size,
-        "est_cost_usd": cost,
-        "chronicler": (chronicler or {}).get("name"),
-        "prompt": final_prompt[:500],
-    }
-    _log_generation(images_dir, record)
-
-    short = _short_link(out_path, campaign_dir)
-    return {
-        "path": str(out_path),
-        "rel_path": os.path.relpath(out_path, Path.cwd()),
-        "short_path": str(short) if short else str(out_path),
-        "cost": cost,
-        "model": model,
-        "quality": quality,
-        "size": size,
-        "title": title,
-    }
 
 
 def _format_http_error(e: "urllib.error.HTTPError") -> str:

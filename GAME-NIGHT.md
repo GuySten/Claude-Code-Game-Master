@@ -128,6 +128,89 @@ Install [cloudflared](https://developers.cloudflare.com/cloudflare-one/connectio
 link that works from anywhere. **The microphone also needs that https link** — so even
 friends on your Wi-Fi need it if they want to talk instead of type.
 
+**5. Pictures (optional)**
+
+The GM can illustrate the adventure: new places, villains, big moments. The players see each
+picture on their screens, drawn in one locked art style, with recurring characters looking the
+same every time. There are two ways to make the pictures:
+
+- **OpenAI** (best quality, about $0.04 a picture): put `OPENAI_API_KEY=sk-...` in `.env`.
+- **Your own computer** (free and private, needs an NVIDIA graphics card with 6 GB or more,
+  e.g. a GTX 1060): a local Stable Diffusion program called **Forge**. Set it up below.
+
+*Local pictures with Forge (Windows + NVIDIA). This is for a 6 GB card like a GTX 1060.*
+
+1. **Update the NVIDIA driver** (GeForce Experience, or nvidia.com → Drivers).
+2. **Download Forge**: on the [Forge GitHub page](https://github.com/lllyasviel/stable-diffusion-webui-forge),
+   find the **one-click package** download in the README. **GTX 10-series cards (like the 1060)
+   need a package built with CUDA 12.1 or 12.4**: newer CUDA 12.8 builds no longer support
+   them. Extract it with [7-Zip](https://www.7-zip.org/) into a short path such as `C:\forge`.
+3. **Run `update.bat`** once, then **`run.bat`**. The first start downloads a few GB and opens
+   `http://127.0.0.1:7860` in your browser. Close it again (the console window too).
+4. **Turn on the API** that the game talks to: open `webui\webui-user.bat` in Notepad and
+   change the `COMMANDLINE_ARGS` line to:
+   ```bat
+   set COMMANDLINE_ARGS=--api
+   ```
+5. **Get the model.** On [Civitai](https://civitai.com) search for **DreamShaper XL**, pick the
+   version labelled **Lightning** (DPM++ SDE), and download the `.safetensors` file (about
+   6.5 GB). Put it in `webui\models\Stable-diffusion\`. It suits fantasy art, portraits and
+   landscapes, and the Lightning version needs only a few steps, which keeps a laptop GPU fast.
+6. **Try it in Forge**: run `run.bat` and pick the model in the top-left **Checkpoint** box.
+   Use these settings: **Sampling method** DPM++ SDE, **Schedule type** Karras, **Sampling
+   steps** 6, **CFG Scale** 2, **Width × Height** 1216 × 832. Type *a cozy fantasy tavern at
+   night* and press Generate. The first picture also loads the model, so it can take a few
+   minutes. After that, expect roughly 30–60 seconds each on a GTX 1060.
+7. **Point the game at Forge**: add this line to `.env` in the game folder:
+   ```
+   IMAGE_BACKEND=forge
+   ```
+   The game's defaults match the settings from step 6. They are listed with the other
+   options below.
+8. **Check it from the game** (Forge must be running):
+   ```bash
+   bash tools/gm-image.sh generate --title "Test" --prompt "a cozy fantasy tavern at night, warm lantern light"
+   ```
+   It prints an `open: file://...` link and "made locally (free)". Then restart Claude Code.
+   When a session starts, the GM's notes say `Scene images: ENABLED (local Forge ...)`.
+
+**Every game night, start Forge (`run.bat`) before `claude`.** You can close the browser tab
+it opens; the console window has to stay open. If Forge isn't running, the game simply plays
+without pictures.
+
+Optional `.env` settings for Forge (the defaults suit DreamShaper XL Lightning):
+
+| Setting | Default | What it does |
+|---|---|---|
+| `FORGE_URL` | `http://127.0.0.1:7860` | Where Forge listens |
+| `FORGE_MODEL` | (whatever Forge has loaded) | Checkpoint to use, as named in Forge's Checkpoint box |
+| `FORGE_STEPS` | `6` | Sampling steps (the GM's "low" quality uses 2 fewer, "high" 2 more) |
+| `FORGE_CFG` | `2` | CFG scale |
+| `FORGE_SAMPLER` / `FORGE_SCHEDULER` | `DPM++ SDE` / `Karras` | Sampler and schedule type |
+| `FORGE_LANDSCAPE` / `FORGE_PORTRAIT` / `FORGE_SQUARE` | `1216x832` / `832x1216` / `1024x1024` | Picture sizes |
+| `FORGE_TIMEOUT` | `600` | Seconds to wait for one picture |
+
+**Too slow, or "out of memory"?** Use a smaller SD 1.5 model instead: **DreamShaper 8** from
+Civitai (about 2 GB), with:
+```
+FORGE_MODEL=dreamshaper_8
+FORGE_LANDSCAPE=768x512
+FORGE_PORTRAIT=512x768
+FORGE_SQUARE=512x512
+FORGE_STEPS=25
+FORGE_CFG=7
+FORGE_SAMPLER=DPM++ 2M
+```
+(Use the model's name exactly as Forge shows it.)
+
+**Set the art style** once per campaign (new campaigns get one when the world is created).
+Ask the GM *"lock an art style for this campaign"*, or run:
+```bash
+bash tools/gm-image.sh chronicler --name "Astreus" --style "ink-and-watercolor fantasy illustration" --persona "a wry court scholar"
+```
+To keep characters on-model, every PC and NPC needs a stored appearance. Ask the GM *"write
+appearances for everyone in the party"*: characters created on the join page don't have one yet.
+
 ---
 
 ## Each game night (host)
@@ -139,6 +222,8 @@ cd claude-code-game-master
 git pull            # pick up the latest version
 claude
 ```
+
+Using local pictures (Forge)? Start Forge's `run.bat` first.
 
 **Check the GM is on Opus:** type `/model`. It should show **Opus**. If it doesn't (a new
 computer, or you switched to try something), run `/models` and pick **Recommended**, or
@@ -307,12 +392,23 @@ You rarely need these — Claude runs them — but they're yours to use:
 | `bash tools/gm-table.sh music auto off` | Stop Claude from changing the music |
 | `bash tools/gm-player.sh party` | Every player character and their stats |
 | `bash tools/gm-music-library.sh fetch` | Download (or re-download) the music library |
+| `bash tools/gm-image.sh generate --title "Test" --prompt "..."` | Make a picture now (checks the image setup) |
+| `bash tools/gm-image.sh log` | Every picture made so far (and the OpenAI spend) |
 | `bash tools/gm-models.sh [preset]` | Which models run the game (recommended · budget · premium · inherit) |
 | `/model` · `/fast` (inside Claude Code) | Check or switch the GM's model now · faster GM replies |
 
 ---
 
 ## Troubleshooting
+
+**No pictures with Forge.** The GM's session notes say why (`Scene images: DISABLED (...)`):
+- *"Forge isn't answering"*: start `run.bat`, wait until the console shows the
+  `127.0.0.1:7860` address, then start a new Claude Code session.
+- *"Forge has no API"*: `--api` is missing from `COMMANDLINE_ARGS` in `webui\webui-user.bat`.
+- *"no kernel image is available"* in Forge's console: the package's CUDA version is too new
+  for a GTX 10-series card. Use a CUDA 12.1 or 12.4 package.
+- *Out of memory*: close games and browsers using the GPU, plug the laptop in, or switch to
+  the SD 1.5 settings in **5. Pictures**.
 
 **Friends can't open the link.** On another network they need the tunnel's `https://…`
 link, not the Wi-Fi one, and the `cloudflared` window must stay open. On the same Wi-Fi, a
