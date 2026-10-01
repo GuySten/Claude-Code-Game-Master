@@ -9,6 +9,12 @@ import pytest
 
 from lib import image_gen
 
+
+def gpu_turn_is_free():
+    import gpu_turn
+    with gpu_turn.gpu_turn("probe", wait=0) as t:
+        return t.held
+
 PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=")
 
@@ -35,8 +41,12 @@ def forge(monkeypatch, tmp_path):
             self.send_error(404)
 
         def do_POST(self):
+            if self.path == "/sdapi/v1/unload-checkpoint":
+                seen["unloads"] = seen.get("unloads", 0) + 1
+                return self._json({})
             if self.path != "/sdapi/v1/txt2img":
                 return self.send_error(404)
+            seen["card_free"] = gpu_turn_is_free()
             seen["requests"].append(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
             self._json({"images": [base64.b64encode(PNG).decode()], "info": "{}"})
 
@@ -195,3 +205,15 @@ def test_forge_without_its_api_is_named_as_such(monkeypatch):
     finally:
         httpd.shutdown()
         httpd.server_close()
+
+
+def test_pictures_take_their_turn_on_the_graphics_card(forge, monkeypatch, tmp_path):
+    import gpu_turn
+    monkeypatch.setattr(gpu_turn, "LOCK_PATH", tmp_path / "gpu.lock")
+    image_gen.generate_image("a tavern", title="Tavern")
+    assert forge["seen"]["card_free"] is False           # held while Forge painted
+    assert gpu_turn_is_free()                             # and given back
+    # Before music, Forge is asked to move its model off the card (into RAM).
+    assert image_gen.forge_release_gpu() is True and forge["seen"]["unloads"] == 1
+    monkeypatch.setenv("IMAGE_BACKEND", "off")
+    assert image_gen.forge_release_gpu() is False and forge["seen"]["unloads"] == 1

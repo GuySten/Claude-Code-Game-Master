@@ -7,6 +7,7 @@
 #   gm-music-compose.sh test                 Time one 30-second piece (first run downloads the model)
 #   gm-music-compose.sh theme "<villain>" [--boss] [--look "..."]   Compose a theme now
 #   gm-music-compose.sh anthem "<PC>"        Compose a player character's heroic anthem now
+#   gm-music-compose.sh normalize            Make this campaign's composed music louder (older, quiet pieces)
 #   gm-music-compose.sh status               What has been composed for this campaign
 #   gm-music-compose.sh remove               Uninstall the composer (deletes .compose-venv)
 #
@@ -66,13 +67,13 @@ print(f\"Composed {d['seconds']} s of music in {d['elapsed']:.0f} s on the {d['d
 print('Listen: ' + pathlib.Path(d['path']).resolve().as_uri())
 print(f\"A villain theme (30 s) takes about {d['elapsed']/60:.1f} min; a hero's anthem (20 s) about {d['elapsed']*0.7/60:.1f} min.\")"
         ;;
-    theme|anthem|status)
+    theme|anthem|normalize|status)
         $PYTHON_CMD "$LIB_DIR/composer.py" "$ACTION" "$@"
         ;;
     remove)
         rm -rf "$VENV" && success "Composer removed (.compose-venv deleted). Composed music stays."
         ;;
     *)
-        sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'
+        sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
         ;;
 esac

@@ -40,6 +40,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from campaign_manager import CampaignManager
 import visual_appearance as va_mod
+from gpu_turn import gpu_turn
 
 
 def resolve_campaign_dir(world_state_dir: str = "world-state"):
@@ -230,6 +231,22 @@ def _forge_open(req, timeout):
     return urllib.request.build_opener(urllib.request.ProxyHandler({})).open(req, timeout=timeout)
 
 
+def forge_release_gpu() -> bool:
+    """Ask Forge to move its model off the graphics card, into RAM (it stays loaded
+    there; the next picture moves it back by itself). Done before music is composed
+    so only one model is on the card. False if Forge isn't in use or didn't answer."""
+    if backend() != "forge":
+        return False
+    req = urllib.request.Request(forge_url() + "/sdapi/v1/unload-checkpoint", data=b"{}",
+                                 headers={"Content-Type": "application/json"}, method="POST")
+    try:
+        with _forge_open(req, 60) as r:
+            r.read()
+        return True
+    except (urllib.error.URLError, OSError, ValueError):
+        return False
+
+
 def images_status(probe: bool = True):
     """(enabled, backend, why) — what the session brief tells the GM."""
     b = backend()
@@ -304,8 +321,9 @@ def _forge_generate(prompt: str, quality: str, size: str):
                                  data=json.dumps(payload).encode("utf-8"),
                                  headers={"Content-Type": "application/json"}, method="POST")
     try:
-        # The first image also loads the model: slow on a laptop GPU.
-        with _forge_open(req, int(os.environ.get("FORGE_TIMEOUT", "600"))) as resp:
+        # The first image also loads the model: slow on a laptop GPU. The card is
+        # shared with the music composer: wait for our turn on it.
+        with gpu_turn("pictures"), _forge_open(req, int(os.environ.get("FORGE_TIMEOUT", "600"))) as resp:
             body = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         detail = ""

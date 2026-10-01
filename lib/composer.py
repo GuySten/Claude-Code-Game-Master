@@ -15,6 +15,7 @@ fight), listed in music-composed.json:
      "anthems": {"Pip": {"file": "anthem-pip.ogg", "seconds": 20}}}
 """
 
+import atexit
 import json
 import os
 import re
@@ -24,6 +25,9 @@ import tempfile
 import threading
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from gpu_turn import gpu_turn  # noqa: E402
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 COMPOSE_VENV = PROJECT_ROOT / ".compose-venv"
@@ -88,75 +92,147 @@ def anthem_prompt(sheet: Dict[str, Any], style: str) -> str:
             "uplifting strings, pounding timpani, glorious and inspiring")
 
 
-def compose(prompt: str, seconds: float, out: Path, loop: bool = False,
-            timeout: int = 3600) -> Dict[str, Any]:
-    """Run the composer (blocking: a minute or two on a GPU, several on a CPU)."""
+# --- the composer process: started once, keeps the model in RAM ---
+SERVER_LOG = Path(tempfile.gettempdir()) / "gm-composer.log"
+_server: Optional[subprocess.Popen] = None
+_server_device = ""
+_server_lock = threading.RLock()
+
+
+def _spawn() -> Optional[subprocess.Popen]:
+    global _server, _server_device
+    if _server is not None and _server.poll() is None:
+        return _server
     py = composer_python()
     if py is None:
-        raise ComposeError("the composer isn't set up (bash tools/gm-music-compose.sh setup)")
-    cmd = [str(py), str(SCRIPT), "--prompt", prompt, "--seconds", str(seconds), "--out", str(out)]
-    if loop:
-        cmd.append("--loop")
+        return None
+    with open(SERVER_LOG, "w", encoding="utf-8", errors="replace") as log:
+        _server = subprocess.Popen([str(py), str(SCRIPT), "--serve"], stdin=subprocess.PIPE,
+                                   stdout=subprocess.PIPE, stderr=log, text=True, encoding="utf-8",
+                                   errors="replace", env={**os.environ, "PYTHONUTF8": "1"})
+    _server_device = ""
+    return _server
+
+
+def _log_tail() -> str:
     try:
-        done = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
-                              env={**os.environ, "PYTHONUTF8": "1"})
-    except subprocess.TimeoutExpired as e:
-        raise ComposeError(f"composing took longer than {timeout} s") from e
-    lines = [l for l in done.stdout.splitlines() if l.strip().startswith("{")]
-    if done.returncode != 0 or not lines:
-        tail = (done.stderr or done.stdout or "").strip().splitlines()[-3:]
-        raise ComposeError("the composer failed: " + " | ".join(tail))
-    return json.loads(lines[-1])
+        return " | ".join(SERVER_LOG.read_text(encoding="utf-8", errors="replace").strip().splitlines()[-3:])
+    except OSError:
+        return ""
+
+
+def _read(proc: subprocess.Popen, want, timeout: float) -> Optional[Dict[str, Any]]:
+    """The composer's next JSON line that ``want(line)`` accepts; None if it died
+    or took longer than ``timeout`` (then it's stopped)."""
+    watchdog = threading.Timer(timeout, proc.kill)
+    watchdog.daemon = True
+    watchdog.start()
+    try:
+        for line in proc.stdout:
+            if line.strip().startswith("{"):
+                try:
+                    r = json.loads(line)
+                except ValueError:
+                    continue
+                if want(r):
+                    return r
+        return None
+    finally:
+        watchdog.cancel()
+
+
+def start_server(timeout: float = 1800) -> bool:
+    """Start the composer and let it read the model into RAM (once). Blocks until
+    it's ready; True if it is. The table calls this in the background at start."""
+    global _server_device
+    with _server_lock:
+        proc = _spawn()
+        if proc is None:
+            return False
+        if _server_device:
+            return True
+        r = _read(proc, lambda r: "ready" in r, timeout)
+        if r is None:
+            stop_server()
+            return False
+        _server_device = r.get("device") or "cpu"
+        return True
+
+
+def stop_server() -> None:
+    global _server, _server_device
+    with _server_lock:
+        proc, _server, _server_device = _server, None, ""
+    if proc is None:
+        return
+    try:
+        proc.stdin.close()               # it finishes when its input ends
+        proc.wait(timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        proc.kill()
+        proc.wait()
+
+
+atexit.register(stop_server)
+
+
+def _free_the_card() -> None:
+    """Pictures' model off the graphics card (into RAM) before music uses it."""
+    try:
+        import image_gen
+        image_gen.forge_release_gpu()
+    except Exception:
+        pass
 
 
 def compose_many(jobs: List[Dict[str, Any]], on_piece: Optional[Callable[[int, Dict[str, Any]], None]] = None,
                  timeout_each: int = 1800) -> List[Optional[Dict[str, Any]]]:
-    """Compose several pieces with ONE model load. ``jobs``: [{prompt, seconds, out,
-    loop}]. ``on_piece(index, result)`` is called as each one lands (the rest are
-    still composing). Returns one result per job (None where that piece failed)."""
+    """Compose pieces ({prompt, seconds, out, loop}) with the running composer: its
+    model stays in RAM, so it's read from disk only once. Each piece takes its turn
+    on the graphics card (pictures wait for it, and it for them), with Forge's model
+    moved off the card first. ``on_piece(index, result)`` is called as each one
+    lands. Returns one result per job (None where that piece failed)."""
     if not jobs:
         return []
-    py = composer_python()
-    if py is None:
+    if composer_python() is None:
         raise ComposeError("the composer isn't set up (bash tools/gm-music-compose.sh setup)")
     results: List[Optional[Dict[str, Any]]] = [None] * len(jobs)
-    with tempfile.TemporaryDirectory() as tmp:
-        batch = Path(tmp) / "jobs.json"
-        batch.write_text(json.dumps(jobs, ensure_ascii=False), encoding="utf-8")
-        with open(Path(tmp) / "stderr.txt", "w+", encoding="utf-8", errors="replace") as err:
-            proc = subprocess.Popen([str(py), str(SCRIPT), "--batch", str(batch)], stdout=subprocess.PIPE,
-                                    stderr=err, text=True, encoding="utf-8", errors="replace",
-                                    env={**os.environ, "PYTHONUTF8": "1"})
-            killed: List[bool] = []
-            watchdog = threading.Timer(timeout_each * len(jobs) + 300, lambda: (killed.append(True), proc.kill()))
-            watchdog.daemon = True
-            watchdog.start()
-            try:
-                for line in proc.stdout:
-                    if not line.strip().startswith("{"):
-                        continue
-                    try:
-                        r = json.loads(line)
-                    except ValueError:
-                        continue
-                    i = r.get("index", -1)
-                    if r.get("ok") and isinstance(i, int) and 0 <= i < len(jobs):
-                        results[i] = r
-                        if on_piece is not None:
-                            on_piece(i, r)
-                proc.wait()
-            finally:
-                watchdog.cancel()
-                if proc.poll() is None:
-                    proc.kill()
-                    proc.wait()
-            if not any(results):
-                if killed:
-                    raise ComposeError("composing took too long")
-                err.seek(0)
-                tail = err.read().strip().splitlines()[-3:]
-                raise ComposeError("the composer failed: " + " | ".join(tail))
+    errors: List[str] = []
+    with _server_lock:
+        for i, job in enumerate(jobs):
+            if not start_server():                   # (re)started if it isn't running
+                errors.append(_log_tail() or "it didn't start")
+                break
+            proc = _server
+            with gpu_turn("music"):
+                if _server_device != "cpu":
+                    _free_the_card()
+                try:
+                    proc.stdin.write(json.dumps({**job, "id": i}, ensure_ascii=False) + "\n")
+                    proc.stdin.flush()
+                    r = _read(proc, lambda r: r.get("id") == i, timeout_each)
+                except OSError:
+                    r = None
+            if r is None:                            # it died, or hung and was stopped
+                errors.append(_log_tail() or "it took too long")
+                stop_server()
+                continue
+            if not r.get("ok"):
+                errors.append(r.get("error") or "that piece failed")
+                continue
+            results[i] = r
+            if on_piece is not None:
+                on_piece(i, r)
+    if not any(results):
+        raise ComposeError("the composer failed: " + (errors[-1] if errors else "no answer"))
     return results
+
+
+def compose(prompt: str, seconds: float, out: Path, loop: bool = False,
+            timeout: int = 3600) -> Dict[str, Any]:
+    """Compose one piece (blocking: a minute or two on a GPU, several on a CPU)."""
+    return compose_many([{"prompt": prompt, "seconds": seconds, "out": str(out), "loop": loop}],
+                        timeout_each=timeout)[0]
 
 
 # --- what has been composed for this campaign ---
@@ -273,8 +349,28 @@ def compose_anthem(campaign_dir, sheet: Dict[str, Any]) -> Dict[str, Any]:
     return reg["anthems"][key]
 
 
+def normalize_files(campaign_dir) -> List[Dict[str, Any]]:
+    """Bring this campaign's composed pieces to the standard loudness (pieces
+    composed before the composer did that by itself are often very quiet)."""
+    py = composer_python()
+    if py is None:
+        raise ComposeError("the composer isn't set up (bash tools/gm-music-compose.sh setup)")
+    music = Path(campaign_dir) / "music"
+    files = sorted(str(f) for sub in ("themes", "anthems") for f in (music / sub).glob("*")
+                   if f.suffix.lower() in (".ogg", ".wav"))
+    if not files:
+        return []
+    done = subprocess.run([str(py), str(SCRIPT), "--normalize", *files], capture_output=True, text=True,
+                          encoding="utf-8", errors="replace", timeout=600, env={**os.environ, "PYTHONUTF8": "1"})
+    got = [json.loads(l) for l in done.stdout.splitlines() if l.strip().startswith("{")]
+    if not got:
+        tail = (done.stderr or done.stdout or "").strip().splitlines()[-3:]
+        raise ComposeError("the composer failed: " + " | ".join(tail))
+    return got
+
+
 def main() -> None:
-    """CLI behind tools/gm-music-compose.sh (theme / anthem / status)."""
+    """CLI behind tools/gm-music-compose.sh (theme / anthem / normalize / status)."""
     import argparse
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from campaign_manager import CampaignManager
@@ -286,6 +382,7 @@ def main() -> None:
     t.add_argument("--look", default="", help="What they're like (shapes the music)")
     a = sub.add_parser("anthem", help="Compose a player character's heroic anthem")
     a.add_argument("name")
+    sub.add_parser("normalize", help="Bring this campaign's composed music up to the standard loudness")
     sub.add_parser("status", help="Is the composer set up? What has been composed?")
     args = ap.parse_args()
 
@@ -302,6 +399,15 @@ def main() -> None:
     if camp is None:
         sys.exit("[ERROR] No active campaign.")
     try:
+        if args.action == "normalize":
+            got = normalize_files(camp)
+            if not got:
+                print("Nothing composed in this campaign yet.")
+            for r in got:
+                name = Path(r["path"]).name
+                print(f"  [SUCCESS] {name}: {r['before_db']} -> {r['after_db']} dB" if r.get("ok")
+                      else f"  [FAILED]  {name}: {r.get('error')}")
+            return
         if args.action == "theme":
             f = compose_theme(camp, args.name, args.boss, args.look)
             print(f"[SUCCESS] {args.name}'s {'boss ' if args.boss else ''}theme: music/themes/{f}")

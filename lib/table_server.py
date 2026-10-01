@@ -2404,6 +2404,10 @@ def serve(port: int, bind: str, code: Optional[str]) -> None:
                  f"program is using it — try: bash tools/gm-table.sh start --port {port + 1}")
     httpd.daemon_threads = True
     threading.Thread(target=state.portrait_worker, daemon=True).start()
+    if composer.available():
+        # The music model is read into RAM now, once, and waits there (on the
+        # graphics card only while it composes).
+        threading.Thread(target=composer.start_server, daemon=True).start()
     lan = _lan_ip()
     record = {"campaign": campaign_dir.name, "port": port, "bind": bind, "code": code,
               "host_key": host_key,
@@ -2435,6 +2439,7 @@ def serve(port: int, bind: str, code: Optional[str]) -> None:
         pass
     finally:
         httpd.server_close()
+        composer.stop_server()
         current = _server_info(campaign_dir)
         if current and current.get("pid") == os.getpid():
             info_path.unlink(missing_ok=True)

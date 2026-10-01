@@ -289,8 +289,21 @@ computer took and a link to listen. That tells you what to expect: if a 30-secon
 
 - **No NVIDIA card?** `setup --cpu` works on any computer, but each piece takes several
   minutes. The music still arrives, just later.
-- **Pictures and music share the GPU.** If the card's memory is full (Forge holding its model),
-  the composer switches to the CPU for that piece: slower, but nothing breaks.
+- **Pictures and music take turns on the GPU; both models stay in RAM.** When the table
+  starts, the composer reads its model into RAM once (in the background). Forge does the
+  same with its picture model on the first picture. After that nothing is read from disk
+  again. Only one model sits on the graphics card at a time: before each music piece, Forge
+  is asked to move its model off the card into RAM. The composer then uses the card and
+  moves its own model back to RAM when the piece is done. The next picture moves Forge's
+  model back by itself, in a few seconds. Pictures wait for a piece in progress, and music
+  waits for a picture.
+- **How much RAM:** the music model takes about 1.2 GB of RAM while it waits. With 8 GB of
+  RAM, use the smaller **DreamShaper 8** picture model (about 2 GB, settings in **5.
+  Pictures**): DreamShaper XL (about 6.5 GB) plus the music model doesn't fit next to
+  Windows, the browser and Claude Code.
+- **Volume:** every composed piece is brought up to the same loudness as ordinary music.
+  Pieces composed before that was added can be very quiet; fix them once with
+  `bash tools/gm-music-compose.sh normalize`.
 - **Compose ahead of time** (optional): `bash tools/gm-music-compose.sh theme "Grimaldi" --boss
   --look "a rotting circus ringmaster"`, or `anthem "Pip"`. `status` lists what's composed.
 - **Turn it off**: `MUSIC_COMPOSE=off` in `.env`. **Uninstall**: `bash tools/gm-music-compose.sh remove`.
@@ -548,6 +561,7 @@ You rarely need these — Claude runs them — but they're yours to use:
 | `bash tools/gm-image.sh enemy "Name" --boss` · `item "Thing"` | Paint a foe (epic for a boss) · a treasure, now |
 | `bash tools/gm-image.sh log` | Every picture made so far (and the OpenAI spend) |
 | `bash tools/gm-music-compose.sh test` · `status` | Time the local composer · what it has composed |
+| `bash tools/gm-music-compose.sh normalize` | Make this campaign's older, quiet composed music as loud as the rest |
 | `bash tools/gm-music-compose.sh theme "Name" --boss` · `anthem "PC"` | Compose a villain's (boss) theme · a hero's anthem ahead of time |
 | `bash tools/gm-models.sh [preset]` | Which models run the game (recommended · budget · premium · inherit) |
 | `/model` · `/fast` (inside Claude Code) | Check or switch the GM's model now · faster GM replies |
@@ -572,6 +586,9 @@ Tell the GM, or run `bash tools/gm-table.sh alias "Marta" "מרתה"`.
 (`"device": "cuda"`). *"no kernel image is available"* means the PyTorch build doesn't support the
 card: run `bash tools/gm-music-compose.sh remove`, then `setup --cpu`. Composing happens in the
 background, so a first theme can take a few minutes to arrive; until then the built-in theme plays.
+
+**Composed music is too quiet.** New pieces come out at a normal loudness. For older ones, run
+`bash tools/gm-music-compose.sh normalize` once (it fixes every composed piece in the campaign).
 
 **No pictures with Forge.** The GM's session notes say why (`Scene images: DISABLED (...)`):
 - *"Forge isn't answering"*: start `run.bat`, wait until the console shows the

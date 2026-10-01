@@ -944,26 +944,26 @@ def test_villains_bosses_and_heroes_get_composed_music(table):
     assert state.music["track"] == "grimaldi-boss.ogg"
 
 
-def test_the_table_composes_everything_queued_with_one_model_load(table, monkeypatch, tmp_path):
+def test_the_table_composes_with_the_model_kept_in_ram(table, monkeypatch, tmp_path):
     import composer
-    from tests.test_composer import FAKE_BATCH
+    from tests.test_composer import fake_composer
     call, state, camp = table["call"], table["state"], table["camp"]
-    fake = tmp_path / "fake_batch.py"
-    fake.write_text(FAKE_BATCH)
-    log = tmp_path / "loads.txt"
-    log.write_text("")
-    monkeypatch.setattr(composer, "SCRIPT", fake)
-    monkeypatch.setattr(composer, "composer_python", lambda: sys.executable)
-    monkeypatch.setenv("FAKE_LOG", str(log))
+    log, released = fake_composer(tmp_path, monkeypatch, composer)
     call("/api/claim", {"code": CODE, "pc": "Pip"})
     call("/api/create", {"code": CODE, "name": "Bram", "concept": "a dwarf"})
-
-    call("/api/gm/say", {"text": "Grimaldi bows.", "theme": "Grimaldi", "villain": True}, host=True)
-    assert sorted(state.music_pass()) == ["Bram", "Grimaldi", "Pip"]
-    assert log.read_text() == "load\n"                    # the villain + two anthems: one load
-    assert state.music["track"] == "grimaldi-theme.ogg"    # took over
-    assert composer.anthem(camp, "Bram") and composer.anthem(camp, "Pip")
-    assert state.music_pass() == [] and log.read_text() == "load\n"   # nothing left: no load
+    try:
+        assert composer.start_server()                     # at table start: model into RAM
+        call("/api/gm/say", {"text": "Grimaldi bows.", "theme": "Grimaldi", "villain": True}, host=True)
+        assert sorted(state.music_pass()) == ["Bram", "Grimaldi", "Pip"]
+        assert state.music["track"] == "grimaldi-theme.ogg"    # took over
+        assert composer.anthem(camp, "Bram") and composer.anthem(camp, "Pip")
+        assert state.music_pass() == []                        # nothing left
+        call("/api/gm/say", {"text": "He grows!", "mood": "boss"}, host=True)
+        assert state.music_pass() == ["Grimaldi"] and state.music["track"] == "grimaldi-boss.ogg"
+        assert log.read_text() == "load\n"                    # read from disk once, all evening
+        assert len(released) == 4                              # Forge stepped off the card each time
+    finally:
+        composer.stop_server()
 
 
 def test_heroic_moments_and_bosses_without_a_composer(table, monkeypatch):
