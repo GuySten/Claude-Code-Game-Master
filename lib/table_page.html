@@ -258,6 +258,8 @@
   #lore-card img { width: 100%; max-height: 160px; object-fit: cover; border-radius: 6px; margin-bottom: 6px; }
   #lore-card .text.loading { color: var(--muted); font-style: italic; }
   .chat-tabs { display: flex; gap: 4px; padding: 10px 10px 0; }
+  #chat-close { flex: 0 0 auto; display: none; padding: 6px 10px; }
+  #chat.open #chat-close { display: inline-block; }
   .chat-tabs button { flex: 1; padding: 6px 8px; font-size: .85rem; }
   .chat-tabs button[aria-pressed="true"] { border-color: var(--accent); }
   #narrator-pane, #talk-pane { display: flex; flex-direction: column; min-height: 0; flex: 1; }
@@ -383,6 +385,7 @@
     <div class="chat-tabs">
       <button type="button" id="tab-talk" aria-pressed="true" data-i18n="chatTitle"></button>
       <button type="button" id="tab-narrator" aria-pressed="false" data-i18n="narTitle"></button>
+      <button type="button" id="chat-close" aria-label="✕">✕</button>
     </div>
     <div id="talk-pane">
       <h2 id="chat-title" class="hidden" data-i18n="chatTitle"></h2>
@@ -1430,7 +1433,12 @@
     $("narrator-text").dir = $("narrator-text").value.trim() ? dirFor($("narrator-text").value) : "auto";
   });
 
+  // The drawers (chat; party on a phone) open just below the header, however
+  // many rows it wrapped into, so its buttons stay reachable.
+  const headerBottom = () => document.querySelector("#table header").getBoundingClientRect().bottom;
+  $("chat-close").onclick = () => $("chat").classList.remove("open");
   $("chat-toggle").onclick = () => {
+    $("chat").style.top = headerBottom() + "px";
     const open = $("chat").classList.toggle("open");
     if (open) { setUnread(0); $("party").classList.remove("open"); $("chat-text").focus();
                 $("chat-log").scrollTop = $("chat-log").scrollHeight; }
@@ -1909,15 +1917,16 @@
       + (ev.owner ? " — " + t("lootFor").replace("{pc}", ev.owner) : "");
     if (ev.type === "levelup") {
       s = s.replace("{level}", ev.level);
-      if (ev.hp_gain) s += ` · ${t("rolledHp")} +${ev.hp_gain}`;
-      if (ev.asi) Object.entries(ev.asi).forEach(([k, v]) => { s += ` · ${k.toUpperCase()} +${v}`; });
+      // (\u2066…\u2069 keeps "+6" reading left-to-right inside Hebrew text)
+      if (ev.hp_gain) s += ` · ${t("rolledHp")} \u2066+${ev.hp_gain}\u2069`;
+      if (ev.asi) Object.entries(ev.asi).forEach(([k, v]) => { s += ` · \u2066${k.toUpperCase()} +${v}\u2069`; });
       if (ev.wish) s += ` · "${ev.wish}"`;
       return s;
     }
     if (ev.type === "join" && ev.concept) s += " — " + ev.concept;
     if (ev.type === "join" && ev.rolled && ev.rolled.stats) {
       const r = ev.rolled;
-      s += " · 🎲 " + Object.entries(r.stats).map(([k, v]) => k.toUpperCase() + " " + v).join(", ");
+      s += " · 🎲 \u2066" + Object.entries(r.stats).map(([k, v]) => k.toUpperCase() + " " + v).join(", ") + "\u2069";
       if (r.hp) s += ` · ${t("rolledHp")} ${r.hp} · ${t("rolledAc")} ${r.ac}`;
       if (r.tries > 1) s += " · " + t("rollTry").replace("{n}", r.tries);
     }
@@ -2457,7 +2466,11 @@
     token = null; me = null; store.set("token", null);
     location.reload();
   };
-  $("party-toggle").onclick = () => $("party").classList.toggle("open");
+  $("party-toggle").onclick = () => {
+    $("party").style.top = headerBottom() + "px";
+    $("party").classList.toggle("open");
+    $("chat").classList.remove("open");
+  };
   $("code-go").onclick = enterCode;
   $("code").addEventListener("keydown", (ev) => { if (ev.key === "Enter") enterCode(); });
   // Rolling a character: the server rolls and keeps the numbers; we show them,

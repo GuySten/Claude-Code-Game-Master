@@ -7,6 +7,7 @@ way a browser (players) and gm-table.sh (the host) do.
 import json
 import threading
 import time
+from pathlib import Path
 import urllib.error
 import urllib.request
 import urllib.parse
@@ -1143,3 +1144,13 @@ def test_hover_cards_show_what_the_player_knows_and_nothing_more(table):
     call("/api/lang", {"code": CODE, "token": pip, "lang": "he"})
     terms = {t["term"]: t for t in state.lore_terms("Pip")}
     assert terms["מרתה"]["of"] == "Marta" and terms["מרתה"]["kind"] == "npc"
+
+
+def test_the_host_wrapper_knows_every_table_command():
+    """gm-table.sh passes only the actions it lists; a new table_server command must be added."""
+    import re
+    root = Path(__file__).resolve().parent.parent
+    commands = set(re.findall(r'sub\.add_parser\("([a-z-]+)"', (root / "lib" / "table_server.py").read_text()))
+    case = re.search(r'^\s*("serve"[^)]*)\)', (root / "tools" / "gm-table.sh").read_text(), re.M).group(1)
+    allowed = set(re.findall(r'"([a-z-]+)"', case))
+    assert commands <= allowed, commands - allowed

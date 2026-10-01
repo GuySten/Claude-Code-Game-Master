@@ -171,6 +171,12 @@ def table_dir(campaign_dir) -> Path:
     return Path(campaign_dir).resolve() / "table"
 
 
+def _stamp() -> float:
+    """Now, to the hundredth of a second, rounded DOWN (never in the future: the
+    round's deadline is counted from it)."""
+    return int(time.time() * 100) / 100
+
+
 def _now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%S")
 
@@ -461,7 +467,7 @@ class TableState:
     def chat_post(self, pc: str, text: str) -> Dict[str, Any]:
         with self.lock:
             msg = {"id": (self.chat[-1]["id"] + 1) if self.chat else 1,
-                   "t": round(time.time(), 2), "pc": pc, "text": text}
+                   "t": _stamp(), "pc": pc, "text": text}
             self.chat.append(msg)
             del self.chat[:-CHAT_KEEP]
             return dict(msg)
@@ -486,7 +492,7 @@ class TableState:
                                            self.overview().get("location"), history, question, pc)
             with self.narrator_slots:
                 got = narrator.answer(question, lines, prompt, lang, ask=self.narrator_ask)
-            entry = {"id": len(self.narrator_log.get(pc, [])) + 1, "t": round(time.time(), 2),
+            entry = {"id": len(self.narrator_log.get(pc, [])) + 1, "t": _stamp(),
                      "q": question, "a": got["answer"], "source": got["source"]}
             with self.lock:
                 self.narrator_log.setdefault(pc, []).append(entry)
@@ -859,7 +865,7 @@ class TableState:
                event: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         with self.lock:
             msg = {"id": (self.messages[-1]["id"] + 1) if self.messages else 1,
-                   "ts": _now(), "t": round(time.time(), 2), "kind": kind, "text": text}
+                   "ts": _now(), "t": _stamp(), "kind": kind, "text": text}
             if pc:
                 msg["pc"] = pc
             if to:

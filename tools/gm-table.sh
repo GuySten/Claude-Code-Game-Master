@@ -15,6 +15,12 @@
 #   gm-table.sh say "..." --theme "Lich" --boss   An enemy's own theme (boss = exciting version)
 #   gm-table.sh music <track>|list|stop   Shared background music for every player
 #   gm-table.sh music theme "<enemy>" [file]      Play / assign an enemy's theme
+#   gm-table.sh say "..." --theme "Lich" --villain --look "..."  A main villain (composed theme, portrait)
+#   gm-table.sh say "..." --heroic "<pc>"  A PC's heroic moment: their anthem, then the scene's music
+#   gm-table.sh say "..." --loot "<item>" --loot-look "..." --loot-for "<pc>"  Important loot, painted
+#   gm-table.sh translate --stdin         Translate players' actions for the rest of the table
+#   gm-table.sh round 90 | round off      How long the GM waits for everyone (default 60 s)
+#   gm-table.sh alias "Marta" "מרתה"      Another spelling of a name (hover cards)
 #   gm-table.sh free "<pc>"               Free a seat (player switching devices)
 #   gm-table.sh stop                      Close the table
 #   gm-table.sh serve [...]               Run the server in the foreground instead
@@ -27,7 +33,7 @@ ACTION=$1
 shift
 
 case "$ACTION" in
-    "serve"|"start"|"status"|"wait"|"inbox"|"say"|"translate"|"music"|"free"|"stop")
+    "serve"|"start"|"status"|"wait"|"inbox"|"say"|"translate"|"music"|"free"|"stop"|"round"|"alias")
         $PYTHON_CMD "$LIB_DIR/table_server.py" "$ACTION" "$@"
         ;;
 
@@ -37,7 +43,7 @@ case "$ACTION" in
         echo "Usage: gm-table.sh <action> [args]"
         echo "  start [--port N] [--code C]   Open the table (runs in the background)"
         echo "  status                        Links, table code, seated players, unread actions"
-        echo "  wait [--all] [--timeout S]    Wait for player actions (--all: until everyone acted)"
+        echo "  wait [--all] [--timeout S]    Wait for the round: every player acted, or 60 s after the first"
         echo "  inbox                         Unread player actions, without waiting"
         echo "  say \"<text>\" [--to PC] [--image FILE] | say --stdin"
         echo "        [--lang en|he]          Post narration (or a whisper / an illustration /"
@@ -47,7 +53,13 @@ case "$ACTION" in
         echo "  music list | music stop       What can play (per mood) / silence"
         echo "  say ... --mood M              Music follows the scene: calm tavern travel mystery dread"
         echo "                                dungeon combat boss sad storm victory silence"
-        echo "  say ... --theme \"<enemy>\" [--boss]  The enemy's own theme (boss: the exciting one)"
+        echo "  say ... --theme \"<enemy>\" [--boss] [--villain] [--look \"...\"]"
+        echo "                                The enemy's own theme (boss: the exciting one), and portrait"
+        echo "  say ... --heroic \"<pc>\"       A heroic moment: the PC's anthem, then the scene's music"
+        echo "  say ... --loot \"<item>\" [--loot-look \"...\"] [--loot-for PC]  Important loot, painted"
+        echo "  translate --stdin             Players' actions in the other language (JSON by id)"
+        echo "  round <seconds>|off           How long the GM waits for everyone once someone acts"
+        echo "  alias \"<name>\" \"<spelling>\"   Another spelling of a name, for the hover cards"
         echo "  music theme \"<enemy>\" [file]  Play / assign an enemy's theme; music themes lists them"
         echo "  music auto on|off             Let --mood change the music (default on)"
         echo "  free \"<pc>\"                   Free a seat so a player can rejoin from a new device"
