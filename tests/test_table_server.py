@@ -758,3 +758,46 @@ def test_every_pc_gets_a_portrait_shown_to_the_table(table):
     _, info = call(f"/api/info?code={CODE}&token={tok}")
     assert {p["name"]: p["portrait"] for p in info["party"]} == {
         "Pip": "0001-portrait-pip.png", "Bram": "0002-portrait-bram.png"}
+
+
+def test_important_places_are_painted_when_the_party_arrives(table):
+    import table_server
+    call, state, camp = table["call"], table["state"], table["camp"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    painted = []
+
+    def maker(name, campaign_dir):
+        painted.append(name)
+        (campaign_dir / "images").mkdir(exist_ok=True)
+        fname = f"place-{len(painted)}.png"
+        (campaign_dir / "images" / fname).write_bytes(b"png")
+        locs = json.loads((campaign_dir / "locations.json").read_text())
+        locs[name]["image"] = fname
+        (campaign_dir / "locations.json").write_text(json.dumps(locs))
+        return fname
+
+    state.place_maker = maker
+    overview = json.loads((camp / "campaign-overview.json").read_text())
+    locs = {"The Rusty Tankard": {"position": "unknown", "description": ""},
+            "The Sunken Crypt": {"position": "under the old chapel", "description": "flooded, green torchlight"}}
+    (camp / "locations.json").write_text(json.dumps(locs))
+
+    # A bare stop (nothing written about it) isn't painted.
+    overview["player_position"]["current_location"] = "The Rusty Tankard"
+    (camp / "campaign-overview.json").write_text(json.dumps(overview))
+    assert state.place_pass(now=1000) is None and painted == []
+
+    # An important place is, once, and the table sees it.
+    overview["player_position"]["current_location"] = "The Sunken Crypt"
+    (camp / "campaign-overview.json").write_text(json.dumps(overview))
+    assert state.place_pass(now=1001) == "The Sunken Crypt"
+    assert state.messages[-1]["event"] == {"type": "place", "location": "The Sunken Crypt"}
+    assert state.place_pass(now=1002 + table_server.PORTRAIT_RETRY) is None
+
+    # Only places the party has BEEN are listed (a painted-ahead place stays secret).
+    locs = json.loads((camp / "locations.json").read_text())
+    locs["Dragon's Lair"] = {"position": "the mountain", "image": "place-1.png"}
+    (camp / "locations.json").write_text(json.dumps(locs))
+    _, info = call(f"/api/info?code={CODE}&token={pip}")
+    assert info["places"] == [{"name": "The Sunken Crypt", "image": "place-1.png"}]
+    assert TableState(camp, str(table["world"])).visited == ["The Rusty Tankard", "The Sunken Crypt"]

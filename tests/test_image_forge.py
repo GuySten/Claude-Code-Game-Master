@@ -130,3 +130,21 @@ def test_portraits_are_drawn_and_kept_on_the_record(forge):
     assert json.loads((camp / "npcs.json").read_text())["Grimnar"]["portrait"] == npc["portrait"]
     with pytest.raises(image_gen.ImageGenError, match="No character"):
         image_gen.generate_portrait("Nobody", camp)
+
+
+def test_places_are_painted_and_kept_on_the_location(forge):
+    camp = forge["camp"]
+    (camp / "locations.json").write_text(json.dumps({
+        "The Crooked Lantern": {"position": "on the river road",
+                                "description": "a leaning tavern with a green lantern", "connections": []},
+        "Back Alley": {"position": "unknown", "description": "", "connections": []}}))
+    assert image_gen.location_is_important(image_gen.find_location("the crooked lantern", camp)[2])
+    assert not image_gen.location_is_important(image_gen.find_location("Back Alley", camp)[2])
+    out = image_gen.generate_location_image("the crooked lantern", camp)
+    sent = forge["seen"]["requests"][-1]
+    assert (sent["width"], sent["height"]) == (1216, 832)
+    assert "Establishing view of The Crooked Lantern" in sent["prompt"] and "green lantern" in sent["prompt"]
+    saved = json.loads((camp / "locations.json").read_text())
+    assert saved["The Crooked Lantern"]["image"] == out["image"]
+    with pytest.raises(image_gen.ImageGenError, match="No location"):
+        image_gen.generate_location_image("Atlantis", camp)

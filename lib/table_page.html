@@ -145,6 +145,22 @@
                           margin: 4px 0 8px 12px; border: 1px solid var(--line); cursor: zoom-in; }
   #sheet-body .portrait.big { float: none; width: 100%; margin: 4px 0 8px; cursor: zoom-out; }
   .msg.system img { max-width: 260px; margin: 6px auto 0; }
+  .msg.system.place img { max-width: min(560px, 100%); }
+  header .where button { border: 0; background: none; padding: 0 4px; font-size: .95rem; }
+  dialog#places { width: min(760px, calc(100% - 24px)); max-height: 90vh; padding: 0;
+                  border: 1px solid var(--line); border-radius: 12px;
+                  background: var(--panel); color: var(--ink); }
+  dialog#places::backdrop { background: rgba(0, 0, 0, .55); }
+  .places-body { padding: 10px 16px 16px; }
+  #place-big { width: 100%; display: block; border-radius: 8px; }
+  #place-name { margin: 8px 0 4px; font-size: 1.15rem; }
+  #place-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+                gap: 8px; margin-top: 10px; }
+  #place-list button { padding: 0; border-radius: 8px; overflow: hidden; text-align: start;
+                       background: var(--bg); }
+  #place-list img { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; display: block; }
+  #place-list span { display: block; font-size: .8rem; padding: 3px 6px; }
+  #place-list button[aria-current="true"] { border-color: var(--accent); }
   .bar > div { transition: width .9s ease; }
   /* A PC's card changes the moment the story reaches them. */
   .pc.hurt { animation: hurt 1.6s ease-out; }
@@ -304,6 +320,18 @@
   </aside>
 </section>
 
+<dialog id="places" aria-labelledby="places-title">
+  <div class="sheet-head">
+    <h2 id="places-title" data-i18n="placesTitle"></h2>
+    <button id="places-close" type="button" aria-label="✕">✕</button>
+  </div>
+  <div class="places-body">
+    <img id="place-big" alt="">
+    <div id="place-name" dir="auto"></div>
+    <div id="place-list"></div>
+  </div>
+</dialog>
+
 <dialog id="sheet" aria-labelledby="sheet-title">
   <div class="sheet-head">
     <div><h2 id="sheet-title" dir="auto"></h2><div class="sub" id="sheet-sub" dir="auto"></div></div>
@@ -385,6 +413,7 @@
       rolledNote: "Rolled with fair dice: 4d6 for each ability, lowest die dropped. Change the name and concept if you like, then Create — the table sees what you rolled.",
       rolledHp: "HP", rolledAc: "AC",
       ev_levelup: "⬆ {pc} reaches level {level}", ev_portrait: "🖼 {pc}'s portrait",
+      ev_place: "🖼 {location}", placesTitle: "Places you've been", placeShow: "See this place",
       ev_seat: "{pc} takes their seat at the table.", ev_join: "A new player joins: {pc}",
       ev_leave: "{pc} steps away from the table.", ev_music_stop: "🎵 The music fades away.",
       amb_wind: "Howling wind", amb_rain: "Steady rain", amb_storm: "Rain with rolling thunder",
@@ -453,6 +482,7 @@
       rolledNote: "הוטל בקוביות הוגנות: 4d6 לכל תכונה, הקובייה הנמוכה נזרקת. שנו את השם והתיאור אם תרצו ולחצו צור — השולחן יראה מה הטלתם.",
       rolledHp: "נק״ח", rolledAc: "דרגת שריון",
       ev_levelup: "⬆ {pc} עולה לדרגה {level}", ev_portrait: "🖼 הדיוקן של {pc}",
+      ev_place: "🖼 {location}", placesTitle: "מקומות שביקרתם בהם", placeShow: "הצג את המקום",
       ev_seat: "{pc} מתיישב/ת ליד השולחן.", ev_join: "שחקן/ית חדש/ה מצטרף/ת: {pc}",
       ev_leave: "{pc} קם/ה מהשולחן.", ev_music_stop: "🎵 המוזיקה דועכת.",
       amb_wind: "רוח מייללת", amb_rain: "גשם יורד", amb_storm: "סערה ורעמים",
@@ -1219,6 +1249,14 @@
     $("campaign").textContent = info.campaign || t("title");
     document.title = info.campaign || t("title");
     $("where").textContent = [info.location, info.time].filter(Boolean).join(" · ");
+    knownPlaces = info.places || [];
+    if (knownPlaces.length) {
+      const here = knownPlaces.find((p) => p.name === info.location);
+      const b = document.createElement("button");
+      b.type = "button"; b.textContent = "🖼"; b.title = t("placeShow");
+      b.onclick = () => openPlaces(here ? here.name : knownPlaces[0].name);
+      $("where").appendChild(b);
+    }
     partyLive = info.party || [];
     narrationGate = info.narration_id || 0;
     syncParty();
@@ -1497,6 +1535,29 @@
     };
     return box;
   }
+  // Pictures of the places the party has been (the server lists only visited ones).
+  let knownPlaces = [];
+  function openPlaces(name) {
+    if (!knownPlaces.length) return;
+    const show = (p) => {
+      $("place-big").src = imageUrl(p.image);
+      $("place-name").textContent = p.name;
+      [...$("place-list").children].forEach((b) => b.setAttribute("aria-current", String(b.dataset.name === p.name)));
+    };
+    $("place-list").textContent = "";
+    if (knownPlaces.length > 1) knownPlaces.forEach((p) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.dataset.name = p.name;
+      b.innerHTML = `<img alt="" loading="lazy" src="${esc(imageUrl(p.image))}"><span dir="auto">${esc(p.name)}</span>`;
+      b.onclick = () => show(p);
+      $("place-list").appendChild(b);
+    });
+    show(knownPlaces.find((p) => p.name === name) || knownPlaces[0]);
+    const dlg = $("places");
+    if (!dlg.open) { if (dlg.showModal) dlg.showModal(); else dlg.setAttribute("open", ""); }
+  }
+  $("places-close").onclick = () => $("places").close();
+  $("places").addEventListener("click", (ev) => { if (ev.target === $("places")) $("places").close(); });
   $("sheet-close").onclick = () => $("sheet").close();
   $("sheet").addEventListener("click", (ev) => { if (ev.target === $("sheet")) $("sheet").close(); });
   $("sheet").addEventListener("close", () => { sheetFor = null; });
@@ -1599,6 +1660,7 @@
     if (!ev || (!STRINGS.en["ev_" + ev.type] && ev.type !== "music")) return m.text;
     if (ev.type === "music") return "🎵 " + trackTitle(ev);
     let s = t("ev_" + ev.type).replace("{pc}", m.pc || "");
+    if (ev.type === "place") return s.replace("{location}", ev.location || "");
     if (ev.type === "levelup") {
       s = s.replace("{level}", ev.level);
       if (ev.hp_gain) s += ` · ${t("rolledHp")} +${ev.hp_gain}`;
@@ -1804,7 +1866,15 @@
     } else if (m.kind === "system") {
       d.textContent = systemText(m);
       d.dir = dirFor(d.textContent);
-      if (m.image) d.appendChild(imageEl(m.image));
+      if (m.image) {
+        const img = imageEl(m.image);
+        if ((m.event || {}).type === "place") {
+          d.classList.add("place");
+          img.style.cursor = "zoom-in";
+          img.onclick = () => openPlaces((m.event || {}).location);
+        }
+        d.appendChild(img);
+      }
     } else {
       const who = document.createElement("div");
       who.className = "who";

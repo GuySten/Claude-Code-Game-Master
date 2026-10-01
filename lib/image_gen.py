@@ -499,6 +499,58 @@ def generate_portrait(name: str, campaign_dir=None, quality: str = DEFAULT_QUALI
     return {**out, "portrait": filename, "kind": kind, "name": record["name"]}
 
 
+# --------------------------------------------------------------- places ----
+def find_location(name: str, campaign_dir):
+    """(locations.json path, key, record) for ``name`` (case-insensitive), else None."""
+    path = Path(campaign_dir) / "locations.json"
+    if not path.exists():
+        return None
+    data = json.loads(path.read_text(encoding="utf-8"))
+    table = data["locations"] if isinstance(data.get("locations"), dict) else data
+    for key, rec in table.items():
+        if key.strip().lower() == str(name).strip().lower() and isinstance(rec, dict):
+            return path, key, rec
+    return None
+
+
+def location_is_important(rec: dict) -> bool:
+    """A place the GM has actually written about (a move alone creates a bare
+    record: position "unknown", no description) or flagged ``important``."""
+    position = str(rec.get("position") or "").strip().lower()
+    return bool(rec.get("important") or str(rec.get("description") or "").strip()
+                or position not in ("", "unknown"))
+
+
+def location_prompt(name: str, rec: dict) -> str:
+    bits = [f"Establishing view of {name}."]
+    for k in ("description", "position"):
+        v = str(rec.get(k) or "").strip()
+        if v and v.lower() != "unknown":
+            bits.append(v.rstrip(".") + ".")
+    bits.append("Wide cinematic environment art with the place itself as the subject: "
+                "architecture, landscape, light and atmosphere; no close-up figures, no text.")
+    return " ".join(bits)
+
+
+def generate_location_image(name: str, campaign_dir=None, quality: str = DEFAULT_QUALITY) -> dict:
+    """Paint a place in the campaign's style and record it on the location as ``image``."""
+    campaign_dir = Path(campaign_dir or resolve_campaign_dir() or "")
+    found = find_location(name, campaign_dir) if str(campaign_dir) else None
+    if not found:
+        raise ImageGenError(f"No location named '{name}' (add it: gm-location.sh add).")
+    path, key, rec = found
+    out = generate_image(location_prompt(key, rec), title=f"place {key}", quality=quality,
+                         size="1536x1024", campaign_dir=campaign_dir)
+    filename = Path(out["path"]).name
+    data = json.loads(path.read_text(encoding="utf-8"))          # re-read just before writing
+    table = data["locations"] if isinstance(data.get("locations"), dict) else data
+    table[key]["image"] = filename
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(path)
+    return {**out, "image": filename, "name": key}
+
+
 def _openai_generate(final_prompt: str, api_key: str, model: str, quality: str, size: str) -> bytes:
     payload = json.dumps({
         "model": model,
@@ -565,6 +617,8 @@ def main() -> None:
                         help="Skip the visual_appearance injection (transformation, disguise, vision)")
     parser.add_argument("--portrait", metavar="NAME",
                         help="Draw this PC's or NPC's portrait and save it on their record")
+    parser.add_argument("--location", metavar="NAME",
+                        help="Paint this location and save the picture on its record")
     parser.add_argument("--appearance", metavar="NAME",
                         help="Print one character's visual_appearance bible line and exit")
     parser.add_argument("--quality", default=DEFAULT_QUALITY, choices=["low", "medium", "high", "auto"])
@@ -586,6 +640,15 @@ def main() -> None:
             print(f"[ERROR] {e}", file=sys.stderr)
             sys.exit(1)
         print(json.dumps(out) if args.json else f"Portrait of {out['name']}: {out['path']}")
+        return
+
+    if args.location is not None:
+        try:
+            out = generate_location_image(args.location, quality=args.quality)
+        except ImageGenError as e:
+            print(f"[ERROR] {e}", file=sys.stderr)
+            sys.exit(1)
+        print(json.dumps(out) if args.json else f"Picture of {out['name']}: {out['path']}")
         return
 
     if args.appearance is not None:

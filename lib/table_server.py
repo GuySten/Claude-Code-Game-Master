@@ -274,6 +274,11 @@ class TableState:
         self.portrait_seen: Dict[str, float] = {}
         self.portrait_wake = threading.Event()
         self.portrait_maker = None            # tests plug in a fake: (name, campaign_dir) -> filename
+        self.place_maker = None               # ditto, for places
+        # Places the party has been (only their pictures are shown: no spoilers).
+        self.places_path = self.dir / "places.json"
+        visited = self._read_json(self.places_path, {}).get("visited", [])
+        self.visited: List[str] = [v for v in visited if isinstance(v, str)]
         # Characters rolled on the join screen, not created yet: roll id -> roll.
         self.pending_rolls: Dict[str, Dict[str, Any]] = {}
         # Actions corrected AFTER the GM read them: id -> the text the GM read.
@@ -1102,18 +1107,79 @@ class TableState:
         return {"ok": True, "level": to, "hp_gain": gain, "asi": asi,
                 "more": opts["pending"] - 1}
 
-    # --- portraits ---
+    # --- portraits and places ---
+    def _art_on(self, fake) -> bool:
+        if fake is not None:
+            return True
+        try:
+            import image_gen
+            return image_gen.images_status()[0]
+        except Exception:
+            return False
+
+    def _note_visit(self) -> Optional[str]:
+        """The party's current location, remembered as visited."""
+        here = self.overview().get("location")
+        if here and here not in self.visited:
+            with self.lock:
+                self.visited.append(here)
+                tmp = self.places_path.with_suffix(".tmp")
+                tmp.write_text(json.dumps({"visited": self.visited}, indent=2, ensure_ascii=False),
+                               encoding="utf-8")
+                tmp.replace(self.places_path)
+        return here
+
+    def place_pass(self, now: Optional[float] = None) -> Optional[str]:
+        """Paint the party's current location if it's an important place (the GM
+        has written about it) with no picture yet, and show it to the table."""
+        import image_gen
+        now = now or time.time()
+        here = self._note_visit()
+        if not here:
+            return None
+        try:
+            found = image_gen.find_location(here, self.campaign_dir)
+        except (OSError, ValueError):
+            return None
+        if not found:
+            return None
+        _, key, rec = found
+        if rec.get("image") and (self.campaign_dir / "images" / str(rec["image"])).is_file():
+            return None
+        if not image_gen.location_is_important(rec) or not self._art_on(self.place_maker):
+            return None
+        if now - self.portrait_tried.get("place:" + key, -PORTRAIT_RETRY) < PORTRAIT_RETRY:
+            return None
+        self.portrait_tried["place:" + key] = now
+        try:
+            filename = (self.place_maker(key, self.campaign_dir) if self.place_maker is not None
+                        else image_gen.generate_location_image(key, self.campaign_dir)["image"])
+        except Exception as e:
+            print(f"[place] {key}: {e}", flush=True)
+            return None
+        self.append("system", f"{key}.", image=filename, event={"type": "place", "location": key})
+        return key
+
+    def places(self) -> List[Dict[str, str]]:
+        """Pictures of the places the party has been, newest visit first."""
+        try:
+            import image_gen
+            out = []
+            for name in reversed(self.visited):
+                found = image_gen.find_location(name, self.campaign_dir)
+                img = found and found[2].get("image")
+                if img and (self.campaign_dir / "images" / str(img)).is_file():
+                    out.append({"name": found[1], "image": img})
+            return out
+        except (OSError, ValueError):
+            return []
+
     def portrait_pass(self, now: Optional[float] = None) -> List[str]:
         """Draw the portrait of every PC who has none (one at a time; slow on a
         laptop GPU), and show it to the table. Returns the names drawn."""
         now = now or time.time()
-        if self.portrait_maker is None:
-            try:
-                import image_gen
-                if not image_gen.images_status()[0]:
-                    return []
-            except Exception:
-                return []
+        if not self._art_on(self.portrait_maker):
+            return []
         drawn = []
         for path, raw in party_roster.all_pcs(self.campaign_dir):
             sheet = to_flat(raw)
@@ -1144,10 +1210,11 @@ class TableState:
         while True:
             self.portrait_wake.wait(30)
             self.portrait_wake.clear()
-            try:
-                self.portrait_pass()
-            except Exception as e:
-                print(f"[portrait] {e}", flush=True)
+            for job in (self.place_pass, self.portrait_pass):     # the scene first
+                try:
+                    job()
+                except Exception as e:
+                    print(f"[art] {e}", flush=True)
 
     def create_pc(self, mode: str, name: str, concept: str) -> Dict[str, Any]:
         from identity_onboarding import IdentityOnboarding
@@ -1239,6 +1306,7 @@ def make_handler(state: TableState, code: str, host_key: str):
                                    "waiting_on": state.waiting_on(),
                                    "music": state.music, "server_now": time.time(),
                                    "progress": state.progress(), "tts": state.tts_ready(),
+                                   "places": state.places(),
                                    "narration_id": state.last_narration(me),
                                    **state.overview()})
             if url.path == "/api/messages":
@@ -1873,6 +1941,11 @@ def _print_messages(messages: List[dict], waiting_on: List[str],
                       f"level {m['event'].get('level')}'s class features/spells to the sheet "
                       f"(gm-player.sh), honouring what they asked if the rules allow, and "
                       f"celebrate it in the story.")
+                continue
+            if kind == "place":
+                print(f"[#{m['id']} PLACE] The table painted {m['event'].get('location')} and "
+                      f"showed everyone ({m.get('image')}) — no need to illustrate its "
+                      f"establishing shot yourself.")
                 continue
             if kind == "portrait":
                 print(f"[#{m['id']} PORTRAIT] {m['text']} (shown to the table: {m.get('image')})")

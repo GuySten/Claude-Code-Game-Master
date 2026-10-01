@@ -29,6 +29,7 @@ if [ "$#" -lt 1 ]; then
     echo "                                 For ONE transformed/disguised character, just omit their"
     echo "                                 --character and describe the altered look in the prompt."
     echo "  portrait <name>            - Draw a PC's or NPC's portrait and save it on their record"
+    echo "  location <name>            - Paint a location and save the picture on its record"
     echo "  appearance <name>          - Print a character's visual_appearance bible line (PC or NPC)"
     echo "  chronicler                 - Show this campaign's in-world chronicler"
     echo "      --name <text>            Set the chronicler's name"
@@ -114,6 +115,22 @@ case "$ACTION" in
         success "Portrait of $NAME saved on their record ($FILE)"
         echo "  open: $SHORT_URI"
         echo "  at the online table: bash tools/gm-table.sh say \"…\" --image $FILE"
+        ;;
+
+    location)
+        require_active_campaign
+        if [ -z "$1" ]; then
+            error "Usage: gm-image.sh location \"<location name>\" [--quality low|medium|high]"
+            exit 1
+        fi
+        NAME="$1"; shift
+        PQUALITY="medium"
+        [ "$1" = "--quality" ] && PQUALITY="$2"
+        RESULT=$($PYTHON_CMD "$LIB_DIR/image_gen.py" --location "$NAME" --quality "$PQUALITY" --json) || exit $?
+        SHORT_URI=$(echo "$RESULT" | $PYTHON_CMD -c "import sys,json,pathlib; d=json.load(sys.stdin); print(pathlib.Path(d.get('short_path') or d['path']).resolve().as_uri())")
+        FILE=$(echo "$RESULT" | $PYTHON_CMD -c "import sys,json; print(json.load(sys.stdin)['image'])")
+        success "Picture of $NAME saved on the location ($FILE)"
+        echo "  open: $SHORT_URI"
         ;;
 
     chronicler)

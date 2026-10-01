@@ -213,6 +213,11 @@ background a minute or two after they join and shown to everyone; then it sits a
 their character sheet and next to their name in the party panel. For an important NPC, or a PC
 made outside the table, the GM runs `bash tools/gm-image.sh portrait "<name>"` (you can too).
 
+**Places.** Every important place gets a picture too. When the party arrives somewhere the GM
+has described, the table paints it in the background and shows it to everyone. Tap **🖼**
+next to the location name at the top of the page to see it again, along with every place
+you've been. The GM can paint any place with `bash tools/gm-image.sh location "<name>"`.
+
 To keep characters on-model, every PC and NPC needs a stored appearance. Ask the GM *"write
 appearances for everyone in the party"*: characters created on the join page don't have one yet.
 
@@ -336,7 +341,8 @@ Copy, fill in the link and code, and send:
    reaches your name, not before.
 10. **Your character sheet.** Tap **📜 My sheet**, or any character in the side panel, for
    the full sheet: a portrait (when pictures are on), abilities, skills, features, spells,
-   equipment, conditions. It updates
+   equipment, conditions. The **🖼** next to the location at the top shows the places you've
+   been. It updates
    with the story too, and what just changed flashes. When you earn a level, **⬆** appears:
    open your sheet and tap **Level up**. Roll your hit die at the table (or take the average),
    pick your ability increases when your class gets them, and tell the GM what you'd like
@@ -374,7 +380,8 @@ Copy, fill in the link and code, and send:
    עליו כדי לראות את כולו מיד. בפאנל הצד רואים את **נקודות החיים** של כולם, והן משתנות יחד
    עם הסיפור: מכה נוחתת על פס החיים שלכם כשהטקסט מגיע לשם שלכם, לא לפני כן.
 10. **דף הדמות.** לחצו **📜 הדף שלי**, או על כל דמות בפאנל הצד, כדי לראות את הדף המלא:
-   דיוקן (כשהתמונות פועלות), תכונות, מיומנויות, יכולות, לחשים, ציוד ומצבים. גם הוא מתעדכן יחד עם הסיפור, ומה שהשתנה
+   דיוקן (כשהתמונות פועלות), תכונות, מיומנויות, יכולות, לחשים, ציוד ומצבים. ה-**🖼** ליד
+   שם המקום למעלה מציג את המקומות שביקרתם בהם. גם הוא מתעדכן יחד עם הסיפור, ומה שהשתנה
    מהבהב. כשאתם מרוויחים דרגה מופיע **⬆**: פתחו את הדף ולחצו **עלייה בדרגה**. הטילו את קוביית
    החיים ליד השולחן (או קחו את הממוצע), בחרו שיפורי תכונות כשהמקצוע מקבל אותם, וכתבו למנהל
    המשחק מה תרצו (תת־מקצוע, לחשים, הישג). מנהל המשחק מוסיף את יכולות המקצוע החדשות.
