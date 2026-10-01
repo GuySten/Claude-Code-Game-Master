@@ -174,3 +174,24 @@ def test_foes_bosses_and_treasures_are_painted_and_kept(forge):
     assert json.loads((camp / "treasures.json").read_text())["Sword of Dawn"] == {
         "image": item["image"], "look": "a sunsteel blade", "owner": "Pip"}
     assert image_gen.treasure_art("sword of dawn", camp) == item["image"]
+
+
+def test_forge_without_its_api_is_named_as_such(monkeypatch):
+    """A running Forge started without --api answers 404 for /sdapi/...: say so."""
+    class NoApi(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def do_GET(self):
+            self.send_error(404)
+
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), NoApi)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    monkeypatch.setenv("IMAGE_BACKEND", "forge")
+    monkeypatch.setenv("FORGE_URL", f"http://127.0.0.1:{httpd.server_address[1]}")
+    try:
+        on, _, why = image_gen.images_status()
+        assert not on and "API is off" in why and "--api" in why
+    finally:
+        httpd.shutdown()
+        httpd.server_close()

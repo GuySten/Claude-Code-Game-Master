@@ -245,6 +245,11 @@ def images_status(probe: bool = True):
     try:
         with _forge_open(urllib.request.Request(forge_url() + "/sdapi/v1/sd-models"), 3) as r:
             models = json.loads(r.read().decode("utf-8")) or []
+    except urllib.error.HTTPError as e:
+        if e.code == 404:                       # the web UI answers, its API doesn't
+            return False, b, ("Forge is running but its API is off — add --api to "
+                              "COMMANDLINE_ARGS in webui\\webui-user.bat and restart it")
+        return False, b, f"Forge answered with an error ({e.code})"
     except (urllib.error.URLError, OSError, ValueError):
         return False, b, (f"Forge isn't answering at {forge_url()} — start it (run.bat) "
                           f"with --api, then images turn on")
