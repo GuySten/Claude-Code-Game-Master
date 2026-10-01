@@ -217,3 +217,28 @@ def test_pictures_take_their_turn_on_the_graphics_card(forge, monkeypatch, tmp_p
     assert image_gen.forge_release_gpu() is True and forge["seen"]["unloads"] == 1
     monkeypatch.setenv("IMAGE_BACKEND", "off")
     assert image_gen.forge_release_gpu() is False and forge["seen"]["unloads"] == 1
+
+
+def test_forge_is_warmed_up_at_the_start_of_the_game(forge, monkeypatch, tmp_path):
+    import gpu_turn
+    monkeypatch.setattr(gpu_turn, "LOCK_PATH", tmp_path / "gpu.lock")
+    monkeypatch.setenv("FORGE_MODEL", "dreamshaper_8")
+    assert image_gen.forge_warm_up() is True
+    warm = forge["seen"]["requests"][-1]
+    assert warm["steps"] == 1 and (warm["width"], warm["height"]) == (64, 64)        # a few seconds
+    assert warm["override_settings"] == {"sd_model_checkpoint": "dreamshaper_8"}      # the right model
+    assert forge["seen"]["unloads"] == 1               # then off the card, waiting in RAM
+    monkeypatch.setenv("IMAGE_BACKEND", "off")
+    assert image_gen.forge_warm_up() is False and len(forge["seen"]["requests"]) == 1
+
+
+def test_the_table_loads_the_picture_model_then_the_music_model(monkeypatch):
+    import composer
+    import image_gen as ig                             # the module the table imports
+    import table_server
+    order = []
+    monkeypatch.setattr(ig, "forge_warm_up", lambda: order.append("pictures") or True)
+    monkeypatch.setattr(composer, "available", lambda: True)
+    monkeypatch.setattr(composer, "start_server", lambda: order.append("music") or True)
+    table_server.warm_up()
+    assert order == ["pictures", "music"]              # one after the other, not both at once

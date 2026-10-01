@@ -290,9 +290,10 @@ computer took and a link to listen. That tells you what to expect: if a 30-secon
 - **No NVIDIA card?** `setup --cpu` works on any computer, but each piece takes several
   minutes. The music still arrives, just later.
 - **Pictures and music take turns on the GPU; both models stay in RAM.** When the table
-  starts, the composer reads its model into RAM once (in the background). Forge does the
-  same with its picture model on the first picture. After that nothing is read from disk
-  again. Only one model sits on the graphics card at a time: before each music piece, Forge
+  starts, it loads both into RAM in the background, one after the other: first Forge's
+  picture model (Forge paints one tiny throwaway picture), then the music model. After
+  that nothing is read from disk again. The music model is released when the table stops;
+  Forge's when you close Forge's window. Only one model sits on the graphics card at a time: before each music piece, Forge
   is asked to move its model off the card into RAM. The composer then uses the card and
   moves its own model back to RAM when the piece is done. The next picture moves Forge's
   model back by itself, in a few seconds. Pictures wait for a piece in progress, and music

@@ -1710,6 +1710,21 @@ class TableState:
         return {"ok": True, "pc": result["character"].get("name", name)}
 
 
+def warm_up() -> None:
+    """At the start of the game, read the AI models into RAM, one after the other
+    (not both at once from the disk): Forge's picture model, then the music model.
+    They wait there all evening, each on the graphics card only while it works;
+    the music model is released when the table stops, Forge's when Forge is closed."""
+    try:
+        import image_gen
+        if image_gen.forge_warm_up():
+            print("[art] Forge's picture model is loaded (in RAM)", flush=True)
+    except Exception as e:
+        print(f"[art] Forge warm-up: {e}", flush=True)
+    if composer.available() and composer.start_server():
+        print("[compose] the music model is loaded (in RAM)", flush=True)
+
+
 # ============================================================ HTTP layer =====
 
 def make_handler(state: TableState, code: str, host_key: str):
@@ -2404,10 +2419,7 @@ def serve(port: int, bind: str, code: Optional[str]) -> None:
                  f"program is using it — try: bash tools/gm-table.sh start --port {port + 1}")
     httpd.daemon_threads = True
     threading.Thread(target=state.portrait_worker, daemon=True).start()
-    if composer.available():
-        # The music model is read into RAM now, once, and waits there (on the
-        # graphics card only while it composes).
-        threading.Thread(target=composer.start_server, daemon=True).start()
+    threading.Thread(target=warm_up, daemon=True).start()
     lan = _lan_ip()
     record = {"campaign": campaign_dir.name, "port": port, "bind": bind, "code": code,
               "host_key": host_key,

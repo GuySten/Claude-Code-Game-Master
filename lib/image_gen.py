@@ -247,6 +247,30 @@ def forge_release_gpu() -> bool:
         return False
 
 
+def forge_warm_up() -> bool:
+    """At the start of a game: have Forge read its picture model into RAM now (one
+    tiny throwaway picture), then move it off the graphics card. The first real
+    picture then doesn't wait on the disk. False if Forge isn't in use or isn't up."""
+    if backend() != "forge" or not images_status()[0]:
+        return False
+    payload = {"prompt": "warm-up", "steps": 1, "width": 64, "height": 64, "seed": 1,
+               "batch_size": 1, "n_iter": 1, "send_images": False, "save_images": False}
+    model = os.environ.get("FORGE_MODEL", "").strip()
+    if model:                                   # the model the game will use
+        payload["override_settings"] = {"sd_model_checkpoint": model}
+        payload["override_settings_restore_afterwards"] = False
+    req = urllib.request.Request(forge_url() + "/sdapi/v1/txt2img", data=json.dumps(payload).encode("utf-8"),
+                                 headers={"Content-Type": "application/json"}, method="POST")
+    try:
+        with gpu_turn("pictures"):
+            with _forge_open(req, int(os.environ.get("FORGE_TIMEOUT", "600"))) as r:
+                r.read()
+            forge_release_gpu()
+        return True
+    except (urllib.error.URLError, OSError, ValueError):
+        return False
+
+
 def images_status(probe: bool = True):
     """(enabled, backend, why) — what the session brief tells the GM."""
     b = backend()
