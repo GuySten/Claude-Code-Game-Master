@@ -332,14 +332,27 @@
   let me = null, lastId = 0, polling = false, historyLoaded = false;
   const allMessages = [];
 
+  // The shared clock all music is timed against. Each /api/info round trip gives a
+  // sample (server time minus our time, corrected by half the round trip); the
+  // sample with the shortest round trip is the most precise, so keep the best
+  // of the recent ones. A few milliseconds instead of a whole network delay.
+  const clockSamples = [];
+  function clockSample(serverNowSec, t0, t1) {
+    clockSamples.push({ rtt: t1 - t0, skew: serverNowSec * 1000 - (t0 + t1) / 2 });
+    if (clockSamples.length > 12) clockSamples.shift();
+    skew = clockSamples.reduce((best, x) => (x.rtt < best.rtt ? x : best)).skew;
+  }
+
   async function api(path, body) {
     const opts = body ? { method: "POST", headers: { "Content-Type": "application/json" },
                           body: JSON.stringify(Object.assign({ code, token }, body)) } : {};
     const sep = path.includes("?") ? "&" : "?";
     const url = body ? path : `${path}${sep}code=${encodeURIComponent(code)}&token=${encodeURIComponent(token || "")}`;
+    const t0 = Date.now();
     const r = await fetch(url, opts);
     let data = {};
     try { data = await r.json(); } catch (e) { data = { ok: false, error: "Server error" }; }
+    if (data && typeof data.server_now === "number") clockSample(data.server_now, t0, Date.now());
     if (!r.ok && data.ok !== false) data.ok = false;
     return data;
   }
@@ -535,9 +548,30 @@
     };
     el.addEventListener("loadedmetadata", start, { once: true });
     el.addEventListener("error", () => setStatus("🎵 " + (m.title || "") + " ✗", true));
+    // Stay in step with everyone else: every few seconds compare where we are with
+    // where the table is. Small gaps close by playing a few percent faster or
+    // slower (pitch is preserved, so it's inaudible); big ones jump.
+    let nudge = null;
+    const resync = setInterval(() => {
+      const dur = el.duration;
+      if (!live || el.paused || !isFinite(dur) || dur <= 0) return;
+      let target = (Date.now() + skew) / 1000 - (m.started_at || 0);
+      if (m.loop) target %= dur; else if (target >= dur) return;
+      let diff = el.currentTime - target;
+      if (m.loop && Math.abs(diff) > dur / 2) diff -= Math.sign(diff) * dur;   // across the loop
+      if (Math.abs(diff) > 1) { try { el.currentTime = target; } catch (e) {} return; }
+      if (Math.abs(diff) > 0.08 && !nudge) {
+        el.playbackRate = diff > 0 ? 0.95 : 1.05;
+        nudge = setTimeout(() => { el.playbackRate = 1; nudge = null; },
+                           Math.min(4000, Math.abs(diff) / 0.05 * 1000));
+      }
+    }, 5000);
     return {
       setLevel(v) { level = v; if (!el.paused) el.volume = v; },
-      stop() { live = false; fadeAudio(el, 0, 1200, () => { el.pause(); el.removeAttribute("src"); el.load(); }); },
+      stop() {
+        live = false; clearInterval(resync); clearTimeout(nudge);
+        fadeAudio(el, 0, 1200, () => { el.pause(); el.removeAttribute("src"); el.load(); });
+      },
     };
   }
 
@@ -573,16 +607,27 @@
     };
     keep(timers, setTimeout(tick, minMs * Math.random()));
   }
-  // A steady pulse (music): step n fires at t0 + n*stepMs, without drift.
+  // A steady pulse (music), shared by the whole table: step n is due at
+  // track start + n*stepMs on the SERVER clock, so every browser plays beat n at
+  // the same moment, whenever it joined (late joiners come in on the right beat).
+  let stepAnchor = 0, syncSeed = "";
   function steps(stepMs, fn, timers) {
-    const t0 = performance.now();
-    let n = 0;
+    const anchor = stepAnchor;
+    const serverMs = () => Date.now() + skew;
+    let n = Math.max(0, Math.ceil((serverMs() - anchor) / stepMs));
     const tick = () => {
       if (timers.stopped) return;
       fn(n++);
-      keep(timers, setTimeout(tick, Math.max(0, t0 + n * stepMs - performance.now())));
+      keep(timers, setTimeout(tick, Math.max(0, anchor + n * stepMs - serverMs())));
     };
-    tick();
+    keep(timers, setTimeout(tick, Math.max(0, anchor + n * stepMs - serverMs())));
+  }
+  // The same "random" choice in every browser for a given track, voice and beat.
+  function shared01(salt, n) {
+    let h = 2166136261;
+    for (const ch of `${syncSeed}|${salt}|${n}`) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619); }
+    h = Math.imul(h ^ (h >>> 15), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
   }
   const hz = (midi) => 440 * Math.pow(2, (midi - 69) / 12);
   function tone(ctx, out, freq, dur, vol, type, cutoff, attack) {
@@ -636,7 +681,9 @@
     },
     storm(ctx, out, timers, nodes) {
       AMBIENCES.rain(ctx, out, timers, nodes);
-      every(9000, 22000, () => burst(ctx, out, 3 + Math.random() * 3, 0.9, 140), timers);
+      steps(1000, (n) => {                     // thunder rolls for everyone at once
+        if (shared01("thunder", n) < 1 / 15) burst(ctx, out, 3 + shared01("roll", n) * 3, 0.9, 140);
+      }, timers);
     },
     cave(ctx, out, timers, nodes) {
       const g = ctx.createGain(), lp = filt(ctx, "lowpass", 300); g.gain.value = 0.18;
@@ -666,8 +713,10 @@
         chords[n % 4].forEach((m) => tone(ctx, out, hz(m + 12), 7, 0.07, "triangle", 1400, 2));
         tone(ctx, out, hz(chords[n % 4][0]), 7, 0.08, "sine", 0, 1.5);
       }, timers);
-      every(2500, 6000, () => tone(ctx, out, hz(melody[Math.floor(Math.random() * melody.length)]),
-                                   2.5, 0.035, "sine", 0, 0.3), timers);
+      steps(1000, (n) => {
+        if (shared01("melody", n) < 0.25)
+          tone(ctx, out, hz(melody[Math.floor(shared01("note", n) * melody.length)]), 2.5, 0.035, "sine", 0, 0.3);
+      }, timers);
     },
     battle(ctx, out, timers) {
       const bass = [38, 38, 41, 38, 36, 38, 41, 43];
@@ -697,8 +746,9 @@
       const o = ctx.createOscillator(), g = ctx.createGain();
       o.frequency.value = 73.4; g.gain.value = 0.08; o.connect(g).connect(out); o.start(); nodes.push(o);
       const notes = [74, 77, 79, 81, 84, 86];               // D minor pentatonic, up high
-      every(1500, 3500, () => {
-        const f = hz(notes[Math.floor(Math.random() * notes.length)]);
+      steps(500, (n) => {
+        if (shared01("shimmer", n) >= 0.2) return;
+        const f = hz(notes[Math.floor(shared01("note", n) * notes.length)]);
         tone(ctx, out, f, 4, 0.04, "sine", 0, 1.2);
         tone(ctx, out, f + 3, 4, 0.03, "sine", 0, 1.4);      // a slow beat for shimmer
       }, timers);
@@ -767,6 +817,8 @@
     const master = ctx.createGain(), timers = [], nodes = [];
     master.gain.value = 0.0001;
     master.connect(ctx.destination);
+    stepAnchor = (m.started_at || 0) * 1000;   // read by steps() while the track is built
+    syncSeed = `${m.id}|${m.src}`;
     build(ctx, master, timers, nodes);
     const ramp = (v, sec) => {
       const now = ctx.currentTime;
@@ -787,7 +839,6 @@
     };
   }
   function applyMusic(m, serverNow) {
-    if (serverNow) skew = serverNow * 1000 - Date.now();
     const changed = !musicState || !m || (musicState.id !== m.id);
     musicState = m || null;
     updateMusicToggle();
@@ -884,7 +935,10 @@
     $("table").classList.remove("hidden");
     applyLang();
     renderInfo(info);
-    if (!polling) { polling = true; pollMessages(); setInterval(refreshInfo, 4000); }
+    if (!polling) {
+      polling = true; pollMessages(); setInterval(refreshInfo, 4000);
+      [400, 900, 1500].forEach((ms) => setTimeout(refreshInfo, ms));   // calibrate the clock
+    }
   }
 
   function renderInfo(info) {
