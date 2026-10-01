@@ -369,19 +369,24 @@ Copy, fill in the link and code, and send:
    language the GM answers you in. You read everything in your language: the story, and
    the other players' actions too — the GM translates them (marked 🌐; tap
    **show original** to see what they wrote).
-7. **While the GM works**, a bar above the text box shows what it's doing (reading your
+7. **Rounds.** When the first player acts, a one-minute countdown starts above the text box.
+   The GM answers once everyone has acted, or when the minute is up. In the last 15 seconds
+   it turns red and chimes for whoever hasn't acted yet. Nothing ticks while the table is on
+   a break: the countdown only starts with the first action. A character who can't act
+   (unconscious, stunned, dead…) isn't waited for.
+8. **While the GM works**, a bar above the text box shows what it's doing (reading your
    actions, rolling dice, updating the sheets, writing the story) and roughly how long is
    left. The estimate comes from how long this table's GM really took on recent turns, so it
    gets more accurate as you play.
-8. **Every die roll is public.** The table itself rolls the dice and shows each roll to
+9. **Every die roll is public.** The table itself rolls the dice and shows each roll to
    everyone the moment the GM sees it — who rolled, for what, and the DC or AC, which is
    set before the dice land ("🎯 Pip — Stealth · DC 15 · 🎲 [12] + 5 = 17 ✓"). A secret
    roll (say, a hidden enemy) shows up as "the GM rolled in secret".
-9. **The story is told as it happens.** New narration appears a few words at a time, in step
+10. **The story is told as it happens.** New narration appears a few words at a time, in step
    with the voice when 🔊 is on. Tap it to see the rest at once. The side panel shows
    everyone's **HP**, and it changes with the story: a hit lands on your HP bar when the text
    reaches your name, not before.
-10. **Your character sheet.** Tap **📜 My sheet**, or any character in the side panel, for
+11. **Your character sheet.** Tap **📜 My sheet**, or any character in the side panel, for
    the full sheet: a portrait (when pictures are on), abilities, skills, features, spells,
    equipment, conditions. The **🖼** next to the location at the top shows the places you've
    been. It updates
@@ -389,7 +394,7 @@ Copy, fill in the link and code, and send:
    open your sheet and tap **Level up**. Roll your hit die at the table (or take the average),
    pick your ability increases when your class gets them, and tell the GM what you'd like
    (a subclass, spells, a feat). The GM adds the new class features.
-11. Refreshing the page keeps your seat. To switch devices, tap **Leave seat** first (or ask
+12. Refreshing the page keeps your seat. To switch devices, tap **Leave seat** first (or ask
    the host to free it).
 
 ## מדריך לשחקנים
@@ -411,23 +416,27 @@ Copy, fill in the link and code, and send:
 6. **שפה.** **English / עברית** מחליף את כל הדף, את המיקרופון ואת השפה שבה מנהל המשחק עונה
    לכם. הכול מופיע בשפה שלכם: הסיפור, וגם הפעולות של השחקנים האחרים — מנהל המשחק מתרגם אותן
    (מסומן ב-🌐; לחצו **הצג מקור** כדי לראות מה הם כתבו).
-7. **בזמן שמנהל המשחק עובד**, פס מעל תיבת הטקסט מראה מה הוא עושה (קורא את הפעולות, מטיל
+7. **סבבים.** כשהשחקן הראשון פועל, מתחילה ספירה לאחור של דקה מעל תיבת הטקסט. מנהל המשחק עונה
+   כשכולם פעלו, או כשהדקה נגמרת. ב-15 השניות האחרונות היא מאדימה ומצלצלת למי שעוד לא פעל. בזמן
+   הפסקה שום דבר לא סופר: הספירה מתחילה רק עם הפעולה הראשונה. השולחן לא מחכה לדמות שאינה
+   יכולה לפעול (מחוסרת הכרה, המומה, מתה…).
+8. **בזמן שמנהל המשחק עובד**, פס מעל תיבת הטקסט מראה מה הוא עושה (קורא את הפעולות, מטיל
    קוביות, מעדכן את הדפים, כותב את הסיפור) וכמה זמן נשאר בערך. ההערכה מבוססת על כמה זמן
    מנהל המשחק של השולחן הזה באמת לקח בתורות האחרונים, כך שהיא נעשית מדויקת יותר במהלך המשחק.
-8. **כל הטלת קובייה גלויה.** השולחן עצמו מטיל את הקוביות ומראה כל הטלה לכולם ברגע שמנהל
+9. **כל הטלת קובייה גלויה.** השולחן עצמו מטיל את הקוביות ומראה כל הטלה לכולם ברגע שמנהל
    המשחק רואה אותה — מי הטיל, בשביל מה, ודרגת הקושי או דרגת השריון, שנקבעת לפני שהקובייה
    נוחתת ("🎯 Pip — התגנבות · דרגת קושי 15 · 🎲 [12] + 5 = 17 ✓"). הטלה סודית (למשל אויב
    נסתר) מופיעה כ"מנהל המשחק הטיל קובייה בסתר".
-9. **הסיפור מסופר בזמן אמת.** קטע חדש מופיע מילה אחרי מילה, ובקצב הקול כש-🔊 פועל. לחצו
+10. **הסיפור מסופר בזמן אמת.** קטע חדש מופיע מילה אחרי מילה, ובקצב הקול כש-🔊 פועל. לחצו
    עליו כדי לראות את כולו מיד. בפאנל הצד רואים את **נקודות החיים** של כולם, והן משתנות יחד
    עם הסיפור: מכה נוחתת על פס החיים שלכם כשהטקסט מגיע לשם שלכם, לא לפני כן.
-10. **דף הדמות.** לחצו **📜 הדף שלי**, או על כל דמות בפאנל הצד, כדי לראות את הדף המלא:
+11. **דף הדמות.** לחצו **📜 הדף שלי**, או על כל דמות בפאנל הצד, כדי לראות את הדף המלא:
    דיוקן (כשהתמונות פועלות), תכונות, מיומנויות, יכולות, לחשים, ציוד ומצבים. ה-**🖼** ליד
    שם המקום למעלה מציג את המקומות שביקרתם בהם. גם הוא מתעדכן יחד עם הסיפור, ומה שהשתנה
    מהבהב. כשאתם מרוויחים דרגה מופיע **⬆**: פתחו את הדף ולחצו **עלייה בדרגה**. הטילו את קוביית
    החיים ליד השולחן (או קחו את הממוצע), בחרו שיפורי תכונות כשהמקצוע מקבל אותם, וכתבו למנהל
    המשחק מה תרצו (תת־מקצוע, לחשים, הישג). מנהל המשחק מוסיף את יכולות המקצוע החדשות.
-11. רענון הדף שומר לכם את המקום. כדי לעבור למכשיר אחר, לחצו קודם **עזיבת המושב** (או בקשו
+12. רענון הדף שומר לכם את המקום. כדי לעבור למכשיר אחר, לחצו קודם **עזיבת המושב** (או בקשו
    מהמארח לפנות אותו).
 
 ---
@@ -441,6 +450,7 @@ You rarely need these — Claude runs them — but they're yours to use:
 | `bash tools/gm-table.sh start` / `stop` | Open / close the table |
 | `bash tools/gm-table.sh status` | Link, code, who's seated, unread actions |
 | `bash tools/gm-table.sh free "Name"` | Free a seat (player switching devices) |
+| `bash tools/gm-table.sh round 90` · `round off` | How long the GM waits for everyone once the first player acts (default 60 s) |
 | `bash tools/gm-table.sh music list` | What plays for each mood, and the enemy themes |
 | `bash tools/gm-table.sh music --mood tavern` | Force a mood's music right now |
 | `bash tools/gm-table.sh music theme "Grimaldi" waltz.mp3` | Give a villain their own track |

@@ -41,9 +41,15 @@ player's PC is `players/<name>.json`. `gm-session.sh context` lists them all und
 ## Online table (players on their own computers)
 `bash tools/gm-table.sh start` opens a browser table (prints links + a table code). Players
 open the link, enter the code, and pick or create their PC. While the table is open:
-1. `bash tools/gm-table.sh wait` (≈9 min max; rerun on timeout) — blocks until players act
-   and prints their actions (`[#12 Bram] I kick the door`), joins, and who hasn't acted.
-   Use `--all` to wait for every seated player (rounds), `inbox` to check without waiting.
+1. `bash tools/gm-table.sh wait` (≈9 min max; rerun on timeout) — blocks until the ROUND
+   closes and prints the actions (`[#12 Bram] I kick the door`), joins, and who hasn't acted.
+   A round opens when the first player acts and closes when every seated player has acted,
+   or 60 s later (the players see a countdown). Until then the table holds the actions back
+   and refuses a public `say`: you can't answer early (whispers, rolls and music still work).
+   `ROUND CLOSED … didn't act` → narrate for those who acted; the others act next beat.
+   A PC who can't act (dead, dying, unconscious, stunned, paralyzed… or at 0 HP, per their
+   sheet) isn't waited for, so record those conditions (`gm-player.sh condition`) as they happen.
+   `inbox` checks without waiting. The host sets the time: `gm-table.sh round 90` / `round off`.
 2. Run the normal core loop for those actions (roll, persist with the PC's name).
 3. Post the narration with `bash tools/gm-table.sh say --stdin <<'EOF' … EOF` — it is the
    ONLY way players see anything; your terminal reply is for the host. Markdown works.

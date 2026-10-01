@@ -6,6 +6,7 @@ way a browser (players) and gm-table.sh (the host) do.
 
 import json
 import threading
+import time
 import urllib.error
 import urllib.request
 import urllib.parse
@@ -327,6 +328,7 @@ def test_progress_follows_the_gms_turn_and_learns_how_long_it_takes(table):
 
 
 def test_a_mixed_language_turn_ends_when_every_language_has_its_version(table):
+    table["state"].set_round_seconds(0)        # (rounds: tested on their own)
     call = table["call"]
     pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
     noa = call("/api/create", {"code": CODE, "name": "Noa"})[1]["token"]
@@ -455,6 +457,7 @@ def test_untagged_narration_at_a_mixed_table_warns_the_gm(table):
 
 
 def test_hp_changes_wait_for_the_narration_that_explains_them(table):
+    table["state"].set_round_seconds(0)        # (rounds: tested on their own)
     call, world = table["call"], table["world"]
     pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
     noa = call("/api/create", {"code": CODE, "name": "Noa"})[1]["token"]
@@ -525,6 +528,7 @@ def test_dice_natural_and_judge():
 
 
 def test_players_can_fix_their_action_until_the_gm_answers(table):
+    table["state"].set_round_seconds(0)        # (rounds: tested on their own)
     call, state = table["call"], table["state"]
     pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
     bram = call("/api/create", {"code": CODE, "name": "Bram", "concept": "a dwarf"})[1]["token"]
@@ -949,3 +953,78 @@ def test_heroic_moments_and_bosses_without_a_composer(table, monkeypatch):
     state.music_revert["at"] = 0
     state.music_tick()
     assert state.music["track"] == "theme:Lich" and state.music["boss"] is True
+
+
+def test_the_gm_waits_for_everyone_or_a_minute_after_the_first_action(table):
+    import table_server
+    call, state = table["call"], table["state"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    bram = call("/api/create", {"code": CODE, "name": "Bram", "concept": "a dwarf"})[1]["token"]
+    call("/api/gm/inbox", {}, host=True)                         # (the join notices)
+
+    # On a break: nobody has acted, nothing is ticking.
+    assert state.round_state()["open"] is False
+    assert call("/api/gm/say", {"text": "The fire crackles."}, host=True)[0] == 200
+
+    # Pip acts: the round opens, the minute starts.
+    call("/api/say", {"code": CODE, "token": pip, "text": "I check the door."})
+    rnd = call(f"/api/info?code={CODE}&token={bram}")[1]["round"]
+    assert rnd["open"] and rnd["waiting_on"] == ["Bram"] and rnd["seconds"] == 60
+    assert 59 <= rnd["deadline"] - time.time() <= 60
+    # ...and the GM can neither read it nor answer yet.
+    held = call("/api/gm/inbox", {}, host=True)[1]
+    assert held["held"] and held["messages"] == []
+    status, body = call("/api/gm/say", {"text": "The door creaks open."}, host=True)
+    assert status == 409 and "Bram" in body["error"]
+    assert call("/api/gm/say", {"text": "Psst.", "to": "Pip"}, host=True)[0] == 200   # whispers are fine
+    assert call("/api/gm/roll", {"notation": "1d20"}, host=True)[0] == 200            # so are rolls
+
+    # Bram acts: everyone has, the round closes at once.
+    call("/api/say", {"code": CODE, "token": bram, "text": "I guard the rear."})
+    assert state.round_state()["open"] is False
+    got = call("/api/gm/inbox", {}, host=True)[1]["messages"]
+    assert [m["text"] for m in got if m["kind"] == "player"] == ["I check the door.", "I guard the rear."]
+    # A player acting while the GM writes doesn't block the answer to the round it read.
+    call("/api/say", {"code": CODE, "token": pip, "text": "I wait."})
+    assert state.round_state()["open"] and call("/api/gm/say", {"text": "The hall is dark."},
+                                                host=True)[0] == 200
+
+    # Bram is away: the round closes a minute after Pip's action anyway.
+    rnd = state.round_state(now=time.time() + table_server.ROUND_SECONDS + 1)
+    assert rnd["open"] is False and rnd["timed_out"] and rnd["waiting_on"] == ["Bram"]
+
+    # The host can change it, or turn it off.
+    assert call("/api/gm/round", {"seconds": 90}, host=True)[1]["seconds"] == 90
+    assert state.round_state()["seconds"] == 90 and state.round_state()["open"]
+    call("/api/gm/round", {"seconds": 0}, host=True)
+    assert state.round_state()["open"] is False
+    assert TableState(table["camp"], str(table["world"])).round_seconds == 0
+
+
+def test_the_round_never_waits_for_a_pc_who_cannot_act(table):
+    import table_server
+    call, state, camp = table["call"], table["state"], table["camp"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    bram_tok = call("/api/create", {"code": CODE, "name": "Bram", "concept": "a dwarf"})[1]["token"]
+    call("/api/gm/inbox", {}, host=True)
+    bram = next((camp / "players").glob("*.json"))
+
+    for knocked_out in ({"conditions": ["unconscious"]}, {"conditions": [{"name": "Stunned"}]},
+                        {"status": "dead"}, {"hp": {"current": 0, "max": 12}}):
+        sheet = {**json.loads(bram.read_text()), "conditions": [], "status": "alive",
+                 "hp": {"current": 12, "max": 12}, **knocked_out}
+        bram.write_text(json.dumps(sheet))
+        assert table_server.cant_act(sheet)
+        call("/api/say", {"code": CODE, "token": pip, "text": "I drag Bram to safety."})
+        rnd = state.round_state()
+        assert rnd["open"] is False and "Bram" in rnd["out_of_action"]     # no need to wait
+        assert "Bram" not in state.waiting_on()
+        assert call("/api/gm/inbox", {}, host=True)[1]["messages"]
+        call("/api/gm/say", {"text": "You pull him behind a pillar."}, host=True)
+
+    # Back on his feet: waited for again.
+    bram.write_text(json.dumps({**json.loads(bram.read_text()), "hp": {"current": 3, "max": 12}}))
+    assert table_server.cant_act(json.loads(bram.read_text())) is None
+    call("/api/say", {"code": CODE, "token": pip, "text": "Get up!"})
+    assert state.round_state()["waiting_on"] == ["Bram"] and state.round_state()["open"]
+    assert table_server.cant_act({"conditions": ["poisoned", "prone"]}) is None

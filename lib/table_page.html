@@ -108,6 +108,10 @@
                      margin-top: 6px; }
   #progress .fill { height: 100%; width: 0; background: var(--accent); border-radius: 3px;
                     transition: width .5s linear; }
+  /* The round's countdown: red, and pulsing, when it's nearly over and you haven't acted. */
+  #progress.urgent .fill { background: var(--hp-low); }
+  #progress.urgent #progress-what { color: var(--hp-low); font-weight: bold;
+                                    animation: pulse 1s ease-in-out infinite; }
   #progress.indeterminate .fill { width: 30%; transition: none;
                                   animation: progress-slide 1.6s ease-in-out infinite; }
   @keyframes progress-slide { from { margin-inline-start: -30%; } to { margin-inline-start: 100%; } }
@@ -390,6 +394,9 @@
       lvlDone: "⬆ You're level {n}!", lvlBadge: "⬆",
       party: "Party", partyTitle: "The party", placeholder: "What do you do? (type, or tap 🎤 and speak)",
       private: "Only the GM sees this", autoSend: "Send when I stop talking", send: "Send",
+      roundYours: "⏳ {t} to act — the GM answers when everyone has acted",
+      roundHurry: "⚠ Only {t} left — act now!", roundWaiting: "⏳ Waiting for {names} — {t}",
+      roundOut: "💤 You can't act right now ({why}), so the table won't wait for you — {t}",
       playingAs: "Playing as", waiting: "Waiting on: ", considering: "The GM is considering…",
       reconnecting: "Reconnecting…", gm: "Game Master", whisper: "whispered to you", toGm: "to the GM only",
       edit: "Edit", edited: "(edited)", editSave: "Save", editCancel: "Cancel",
@@ -461,6 +468,9 @@
       lvlDone: "⬆ עליתם לדרגה {n}!", lvlBadge: "⬆",
       party: "החבורה", partyTitle: "החבורה", placeholder: "מה אתם עושים? (הקלידו, או לחצו 🎤 ודברו)",
       private: "רק מנהל המשחק יראה", autoSend: "לשלוח כשאני מסיים/ת לדבר", send: "שליחה",
+      roundYours: "⏳ נותרו {t} לפעול — מנהל המשחק עונה כשכולם פעלו",
+      roundHurry: "⚠ נותרו רק {t} — פעלו עכשיו!", roundWaiting: "⏳ מחכים ל{names} — {t}",
+      roundOut: "💤 אינכם יכולים לפעול כרגע ({why}), לכן השולחן לא מחכה לכם — {t}",
       playingAs: "משחקים בתור", waiting: "מחכים ל: ", considering: "מנהל המשחק חושב…",
       reconnecting: "מתחבר מחדש…", gm: "מנהל המשחק", whisper: "לחש לך", toGm: "רק למנהל המשחק",
       edit: "עריכה", edited: "(נערך)", editSave: "שמירה", editCancel: "ביטול",
@@ -1261,6 +1271,7 @@
     applyMusic(info.music, info.server_now);
     if (!!info.tts !== ttsOk) { ttsOk = !!info.tts; fillVoiceMenus(); }
     progressState = info.progress || { state: "idle" };
+    roundState = info.round || { open: false };
     waitingOn = info.waiting_on || [];
     updateProgress();
     $("campaign").textContent = info.campaign || t("title");
@@ -1746,7 +1757,43 @@
     if (pct == null) box.removeAttribute("aria-valuenow");
     else box.setAttribute("aria-valuenow", String(Math.round(pct)));
   }
+  // The round: once someone acts, everyone has a minute (the server's clock).
+  const ROUND_URGENT = 15;
+  let roundState = { open: false }, roundChimed = {};
+  const fmtClock = (s) => Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0");
+  function chime() {
+    try {
+      const ctx = audioCtx();
+      [0, 0.22].forEach((at) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = "sine"; o.frequency.value = 880;
+        g.gain.setValueAtTime(0.0001, ctx.currentTime + at);
+        g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + at + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + at + 0.18);
+        o.connect(g).connect(ctx.destination);
+        o.start(ctx.currentTime + at); o.stop(ctx.currentTime + at + 0.2);
+      });
+    } catch (e) {}
+  }
+  function showRound() {
+    const r = roundState;
+    const left = r && r.open ? r.deadline - serverNow() : 0;
+    const box = $("progress");
+    if (!(left > 0)) { box.classList.remove("urgent"); return false; }
+    const mine = !!me && (r.waiting_on || []).includes(me);
+    const urgent = mine && left <= ROUND_URGENT;
+    const clock = fmtClock(Math.ceil(left));
+    const out = me && (r.out_of_action || {})[me];
+    showProgress(mine ? t(urgent ? "roundHurry" : "roundYours").replace("{t}", clock)
+                 : out ? t("roundOut").replace("{why}", out).replace("{t}", clock)
+                 : t("roundWaiting").replace("{names}", (r.waiting_on || []).join(", ")).replace("{t}", clock),
+                 "", 100 * left / Math.max(1, r.seconds));
+    box.classList.toggle("urgent", urgent);
+    if (urgent && !roundChimed[r.started_at]) { roundChimed[r.started_at] = true; chime(); }
+    return true;
+  }
   function updateProgress() {
+    if (showRound()) return;
     const p = progressState;
     if (p.state === "working" && lastGmId <= p.start_id) {
       const now = serverNow(), elapsed = Math.max(0, now - p.started_at);
@@ -1770,7 +1817,7 @@
     }
     $("progress").classList.add("hidden");
   }
-  setInterval(updateProgress, 500);
+  setInterval(updateProgress, 250);
 
   // Every player reads one language. A message written in another one shows its
   // translation (sent by the GM with `gm-table.sh translate`), with the original a
@@ -2028,7 +2075,8 @@
         // The music changed, or the narration arrived (the party's HP, held back
         // during the GM's turn, now catches up with the story): refresh now.
         if (historyLoaded && r.messages.some((m) => (m.event && /^music/.test(m.event.type))
-                                                   || (m.kind === "gm" && !m.to))) refreshInfo();
+                                                   || (m.kind === "gm" && !m.to)
+                                                   || m.kind === "player")) refreshInfo();
       }
       historyLoaded = true;
     } catch (e) { setStatus(t("reconnecting")); }
