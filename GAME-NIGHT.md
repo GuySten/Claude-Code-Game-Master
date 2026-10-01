@@ -224,7 +224,9 @@ Copy, fill in the link and code, and send:
 5. **Secrets.** Tick **"Only the GM sees this"** to whisper to the GM. Purple messages are
    whispers only you can see.
 6. **Language.** **עברית / English** switches the whole page, your microphone, and the
-   language the GM answers you in.
+   language the GM answers you in. You read everything in your language: the story, and
+   the other players' actions too — the GM translates them (marked 🌐; tap
+   **show original** to see what they wrote).
 7. **While the GM works**, a bar above the text box shows what it's doing (reading your
    actions, rolling dice, updating the sheets, writing the story) and roughly how long is
    left. The estimate comes from how long this table's GM really took on recent turns, so it
@@ -245,7 +247,8 @@ Copy, fill in the link and code, and send:
 5. **סודות.** סמנו **"רק מנהל המשחק יראה"** כדי ללחוש למנהל המשחק. הודעות סגולות הן לחישות
    שרק אתם רואים.
 6. **שפה.** **English / עברית** מחליף את כל הדף, את המיקרופון ואת השפה שבה מנהל המשחק עונה
-   לכם.
+   לכם. הכול מופיע בשפה שלכם: הסיפור, וגם הפעולות של השחקנים האחרים — מנהל המשחק מתרגם אותן
+   (מסומן ב-🌐; לחצו **הצג מקור** כדי לראות מה הם כתבו).
 7. **בזמן שמנהל המשחק עובד**, פס מעל תיבת הטקסט מראה מה הוא עושה (קורא את הפעולות, מטיל
    קוביות, מעדכן את הדפים, כותב את הסיפור) וכמה זמן נשאר בערך. ההערכה מבוססת על כמה זמן
    מנהל המשחק של השולחן הזה באמת לקח בתורות האחרונים, כך שהיא נעשית מדויקת יותר במהלך המשחק.

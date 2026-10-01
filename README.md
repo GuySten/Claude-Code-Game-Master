@@ -148,6 +148,9 @@ asides to the GM, whispers back, and live HP bars for the party.
 - **Players see the GM working.** While Claude takes its turn, every screen shows what it's
   doing — reading the actions, rolling dice, updating sheets, writing the story — with a
   progress bar and a time estimate learned from this table's recent turns.
+- **Everyone reads one language.** Each player sees the whole table — the story and
+  every other player's actions — in their own language (English or Hebrew); Claude
+  translates the actions as part of its turn, and the original is a tap away.
 - **Talk instead of type.** Players tap 🎤 and speak their action, in **English or Hebrew**
   (the page switches fully to Hebrew, right-to-left, with one tap), and can turn on 🔊 to
   hear the story read aloud. This uses the browser's own speech engines (Chrome, Edge or

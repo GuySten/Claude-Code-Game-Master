@@ -400,3 +400,50 @@ def test_creating_an_unclaimed_existing_name_points_at_the_list(table):
     table["state"].free("Bram")
     status, body = call("/api/create", {"code": CODE, "name": "bram"})
     assert status == 409 and body["existing"] == "bram" and "pick them in the list" in body["error"]
+
+
+def test_actions_are_translated_for_players_of_the_other_language(table):
+    call, state = table["call"], table["state"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    noa = call("/api/create", {"code": CODE, "name": "Noa"})[1]["token"]
+    call("/api/lang", {"code": CODE, "token": noa, "lang": "he"})
+    call("/api/say", {"code": CODE, "token": pip, "text": "I light a torch.", "lang": "en"})
+    msg_id = call("/api/say", {"code": CODE, "token": noa, "text": "אני פותחת את הדלת",
+                               "lang": "he"})[1]["message"]["id"]
+
+    _, inbox = call("/api/gm/inbox", {}, host=True)
+    needed = {n["id"]: (n["from"], n["to"]) for n in inbox["translate"]}
+    assert needed[msg_id] == ("he", ["en"]) and len(needed) == 2
+
+    _, seen = call(f"/api/messages?code={CODE}&token={pip}&after=0")
+    rev = seen["rev"]
+    status, body = call("/api/gm/translate", {"translations": {
+        str(msg_id): {"en": "I open the door."},
+        str(msg_id - 1): {"he": "אני מדליק לפיד."}}}, host=True)
+    assert status == 200 and sorted(body["updated"]) == [msg_id - 1, msg_id]
+    assert body["still_needed"] == []
+
+    # Browsers that already saw the messages get the updated ones (by revision).
+    _, update = call(f"/api/messages?code={CODE}&token={pip}&after={msg_id}&rev={rev}")
+    tr = {m["id"]: m.get("tr") for m in update["messages"]}
+    assert tr[msg_id] == {"en": "I open the door."}
+
+    # Translations survive a restart of the table server.
+    reloaded = TableState(table["camp"], str(table["world"]))
+    by_id = {m["id"]: m for m in reloaded.messages}
+    assert by_id[msg_id]["tr"] == {"en": "I open the door."}
+    assert by_id[msg_id - 1]["tr"] == {"he": "אני מדליק לפיד."}
+    assert reloaded.rev >= state.rev
+
+
+def test_untagged_narration_at_a_mixed_table_warns_the_gm(table):
+    call = table["call"]
+    call("/api/claim", {"code": CODE, "pc": "Pip"})
+    noa = call("/api/create", {"code": CODE, "name": "Noa"})[1]["token"]
+    call("/api/lang", {"code": CODE, "token": noa, "lang": "he"})
+    _, body = call("/api/gm/say", {"text": "The door creaks open."}, host=True)
+    assert "Hebrew players get it in English" in body["warning"]
+    _, body = call("/api/gm/say", {"text": "The door creaks open.", "lang": "en"}, host=True)
+    assert body["warning"] is None
+    _, body = call("/api/gm/say", {"text": "Psst.", "to": "Noa"}, host=True)
+    assert "whisper in Hebrew" in body["warning"]

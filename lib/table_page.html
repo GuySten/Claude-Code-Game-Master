@@ -67,6 +67,10 @@
   .who { font-size: .8rem; color: var(--muted); margin-bottom: 2px; letter-spacing: .02em;
          display: flex; justify-content: space-between; gap: 8px; }
   .who button { border: 0; background: none; padding: 0 4px; font-size: .9rem; color: var(--muted); }
+  .tr-note { font-size: .78rem; color: var(--muted); margin-top: 4px; }
+  .tr-note button { border: 0; background: none; padding: 0; color: var(--accent);
+                    font-size: inherit; text-decoration: underline; cursor: pointer; }
+  .msg.translating .body { opacity: .65; }
   .msg img { max-width: 100%; border-radius: 8px; margin-top: 8px; display: block; }
   .msg p { margin: 0 0 .6em; } .msg p:last-child { margin: 0; }
   .msg h3 { margin: .2em 0 .4em; font-size: 1.05rem; }
@@ -263,6 +267,9 @@
       etaLeft: "about {t} left", etaLonger: "taking a little longer than usual",
       sec: "{n} sec", min: "{n} min", sent: "✉️ Sent — the GM will pick it up in a moment",
       sentWaiting: "✉️ Sent — waiting for {names}",
+      trFrom: "🌐 Translated from {lang}", trShowOriginal: "show original",
+      trShowTranslation: "show translation", trWaiting: "🌐 Translating…",
+      lang_en: "English", lang_he: "Hebrew",
       ev_seat: "{pc} takes their seat at the table.", ev_join: "A new player joins: {pc}",
       ev_leave: "{pc} steps away from the table.", ev_music_stop: "🎵 The music fades away.",
       amb_wind: "Howling wind", amb_rain: "Steady rain", amb_storm: "Rain with rolling thunder",
@@ -303,6 +310,9 @@
       etaLeft: "עוד בערך {t}", etaLonger: "לוקח קצת יותר זמן מהרגיל",
       sec: "{n} שניות", min: "{n} דקות", sent: "✉️ נשלח — מנהל המשחק יקרא את זה עוד רגע",
       sentWaiting: "✉️ נשלח — מחכים ל{names}",
+      trFrom: "🌐 תורגם מ{lang}", trShowOriginal: "הצג מקור",
+      trShowTranslation: "הצג תרגום", trWaiting: "🌐 מתרגם…",
+      lang_en: "אנגלית", lang_he: "עברית",
       ev_seat: "{pc} מתיישב/ת ליד השולחן.", ev_join: "שחקן/ית חדש/ה מצטרף/ת: {pc}",
       ev_leave: "{pc} קם/ה מהשולחן.", ev_music_stop: "🎵 המוזיקה דועכת.",
       amb_wind: "רוח מייללת", amb_rain: "גשם יורד", amb_storm: "סערה ורעמים",
@@ -329,7 +339,7 @@
   // -------------------------------------------------------------- api ---
   let code = new URLSearchParams(location.search).get("code") || store.get("code") || "";
   let token = store.get("token");
-  let me = null, lastId = 0, polling = false, historyLoaded = false;
+  let me = null, lastId = 0, lastRev = 0, polling = false, historyLoaded = false;
   const allMessages = [];
 
   // The shared clock all music is timed against. Each /api/info round trip gives a
@@ -1050,8 +1060,35 @@
   }
   setInterval(updateProgress, 500);
 
+  // Every player reads one language. A message written in another one shows its
+  // translation (sent by the GM with `gm-table.sh translate`), with the original a
+  // tap away; until the translation arrives, the original shows, marked.
+  const msgEls = new Map();            // message id -> its element, to update in place
+  const showOriginal = new Set();      // ids this player flipped back to the original
+  function sourceLang(m) { return m.lang || (dirFor(m.text || "") === "rtl" ? "he" : "en"); }
+  function readable(m) {
+    if (m.kind === "system" || !m.text || (m.kind === "player" && m.pc === me)) return null;
+    if (m.kind === "gm" && m.lang) return null;           // already one version per language
+    const src = sourceLang(m);
+    if (src === lang) return null;
+    const tr = (m.tr || {})[lang];
+    if (m.kind === "gm" && !tr) return null;   // narration: the GM posts per language
+    return { src, text: tr || null };
+  }
+
   function addMessage(m) {
-    if (!shownToMe(m)) return;
+    const d = renderMessage(m);
+    if (d) $("log").appendChild(d);
+  }
+  function updateMessage(m) {
+    const old = msgEls.get(m.id);
+    const fresh = renderMessage(m);
+    if (old && fresh) old.replaceWith(fresh);
+    else if (fresh) $("log").appendChild(fresh);
+  }
+
+  function renderMessage(m) {
+    if (!shownToMe(m)) return null;
     if (m.kind === "gm" && !m.to) lastGmId = Math.max(lastGmId, m.id);
     const d = document.createElement("div");
     d.className = "msg " + m.kind + (m.to ? " whisper" : "") + (m.pc === me && m.kind === "player" ? " mine" : "");
@@ -1073,8 +1110,30 @@
         who.appendChild(play);
       }
       const body = document.createElement("div");
-      body.innerHTML = md(m.text || "");
+      body.className = "body";
+      const tr = readable(m);
+      const useTr = tr && tr.text && !showOriginal.has(m.id);
+      body.innerHTML = md(useTr ? tr.text : (m.text || ""));
       d.append(who, body);
+      if (tr) {
+        const note = document.createElement("div");
+        note.className = "tr-note";
+        if (tr.text) {
+          note.append(t("trFrom").replace("{lang}", t("lang_" + tr.src)) + " · ");
+          const flip = document.createElement("button");
+          flip.type = "button";
+          flip.textContent = useTr ? t("trShowOriginal") : t("trShowTranslation");
+          flip.onclick = () => {
+            if (showOriginal.has(m.id)) showOriginal.delete(m.id); else showOriginal.add(m.id);
+            updateMessage(m);
+          };
+          note.appendChild(flip);
+        } else {
+          note.textContent = t("trWaiting");
+          d.classList.add("translating");
+        }
+        d.appendChild(note);
+      }
       if (m.image) {
         const img = document.createElement("img");
         img.alt = "";
@@ -1083,18 +1142,27 @@
         d.appendChild(img);
       }
     }
-    $("log").appendChild(d);
+    msgEls.set(m.id, d);
+    return d;
   }
 
   function rerenderLog() {
     $("log").textContent = "";
+    msgEls.clear();
     allMessages.forEach(addMessage);
     $("log").scrollTop = $("log").scrollHeight;
   }
 
   async function pollMessages() {
     try {
-      const r = await api("/api/messages?after=" + lastId);
+      const r = await api("/api/messages?after=" + lastId + "&rev=" + lastRev);
+      if (r.ok && typeof r.rev === "number") lastRev = Math.max(lastRev, r.rev);
+      const changed = r.ok ? r.messages.filter((m) => m.id <= lastId) : [];
+      changed.forEach((m) => {
+        const i = allMessages.findIndex((x) => x.id === m.id);
+        if (i >= 0) { allMessages[i] = m; updateMessage(m); }
+      });
+      if (r.ok) r.messages = r.messages.filter((m) => m.id > lastId);
       if (r.ok && r.messages.length) {
         const log = $("log");
         const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 80;

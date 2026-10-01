@@ -55,9 +55,15 @@ open the link, enter the code, and pick or create their PC. While the table is o
   speech-to-text slips — read for intent, never mock a transcription) and hear the narration
   read aloud, so write `say` text for the ear too: no HP bars, tables or box art there, short
   sentences, dice as one plain line. Each action is tagged with the player's language
-  (English/Hebrew). Answer in it — natural Hebrew, not transliteration. Mixed table (`wait`
-  prints `Table languages`): post each beat once per language, `say --lang en` and
-  `say --lang he`; each player sees only their own. Untagged `say` goes to everyone.
+  (English/Hebrew). Answer in it — natural Hebrew, not transliteration. **Every player
+  reads one language.** Mixed table (`wait` prints `Table languages`): post each beat once
+  per language, `say --lang en` and `say --lang he`; each player sees only their own
+  (an untagged `say` reaches everyone untranslated, and `say` warns you). Whisper in the
+  recipient's language. When `wait` prints **TRANSLATE**, first thing in your turn send
+  every listed action's translation in ONE call — `gm-table.sh translate --stdin` with
+  `{"<id>": {"<lang>": "<translation>"}}` (the command is printed, ready to fill) — so
+  players see each other's actions in their own language. Translate faithfully: same
+  meaning and tone, names unchanged, no additions.
 - **Music is automatic — you pick the mood, the table picks the track.** Tag EVERY `say`
   with the scene's mood: `--mood calm|tavern|travel|mystery|dread|dungeon|combat|boss|sad|
   storm|victory|silence`. Same mood = the track keeps playing; a new mood switches it

@@ -15,6 +15,9 @@ can speak their actions (push-to-talk) and hear the narration read aloud, in
 English or Hebrew. Each player's language travels with their actions so the GM
 can answer in it; ``say --lang he|en`` posts a language-specific version of a
 beat (each browser shows only its own language's version; untagged = everyone).
+Players' actions are translated too: the GM sends translations with
+``gm-table.sh translate`` (``wait`` lists what needs it), and each browser shows
+every action in its player's language, with the original a tap away.
 
 Music: ``gm-table.sh music <track>`` sets one shared background track for the
 whole table — an audio file from ``music/`` (project-wide) or ``<campaign>/music/``,
@@ -184,12 +187,24 @@ class TableState:
         self.cursor_path = self.dir / "gm-cursor"
         self.lock = threading.Lock()
         self.messages: List[Dict[str, Any]] = []
+        self.rev = 0          # bumps on every new message AND every translation
         if self.log_path.exists():
+            by_id: Dict[int, Dict[str, Any]] = {}
             for line in self.log_path.read_text(encoding="utf-8").splitlines():
                 try:
-                    self.messages.append(json.loads(line))
+                    entry = json.loads(line)
                 except ValueError:
                     continue
+                self.rev += 1
+                if "patch" in entry:          # a translation added later
+                    target = by_id.get(entry.get("patch"))
+                    if target is not None:
+                        target.setdefault("tr", {}).update(entry.get("tr") or {})
+                        target["rev"] = self.rev
+                    continue
+                entry["rev"] = self.rev
+                self.messages.append(entry)
+                by_id[entry.get("id")] = entry
         self.seats: Dict[str, str] = self._read_json(self.seats_path, {})
         self.langs_path = self.dir / "langs.json"
         self.langs: Dict[str, str] = self._read_json(self.langs_path, {})
@@ -433,11 +448,14 @@ class TableState:
                 msg["voice"] = True
             if event:
                 msg["event"] = event   # lets each browser word the notice in its language
+            self.rev += 1
+            msg["rev"] = self.rev
             self.messages.append(msg)
             if kind == "gm" and not to:
                 self._gm_spoke(lang if lang in LANGS else None)
             with open(self.log_path, "a", encoding="utf-8") as f:
-                f.write(json.dumps(msg, ensure_ascii=False) + "\n")
+                f.write(json.dumps({k: v for k, v in msg.items() if k != "rev"},
+                                   ensure_ascii=False) + "\n")
             return msg
 
     def visible_to(self, msg: Dict[str, Any], pc: Optional[str]) -> bool:
@@ -448,9 +466,66 @@ class TableState:
             return True
         return pc is not None and party_roster._same_name(to, pc)
 
-    def since(self, after: int, pc: Optional[str]) -> List[Dict[str, Any]]:
+    def since(self, after: int, pc: Optional[str], rev: int = 0) -> List[Dict[str, Any]]:
+        """New messages (id > after), plus older ones changed since revision
+        ``rev`` (a translation arrived), so browsers can update them in place."""
         with self.lock:
-            return [m for m in self.messages if m["id"] > after and self.visible_to(m, pc)]
+            return [m for m in self.messages
+                    if (m["id"] > after or (rev and m.get("rev", 0) > rev))
+                    and self.visible_to(m, pc)]
+
+    # --- translation: every player reads one language ---
+    @staticmethod
+    def text_lang(text: str) -> str:
+        """'he' or 'en', by which script most of the letters are in."""
+        he = sum(1 for ch in text if "\u0590" <= ch <= "\u05ff")
+        latin = sum(1 for ch in text if ch.isascii() and ch.isalpha())
+        return "he" if he > latin else "en"
+
+    def needs_translation(self, ids: Optional[List[int]] = None) -> List[Dict[str, Any]]:
+        """Public player actions that some seated player can't read yet:
+        [{id, pc, from, to: [langs], text}] — at a mixed table, or when someone writes
+        in a language the rest of the table doesn't read."""
+        langs = set(self.seated_langs().values())
+        if not langs:
+            return []
+        out = []
+        with self.lock:
+            pool = [m for m in self.messages if m["kind"] == "player" and not m.get("to")]
+            if ids is not None:
+                pool = [m for m in pool if m["id"] in ids]
+            for m in pool[-20:]:
+                src = m.get("lang") or self.text_lang(m.get("text", ""))
+                missing = sorted(l for l in langs if l != src and l not in (m.get("tr") or {}))
+                if missing:
+                    out.append({"id": m["id"], "pc": m.get("pc"), "from": src,
+                                "to": missing, "text": m.get("text", "")})
+        return out
+
+    def translate(self, translations: Dict[str, Dict[str, str]]) -> List[int]:
+        """Store translations {message id: {lang: text}}; returns the ids updated."""
+        done = []
+        with self.lock:
+            by_id = {m["id"]: m for m in self.messages}
+            for raw_id, versions in (translations or {}).items():
+                try:
+                    msg = by_id.get(int(raw_id))
+                except (TypeError, ValueError):
+                    continue
+                if msg is None or msg.get("to") or not isinstance(versions, dict):
+                    continue
+                clean = {l: str(t).strip()[:MAX_TEXT] for l, t in versions.items()
+                         if l in LANGS and str(t).strip()}
+                if not clean:
+                    continue
+                msg.setdefault("tr", {}).update(clean)
+                self.rev += 1
+                msg["rev"] = self.rev
+                with open(self.log_path, "a", encoding="utf-8") as f:
+                    f.write(json.dumps({"patch": msg["id"], "tr": clean},
+                                       ensure_ascii=False) + "\n")
+                done.append(msg["id"])
+        return done
 
     def gm_unread(self, mark: bool) -> List[Dict[str, Any]]:
         with self.lock:
@@ -695,9 +770,11 @@ def make_handler(state: TableState, code: str, host_key: str):
             if url.path == "/api/messages":
                 try:
                     after = int(q.get("after", 0))
+                    rev = int(q.get("rev", 0))
                 except ValueError:
-                    after = 0
-                return self._json({"ok": True, "me": me, "messages": state.since(after, me)})
+                    after, rev = 0, 0
+                return self._json({"ok": True, "me": me, "rev": state.rev,
+                                   "messages": state.since(after, me, rev)})
             return self._err("not found", 404)
 
         def do_POST(self):
@@ -774,9 +851,11 @@ def make_handler(state: TableState, code: str, host_key: str):
 
         def _gm(self, path: str, data: Dict[str, Any]):
             if path == "/api/gm/inbox":
-                return self._json({"ok": True, "messages": state.gm_unread(mark=True),
+                unread = state.gm_unread(mark=True)
+                return self._json({"ok": True, "messages": unread,
                                    "waiting_on": state.waiting_on(),
                                    "langs": state.seated_langs(),
+                                   "translate": state.needs_translation(),
                                    "music": state.music, "auto_music": state.auto_music})
             if path == "/api/gm/say":
                 text = str(data.get("text", "")).strip()
@@ -812,7 +891,22 @@ def make_handler(state: TableState, code: str, host_key: str):
                 if music is not None:
                     self._announce_music(music)
                 msg = state.append("gm", text, to=to or None, image=image, lang=lang)
-                return self._json({"ok": True, "message": msg, "music": music})
+                warning = None
+                seated = state.seated_langs()
+                table_langs = set(seated.values())
+                if to:
+                    want = seated.get(to) or next((l for n, l in seated.items()
+                                                   if party_roster._same_name(n, to)), None)
+                    if want and text and state.text_lang(text) != want:
+                        warning = (f"{to} plays in {LANGS[want]} — whisper in {LANGS[want]}.")
+                elif not lang and text and len(table_langs) > 1:
+                    wrote = state.text_lang(text)
+                    others = sorted(LANGS[l] for l in table_langs if l != wrote)
+                    warning = (f"Mixed table: this beat has no --lang, so {', '.join(others)} "
+                               f"players get it in {LANGS[wrote]}. Next time post one version "
+                               f"per language with --lang.")
+                return self._json({"ok": True, "message": msg, "music": music,
+                                   "warning": warning})
             if path == "/api/gm/music":
                 if "auto" in data:
                     state.set_auto_music(bool(data["auto"]))
@@ -868,6 +962,10 @@ def make_handler(state: TableState, code: str, host_key: str):
                                         data.get("title"))
                 self._announce_music(music)
                 return self._json({"ok": True, "music": music})
+            if path == "/api/gm/translate":
+                updated = state.translate(data.get("translations") or {})
+                return self._json({"ok": True, "updated": updated,
+                                   "still_needed": state.needs_translation()})
             if path == "/api/gm/shutdown":
                 # Graceful stop on every platform (no Unix signals needed).
                 self._json({"ok": True})
@@ -1169,9 +1267,25 @@ def _call(campaign_dir: Path, method: str, path: str, data: Optional[dict] = Non
         sys.exit(f"[ERROR] Could not reach the table server: {e.reason}")
 
 
+def _print_translate_request(needed: List[dict]) -> None:
+    """Tell the GM exactly what to translate, as a ready-to-fill command."""
+    if not needed:
+        return
+    print("\nTRANSLATE for the table (players each read one language) — one call, before you narrate:")
+    for item in needed:
+        to = ", ".join(LANGS[l] for l in item["to"])
+        print(f"  #{item['id']} {item.get('pc') or '?'} ({LANGS.get(item['from'], item['from'])} -> {to}): "
+              f"{item['text']}")
+    example = {str(item["id"]): {l: "..." for l in item["to"]} for item in needed}
+    print("  bash tools/gm-table.sh translate --stdin <<'JSON'")
+    print("  " + json.dumps(example, ensure_ascii=False))
+    print("  JSON")
+
+
 def _print_messages(messages: List[dict], waiting_on: List[str],
                     langs: Optional[Dict[str, str]] = None,
-                    music: Optional[Dict[str, Any]] = None, auto_music: bool = True) -> None:
+                    music: Optional[Dict[str, Any]] = None, auto_music: bool = True,
+                    translate: Optional[List[dict]] = None) -> None:
     if not messages:
         print("(no new player messages)")
     for m in messages:
@@ -1196,6 +1310,7 @@ def _print_messages(messages: List[dict], waiting_on: List[str],
                   + "  -> post each beat once per language: say --lang he / say --lang en")
         elif used and used[0] != "en":
             print(f"Table language: {LANGS.get(used[0], used[0])} -> narrate in it")
+    _print_translate_request(translate or [])
     if auto_music and music is not None:
         mood = music.get("mood")
         playing = music.get("title") if music.get("track") else "silence"
@@ -1244,6 +1359,10 @@ def main() -> None:
                    help="The scene's mood; the music follows it (no change if it's the same)")
     s.add_argument("--theme", metavar="ENEMY",
                    help="A special enemy enters: play their own theme music")
+    tr = sub.add_parser("translate", help="Translate players' actions for the rest of the table")
+    tr.add_argument("json", nargs="?", help='{"12": {"en": "..."}, "13": {"he": "..."}} (or --stdin)')
+    tr.add_argument("--stdin", action="store_true", help="Read the JSON from stdin")
+
     s.add_argument("--boss", action="store_true",
                    help="With --theme: this is a boss — play the fast, thundering version")
 
@@ -1307,7 +1426,8 @@ def main() -> None:
     if args.action == "inbox":
         r = _call(campaign_dir, "POST", "/api/gm/inbox", {})
         return _print_messages(r.get("messages", []), r.get("waiting_on", []), r.get("langs"),
-                               r.get("music"), r.get("auto_music", True))
+                               r.get("music"), r.get("auto_music", True),
+                               r.get("translate"))
 
     if args.action == "wait":
         deadline = time.time() + args.timeout
@@ -1328,7 +1448,22 @@ def main() -> None:
             print(f"(no player messages after {args.timeout}s — run wait again)")
             return
         return _print_messages(r["messages"], r.get("waiting_on", []), r.get("langs"),
-                               r.get("music"), r.get("auto_music", True))
+                               r.get("music"), r.get("auto_music", True),
+                               r.get("translate"))
+
+    if args.action == "translate":
+        raw = sys.stdin.read() if args.stdin else (args.json or "")
+        try:
+            translations = json.loads(raw)
+            assert isinstance(translations, dict)
+        except (ValueError, AssertionError):
+            sys.exit('[ERROR] Give JSON like {"12": {"en": "I light a torch."}}')
+        r = _call(campaign_dir, "POST", "/api/gm/translate", {"translations": translations})
+        print(f"TRANSLATED {len(r.get('updated', []))} message(s): "
+              + ", ".join(f"#{i}" for i in r.get("updated", [])))
+        if r.get("still_needed"):
+            _print_translate_request(r["still_needed"])
+        return
 
     if args.action == "say":
         text = sys.stdin.read() if args.stdin else (args.text or "")
@@ -1343,6 +1478,8 @@ def main() -> None:
         if m.get("lang"):
             who += f", {LANGS[m['lang']]} speakers only"
         print(f"POSTED #{m['id']}{who}")
+        if r.get("warning"):
+            print(f"[WARNING] {r['warning']}")
         if r.get("music"):
             mu_ = r["music"]
             print(f"MUSIC -> {mu_.get('title') if mu_.get('track') else 'silence'} "

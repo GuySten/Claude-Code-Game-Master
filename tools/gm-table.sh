@@ -27,7 +27,7 @@ ACTION=$1
 shift
 
 case "$ACTION" in
-    "serve"|"start"|"status"|"wait"|"inbox"|"say"|"music"|"free"|"stop")
+    "serve"|"start"|"status"|"wait"|"inbox"|"say"|"translate"|"music"|"free"|"stop")
         $PYTHON_CMD "$LIB_DIR/table_server.py" "$ACTION" "$@"
         ;;
 
