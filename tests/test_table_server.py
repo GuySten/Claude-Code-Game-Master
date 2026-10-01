@@ -361,11 +361,15 @@ def test_the_claude_code_hook_reports_the_gms_stage(table, monkeypatch):
     call("/api/say", {"code": CODE, "token": pip, "text": "Attack!"})
     call("/api/gm/inbox", {}, host=True)
 
+    import os
+    import shutil
+    bash = shutil.which("bash") or "bash"      # Git Bash on Windows, as Claude Code uses
+
     def run(command, expect):
         payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
-        done = subprocess.run(["bash", str(hook)], input=payload, text=True, capture_output=True,
-                              env={"PATH": "/usr/bin:/bin:/usr/local/bin",
-                                   "GM_WORLD_STATE_BASE": str(table["world"])}, timeout=10)
+        done = subprocess.run([bash, str(hook)], input=payload, text=True, capture_output=True,
+                              env={**os.environ, "GM_WORLD_STATE_BASE": str(table["world"])},
+                              timeout=20)
         assert done.returncode == 0 and done.stdout == ""     # never blocks the tool
         for _ in range(40):                                     # the report is sent async
             if table["state"].turn["stage"] == expect:

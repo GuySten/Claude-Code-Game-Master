@@ -39,8 +39,8 @@ expect "status line HUD"           "Pip"          bash -c "echo '{}' | bash tool
 expect "json-get (no jq)"          "Smoke Test"   bash tools/json-get.sh "$GM_WORLD_STATE_BASE/campaigns/smoke/campaign-overview.json" campaign_name
 expect "model presets"             "recommended"  uv run python lib/model_presets.py
 expect "open the table"            "TABLE OPEN"   bash tools/gm-table.sh start --port "$PORT" --code smoke-1
-expect "players can reach it"      '"ok": true'   curl -s --noproxy '*' "http://127.0.0.1:$PORT/api/info?code=smoke-1"
-expect "the page is served"        "<title>"      curl -s --noproxy '*' "http://127.0.0.1:$PORT/"
+expect "players can reach it"      '"ok": true'   curl -s --max-time 10 --noproxy '*' "http://127.0.0.1:$PORT/api/info?code=smoke-1"
+expect "the page is served"        "<title>"      curl -s --max-time 10 --noproxy '*' "http://127.0.0.1:$PORT/"
 expect "GM narrates (Hebrew)"      "POSTED"       bash tools/gm-table.sh say "שלום, Pip! The inn is warm." --mood tavern
 expect "music follows the mood"    "tavern"       bash tools/gm-table.sh music list
 expect "table status"              "TABLE OPEN"   bash tools/gm-table.sh status

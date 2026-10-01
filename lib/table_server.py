@@ -1075,6 +1075,19 @@ def make_handler(state: TableState, code: str, host_key: str):
     return Handler
 
 
+class _TableHTTPServer(ThreadingHTTPServer):
+    """ThreadingHTTPServer without the reverse-DNS lookup in server_bind
+    (socket.getfqdn), which can stall startup for many seconds on macOS. The
+    name it looks up is never used."""
+    daemon_threads = True
+
+    def server_bind(self):
+        import socketserver
+        socketserver.TCPServer.server_bind(self)
+        host, port = self.server_address[:2]
+        self.server_name, self.server_port = str(host), port
+
+
 # ============================================================ host side ======
 
 def _lan_ip() -> str:
@@ -1197,14 +1210,18 @@ def _start_server(campaign_dir: Path, base: str, port: int, bind: str,
         kwargs["start_new_session"] = True
     with open(tdir / "server.log", "w", encoding="utf-8") as log:
         proc = subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT, **kwargs)
-    for _ in range(100):
+    started = time.time()
+    while time.time() - started < 30:          # a slow first start is fine; a dead one isn't
         if (tdir / "server.json").exists() or proc.poll() is not None:
             break
         time.sleep(0.1)
     time.sleep(0.2)
     print((tdir / "server.log").read_text(encoding="utf-8", errors="replace").rstrip())
     if not (tdir / "server.json").exists():
-        sys.exit("[ERROR] The table server did not start (see the log above).")
+        code_now = proc.poll()
+        state = (f"it exited with code {code_now}" if code_now is not None
+                 else f"it is still starting after {time.time() - started:.0f} s")
+        sys.exit(f"[ERROR] The table server did not start: {state} (log above).")
     print("\nPlayers: open the link and enter the table code.")
     print("Friends elsewhere: run a tunnel (see: gm-table.sh help) and share its https link.")
 
@@ -1230,7 +1247,7 @@ def serve(port: int, bind: str, code: Optional[str]) -> None:
     host_key = secrets.token_urlsafe(24)
     state = TableState(campaign_dir, base)
     try:
-        httpd = ThreadingHTTPServer((bind, port), make_handler(state, code, host_key))
+        httpd = _TableHTTPServer((bind, port), make_handler(state, code, host_key))
     except OSError as e:
         sys.exit(f"[ERROR] Port {port} is not available ({e.strerror or e}). Another table or "
                  f"program is using it — try: bash tools/gm-table.sh start --port {port + 1}")
