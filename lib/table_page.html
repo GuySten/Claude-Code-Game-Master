@@ -1176,7 +1176,10 @@
         updateProgress();
         // The music changed: fetch it now instead of on the next 4-second refresh,
         // so the new track starts with the narration it belongs to.
-        if (historyLoaded && r.messages.some((m) => m.event && /^music/.test(m.event.type))) refreshInfo();
+        // The music changed, or the narration arrived (the party's HP, held back
+        // during the GM's turn, now catches up with the story): refresh now.
+        if (historyLoaded && r.messages.some((m) => (m.event && /^music/.test(m.event.type))
+                                                   || (m.kind === "gm" && !m.to))) refreshInfo();
       }
       historyLoaded = true;
     } catch (e) { setStatus(t("reconnecting")); }

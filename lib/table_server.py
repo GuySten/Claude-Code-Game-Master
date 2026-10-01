@@ -556,7 +556,11 @@ class TableState:
         self.turn = {"started_at": now, "start_id": self.messages[-1]["id"],
                      "estimate": round(self.turn_estimate(), 1),
                      "stage": "reading", "stage_at": now,
-                     "langs_needed": sorted(langs), "langs_done": []}
+                     "langs_needed": sorted(langs), "langs_done": [],
+                     # The sheets as the players last saw them. The GM records
+                     # every change BEFORE narrating it, so without this the HP
+                     # bars would give the outcome away before the story does.
+                     "party": self.party()}
 
     def set_stage(self, stage: str) -> bool:
         with self.lock:
@@ -652,6 +656,29 @@ class TableState:
         return bool(tokens)
 
     # --- party view ---
+    def party_for(self, viewer: Optional[str]) -> List[Dict[str, Any]]:
+        """The party as this viewer should see it right now: during the GM's turn,
+        the sheets as they were when the turn began — until this viewer's own
+        narration is out — so HP, conditions and deaths land with the story,
+        not before it. Seats ('claimed') and newcomers are always live."""
+        live = self.party()
+        with self.lock:
+            turn = self.turn
+            if not turn or time.time() - turn["started_at"] >= STALE_TURN_SECONDS:
+                return live
+            lang = self.langs.get(viewer, "en") if viewer else None
+            if lang is not None and lang in turn["langs_done"]:
+                return live
+            held = {p["name"]: p for p in turn.get("party") or []}
+        out = []
+        for pc in live:
+            before = held.get(pc["name"])
+            if before is None:
+                out.append(pc)
+            else:
+                out.append({**before, "claimed": pc["claimed"], "lead": pc["lead"]})
+        return out
+
     def party(self) -> List[Dict[str, Any]]:
         out = []
         for path, raw in party_roster.all_pcs(self.campaign_dir):
@@ -762,7 +789,7 @@ def make_handler(state: TableState, code: str, host_key: str):
                 return self._err("bad table code", 403)
             me = state.pc_for(q.get("token"))
             if url.path == "/api/info":
-                return self._json({"ok": True, "me": me, "party": state.party(),
+                return self._json({"ok": True, "me": me, "party": state.party_for(me),
                                    "waiting_on": state.waiting_on(),
                                    "music": state.music, "server_now": time.time(),
                                    "progress": state.progress(),

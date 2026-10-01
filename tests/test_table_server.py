@@ -447,3 +447,29 @@ def test_untagged_narration_at_a_mixed_table_warns_the_gm(table):
     assert body["warning"] is None
     _, body = call("/api/gm/say", {"text": "Psst.", "to": "Noa"}, host=True)
     assert "whisper in Hebrew" in body["warning"]
+
+
+def test_hp_changes_wait_for_the_narration_that_explains_them(table):
+    call, world = table["call"], table["world"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    noa = call("/api/create", {"code": CODE, "name": "Noa"})[1]["token"]
+    call("/api/lang", {"code": CODE, "token": noa, "lang": "he"})
+    hp = lambda token: {p["name"]: p["hp"] for p in
+                        call(f"/api/info?code={CODE}&token={token}")[1]["party"]}
+
+    call("/api/say", {"code": CODE, "token": pip, "text": "I attack the troll!", "lang": "en"})
+    call("/api/gm/inbox", {}, host=True)                    # the GM starts its turn...
+    PlayerManager(str(world)).modify_hp("Pip", -6)          # ...and records the damage first
+    assert hp(pip)["Pip"] == 10 and hp(noa)["Pip"] == 10    # nobody sees it before the story
+
+    call("/api/create", {"code": CODE, "name": "Wren"})     # a newcomer still appears at once
+    assert "Wren" in hp(pip)
+
+    call("/api/gm/say", {"text": "The troll's club catches you: 6 damage.", "lang": "en"}, host=True)
+    assert hp(pip)["Pip"] == 4                              # English story out: English sees it
+    assert hp(noa)["Pip"] == 10                             # Hebrew version not out yet
+    call("/api/gm/say", {"text": "האלה של הטרול פוגעת בך: 6 נזק.", "lang": "he"}, host=True)
+    assert hp(noa)["Pip"] == 4
+
+    PlayerManager(str(world)).modify_hp("Pip", +2)          # outside a turn: live, as before
+    assert hp(pip)["Pip"] == 6
