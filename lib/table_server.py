@@ -239,6 +239,7 @@ def cant_act(sheet: Dict[str, Any]) -> Optional[str]:
 PORTRAIT_GRACE = 180
 # A recorded NPC the narration has named this many times gets a portrait by itself.
 NPC_PORTRAIT_MENTIONS = 3
+REPAINT_GAP = 120          # a player can ask for a new portrait this often
 PORTRAIT_RETRY = 900
 # Ability score increases (5e): every class at these levels, plus a few extras.
 ASI_LEVELS = {4, 8, 12, 16, 19}
@@ -339,6 +340,9 @@ class TableState:
         store = self._read_json(self.lore_store_path, {})
         self.lore_store: Dict[str, Dict[str, Any]] = store if isinstance(store, dict) else {}
         self.card_jobs: List[tuple] = []
+        self.after_busy = 0                            # narrations still being followed up
+        self.repaints: set = set()                     # PCs whose portrait is being redone
+        self.repaint_asked: Dict[str, float] = {}
         self.level_notices_path = self.dir / "level-notices.json"
         notices = self._read_json(self.level_notices_path, {})
         self.level_notices: Dict[str, int] = notices if isinstance(notices, dict) else {}
@@ -704,6 +708,9 @@ class TableState:
             self.prepare_cards(msg)
         except Exception as e:
             print(f"[lore] after narration: {e}", flush=True)
+        finally:
+            with self.lock:
+                self.after_busy -= 1
 
     def announce_level_ups(self) -> List[str]:
         """A PC whose level rose (the GM awarded XP, or a milestone) is told so in
@@ -1059,6 +1066,7 @@ class TableState:
             if kind == "gm" and not to:
                 self._gm_spoke(lang if lang in LANGS else None)
             if kind == "gm":
+                self.after_busy += 1            # (tests wait for this to reach 0)
                 threading.Thread(target=self._after_narration, args=(dict(msg),), daemon=True).start()
             with open(self.log_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps({k: v for k, v in msg.items() if k != "rev"},
@@ -1950,6 +1958,36 @@ class TableState:
         except (OSError, ValueError):
             return []
 
+    def set_sex(self, pc: str, sex: str) -> bool:
+        """Record a PC's sex in their appearance (what their portrait shows)."""
+        sex = {"male": "male", "female": "female"}.get(str(sex).strip().lower(), "")
+        path = party_roster.find_pc(self.campaign_dir, pc)
+        if not sex or path is None:
+            return False
+        with self.lock:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            va = data.get("visual_appearance") if isinstance(data.get("visual_appearance"), dict) else {}
+            data["visual_appearance"] = {**va, "sex": sex}
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+            tmp.replace(path)
+        return True
+
+    def repaint(self, pc: str, sex: str = "") -> Dict[str, Any]:
+        """A player asks for a new portrait of their character (it came out wrong),
+        optionally saying whether they're a man or a woman."""
+        now = time.time()
+        with self.lock:
+            if now - self.repaint_asked.get(pc, 0) < REPAINT_GAP:
+                return {"ok": False, "error": "A new portrait is already on its way."}
+            self.repaint_asked[pc] = now
+            self.repaints.add(pc)
+            self.portrait_tried.pop(pc, None)
+        if sex:
+            self.set_sex(pc, sex)
+        self.portrait_wake.set()
+        return {"ok": True}
+
     def portrait_pass(self, now: Optional[float] = None) -> List[str]:
         """Draw the portrait of every PC who has none (one at a time; slow on a
         laptop GPU), and show it to the table. Returns the names drawn."""
@@ -1960,10 +1998,11 @@ class TableState:
         for path, raw in party_roster.all_pcs(self.campaign_dir):
             sheet = to_flat(raw)
             name = sheet.get("name") or path.stem
-            if sheet.get("portrait") and (self.campaign_dir / "images" / sheet["portrait"]).is_file():
+            again = name in self.repaints
+            if not again and sheet.get("portrait") and (self.campaign_dir / "images" / sheet["portrait"]).is_file():
                 continue
             first = self.portrait_seen.setdefault(name, now)
-            if not sheet.get("visual_appearance") and now - first < PORTRAIT_GRACE:
+            if not again and not sheet.get("visual_appearance") and now - first < PORTRAIT_GRACE:
                 continue                    # give the GM a moment to write their look
             if now - self.portrait_tried.get(name, -PORTRAIT_RETRY) < PORTRAIT_RETRY:
                 continue
@@ -1977,6 +2016,7 @@ class TableState:
             except Exception as e:          # no GPU memory, service down...: try later
                 print(f"[portrait] {name}: {e}", flush=True)
                 continue
+            self.repaints.discard(name)
             self.append("system", f"{name}'s portrait.", pc=name, image=filename,
                         event={"type": "portrait"})
             drawn.append(name)
@@ -2239,6 +2279,8 @@ def make_handler(state: TableState, code: str, host_key: str):
                 if mode == "original" and not name:
                     return self._err("Give your character a name.")
                 created = state.create_pc(mode, name, concept)
+                if created["ok"] and data.get("sex"):
+                    state.set_sex(created["pc"], str(data["sex"]))
                 if not created["ok"]:
                     existing = party_roster.find_pc(state.campaign_dir, name) if name else None
                     if existing is not None and not state.claimed_by_anyone(name):
@@ -2280,6 +2322,14 @@ def make_handler(state: TableState, code: str, host_key: str):
                 msg = state.append("player", text, pc=me, to=me if private else None,
                                    lang=lang, voice=bool(data.get("voice")))
                 return self._json({"ok": True, "message": msg})
+
+            if url.path == "/api/portrait":
+                if not me:
+                    return self._err("Take a seat first.", 403)
+                if not state._art_on(state.portrait_maker):
+                    return self._err("Pictures are off at this table.", 409)
+                result = state.repaint(me, str(data.get("sex", "")))
+                return self._json(result, 200 if result["ok"] else 429)
 
             if url.path == "/api/edit":
                 if not me:

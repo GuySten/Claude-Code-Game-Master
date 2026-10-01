@@ -599,6 +599,42 @@ def test_every_action_can_be_fixed_for_its_first_seconds(table, monkeypatch):
     assert [m["text"] for m in got if m["kind"] == "player"] == ["I pick the lock."]
 
 
+def test_players_say_how_their_portrait_looks_and_can_have_it_repainted(table):
+    call, state, camp = table["call"], table["state"], table["camp"]
+    (camp / "images").mkdir(exist_ok=True)
+    painted = []
+
+    def maker(name, campaign_dir):
+        path = state.party_path(name) if hasattr(state, "party_path") else None
+        import party_roster
+        path = party_roster.find_pc(campaign_dir, name)
+        sheet = json.loads(path.read_text())
+        painted.append((name, (sheet.get("visual_appearance") or {}).get("sex")))
+        f = f"portrait-{name.lower()}-{len(painted)}.png"
+        (campaign_dir / "images" / f).write_bytes(b"\x89PNG")
+        sheet["portrait"] = f
+        path.write_text(json.dumps(sheet))
+        return f
+
+    state.portrait_maker = maker
+    noa = call("/api/create", {"code": CODE, "name": "Noa", "concept": "an elf ranger", "sex": "female"})[1]["token"]
+    import party_roster
+    sheet = json.loads(party_roster.find_pc(camp, "Noa").read_text())
+    assert sheet["visual_appearance"]["sex"] == "female"            # chosen on the join page
+    state.portrait_pass()                                            # she has a look: painted at once
+    assert ("Noa", "female") in painted
+
+    # Wrong anyway? Repaint it, as a man this time: painted again though it has one.
+    status, body = call("/api/portrait", {"code": CODE, "token": noa, "sex": "male"})
+    assert status == 200 and body["ok"]
+    assert call("/api/portrait", {"code": CODE, "token": noa})[0] == 429       # not twice in a row
+    state.portrait_pass()
+    assert painted[-1] == ("Noa", "male") and len([p for p in painted if p[0] == "Noa"]) == 2
+    state.portrait_pass()
+    assert len([p for p in painted if p[0] == "Noa"]) == 2                     # once
+    assert call("/api/portrait", {"code": CODE, "sex": "male"})[0] == 403      # seated players only
+
+
 def test_recurring_npcs_get_portraits_by_themselves(table):
     call, state, camp = table["call"], table["state"], table["camp"]
     state.set_round_seconds(0)
@@ -1237,6 +1273,7 @@ def test_hover_cards_show_what_the_player_knows_and_nothing_more(table):
                                  "The Ashen Hand's sigil is carved on the bar."}, host=True)
     call("/api/gm/alias", {"name": "Marta", "alias": "מרתה"}, host=True)
     call("/api/gm/say", {"text": "מרתה מחייכת.", "lang": "he"}, host=True)
+    assert wait_for(lambda: state.after_busy == 0)  # (the follow-ups ran without a model)
     asked = []
 
     def ask(system, prompt):

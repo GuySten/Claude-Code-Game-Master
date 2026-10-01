@@ -417,7 +417,8 @@ Copy, fill in the link and code, and send:
    cleric who lost her faith"). **Nameless traveler** works too; the world will name you. Or
    tap **🎲 Roll a character**: fair dice roll your abilities (4d6, lowest die dropped) and
    suggest a race, class, name and concept, which you can change. Everyone sees what you
-   rolled, and how many tries it took.
+   rolled, and how many tries it took. *Their portrait shows* (a man / a woman) makes sure
+   your portrait gets it right.
 
 **Playing**
 
@@ -496,7 +497,8 @@ Copy, fill in the link and code, and send:
 2. **בחרו מי אתם.** לחצו על דמות פנויה, או צרו אחת: שם ושורה אחת ("גמדה כוהנת שאיבדה את
    אמונתה"). אפשר גם **נווד/ת בלי שם**: העולם כבר ייתן לכם שם. או לחצו **🎲 הטלת דמות**:
    קוביות הוגנות מטילות את התכונות שלכם (4d6, הקובייה הנמוכה נזרקת) ומציעות גזע, מקצוע, שם
-   ותיאור, שאפשר לשנות. כולם רואים מה הטלתם, וכמה ניסיונות זה לקח.
+   ותיאור, שאפשר לשנות. כולם רואים מה הטלתם, וכמה ניסיונות זה לקח. *הדיוקן מראה* (גבר / אישה)
+   מוודא שהדיוקן שלכם ייצא נכון.
 
 **משחק**
 
@@ -618,6 +620,11 @@ stays as written.
 (`gm-player.sh xp`), not when it just mentions it in the story. Ask the GM *"award the XP from
 that fight"*, or run `bash tools/gm-player.sh xp "Name" +300` yourself. The story then says
 who can level up, and they do it from their sheet (**📜** → **Level up**).
+
+**A portrait shows the wrong sex** (a woman for a male character). Open your sheet (**📜**),
+tap **🔄 Repaint portrait** under the portrait, choose *a man* or *a woman*, and tap **Paint**:
+a new one arrives in a minute or two, and it's remembered for every later picture. New
+characters: choose it on the join page (*Their portrait shows*).
 
 **My portrait isn't on my sheet.** Portraits need pictures turned on (Forge or OpenAI). The
 table waits about 3 minutes for the GM to describe a new character's look, then paints them

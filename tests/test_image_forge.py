@@ -130,13 +130,19 @@ def test_portraits_are_drawn_and_kept_on_the_record(forge):
     out = image_gen.generate_portrait("pip", camp)
     sent = forge["seen"]["requests"][-1]
     assert (sent["width"], sent["height"]) == (832, 1216)                 # a portrait shape
-    assert "Character portrait of Pip, Halfling Rogue" in sent["prompt"]
+    # Her sex leads the prompt (models weigh the start most), and Forge is told
+    # what NOT to draw.
+    assert sent["prompt"].startswith("Character portrait of a woman: Pip, a female Halfling Rogue.")
+    assert sent["negative_prompt"].startswith("man, male, masculine face, beard")
     assert "red curls" in sent["prompt"] and "ink and watercolor" in sent["prompt"]
     assert json.loads((camp / "character.json").read_text())["portrait"] == out["portrait"]
     assert (camp / "images" / out["portrait"]).read_bytes() == PNG
 
     npc = image_gen.generate_portrait("Grimnar", camp)
-    assert "dwarf blacksmith" in forge["seen"]["requests"][-1]["prompt"]
+    sent = forge["seen"]["requests"][-1]
+    assert "dwarf blacksmith" in sent["prompt"]
+    assert sent["prompt"].startswith("Character portrait of Grimnar")      # sex unknown: no guess
+    assert not sent["negative_prompt"].startswith(("man,", "woman,"))
     assert json.loads((camp / "npcs.json").read_text())["Grimnar"]["portrait"] == npc["portrait"]
     with pytest.raises(image_gen.ImageGenError, match="No character"):
         image_gen.generate_portrait("Nobody", camp)

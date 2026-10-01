@@ -319,8 +319,9 @@ FORGE_NEGATIVE = ("text, words, letters, watermark, signature, logo, frame, bord
                   "bad hands, bad anatomy")
 
 
-def _forge_generate(prompt: str, quality: str, size: str):
-    """One image from the local Forge/AUTOMATIC1111 API -> (png bytes, model, WxH)."""
+def _forge_generate(prompt: str, quality: str, size: str, avoid: str = ""):
+    """One image from the local Forge/AUTOMATIC1111 API -> (png bytes, model, WxH).
+    ``avoid``: more for the negative prompt (a man's portrait avoids "woman")."""
     w, h = _forge_dims(size)
     steps = int(os.environ.get("FORGE_STEPS", "6"))
     if quality == "low":
@@ -329,7 +330,7 @@ def _forge_generate(prompt: str, quality: str, size: str):
         steps += 2
     payload = {
         "prompt": prompt,
-        "negative_prompt": os.environ.get("FORGE_NEGATIVE", FORGE_NEGATIVE),
+        "negative_prompt": ", ".join(x for x in (avoid, os.environ.get("FORGE_NEGATIVE", FORGE_NEGATIVE)) if x),
         "steps": steps,
         "cfg_scale": float(os.environ.get("FORGE_CFG", "2")),
         "sampler_name": os.environ.get("FORGE_SAMPLER", "DPM++ SDE"),
@@ -416,7 +417,7 @@ def build_prompt(prompt: str, characters=None, campaign_dir=None, *,
 def generate_image(prompt: str, *, title: str = "", quality: str = DEFAULT_QUALITY,
                    size: str = DEFAULT_SIZE, model: str = DEFAULT_MODEL,
                    characters=None, style_lock: bool = True,
-                   appearance_lock: bool = True, campaign_dir=None) -> dict:
+                   appearance_lock: bool = True, campaign_dir=None, avoid: str = "") -> dict:
     """Generate one image and save it under the active campaign's images/ dir.
 
     ``characters`` is an optional list of character names in frame; each one's
@@ -450,7 +451,7 @@ def generate_image(prompt: str, *, title: str = "", quality: str = DEFAULT_QUALI
                                 chronicler=chronicler)
 
     if source == "forge":
-        image_bytes, model, size = _forge_generate(final_prompt, quality, size)
+        image_bytes, model, size = _forge_generate(final_prompt, quality, size, avoid)
         cost = 0.0
     else:
         image_bytes = _openai_generate(final_prompt, api_key, model, quality, size)
@@ -504,12 +505,39 @@ def _find_character(name: str, campaign_dir: Path):
     return None
 
 
+SEXES = {"male": ("male", "man", "woman, female, feminine face, girl, breasts"),
+         "female": ("female", "woman", "man, male, masculine face, beard, boy")}
+
+
+def sex_of(record: dict) -> str:
+    """'male', 'female' or '' from the record's stored appearance."""
+    va = record.get("visual_appearance") if isinstance(record.get("visual_appearance"), dict) else {}
+    s = str(va.get("sex") or record.get("sex") or "").strip().lower()
+    if s in ("male", "man", "m", "boy", "masculine", "he", "זכר", "גבר"):
+        return "male"
+    if s in ("female", "woman", "f", "girl", "feminine", "she", "נקבה", "אישה"):
+        return "female"
+    return ""
+
+
+def portrait_avoid(record: dict) -> str:
+    """What a portrait must not show (the other sex), for the negative prompt."""
+    sex = sex_of(record)
+    return SEXES[sex][2] if sex else ""
+
+
 def portrait_prompt(record: dict) -> str:
-    """A head-and-shoulders portrait brief from whatever the record says about them."""
+    """A head-and-shoulders portrait brief from whatever the record says about them.
+    Their sex comes FIRST: picture models weigh the start of a prompt most."""
     name = record.get("name", "")
     who = " ".join(str(record.get(k) or "").strip() for k in ("race", "class")).strip()
     about = record.get("concept") or record.get("description") or ""
-    lines = [f"Character portrait of {name}" + (f", {who}" if who else "") + "."]
+    sex = sex_of(record)
+    if sex:
+        adj, noun, _ = SEXES[sex]
+        lines = [f"Character portrait of a {noun}: {name}, a {adj} {who or noun}."]
+    else:
+        lines = [f"Character portrait of {name}" + (f", {who}" if who else "") + "."]
     if about:
         lines.append(f"Who they are: {about}.")
     lines.append("Head-and-shoulders portrait facing the viewer, expressive detailed face, "
@@ -541,7 +569,7 @@ def generate_portrait(name: str, campaign_dir=None, quality: str = DEFAULT_QUALI
     kind, path, record = found
     out = generate_image(portrait_prompt(record), title=f"portrait {record['name']}",
                          quality=quality, size="1024x1536", characters=[record["name"]],
-                         campaign_dir=campaign_dir)
+                         campaign_dir=campaign_dir, avoid=portrait_avoid(record))
     filename = Path(out["path"]).name
     _record_portrait(kind, path, record["name"], filename)
     return {**out, "portrait": filename, "kind": kind, "name": record["name"]}
