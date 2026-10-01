@@ -1101,3 +1101,45 @@ def test_the_narrator_remembers_only_what_this_player_saw(table):
     assert got["source"] == "recall" and "Old Marta hands you a brass key." in got["a"]
     lines = narrator.story_lines(state.since(0, "Pip"), "Pip", "en")
     assert narrator.recall(lines, "zeppelin?", "en").startswith("I couldn't find")
+
+
+def test_hover_cards_show_what_the_player_knows_and_nothing_more(table):
+    call, state, camp = table["call"], table["state"], table["camp"]
+    state.set_round_seconds(0)
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    (camp / "npcs.json").write_text(json.dumps({
+        "Marta": {"description": "innkeeper; SECRETLY the cult leader"},
+        "Vex": {"description": "the hidden villain"}}))
+    (camp / "locations.json").write_text(json.dumps({"The Crooked Lantern": {"position": "river road"}}))
+    (camp / "world-bible.json").write_text(json.dumps({"factions": {"nodes": [{"name": "The Ashen Hand"}]}}))
+    call("/api/gm/say", {"text": "At the Crooked Lantern, Marta hands Pip a key. "
+                                 "The Ashen Hand's sigil is carved on the bar."}, host=True)
+    call("/api/gm/alias", {"name": "Marta", "alias": "מרתה"}, host=True)
+    call("/api/gm/say", {"text": "מרתה מחייכת.", "lang": "he"}, host=True)
+    asked = []
+
+    def ask(system, prompt):
+        asked.append(prompt)
+        return "Marta is the innkeeper who gave you a key."
+
+    state.narrator_ask = ask
+    _, info = call(f"/api/info?code={CODE}&token={pip}")
+    terms = {t["term"]: t["kind"] for t in info["lore_terms"]}
+    assert terms["Marta"] == "npc" and terms["The Crooked Lantern"] == "place"
+    assert terms["The Ashen Hand"] == "faction" and terms["Pip"] == "pc"
+    assert "Vex" not in terms                       # never mentioned to them: not even the name
+    assert "מרתה" not in terms                      # Pip reads English: not in their story
+
+    status, card = call(f"/api/lore?code={CODE}&token={pip}&term=marta")
+    assert status == 200 and card["name"] == "Marta" and card["kind"] == "npc"
+    assert card["text"] == "Marta is the innkeeper who gave you a key."
+    assert "SECRETLY" not in asked[-1] and "Marta hands Pip a key" in asked[-1]
+    call(f"/api/lore?code={CODE}&token={pip}&term=Marta")
+    assert len(asked) == 1                          # cached until the story says more
+    assert call(f"/api/lore?code={CODE}&token={pip}&term=Vex")[0] == 404
+    assert call(f"/api/lore?code={CODE}&term=Marta", host=True)[0] == 403
+
+    # A Hebrew reader: the alias is hoverable and means Marta.
+    call("/api/lang", {"code": CODE, "token": pip, "lang": "he"})
+    terms = {t["term"]: t for t in state.lore_terms("Pip")}
+    assert terms["מרתה"]["of"] == "Marta" and terms["מרתה"]["kind"] == "npc"

@@ -247,6 +247,16 @@
   #chat form { display: flex; gap: 6px; padding: 8px 10px 12px; border-top: 1px solid var(--line); }
   #chat input { flex: 1; padding: 8px 10px; }
   #chat form button { padding: 6px 12px; }
+  /* Names from the story: hover (or tap) for what you know about them. */
+  .lore { border-bottom: 1px dotted var(--accent); cursor: help; }
+  #lore-card { position: fixed; z-index: 20; width: min(320px, calc(100vw - 24px));
+               background: var(--panel); color: var(--ink); border: 1px solid var(--line);
+               border-radius: 10px; box-shadow: 0 8px 28px rgba(0, 0, 0, .25);
+               padding: 10px 12px; font-size: .9rem; }
+  #lore-card .head { font-weight: bold; margin-bottom: 4px; }
+  #lore-card .kind { color: var(--muted); font-weight: normal; font-size: .78rem; margin-inline-start: 6px; }
+  #lore-card img { width: 100%; max-height: 160px; object-fit: cover; border-radius: 6px; margin-bottom: 6px; }
+  #lore-card .text.loading { color: var(--muted); font-style: italic; }
   .chat-tabs { display: flex; gap: 4px; padding: 10px 10px 0; }
   .chat-tabs button { flex: 1; padding: 6px 8px; font-size: .85rem; }
   .chat-tabs button[aria-pressed="true"] { border-color: var(--accent); }
@@ -394,6 +404,8 @@
   </section>
 </section>
 
+<div id="lore-card" class="hidden" role="tooltip"></div>
+
 <dialog id="places" aria-labelledby="places-title">
   <div class="sheet-head">
     <h2 id="places-title" data-i18n="placesTitle"></h2>
@@ -452,6 +464,8 @@
       lvlDone: "⬆ You're level {n}!", lvlBadge: "⬆",
       chatButton: "💬 Chat", chatNote: "Just the players: the GM can't see this.",
       chatPh: "Say something to the other players…", chatSend: "Send",
+      lore_npc: "👤 person", lore_place: "📍 place", lore_faction: "⚑ faction", lore_pc: "🛡 hero",
+      lore_foe: "⚔ foe", lore_treasure: "💎 treasure", loreLoading: "📖 Remembering…",
       chatTitle: "💬 Table talk", narTitle: "📖 Narrator", narAsk: "Ask", narThinking: "📖 Remembering…",
       narNote: "Forgot something? Ask about the story so far. The narrator only remembers what you've seen; it can't change the game, and only you see this.",
       narPh: "Who gave us the key? What did the oracle say?…",
@@ -531,6 +545,8 @@
       lvlDone: "⬆ עליתם לדרגה {n}!", lvlBadge: "⬆",
       chatButton: "💬 צ'אט", chatNote: "רק השחקנים: מנהל המשחק לא רואה את זה.",
       chatPh: "כתבו משהו לשאר השחקנים…", chatSend: "שליחה",
+      lore_npc: "👤 דמות", lore_place: "📍 מקום", lore_faction: "⚑ פלג", lore_pc: "🛡 גיבור",
+      lore_foe: "⚔ אויב", lore_treasure: "💎 אוצר", loreLoading: "📖 נזכר…",
       chatTitle: "💬 שיחת שולחן", narTitle: "📖 המספר", narAsk: "שאלו", narThinking: "📖 נזכר…",
       narNote: "שכחתם משהו? שאלו על הסיפור עד עכשיו. המספר זוכר רק מה שראיתם; הוא לא יכול לשנות את המשחק, ורק אתם רואים את זה.",
       narPh: "מי נתן לנו את המפתח? מה אמרה האורקל?…",
@@ -1443,6 +1459,7 @@
     if (!!info.tts !== ttsOk) { ttsOk = !!info.tts; fillVoiceMenus(); }
     progressState = info.progress || { state: "idle" };
     roundState = info.round || { open: false };
+    setLoreTerms(info.lore_terms);
     waitingOn = info.waiting_on || [];
     updateProgress();
     $("campaign").textContent = info.campaign || t("title");
@@ -1870,6 +1887,7 @@
     r.nodes.forEach((x) => { x.node.data = x.full; });
     r.extras.forEach((x) => x.classList.remove("hidden"));
     r.el.classList.remove("revealing", "queued");
+    wrapLore(r.el.querySelector(".body"));        // names learned while it was being told
     r.el.removeAttribute("aria-busy");
     const log = $("log");
     if (log.scrollHeight - log.scrollTop - log.clientHeight < 200) log.scrollTop = log.scrollHeight;
@@ -2120,6 +2138,113 @@
     return img;
   }
 
+  // ---------------------------------------------- hover cards for names ---
+  let loreTerms = [], loreSig = "", loreRe = null;
+  const loreCards = new Map();          // term -> {data, at}
+  function buildLoreRe() {
+    if (!loreTerms.length) { loreRe = null; return; }
+    const esc_ = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    loreRe = new RegExp(loreTerms.map((t) => /[A-Za-z]/.test(t.term)
+      ? "(?<![\\p{L}\\p{N}])" + esc_(t.term) + "(?![\\p{L}\\p{N}])" : esc_(t.term)).join("|"), "giu");
+  }
+  function wrapLore(body) {
+    if (!loreRe || !body) return;
+    const walk = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, {
+      acceptNode: (n) => n.parentElement && n.parentElement.closest(".lore")
+        ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+    const nodes = [];
+    let n;
+    while ((n = walk.nextNode())) nodes.push(n);
+    nodes.forEach((node) => {
+      const text = node.data;
+      loreRe.lastIndex = 0;
+      if (!loreRe.test(text)) return;
+      loreRe.lastIndex = 0;
+      const frag = document.createDocumentFragment();
+      let last = 0, mm;
+      while ((mm = loreRe.exec(text))) {
+        if (mm.index > last) frag.appendChild(document.createTextNode(text.slice(last, mm.index)));
+        const span = document.createElement("span");
+        span.className = "lore"; span.textContent = mm[0]; span.dataset.term = mm[0];
+        span.tabIndex = 0;
+        frag.appendChild(span);
+        last = mm.index + mm[0].length;
+      }
+      if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+      node.replaceWith(frag);
+    });
+  }
+  function rewrapAll() {
+    msgEls.forEach((el) => {
+      if (el.classList.contains("gm") && !el.classList.contains("revealing")) wrapLore(el.querySelector(".body"));
+    });
+  }
+  function setLoreTerms(terms) {
+    const sig = JSON.stringify(terms || []);
+    if (sig === loreSig) return;
+    loreSig = sig; loreTerms = terms || []; buildLoreRe(); rewrapAll();
+  }
+  let loreTimer = null, loreFor = null;
+  async function showLore(span) {
+    const card = $("lore-card");
+    loreFor = span;
+    const term = span.dataset.term;
+    const place = () => {
+      const r = span.getBoundingClientRect(), w = card.offsetWidth, h = card.offsetHeight;
+      let top = r.bottom + 6;
+      if (top + h > innerHeight - 8) top = Math.max(8, r.top - h - 6);
+      card.style.top = top + "px";
+      card.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left)) + "px";
+    };
+    const fill = (d, loading) => {
+      card.textContent = "";
+      if (d && d.image) card.appendChild(imageEl(d.image));
+      const head = document.createElement("div");
+      head.className = "head"; head.dir = "auto"; head.textContent = (d && d.name) || term;
+      const kind = document.createElement("span");
+      kind.className = "kind"; kind.textContent = d ? t("lore_" + d.kind) : "";
+      head.appendChild(kind);
+      const text = document.createElement("div");
+      text.className = "text" + (loading ? " loading" : "");
+      text.textContent = loading ? t("loreLoading") : (d.text || "");
+      text.dir = dirFor(text.textContent);
+      card.append(head, text);
+      card.classList.remove("hidden");
+      place();
+    };
+    const cached = loreCards.get(term);
+    if (cached && Date.now() - cached.at < 60000) return fill(cached.data);
+    fill(null, true);
+    const r = await api("/api/lore?term=" + encodeURIComponent(term));
+    if (r.ok) loreCards.set(term, { data: r, at: Date.now() });
+    if (loreFor === span) fill(r.ok ? r : { name: term, kind: "", text: r.error || "" });
+  }
+  function hideLore() { loreFor = null; $("lore-card").classList.add("hidden"); }
+  $("log").addEventListener("mouseover", (ev) => {
+    const span = ev.target.closest && ev.target.closest(".lore");
+    if (!span) return;
+    clearTimeout(loreTimer);
+    loreTimer = setTimeout(() => showLore(span), 250);
+  });
+  $("log").addEventListener("mouseout", (ev) => {
+    const span = ev.target.closest && ev.target.closest(".lore");
+    if (!span) return;
+    clearTimeout(loreTimer);
+    loreTimer = setTimeout(() => { if (!$("lore-card").matches(":hover")) hideLore(); }, 300);
+  });
+  $("lore-card").addEventListener("mouseleave", () => { loreTimer = setTimeout(hideLore, 300); });
+  $("lore-card").addEventListener("mouseenter", () => clearTimeout(loreTimer));
+  $("log").addEventListener("click", (ev) => {            // tap, on a phone
+    const span = ev.target.closest && ev.target.closest(".lore");
+    if (span) { ev.stopPropagation(); showLore(span); }
+  }, true);
+  document.addEventListener("click", (ev) => {
+    if (!ev.target.closest(".lore") && !ev.target.closest("#lore-card")) hideLore();
+  });
+  document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") hideLore(); });
+  $("log").addEventListener("focusin", (ev) => { if (ev.target.classList.contains("lore")) showLore(ev.target); });
+  $("log").addEventListener("scroll", hideLore);
+
   function renderMessage(m) {
     if (!shownToMe(m)) return null;
     if (m.kind === "gm" && !m.to) lastGmId = Math.max(lastGmId, m.id);
@@ -2172,6 +2297,7 @@
       const tr = readable(m);
       const useTr = tr && tr.text && !showOriginal.has(m.id);
       body.innerHTML = md(useTr ? tr.text : (m.text || ""));
+      if (m.kind === "gm") wrapLore(body);
       d.append(who, body);
       if (tr) {
         const note = document.createElement("div");

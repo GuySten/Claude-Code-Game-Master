@@ -368,7 +368,9 @@ Copy, fill in the link and code, and send:
    screen) is just for the players: plan, joke, argue. The GM never sees it. It isn't saved,
    so it clears when the host restarts the table. Forgot who gave you the key, or what the
    oracle said? Ask the **📖 Narrator** tab beside it. It answers from what *you* have seen
-   in the story so far, privately, and it can't change the game or reveal secrets.
+   in the story so far, privately, and it can't change the game or reveal secrets. Names
+   underlined with dots in the story (people, places, factions) work the same way: hover
+   over one, or tap it on a phone, to see what you know about it.
 6. **Language.** **עברית / English** switches the whole page, your microphone, and the
    language the GM answers you in. You read everything in your language: the story, and
    the other players' actions too — the GM translates them (marked 🌐; tap
@@ -420,7 +422,8 @@ Copy, fill in the link and code, and send:
    לתכנן, לצחוק, להתווכח. מנהל המשחק לא רואה אותה. היא לא נשמרת, ולכן נמחקת כשהמארח מפעיל
    את השולחן מחדש. שכחתם מי נתן לכם את המפתח, או מה אמרה האורקל? שאלו את לשונית
    **📖 המספר** שלידה. הוא עונה ממה *שאתם* ראיתם בסיפור עד עכשיו, בפרטיות, ולא יכול לשנות את
-   המשחק או לגלות סודות.
+   המשחק או לגלות סודות. שמות המסומנים בקו מנוקד בסיפור (דמויות, מקומות, פלגים) עובדים אותו
+   דבר: העבירו עליהם את העכבר, או הקישו עליהם בטלפון, כדי לראות מה אתם יודעים עליהם.
 6. **שפה.** **English / עברית** מחליף את כל הדף, את המיקרופון ואת השפה שבה מנהל המשחק עונה
    לכם. הכול מופיע בשפה שלכם: הסיפור, וגם הפעולות של השחקנים האחרים — מנהל המשחק מתרגם אותן
    (מסומן ב-🌐; לחצו **הצג מקור** כדי לראות מה הם כתבו).

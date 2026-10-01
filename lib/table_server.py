@@ -318,6 +318,8 @@ class TableState:
         self.narrator_busy: set = set()
         self.narrator_slots = threading.Semaphore(2)
         self.narrator_ask = None                        # tests plug in a fake model
+        self.lore_cache: Dict[tuple, Dict[str, Any]] = {}
+        self.aliases_path = self.dir / "aliases.json"
         # Composed music: villains' and bosses' themes and the PCs' anthems are
         # composed in the background (lib/composer.py) when the composer is set up.
         self.music_jobs: List[Dict[str, Any]] = []
@@ -493,6 +495,97 @@ class TableState:
         finally:
             with self.lock:
                 self.narrator_busy.discard(pc)
+
+    # --- hover cards: what a player knows about a name in the story ---
+    def aliases(self) -> Dict[str, str]:
+        """Other names for the same thing (a Hebrew spelling): alias -> name."""
+        data = self._read_json(self.aliases_path, {})
+        return {str(k): str(v) for k, v in data.items()} if isinstance(data, dict) else {}
+
+    def set_alias(self, name: str, alias: str) -> None:
+        with self.lock:
+            data = self.aliases()
+            data[" ".join(alias.split())] = " ".join(name.split())
+            tmp = self.aliases_path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+            tmp.replace(self.aliases_path)
+
+    def _named_things(self) -> Dict[str, str]:
+        """Every name the campaign knows -> its kind (only names; never what the
+        GM's files say about them)."""
+        names: Dict[str, str] = {}
+
+        def table(fn: str, key: str = "") -> Dict[str, Any]:
+            data = self._read_json(self.campaign_dir / fn, {})
+            if key and isinstance(data, dict) and isinstance(data.get(key), dict):
+                data = data[key]
+            return data if isinstance(data, dict) else {}
+
+        for n in table("npcs.json", "npcs"):
+            names[n] = "npc"
+        for n in table("locations.json", "locations"):
+            names[n] = "place"
+        factions = table("world-bible.json").get("factions")
+        nodes = factions.get("nodes") if isinstance(factions, dict) else factions
+        for f in nodes if isinstance(nodes, list) else []:
+            if isinstance(f, dict) and f.get("name"):
+                names[str(f["name"])] = "faction"
+        for name, _boss in self.shown_foes:
+            names.setdefault(name, "foe")
+        for name in self.shown_treasures:
+            names.setdefault(name, "treasure")
+        for pc in self.party():
+            names[pc["name"]] = "pc"
+        return {n: k for n, k in names.items() if len(n.strip()) >= 3}
+
+    def lore_terms(self, viewer: Optional[str]) -> List[Dict[str, str]]:
+        """The names this player has met in the story (so they can be hovered).
+        A name only appears once the narration they saw has used it: no spoilers."""
+        import narrator
+        lang = self.langs.get(viewer, "en") if viewer else "en"
+        key = ("terms", viewer, self.rev, lang)
+        if key in self.lore_cache:
+            return self.lore_cache[key]["terms"]
+        seen = "\n".join(narrator.story_lines(self.since(0, viewer), viewer or "", lang)).lower()
+        things = self._named_things()
+        out = [{"term": n, "kind": k} for n, k in things.items() if n.lower() in seen]
+        for alias, name in self.aliases().items():
+            kind = things.get(name) or next((k for n, k in things.items() if n.lower() == name.lower()), None)
+            if kind and alias.lower() in seen:
+                out.append({"term": alias, "kind": kind, "of": name})
+        out.sort(key=lambda t: -len(t["term"]))
+        self.lore_cache = {k: v for k, v in self.lore_cache.items() if k[0] != "terms" or k[1] != viewer}
+        self.lore_cache[key] = {"terms": out}
+        return out
+
+    def lore_card(self, viewer: str, term: str) -> Optional[Dict[str, Any]]:
+        import image_gen
+        import narrator
+        known = {t["term"].lower(): t for t in self.lore_terms(viewer)}
+        hit = known.get(" ".join(str(term).split()).lower())
+        if not hit:
+            return None                         # not met in the story: nothing to say
+        name, kind = hit.get("of") or hit["term"], hit["kind"]
+        spellings = {name.lower()} | {a.lower() for a, n in self.aliases().items() if n.lower() == name.lower()}
+        lang = self.langs.get(viewer, "en")
+        lines = [l for l in narrator.story_lines(self.since(0, viewer), viewer, lang)
+                 if any(s in l.lower() for s in spellings)]
+        key = ("card", viewer, name.lower(), len(lines), lang)
+        if key not in self.lore_cache:
+            got = narrator.answer(f"{name}?", lines[-30:], narrator.lore_prompt(name, kind, lines[-30:], viewer),
+                                  lang, ask=self.narrator_ask)
+            image = None
+            if kind == "place":
+                image = next((p["image"] for p in self.places() if p["name"].lower() == name.lower()), None)
+            elif kind == "foe":
+                image = next((f["image"] for f in self.gallery()["foes"] if f["name"].lower() == name.lower()), None)
+            elif kind == "treasure":
+                image = image_gen.treasure_art(name, self.campaign_dir) or None
+            elif kind == "pc":
+                image = next((p.get("portrait") for p in self.party() if p["name"] == name), None)
+            self.lore_cache[key] = {"term": hit["term"], "name": name, "kind": kind,
+                                    "text": got["answer"], "source": got["source"], "image": image}
+        return self.lore_cache[key]
 
     def gm_read_since_narration(self) -> bool:
         """Has the GM read players' actions since it last narrated to everyone?"""
@@ -1683,6 +1776,7 @@ def make_handler(state: TableState, code: str, host_key: str):
                                    "progress": state.progress(), "tts": state.tts_ready(),
                                    "places": state.places(), **state.gallery(),
                                    "round": state.round_state(),
+                                   "lore_terms": state.lore_terms(me),
                                    "narration_id": state.last_narration(me),
                                    **state.overview()})
             if url.path == "/api/messages":
@@ -1697,6 +1791,13 @@ def make_handler(state: TableState, code: str, host_key: str):
                 if not me:
                     return self._err("Take a seat first.", 403)
                 return self._json({"ok": True, "entries": state.narrator_log.get(me, [])})
+            if url.path == "/api/lore":
+                if not me:
+                    return self._err("Take a seat first.", 403)
+                card = state.lore_card(me, q.get("term", ""))
+                if card is None:
+                    return self._err("Nothing known about that yet.", 404)
+                return self._json({"ok": True, **card})
             if url.path == "/api/chat":
                 if not me:                      # seated players only: never the host key
                     return self._err("Take a seat first.", 403)
@@ -2007,6 +2108,12 @@ def make_handler(state: TableState, code: str, host_key: str):
                         return self._err("seconds must be a number (0 = off)")
                 return self._json({"ok": True, "seconds": state.round_seconds,
                                    "round": state.round_state()})
+            if path == "/api/gm/alias":
+                name, alias = str(data.get("name", "")).strip(), str(data.get("alias", "")).strip()
+                if not name or not alias:
+                    return self._err("give a name and its other spelling")
+                state.set_alias(name, alias)
+                return self._json({"ok": True, "aliases": state.aliases()})
             if path == "/api/gm/free":
                 freed = state.free(str(data.get("pc", "")))
                 return self._json({"ok": True, "freed": freed})
@@ -2498,6 +2605,10 @@ def main() -> None:
     f = sub.add_parser("free", help="Free a player's seat so they can rejoin from another device")
     f.add_argument("pc")
 
+    al = sub.add_parser("alias", help="Another spelling of a name (e.g. its Hebrew form), for hover cards")
+    al.add_argument("name", help="The name as the campaign knows it (NPC, place, faction)")
+    al.add_argument("alias", help="The other spelling, as it appears in the narration")
+
     ro = sub.add_parser("round", help="How long the GM waits for everyone once the first player acts")
     ro.add_argument("value", nargs="?", help="Seconds (default 60), or 'off'. Omit to show it.")
 
@@ -2538,6 +2649,13 @@ def main() -> None:
         seated = [f"{pc} ({LANGS.get(langs.get(pc, 'en'), '?')})" for pc in pending.get("seated") or []]
         print(f"  Seated players:     {', '.join(seated) or '(nobody yet)'}")
         print(f"  Unread actions:     {pending.get('unread', 0)}")
+        return
+
+    if args.action == "alias":
+        r = _call(campaign_dir, "POST", "/api/gm/alias", {"name": args.name, "alias": args.alias})
+        if not r.get("ok"):
+            sys.exit(f"[ERROR] {r.get('error')}")
+        print(f"ALIAS {args.alias} -> {args.name}")
         return
 
     if args.action == "round":

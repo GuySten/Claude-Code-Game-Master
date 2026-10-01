@@ -115,6 +115,18 @@ def build_prompt(lines: List[str], sheet: Optional[Dict[str, Any]], party: List[
     return "\n\n".join(parts)
 
 
+def lore_prompt(name: str, kind: str, lines: List[str], viewer: str) -> str:
+    """A hover card: what this player knows about one name, from the story only."""
+    what = {"npc": "this person", "place": "this place", "faction": "this group",
+            "pc": "this player character", "foe": "this foe", "treasure": "this item"}.get(kind, "this")
+    log = "\n".join(lines)
+    if len(log) > LOG_CHARS // 2:
+        log = "…" + log[-(LOG_CHARS // 2):]
+    return (f"STORY LOG lines that mention {name} (oldest first):\n{log}\n\n"
+            f"In one or two short sentences, sum up what {viewer} knows about {what}, {name}, "
+            f"from these lines only. No preamble; start with the facts.")
+
+
 # --------------------------------------------------------------- answers ----
 def _claude(system: str, prompt: str) -> str:
     exe = shutil.which("claude")

@@ -98,6 +98,12 @@ open the link, enter the code, and pick or create their PC. While the table is o
   a boss, a sacrifice, a desperate save that works; at most once or twice a session, never
   for an ordinary hit), add `--heroic "<PC>"` to that beat's `say`: their personal anthem
   plays, then the scene's music returns. Without the composer the victory music plays.
+**Hover cards.** Names of NPCs, places and factions that appear in your narration become
+hoverable on the players' pages, showing what THEY know (summed up from the story they saw,
+never from your files). So use each name exactly as the campaign records it. When you write
+a name in another spelling (Hebrew narration of "Marta" → "מרתה"), record it once:
+`gm-table.sh alias "Marta" "מרתה"`.
+
 **The players' side chat is theirs.** The page has a players-only chat (table talk, plans,
 jokes). It is never sent to you and isn't stored anywhere you can read: never try to get it
 (no tokens, no player endpoints, no asking the host to relay it), and don't act on anything
