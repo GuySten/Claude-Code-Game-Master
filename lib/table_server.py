@@ -240,6 +240,8 @@ PORTRAIT_GRACE = 180
 # A recorded NPC the narration has named this many times gets a portrait by itself.
 NPC_PORTRAIT_MENTIONS = 3
 REPAINT_GAP = 120          # a player can ask for a new portrait this often
+CARD_WORKERS = 2           # hover cards prepared at the same time
+WARM_CARDS = 12            # a player's most recently mentioned names kept ready
 PORTRAIT_RETRY = 900
 # Ability score increases (5e): every class at these levels, plus a few extras.
 ASI_LEVELS = {4, 8, 12, 16, 19}
@@ -340,13 +342,15 @@ class TableState:
         store = self._read_json(self.lore_store_path, {})
         self.lore_store: Dict[str, Dict[str, Any]] = store if isinstance(store, dict) else {}
         self.card_jobs: List[tuple] = []
+        self.card_workers = 0
+        self.card_running: set = set()
+        self.cards_warmed: set = set()
         self.after_busy = 0                            # narrations still being followed up
         self.repaints: set = set()                     # PCs whose portrait is being redone
         self.repaint_asked: Dict[str, float] = {}
         self.level_notices_path = self.dir / "level-notices.json"
         notices = self._read_json(self.level_notices_path, {})
         self.level_notices: Dict[str, int] = notices if isinstance(notices, dict) else {}
-        self.card_worker_on = False
         self.aliases_path = self.dir / "aliases.json"
         self.spelling_lock = threading.Lock()
         # Character sheets in the player's language: each phrase translated once by
@@ -627,15 +631,17 @@ class TableState:
         things = self._named_things()
         spellings = self._spellings()
 
-        def mentions(name: str) -> int:
+        def mentions(name: str) -> Dict[str, int]:
+            """How many story lines mention it, and the latest one that does."""
             forms = spellings.get(name.lower(), {name.lower()})
-            return sum(1 for l in lines if any(f in l for f in forms))
+            hits = [i for i, l in enumerate(lines) if any(f in l for f in forms)]
+            return {"n": len(hits), "last": hits[-1] if hits else -1}
 
-        out = [{"term": n, "kind": k, "n": mentions(n)} for n, k in things.items() if n.lower() in seen]
+        out = [{"term": n, "kind": k, **mentions(n)} for n, k in things.items() if n.lower() in seen]
         for alias, name in self.aliases().items():
             kind = things.get(name) or next((k for n, k in things.items() if n.lower() == name.lower()), None)
             if kind and alias.lower() in seen:
-                out.append({"term": alias, "kind": kind, "of": name, "n": mentions(name)})
+                out.append({"term": alias, "kind": kind, "of": name, **mentions(name)})
         out.sort(key=lambda t: -len(t["term"]))
         self.lore_cache = {k: v for k, v in self.lore_cache.items() if k[0] != "terms" or k[1] != viewer}
         self.lore_cache[key] = {"terms": out}
@@ -663,14 +669,28 @@ class TableState:
         lines = [l for l in narrator.story_lines(self.since(0, viewer), viewer, lang)
                  if any(f in l.lower() for f in forms)]
         key = f"{viewer}|{name.lower()}|{lang}"
-        with self.lock:
-            have = self.lore_store.get(key)
+        for _ in range(150):                    # no card yet, but one is being made: wait for it
+            with self.lock:
+                have = self.lore_store.get(key)
+                if refresh or have or key not in self.card_running:
+                    break
+            time.sleep(0.2)
         stale = bool(have) and have["n"] != len(lines)
         if refresh and have and not stale:
             return None                         # current already
         if refresh or not have:
-            got = narrator.answer(f"{name}?", lines[-30:], narrator.lore_prompt(name, kind, lines[-30:], viewer),
-                                  lang, ask=self.narrator_ask)
+            if refresh:
+                with self.lock:
+                    if key in self.card_running:
+                        return None             # the other worker has it
+                    self.card_running.add(key)
+            try:
+                got = narrator.answer(f"{name}?", lines[-30:], narrator.lore_prompt(name, kind, lines[-30:], viewer),
+                                      lang, ask=self.narrator_ask)
+            finally:
+                if refresh:
+                    with self.lock:
+                        self.card_running.discard(key)
             have = {"n": len(lines), "text": got["answer"], "source": got["source"]}
             with self.lock:
                 self.lore_store[key] = have
@@ -731,22 +751,43 @@ class TableState:
             told.append(pc["name"])
         return told
 
-    def queue_card(self, viewer: str, term: str) -> None:
-        """Make (or bring up to date) a hover card in the background."""
+    def queue_card(self, viewer: str, term: str, soon: bool = True) -> None:
+        """Make (or bring up to date) a hover card in the background: ``soon`` ones
+        (just mentioned) before the rest."""
         with self.lock:
             job = (viewer, term)
             if job in self.card_jobs:
-                return
-            self.card_jobs.append(job)
-            if not self.card_worker_on:
-                self.card_worker_on = True
+                if not soon:
+                    return
+                self.card_jobs.remove(job)
+            if soon:
+                self.card_jobs.insert(0, job)
+            else:
+                self.card_jobs.append(job)
+            if self.card_workers < CARD_WORKERS:
+                self.card_workers += 1
                 threading.Thread(target=self._card_worker, daemon=True).start()
+
+    def warm_cards(self, viewer: str) -> None:
+        """Get ready the cards a player is likely to hover: the names their story
+        mentioned most recently that have no card yet (not every name: each card
+        is a model call)."""
+        import narrator
+        if self.narrator_ask is None and narrator.backend() == "off":
+            return
+        lang = self.langs.get(viewer, "en")
+        with self.lock:
+            have = set(self.lore_store)
+        terms = sorted(self.lore_terms(viewer), key=lambda t: -t.get("last", -1))
+        for t in terms[:WARM_CARDS]:
+            if f"{viewer}|{(t.get('of') or t['term']).lower()}|{lang}" not in have:
+                self.queue_card(viewer, t["term"], soon=False)
 
     def _card_worker(self) -> None:
         while True:
             with self.lock:
                 if not self.card_jobs:
-                    self.card_worker_on = False
+                    self.card_workers -= 1
                     return
                 viewer, term = self.card_jobs.pop(0)
             try:
@@ -767,6 +808,7 @@ class TableState:
             mentioned = [t["term"] for t in self.lore_terms(pc) if t["term"].lower() in low]
             for term in mentioned[:8]:
                 self.queue_card(pc, term)
+            self.warm_cards(pc)
 
     def gm_read_since_narration(self) -> bool:
         """Has the GM read players' actions since it last narrated to everyone?"""
@@ -2186,6 +2228,9 @@ def make_handler(state: TableState, code: str, host_key: str):
             me = state.pc_for(q.get("token"))
             if url.path == "/api/info":
                 state.music_tick()
+                if me and me not in state.cards_warmed:     # a player sits down: their cards
+                    state.cards_warmed.add(me)
+                    threading.Thread(target=state.warm_cards, args=(me,), daemon=True).start()
                 return self._json({"ok": True, "me": me, "party": state.party_for(me),
                                    "waiting_on": state.waiting_on(),
                                    "music": state.music, "server_now": time.time(),

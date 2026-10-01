@@ -1262,6 +1262,7 @@ def test_the_narrator_remembers_only_what_this_player_saw(table):
 
 def test_hover_cards_show_what_the_player_knows_and_nothing_more(table):
     call, state, camp = table["call"], table["state"], table["camp"]
+    state.cards_warmed.add("Pip")                  # (sitting-down warm-up: its own test)
     state.set_round_seconds(0)
     pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
     (camp / "npcs.json").write_text(json.dumps({
@@ -1376,6 +1377,7 @@ def test_every_player_character_has_a_card_and_the_sheet_speaks_the_players_lang
 
 def test_hover_cards_are_ready_before_the_hover_and_kept(table):
     call, state, camp, world = table["call"], table["state"], table["camp"], table["world"]
+    state.cards_warmed.add("Pip")                  # (sitting-down warm-up: its own test)
     state.set_round_seconds(0)
     pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
     (camp / "npcs.json").write_text(json.dumps({"Marta": {"description": "innkeeper"}}))
@@ -1415,6 +1417,28 @@ def test_hover_cards_are_ready_before_the_hover_and_kept(table):
     again.langs = dict(state.langs)
     again.messages = list(state.messages)
     assert again.lore_card("Pip", "Marta")["text"] == "Card #2" and len(asked) == 2
+
+
+def test_a_player_sitting_down_finds_their_recent_cards_ready(table):
+    import lib.table_server as ts
+    call, state, camp = table["call"], table["state"], table["camp"]
+    state.set_round_seconds(0)
+    names = {f"Npc{i}": {} for i in range(15)}
+    (camp / "npcs.json").write_text(json.dumps(names))
+    for i in range(15):                                     # (told before this table run)
+        state.append("gm", f"Npc{i} nods.")
+    assert wait_for(lambda: state.after_busy == 0)
+    asked = []
+    state.narrator_ask = lambda system, prompt: asked.append(prompt) or "A card."
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    call(f"/api/info?code={CODE}&token={pip}")              # sits down
+    assert wait_for(lambda: len(state.lore_store) >= ts.WARM_CARDS and not state.card_jobs)
+    ready = {k.split("|")[1] for k in state.lore_store}
+    assert "npc14" in ready and "npc0" not in ready         # the most recent names, not all
+    n = len(asked)
+    started = time.time()
+    card = call(f"/api/lore?code={CODE}&token={pip}&term=Npc14")[1]
+    assert card["text"] == "A card." and len(asked) == n and time.time() - started < 1
 
 
 def test_sheet_strings_are_the_words_a_player_reads():
