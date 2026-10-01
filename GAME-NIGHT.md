@@ -249,7 +249,9 @@ bash tools/gm-image.sh chronicler --name "Astreus" --style "ink-and-watercolor f
   flourish. Players can ask for one too ("show me that!").
 - **Portraits.** Every player character gets one a minute or two after they join. It's shown to
   everyone, then sits at the top of their character sheet and next to their name in the party
-  panel. The GM paints important NPCs (`bash tools/gm-image.sh portrait "<name>"`; you can too).
+  panel. **Recurring NPCs** get one too: once the story has named someone three times (the
+  innkeeper you keep visiting, a rival), their portrait is painted and shown to everyone. The GM
+  can paint one sooner (`bash tools/gm-image.sh portrait "<name>"`; you can too).
 - **Places.** When the party arrives somewhere the GM has described, the table paints it and
   shows it to everyone (`bash tools/gm-image.sh location "<name>"` paints one on demand).
 - **Foes.** When a notable enemy steps in, they're painted as their music starts. A boss gets an
@@ -258,8 +260,8 @@ bash tools/gm-image.sh chronicler --name "Astreus" --style "ink-and-watercolor f
 - **Treasures.** Important loot (a magic sword, an artifact) is painted when it's found, shown
   with a gold glow, and appears beside the item on the owner's character sheet.
 
-Players find all of it in the **🖼** gallery next to the location name: *Places*, *Foes* and
-*Treasures*, listing only what they've already seen.
+Players find all of it in the **🖼** gallery next to the location name: *Places*, *People*,
+*Foes* and *Treasures*, listing only what they've already seen.
 
 To keep characters on-model, every PC and NPC needs a stored appearance. Ask the GM *"write
 appearances for everyone in the party"*: characters created on the join page don't have one yet.
@@ -460,8 +462,9 @@ Copy, fill in the link and code, and send:
     **Party** on a phone). Music follows the scene; villains have their own themes, bosses
     get battle music, and when you do something truly heroic your own anthem may play.
 12. **Pictures** (when the host has them on). Places, villains, bosses and important
-    treasures are painted as you meet them, and every character gets a portrait. Tap **🖼**
-    next to the location at the top for the gallery: *Places*, *Foes*, *Treasures*.
+    treasures are painted as you meet them, every character gets a portrait, and so does an
+    NPC you keep meeting. Tap **🖼** next to the location at the top for the gallery: *Places*,
+    *People*, *Foes*, *Treasures*.
 
 **Between the players**
 
@@ -529,8 +532,8 @@ Copy, fill in the link and code, and send:
     וקולות נמצאים בפאנל החבורה (בטלפון: לחצו **החבורה**). המוזיקה הולכת אחרי הסצנה; לנבלים יש
     מנגינה משלהם, לבוסים מוזיקת קרב, וכשאתם עושים משהו הרואי באמת, ייתכן שההמנון שלכם יתנגן.
 12. **תמונות** (כשהמארח הפעיל אותן). מקומות, נבלים, בוסים ואוצרות חשובים מצוירים כשאתם פוגשים
-    אותם, ולכל דמות יש דיוקן. לחצו **🖼** ליד שם המקום למעלה כדי לפתוח את הגלריה: *מקומות*,
-    *אויבים*, *אוצרות*.
+    אותם, לכל דמות יש דיוקן, וגם לדמות משנה שחוזרת שוב ושוב. לחצו **🖼** ליד שם המקום למעלה
+    כדי לפתוח את הגלריה: *מקומות*, *דמויות*, *אויבים*, *אוצרות*.
 
 **בין השחקנים**
 

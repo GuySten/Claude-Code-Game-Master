@@ -237,6 +237,8 @@ def cant_act(sheet: Dict[str, Any]) -> Optional[str]:
 # this long for the GM to write the character's look (so the portrait matches
 # every later picture of them), and retries a failed one after a while.
 PORTRAIT_GRACE = 180
+# A recorded NPC the narration has named this many times gets a portrait by itself.
+NPC_PORTRAIT_MENTIONS = 3
 PORTRAIT_RETRY = 900
 # Ability score increases (5e): every class at these levels, plus a few extras.
 ASI_LEVELS = {4, 8, 12, 16, 19}
@@ -323,6 +325,7 @@ class TableState:
         g = self._read_json(self.gallery_path, {})
         self.shown_foes: List[List[Any]] = [x for x in g.get("foes", []) if isinstance(x, list)]
         self.shown_treasures: List[str] = [x for x in g.get("treasures", []) if isinstance(x, str)]
+        self.shown_people: List[str] = [x for x in g.get("people", []) if isinstance(x, str)]
         self.chat: List[Dict[str, Any]] = []           # players only; never written to disk
         # The Narrator (lib/narrator.py): each player's private questions and answers.
         self.narrator_log: Dict[str, List[Dict[str, Any]]] = {}
@@ -677,6 +680,8 @@ class TableState:
             image = next((f["image"] for f in self.gallery()["foes"] if f["name"].lower() == name.lower()), None)
         elif kind == "treasure":
             image = image_gen.treasure_art(name, self.campaign_dir) or None
+        elif kind == "npc" and name in self.shown_people:
+            image = self._npcs().get(name, {}).get("portrait")
         elif kind == "pc":
             pc = next((p for p in party if p["name"] == name), {})
             image = pc.get("portrait")
@@ -1761,7 +1766,8 @@ class TableState:
     def _save_gallery(self) -> None:
         with self.lock:
             tmp = self.gallery_path.with_suffix(".tmp")
-            tmp.write_text(json.dumps({"foes": self.shown_foes, "treasures": self.shown_treasures},
+            tmp.write_text(json.dumps({"foes": self.shown_foes, "treasures": self.shown_treasures,
+                                       "people": self.shown_people},
                                       indent=2, ensure_ascii=False), encoding="utf-8")
             tmp.replace(self.gallery_path)
 
@@ -1846,7 +1852,66 @@ class TableState:
             if f:
                 rec = table.get(image_gen._entry(table, name)) or {}
                 treasures.append({"name": name, "image": f, "owner": rec.get("owner") or ""})
-        return {"foes": foes, "treasures": treasures}
+        npcs = self._npcs()
+        people = [{"name": n, "image": npcs[n]["portrait"]} for n in reversed(self.shown_people)
+                  if n in npcs and self._has_image(npcs[n].get("portrait"))]
+        return {"foes": foes, "treasures": treasures, "people": people}
+
+    def _has_image(self, filename: Any) -> bool:
+        return bool(filename) and (self.campaign_dir / "images" / str(filename)).is_file()
+
+    def _npcs(self) -> Dict[str, Dict[str, Any]]:
+        """The campaign's recorded NPCs: name -> record."""
+        data = self._read_json(self.campaign_dir / "npcs.json", {})
+        if isinstance(data, dict) and isinstance(data.get("npcs"), dict):
+            data = data["npcs"]
+        return {k: v for k, v in data.items() if isinstance(v, dict)} if isinstance(data, dict) else {}
+
+    def npc_mentions(self) -> Dict[str, int]:
+        """How many of the GM's public narrations name each recorded NPC (in any
+        spelling): the recurring ones are the ones worth a portrait."""
+        spellings = self._spellings()
+        with self.lock:
+            told = [m["text"].lower() for m in self.messages
+                    if m["kind"] == "gm" and not m.get("to") and m.get("text")]
+        out = {}
+        for name in self._npcs():
+            forms = spellings.get(name.lower(), {name.lower()})
+            out[name] = sum(1 for t in told if any(f in t for f in forms))
+        return out
+
+    def npc_pass(self, now: Optional[float] = None) -> List[str]:
+        """Recurring NPCs (named in NPC_PORTRAIT_MENTIONS narrations or more) get a
+        portrait, one per pass, shown to the table and kept in the gallery's People.
+        One the GM already painted is shown the same way."""
+        now = now or time.time()
+        if not self._art_on(self.portrait_maker):
+            return []
+        npcs = self._npcs()
+        recurring = sorted(((n, c) for n, c in self.npc_mentions().items()
+                            if c >= NPC_PORTRAIT_MENTIONS and n not in self.shown_people),
+                           key=lambda x: -x[1])
+        for name, _ in recurring:
+            filename = npcs[name].get("portrait")
+            if not self._has_image(filename):
+                key = "npc:" + name
+                if now - self.portrait_tried.get(key, -PORTRAIT_RETRY) < PORTRAIT_RETRY:
+                    continue
+                self.portrait_tried[key] = now
+                try:
+                    if self.portrait_maker is not None:
+                        filename = self.portrait_maker(name, self.campaign_dir)
+                    else:
+                        import image_gen
+                        filename = image_gen.generate_portrait(name, self.campaign_dir)["portrait"]
+                except Exception as e:          # no GPU memory, service down...: try later
+                    print(f"[portrait] {name}: {e}", flush=True)
+                    continue
+            self.shown_people.append(name)
+            self._save_gallery()
+            self.append("system", f"{name}.", image=filename, event={"type": "npc", "name": name})
+            return [name]                       # one per pass: the scene's pictures get a turn
+        return []
 
     def places(self) -> List[Dict[str, str]]:
         """Pictures of the places the party has been, newest visit first."""
@@ -1900,7 +1965,7 @@ class TableState:
             self.portrait_wake.clear()
             self.music_tick()
             # The scene first; composing (minutes each) last, so pictures don't wait on it.
-            for job in (self.place_pass, self.art_pass, self.portrait_pass, self.music_pass):
+            for job in (self.place_pass, self.art_pass, self.portrait_pass, self.npc_pass, self.music_pass):
                 try:
                     job()
                 except Exception as e:

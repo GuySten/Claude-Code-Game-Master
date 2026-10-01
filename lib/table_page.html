@@ -151,6 +151,7 @@
   .msg.system img { max-width: 260px; margin: 6px auto 0; }
   .msg.system.place img { max-width: min(560px, 100%); }
   .msg.system.foe img { max-width: min(300px, 80%); border: 2px solid var(--hp-low); }
+  .msg.system.npc img { max-width: min(240px, 70%); border: 1px solid var(--line); border-radius: 8px; }
   .msg.system.boss img { max-width: min(380px, 90%); border: 2px solid var(--hp-low);
                          box-shadow: 0 0 18px 4px color-mix(in srgb, var(--hp-low) 55%, transparent); }
   .msg.system.boss { color: var(--hp-low); font-weight: bold; font-style: normal; letter-spacing: .04em; }
@@ -518,7 +519,8 @@
       ev_levelup: "⬆ {pc} reaches level {level}", ev_portrait: "🖼 {pc}'s portrait",
       ev_place: "🖼 {location}", placesTitle: "Gallery", placeShow: "Places, foes and treasures",
       ev_foe: "⚔ {name}", ev_boss: "💀 {name}", ev_loot: "💎 {name}", lootFor: "for {pc}",
-      galPlaces: "🗺 Places", galFoes: "⚔ Foes", galTreasures: "💎 Treasures",
+      galPlaces: "🗺 Places", galFoes: "⚔ Foes", galTreasures: "💎 Treasures", galPeople: "👤 People",
+      ev_npc: "🖼 {name}",
       ev_seat: "{pc} takes their seat at the table.", ev_join: "A new player joins: {pc}",
       ev_leave: "{pc} steps away from the table.", ev_music_stop: "🎵 The music fades away.",
       amb_wind: "Howling wind", amb_rain: "Steady rain", amb_storm: "Rain with rolling thunder",
@@ -599,7 +601,8 @@
       ev_levelup: "⬆ {pc} עולה לדרגה {level}", ev_portrait: "🖼 הדיוקן של {pc}",
       ev_place: "🖼 {location}", placesTitle: "גלריה", placeShow: "מקומות, אויבים ואוצרות",
       ev_foe: "⚔ {name}", ev_boss: "💀 {name}", ev_loot: "💎 {name}", lootFor: "של {pc}",
-      galPlaces: "🗺 מקומות", galFoes: "⚔ אויבים", galTreasures: "💎 אוצרות",
+      galPlaces: "🗺 מקומות", galFoes: "⚔ אויבים", galTreasures: "💎 אוצרות", galPeople: "👤 דמויות",
+      ev_npc: "🖼 {name}",
       ev_seat: "{pc} מתיישב/ת ליד השולחן.", ev_join: "שחקן/ית חדש/ה מצטרף/ת: {pc}",
       ev_leave: "{pc} קם/ה מהשולחן.", ev_music_stop: "🎵 המוזיקה דועכת.",
       amb_wind: "רוח מייללת", amb_rain: "גשם יורד", amb_storm: "סערה ורעמים",
@@ -1476,8 +1479,9 @@
     $("campaign").textContent = info.campaign || t("title");
     document.title = info.campaign || t("title");
     $("where").textContent = [info.location, info.time].filter(Boolean).join(" · ");
-    gallery = { places: info.places || [], foes: info.foes || [], treasures: info.treasures || [] };
-    if (gallery.places.length || gallery.foes.length || gallery.treasures.length) {
+    gallery = { places: info.places || [], people: info.people || [], foes: info.foes || [],
+                treasures: info.treasures || [] };
+    if (gallery.places.length || gallery.people.length || gallery.foes.length || gallery.treasures.length) {
       const b = document.createElement("button");
       b.type = "button"; b.textContent = "🖼"; b.title = t("placeShow");
       b.onclick = () => gallery.places.length ? openGallery("places", info.location) : openGallery();
@@ -1798,9 +1802,9 @@
   }
   // The gallery: places the party has been, foes met, treasures found (the server
   // lists only what the players have already seen, so nothing is spoiled).
-  let gallery = { places: [], foes: [], treasures: [] };
+  let gallery = { places: [], people: [], foes: [], treasures: [] };
   function openGallery(tab, name) {
-    const tabs = ["places", "foes", "treasures"].filter((k) => gallery[k].length);
+    const tabs = ["places", "people", "foes", "treasures"].filter((k) => gallery[k].length);
     if (!tabs.length) return;
     tab = tabs.includes(tab) ? tab : tabs[0];
     const items = gallery[tab];
@@ -1816,7 +1820,7 @@
     if (tabs.length > 1) tabs.forEach((k) => {
       const b = document.createElement("button");
       b.type = "button";
-      b.textContent = t({ places: "galPlaces", foes: "galFoes", treasures: "galTreasures" }[k]);
+      b.textContent = t({ places: "galPlaces", people: "galPeople", foes: "galFoes", treasures: "galTreasures" }[k]);
       b.setAttribute("aria-pressed", String(k === tab));
       b.onclick = () => openGallery(k);
       $("gallery-tabs").appendChild(b);
@@ -1940,6 +1944,7 @@
     let s = t("ev_" + ev.type).replace("{pc}", m.pc || "");
     if (ev.type === "place") return s.replace("{location}", ev.location || "");
     if (ev.type === "foe") return t(ev.boss ? "ev_boss" : "ev_foe").replace("{name}", ev.name || "");
+    if (ev.type === "npc") return t("ev_npc").replace("{name}", ev.name || "");
     if (ev.type === "loot") return t("ev_loot").replace("{name}", ev.name || "")
       + (ev.owner ? " — " + t("lootFor").replace("{pc}", ev.owner) : "");
     if (ev.type === "levelup") {
@@ -2327,7 +2332,7 @@
       if (m.image) {
         const img = imageEl(m.image);
         const ev = m.event || {};
-        const tab = { place: "places", foe: "foes", loot: "treasures" }[ev.type];
+        const tab = { place: "places", npc: "people", foe: "foes", loot: "treasures" }[ev.type];
         if (tab) {
           d.classList.add(ev.type === "foe" && ev.boss ? "boss" : ev.type);
           if (ev.type === "foe") d.classList.add("foe");

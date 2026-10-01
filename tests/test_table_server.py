@@ -599,6 +599,52 @@ def test_every_action_can_be_fixed_for_its_first_seconds(table, monkeypatch):
     assert [m["text"] for m in got if m["kind"] == "player"] == ["I pick the lock."]
 
 
+def test_recurring_npcs_get_portraits_by_themselves(table):
+    call, state, camp = table["call"], table["state"], table["camp"]
+    state.set_round_seconds(0)
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    (camp / "images").mkdir(exist_ok=True)
+    (camp / "npcs.json").write_text(json.dumps({"npcs": {
+        "Marta": {"description": "the innkeeper"}, "Old Tom": {"description": "a fisherman"}}}))
+    painted = []
+
+    def maker(name, campaign_dir):
+        painted.append(name)
+        f = f"portrait-{name.lower().replace(' ', '-')}.png"
+        (campaign_dir / "images" / f).write_bytes(b"\x89PNG")
+        data = json.loads((campaign_dir / "npcs.json").read_text())
+        data["npcs"][name]["portrait"] = f
+        (campaign_dir / "npcs.json").write_text(json.dumps(data))
+        return f
+
+    state.portrait_maker = maker
+    state.portrait_tried["Pip"] = time.time()                 # (Pip's own portrait: not this test)
+    call("/api/gm/alias", {"name": "Marta", "alias": "מרתה"}, host=True)
+    for text in ("Marta pours ale.", "Old Tom waves.", "מרתה מחייכת."):
+        call("/api/gm/say", {"text": text}, host=True)
+    call("/api/gm/say", {"text": "Marta, privately: the cellar.", "to": "Pip"}, host=True)
+    assert state.npc_pass() == []                            # twice in public: not yet recurring
+    assert state.npc_mentions() == {"Marta": 2, "Old Tom": 1}
+    call("/api/gm/say", {"text": "Marta winks at Old Tom."}, host=True)
+    assert state.npc_pass() == ["Marta"] and painted == ["Marta"]
+    shown = [m for m in state.messages if (m.get("event") or {}).get("type") == "npc"]
+    assert shown[-1]["image"] == "portrait-marta.png"          # shown to the table
+    assert state.npc_pass() == []                              # once
+    _, info = call(f"/api/info?code={CODE}&token={pip}")
+    assert info["people"] == [{"name": "Marta", "image": "portrait-marta.png"}]
+    state.narrator_ask = lambda system, prompt: "The innkeeper."
+    assert call(f"/api/lore?code={CODE}&token={pip}&term=Marta")[1]["image"] == "portrait-marta.png"
+    # One the GM painted already is shown the same way, without painting again.
+    (camp / "images" / "tom.png").write_bytes(b"\x89PNG")
+    data = json.loads((camp / "npcs.json").read_text())
+    data["npcs"]["Old Tom"]["portrait"] = "tom.png"
+    (camp / "npcs.json").write_text(json.dumps(data))
+    for _ in range(2):
+        call("/api/gm/say", {"text": "Old Tom mends a net."}, host=True)
+    assert state.npc_pass() == ["Old Tom"] and painted == ["Marta"]
+    assert [p["name"] for p in call(f"/api/info?code={CODE}&token={pip}")[1]["people"]] == ["Old Tom", "Marta"]
+
+
 def test_the_host_makes_natural_voices_for_seated_players(table):
     import table_tts
     call, state = table["call"], table["state"]
