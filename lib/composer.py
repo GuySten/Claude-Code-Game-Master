@@ -20,8 +20,10 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
+import threading
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 COMPOSE_VENV = PROJECT_ROOT / ".compose-venv"
@@ -107,6 +109,56 @@ def compose(prompt: str, seconds: float, out: Path, loop: bool = False,
     return json.loads(lines[-1])
 
 
+def compose_many(jobs: List[Dict[str, Any]], on_piece: Optional[Callable[[int, Dict[str, Any]], None]] = None,
+                 timeout_each: int = 1800) -> List[Optional[Dict[str, Any]]]:
+    """Compose several pieces with ONE model load. ``jobs``: [{prompt, seconds, out,
+    loop}]. ``on_piece(index, result)`` is called as each one lands (the rest are
+    still composing). Returns one result per job (None where that piece failed)."""
+    if not jobs:
+        return []
+    py = composer_python()
+    if py is None:
+        raise ComposeError("the composer isn't set up (bash tools/gm-music-compose.sh setup)")
+    results: List[Optional[Dict[str, Any]]] = [None] * len(jobs)
+    with tempfile.TemporaryDirectory() as tmp:
+        batch = Path(tmp) / "jobs.json"
+        batch.write_text(json.dumps(jobs, ensure_ascii=False), encoding="utf-8")
+        with open(Path(tmp) / "stderr.txt", "w+", encoding="utf-8", errors="replace") as err:
+            proc = subprocess.Popen([str(py), str(SCRIPT), "--batch", str(batch)], stdout=subprocess.PIPE,
+                                    stderr=err, text=True, encoding="utf-8", errors="replace",
+                                    env={**os.environ, "PYTHONUTF8": "1"})
+            killed: List[bool] = []
+            watchdog = threading.Timer(timeout_each * len(jobs) + 300, lambda: (killed.append(True), proc.kill()))
+            watchdog.daemon = True
+            watchdog.start()
+            try:
+                for line in proc.stdout:
+                    if not line.strip().startswith("{"):
+                        continue
+                    try:
+                        r = json.loads(line)
+                    except ValueError:
+                        continue
+                    i = r.get("index", -1)
+                    if r.get("ok") and isinstance(i, int) and 0 <= i < len(jobs):
+                        results[i] = r
+                        if on_piece is not None:
+                            on_piece(i, r)
+                proc.wait()
+            finally:
+                watchdog.cancel()
+                if proc.poll() is None:
+                    proc.kill()
+                    proc.wait()
+            if not any(results):
+                if killed:
+                    raise ComposeError("composing took too long")
+                err.seek(0)
+                tail = err.read().strip().splitlines()[-3:]
+                raise ComposeError("the composer failed: " + " | ".join(tail))
+    return results
+
+
 # --- what has been composed for this campaign ---
 def registry_path(campaign_dir) -> Path:
     return Path(campaign_dir) / "music-composed.json"
@@ -159,6 +211,45 @@ def anthem(campaign_dir, name: str) -> Optional[Dict[str, Any]]:
     if rec and (Path(campaign_dir) / "music" / "anthems" / rec.get("file", "")).is_file():
         return rec
     return None
+
+
+def compose_pieces(campaign_dir, pieces: List[Dict[str, Any]],
+                   on_piece: Optional[Callable[[Dict[str, Any], str], None]] = None) -> List[Optional[str]]:
+    """Compose themes ({kind: theme, name, boss, look}) and anthems ({kind: anthem,
+    sheet}) together, with ONE model load. Each is registered (and ``on_piece(piece,
+    file)`` called) as soon as it lands. Returns the file names (None where a piece failed)."""
+    camp = Path(campaign_dir)
+    style = flavor(camp)
+    jobs = []
+    for p in pieces:
+        if p["kind"] == "theme":
+            out = camp / "music" / "themes" / f"{slug(p['name'])}-{'boss' if p['boss'] else 'theme'}.ogg"
+            jobs.append({"prompt": theme_prompt(p["name"], p.get("look", ""), style, p["boss"]),
+                         "seconds": THEME_SECONDS, "out": str(out), "loop": True})
+        else:
+            name = p["sheet"].get("name", "hero")
+            out = camp / "music" / "anthems" / f"anthem-{slug(name)}.ogg"
+            jobs.append({"prompt": anthem_prompt(p["sheet"], style), "seconds": ANTHEM_SECONDS,
+                         "out": str(out), "loop": False})
+    files: List[Optional[str]] = [None] * len(pieces)
+
+    def landed(i: int, r: Dict[str, Any]) -> None:
+        p, f = pieces[i], Path(r["path"]).name
+        reg = load_registry(camp)
+        if p["kind"] == "theme":
+            key = _key(reg["themes"], p["name"]) or p["name"]
+            reg["themes"].setdefault(key, {})["boss" if p["boss"] else "normal"] = f
+        else:
+            name = p["sheet"].get("name", "hero")
+            key = _key(reg["anthems"], name) or name
+            reg["anthems"][key] = {"file": f, "seconds": r.get("seconds", ANTHEM_SECONDS)}
+        save_registry(camp, reg)
+        files[i] = f
+        if on_piece is not None:
+            on_piece(p, f)
+
+    compose_many(jobs, landed)
+    return files
 
 
 def compose_theme(campaign_dir, name: str, boss: bool, look: str = "") -> str:

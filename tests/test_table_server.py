@@ -5,6 +5,7 @@ way a browser (players) and gm-table.sh (the host) do.
 """
 
 import json
+import sys
 import threading
 import time
 from pathlib import Path
@@ -941,6 +942,28 @@ def test_villains_bosses_and_heroes_get_composed_music(table):
     state.music_revert["at"] = 0
     call(f"/api/info?code={CODE}")
     assert state.music["track"] == "grimaldi-boss.ogg"
+
+
+def test_the_table_composes_everything_queued_with_one_model_load(table, monkeypatch, tmp_path):
+    import composer
+    from tests.test_composer import FAKE_BATCH
+    call, state, camp = table["call"], table["state"], table["camp"]
+    fake = tmp_path / "fake_batch.py"
+    fake.write_text(FAKE_BATCH)
+    log = tmp_path / "loads.txt"
+    log.write_text("")
+    monkeypatch.setattr(composer, "SCRIPT", fake)
+    monkeypatch.setattr(composer, "composer_python", lambda: sys.executable)
+    monkeypatch.setenv("FAKE_LOG", str(log))
+    call("/api/claim", {"code": CODE, "pc": "Pip"})
+    call("/api/create", {"code": CODE, "name": "Bram", "concept": "a dwarf"})
+
+    call("/api/gm/say", {"text": "Grimaldi bows.", "theme": "Grimaldi", "villain": True}, host=True)
+    assert sorted(state.music_pass()) == ["Bram", "Grimaldi", "Pip"]
+    assert log.read_text() == "load\n"                    # the villain + two anthems: one load
+    assert state.music["track"] == "grimaldi-theme.ogg"    # took over
+    assert composer.anthem(camp, "Bram") and composer.anthem(camp, "Pip")
+    assert state.music_pass() == [] and log.read_text() == "load\n"   # nothing left: no load
 
 
 def test_heroic_moments_and_bosses_without_a_composer(table, monkeypatch):

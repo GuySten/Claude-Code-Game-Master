@@ -692,29 +692,16 @@ class TableState:
         self.portrait_wake.set()
 
     def music_pass(self) -> List[str]:
-        """Compose what's queued (villain/boss themes), then one missing PC anthem.
-        When a theme lands while its foe's music is playing, it takes over."""
+        """Compose what's queued (villain/boss themes) and the missing PC anthems, all
+        in one go: the model loads once per batch, not once per piece (it's the slow,
+        memory-hungry part). When a theme lands while its foe's music is playing, it
+        takes over at once, while the rest are still being composed."""
         if self.music_maker is None and not composer.available():
             self.music_jobs.clear()
             return []
-        done = []
+        pieces = []
         while self.music_jobs:
-            job = self.music_jobs.pop(0)
-            try:
-                if self.music_maker is not None:
-                    f = self.music_maker("theme", job["name"], job["boss"], job["look"], None)
-                else:
-                    f = composer.compose_theme(self.campaign_dir, job["name"], job["boss"], job["look"])
-            except Exception as e:
-                print(f"[compose] {job['name']}: {e}", flush=True)
-                continue
-            done.append(job["name"])
-            playing = self.music
-            if (party_roster._same_name(playing.get("theme"), job["name"])
-                    and bool(playing.get("boss")) == job["boss"] and playing.get("track") != f):
-                music = self.set_music(f, playing.get("volume", 0.6), True, playing.get("title"),
-                                       mood=playing.get("mood"), theme=job["name"], boss=job["boss"])
-                self.announce_music(music)
+            pieces.append(self.music_jobs.pop(0))
         for path, raw in party_roster.all_pcs(self.campaign_dir):
             sheet = to_flat(raw)
             name = sheet.get("name") or path.stem
@@ -723,15 +710,35 @@ class TableState:
             if time.time() - self.portrait_tried.get("anthem:" + name, -PORTRAIT_RETRY) < PORTRAIT_RETRY:
                 continue
             self.portrait_tried["anthem:" + name] = time.time()
-            try:
-                if self.music_maker is not None:
-                    self.music_maker("anthem", name, False, "", sheet)
-                else:
-                    composer.compose_anthem(self.campaign_dir, sheet)
-                done.append(name)
-            except Exception as e:
-                print(f"[compose] {name}'s anthem: {e}", flush=True)
-            break                              # one anthem per pass: pictures get a turn
+            pieces.append({"kind": "anthem", "name": name, "boss": False, "look": "", "sheet": sheet})
+        if not pieces:
+            return []
+        done: List[str] = []
+
+        def landed(job: Dict[str, Any], f: str) -> None:
+            done.append(job["name"])
+            playing = self.music
+            if (job["kind"] == "theme" and party_roster._same_name(playing.get("theme"), job["name"])
+                    and bool(playing.get("boss")) == job["boss"] and playing.get("track") != f):
+                music = self.set_music(f, playing.get("volume", 0.6), True, playing.get("title"),
+                                       mood=playing.get("mood"), theme=job["name"], boss=job["boss"])
+                self.announce_music(music)
+
+        if self.music_maker is not None:
+            for job in pieces:
+                try:
+                    landed(job, self.music_maker(job["kind"], job["name"], job["boss"], job["look"],
+                                                 job.get("sheet")))
+                except Exception as e:
+                    print(f"[compose] {job['name']}: {e}", flush=True)
+            return done
+        try:
+            files = composer.compose_pieces(self.campaign_dir, pieces, landed)
+            for job, f in zip(pieces, files):
+                if not f:
+                    print(f"[compose] {job['name']}: that piece failed", flush=True)
+        except Exception as e:
+            print(f"[compose] {', '.join(j['name'] for j in pieces)}: {e}", flush=True)
         return done
 
     def heroic_moment(self, pc: str) -> Optional[Dict[str, Any]]:

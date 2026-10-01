@@ -7,6 +7,7 @@ Hugging Face transformers. The game itself stays CPU-only and never imports
 this; it starts this script and reads the one JSON line it prints.
 
     python lib/music_compose.py --prompt "..." --seconds 30 --out music/x.ogg
+    python lib/music_compose.py --batch jobs.json   # many pieces, ONE model load
     python lib/music_compose.py --check        # what hardware would be used
     python lib/music_compose.py --benchmark    # time one 30-second piece
 
@@ -107,6 +108,8 @@ def main() -> None:
     ap.add_argument("--loop", action="store_true", help="A looping theme: short fades both ends")
     ap.add_argument("--device", default=os.environ.get("COMPOSE_DEVICE", "auto"),
                     help="auto (GPU if there is one), cuda, or cpu")
+    ap.add_argument("--batch", help="A JSON list of {prompt, seconds, out, loop}: composed in turn "
+                                    "with the model loaded once (one JSON line per piece)")
     ap.add_argument("--check", action="store_true", help="Print the hardware that would be used")
     ap.add_argument("--benchmark", action="store_true", help="Time one 30-second piece")
     args = ap.parse_args()
@@ -121,6 +124,22 @@ def main() -> None:
             info.update(gpu=props.name, vram_gb=round(props.total_memory / 2**30, 1),
                         capability=f"{props.major}.{props.minor}")
         print(json.dumps(info))
+        return
+
+    if args.batch:
+        jobs = json.loads(Path(args.batch).read_text(encoding="utf-8"))
+        for i, job in enumerate(jobs):
+            started = time.time()
+            try:
+                samples, rate, used = generate(job["prompt"], job.get("seconds", 30), device)
+                loop = bool(job.get("loop"))
+                samples = fade(samples, rate, 0.4 if loop else 0.05, 1.5 if loop else 2.0)
+                path = write(samples, rate, Path(job["out"]))
+                print(json.dumps({"ok": True, "index": i, "path": str(path),
+                                  "seconds": round(len(samples) / rate, 1), "device": used,
+                                  "elapsed": round(time.time() - started, 1)}), flush=True)
+            except Exception as e:            # one bad piece doesn't sink the rest
+                print(json.dumps({"ok": False, "index": i, "error": f"{type(e).__name__}: {e}"}), flush=True)
         return
 
     if args.benchmark:
