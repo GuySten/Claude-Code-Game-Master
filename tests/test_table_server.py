@@ -1498,9 +1498,11 @@ def test_sheet_strings_are_the_words_a_player_reads():
     got = table_server.sheet_strings({
         "name": "Pip", "portrait": "p.png", "race": "Halfling", "hp": {"current": 7, "max": 9},
         "stats": {"str": 8}, "spell_slots": {"1": 2}, "skills": {"stealth": 5},
-        "equipment": [{"name": "Shortsword", "damage": "1d6+2"}, "Thieves' tools", "קרן"]})
+        "equipment": [{"name": "Shortsword", "damage": "1d6+2"}, "Thieves' tools", "קרן"],
+        "spells": ["Fire Bolt (קרן אש, 1d10)"]})
     assert "Pip" not in got and "p.png" not in got and "1d6+2" not in got and "קרן" not in got
-    for s in ("Halfling", "Race", "Spell slots", "Stealth", "Shortsword", "Damage", "Thieves' tools", "Str"):
+    for s in ("Halfling", "Race", "Spell slots", "Stealth", "Shortsword", "Damage", "Thieves' tools", "Str",
+              "Fire Bolt (קרן אש, 1d10)"):                  # a mixed phrase: translated whole
         assert s in got, s
 
 

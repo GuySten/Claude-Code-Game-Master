@@ -2123,13 +2123,13 @@ def _pretty_key(k: Any) -> str:
 
 def sheet_strings(sheet: Dict[str, Any]) -> List[str]:
     """The English words a player sees on a sheet: its values and the labels of its
-    keys (numbers, dice and already-translated text left out)."""
+    keys (numbers, dice and all-Hebrew text left out). A phrase that mixes the two
+    ("Fire Bolt (קרן אש, 1d10)") is in: it comes back all in the reader's language."""
     out: List[str] = []
 
     def add(s: Any) -> None:
         s = str(s).strip()
-        if (s and len(s) <= 800 and re.search(r"[A-Za-z]{2,}", s)
-                and not re.search(r"[\u0590-\u05FF]", s)):
+        if s and len(s) <= 800 and re.search(r"[A-Za-z]{2,}", s):
             out.append(s)
 
     def walk(v: Any) -> None:

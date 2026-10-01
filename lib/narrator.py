@@ -156,7 +156,8 @@ again remember about tell said say name called mean happened happen""".split())
 
 
 TRANSLATE_RULES = """You translate the text of a tabletop role-playing game's character sheet \
-from English into {lang}. You get a JSON object of numbered strings, like {{"1": "Stealth", \
+from English into {lang}. Some strings already mix in {lang} words: give those entirely in \
+{lang} too, without repeating anything. You get a JSON object of numbered strings, like {{"1": "Stealth", \
 "2": "Fire Bolt (1d10)"}}. Reply with ONLY a JSON object with the same numbers, each mapped to \
 its translation, like {{"1": "...", "2": "..."}}. Translate every one. Use the usual {lang} terms \
 of role-playing games (Dungeons & Dragons) where they exist. Keep numbers, dice (1d8+2) and \

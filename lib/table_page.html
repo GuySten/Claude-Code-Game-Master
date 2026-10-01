@@ -696,6 +696,9 @@
     return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;",
                                                    '"': "&quot;", "'": "&#39;" }[c]));
   }
+  // Dice in Hebrew: 2d6 → 2ק6 (ק for קובייה). Only how it's shown; English stays 2d6.
+  const heDice = (s) => lang === "he"
+    ? String(s).replace(/(^|[^A-Za-z0-9])(\d*)d(\d+)(?![A-Za-z0-9])/g, "$1$2ק$3") : String(s);
   function md(text) {
     return String(text).trim().split(/\n{2,}/).map((block) => {
       let h = esc(block)
@@ -1647,7 +1650,7 @@
   const tx = (s) => {
     if (txOff || typeof s !== "string") return s;
     const k = s.trim();
-    return sheetTr.get(k) || (lang === "he" && HE_TERMS[k.toLowerCase()]) || s;
+    return heDice(sheetTr.get(k) || (lang === "he" && HE_TERMS[k.toLowerCase()]) || s);
   };
   const prettyKey = (k) => String(k).replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
   function label(k) {
@@ -1830,7 +1833,7 @@
         const avg = Math.max(1, Math.floor(lu.hit_die / 2) + 1 + lu.con_mod);
         const mod = lu.con_mod ? (lu.con_mod > 0 ? "+" : "") + lu.con_mod : "";
         form.innerHTML = `<div class="muted">${esc(t("lvlHp"))}</div>` +
-          `<label><input type="radio" name="lvl-hp" value="roll" checked> ${esc(t("lvlRoll").replace("{d}", "1d" + lu.hit_die + mod))}</label>` +
+          `<label><input type="radio" name="lvl-hp" value="roll" checked> ${esc(t("lvlRoll").replace("{d}", heDice("1d" + lu.hit_die) + mod))}</label>` +
           `<label><input type="radio" name="lvl-hp" value="average"> ${esc(t("lvlAvg").replace("{n}", avg))}</label>`;
       } else {
         form.innerHTML = `<div class="muted">${esc(t("lvlNoHp"))}</div>`;
@@ -2166,7 +2169,7 @@
     const mod = r.modifier ? ` ${r.modifier > 0 ? "+" : "−"} ${Math.abs(r.modifier)}` : "";
     const math = document.createElement("bdi");
     math.dir = "ltr";
-    math.innerHTML = `🎲 ${esc(r.notation || "")}: [${esc((r.rolls || []).join("+"))}]`
+    math.innerHTML = `🎲 <bdi dir="${lang === "he" ? "rtl" : "ltr"}">${esc(heDice(r.notation || ""))}</bdi>: [${esc((r.rolls || []).join("+"))}]`
       + `${esc(mod)} = <span class="total">${esc(r.total)}</span>`;
     line.appendChild(math);
     const word = (text, cls) => {
@@ -2332,7 +2335,7 @@
       sub.textContent = d && d.sub ? d.sub.replace(/^(.*?)level (\d+)$/, (_, a, n) => a + t("lvl") + " " + n) : "";
       const text = document.createElement("div");
       text.className = "text" + (loading ? " loading" : "");
-      text.textContent = loading ? t("loreLoading") : (d.text || "");
+      text.textContent = loading ? t("loreLoading") : heDice(d.text || "");
       text.dir = dirFor(text.textContent);
       card.append(head);
       if (sub.textContent) card.append(sub);
@@ -2443,7 +2446,7 @@
       body.className = "body";
       const tr = readable(m);
       const useTr = tr && tr.text && !showOriginal.has(m.id);
-      body.innerHTML = md(useTr ? tr.text : (m.text || ""));
+      body.innerHTML = md(heDice(useTr ? tr.text : (m.text || "")));
       if (m.kind === "gm") wrapLore(body);
       d.append(who, body);
       if (tr) {
