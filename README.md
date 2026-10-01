@@ -177,7 +177,9 @@ asides to the GM, whispers back, and live HP bars for the party.
 - **Composed music for the big moments (optional, local AI).** With MusicGen set up on the
   host (`bash tools/gm-music-compose.sh setup`; an NVIDIA GPU helps), main villains and
   bosses get their own composed themes, and each player character gets a heroic anthem that
-  plays when they do something heroic. All of it is composed in the background during play.
+  plays when they do something heroic. All of it is composed in the background during play,
+  at the same loudness as the rest of the music. The music and picture models are loaded
+  into RAM once, when the table starts, and take turns on the graphics card.
 - **A starter music library**: `bash tools/gm-music-library.sh fetch` downloads 25 tracks
   by Kevin MacLeod (incompetech.com, CC BY 4.0, credited on screen), already sorted by mood.
   With no files at all, built-in generated soundscapes cover every mood. Same Wi-Fi works out of

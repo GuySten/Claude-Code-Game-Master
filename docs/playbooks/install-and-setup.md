@@ -58,6 +58,11 @@ Enumerated from `os.environ.get` across `lib/` and `tools/`:
 | `OPENAI_API_KEY` | `image_gen`, `session_manager` | turns scene images on through OpenAI. With neither this nor `IMAGE_BACKEND=forge` the session brief says DISABLED |
 | `IMAGE_BACKEND` | `image_gen`, `session_manager` | `openai` · `forge` (a local Stable Diffusion WebUI Forge / AUTOMATIC1111 with `--api`, free) · `off`. Default: `openai` when a key is set, else `off` |
 | `FORGE_URL`, `FORGE_MODEL`, `FORGE_STEPS`, `FORGE_CFG`, `FORGE_SAMPLER`, `FORGE_SCHEDULER`, `FORGE_LANDSCAPE`/`PORTRAIT`/`SQUARE`, `FORGE_TIMEOUT` | `image_gen` | local Forge tuning; defaults suit DreamShaper XL Lightning (GAME-NIGHT.md → 5. Pictures) |
+| `MUSIC_COMPOSE` | `composer` | `off` turns the local composer off (default: on when `.compose-venv` exists) |
+| `COMPOSE_MODEL`, `COMPOSE_DEVICE` | `music_compose` | MusicGen model (default `facebook/musicgen-small`) · `auto`/`cuda`/`cpu` |
+| `COMPOSE_LOUDNESS` | `music_compose` | loudness composed pieces are brought to, dB (default `-14`) |
+| `COMPOSE_RAM_HALF` | `music_compose` | `0` keeps the waiting music model in full precision in RAM (default: half, with a GPU) |
+| `GPU_LOCK_FILE`, `GPU_TURN_WAIT` | `gpu_turn` | the shared one-model-on-the-GPU lock (default in the temp folder) · max seconds to wait for it (900) |
 | `OPENAI_IMAGE_MODEL` | `image_gen` | default `gpt-image-2` |
 | `OPENAI_IMAGE_QUALITY` | `image_gen` | default `medium` |
 | `OPENAI_IMAGE_SIZE` | `image_gen` | default `1536x1024` |

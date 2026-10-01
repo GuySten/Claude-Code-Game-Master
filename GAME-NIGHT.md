@@ -222,7 +222,9 @@ Optional `.env` settings for Forge (the defaults suit DreamShaper XL Lightning):
 | `FORGE_LANDSCAPE` / `FORGE_PORTRAIT` / `FORGE_SQUARE` | `1216x832` / `832x1216` / `1024x1024` | Picture sizes |
 | `FORGE_TIMEOUT` | `600` | Seconds to wait for one picture |
 
-**Too slow, or "out of memory"?** Use a smaller SD 1.5 model instead: **DreamShaper 8** from
+**Too slow, "out of memory", or only 8 GB of RAM?** Use a smaller SD 1.5 model instead
+(with 8 GB of RAM, use it from the start: the picture and music models both stay in RAM all
+evening, and DreamShaper XL is too big to share): **DreamShaper 8** from
 Civitai (about 2 GB), with:
 ```
 FORGE_MODEL=dreamshaper_8
@@ -323,8 +325,11 @@ git pull            # pick up the latest version
 claude
 ```
 
-Using local pictures (Forge)? Start Forge's `run.bat` first. (The composer, if you set it up,
-needs nothing: the table starts it by itself.)
+Using local pictures (Forge)? Start Forge's `run.bat` first and wait until its console shows
+the `127.0.0.1:7860` address. The composer, if you set it up, needs nothing: the table starts
+it by itself. When the table opens, it loads Forge's picture model and then the music model
+into RAM, in the background (a minute or so from an SSD). They stay there all evening and
+take turns on the graphics card, so the first portrait doesn't wait on the disk.
 
 **Check the GM is on Opus:** type `/model`. It should show **Opus**. If it doesn't (a new
 computer, or you switched to try something), run `/models` and pick **Recommended**, or
@@ -374,7 +379,8 @@ nobody for more than a minute, but you can free their seat: `bash tools/gm-table
 **7. End the night** — tell Claude *"let's stop here for tonight."* It saves the session
 (characters, the world, what happened, the cliffhanger), says goodbye at the table, and
 closes it. Next time: `/gm` → pick the campaign → *"my friends are joining online"* — and
-everyone takes the same seats again.
+everyone takes the same seats again. Close Forge's console window too: that frees the RAM
+its picture model was using (the music model is freed when the table closes).
 
 ---
 
@@ -599,6 +605,21 @@ background, so a first theme can take a few minutes to arrive; until then the bu
   for a GTX 10-series card. Use a CUDA 12.1 or 12.4 package.
 - *Out of memory*: close games and browsers using the GPU, plug the laptop in, or switch to
   the SD 1.5 settings in **5. Pictures**.
+
+**The computer strains when the table starts, or pictures and music are very slow.** The
+table reads both AI models into RAM at the start (a few GB). Open Task Manager → Performance
+while it does:
+- *Disk at 100% for minutes*: the models are on a slow or failing hard drive. Move the game
+  folder, Forge and the downloaded models (`C:\Users\<you>\.cache\huggingface`) to an SSD.
+  [CrystalDiskInfo](https://crystalmark.info/en/software/crystaldiskinfo/) shows a drive's
+  health; back up `world-state/` at once if it says *Caution* or *Bad*.
+- *Memory above 90%*: use DreamShaper 8 (see **5. Pictures**) and close other programs.
+- *"GPU 1" (the NVIDIA card) idle while music composes, CPU at 100%*: the composer isn't
+  using the card; run `bash tools/gm-music-compose.sh check` (it should say `"device": "cuda"`).
+  The Intel graphics never run the AI models, so its setting doesn't matter.
+- The table's window prints `[art] Forge's picture model is loaded` and `[compose] the music
+  model is loaded` when each is ready. `[art] Forge warm-up: ...` means Forge wasn't ready
+  yet; the first picture then loads the model instead (slower, nothing breaks).
 
 **Friends can't open the link.** On another network they need the tunnel's `https://…`
 link, not the Wi-Fi one, and the `cloudflared` window must stay open. On the same Wi-Fi, a
