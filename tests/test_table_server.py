@@ -754,6 +754,30 @@ def test_a_joining_player_can_roll_a_character(table):
     assert call("/api/roll-character", {"code": "wrong"})[0] == 403
 
 
+def test_a_ready_level_up_is_announced_once(table):
+    call, state, camp = table["call"], table["state"], table["camp"]
+    state.set_round_seconds(0)
+    path = camp / "character.json"
+    sheet = json.loads(path.read_text())
+    sheet.update({"class": "Rogue", "level": 1})
+    path.write_text(json.dumps(sheet))
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    call(f"/api/info?code={CODE}&token={pip}")                    # first seen at level 1
+    notices = lambda: [m for m in state.messages if (m.get("event") or {}).get("type") == "levelready"]
+    assert state.announce_level_ups() == [] and notices() == []
+    # The GM awards XP (the award raises the level), then narrates: the player is told.
+    sheet["level"], sheet["xp"] = 2, {"current": 300, "next_level": 900}
+    path.write_text(json.dumps(sheet))
+    call("/api/gm/say", {"text": "The goblins flee. You gain 300 XP."}, host=True)
+    assert wait_for(lambda: len(notices()) == 1)
+    assert notices()[0]["pc"] == "Pip" and notices()[0]["event"]["level"] == 2
+    call("/api/gm/say", {"text": "Night falls."}, host=True)      # once per level
+    time.sleep(0.3)
+    assert len(notices()) == 1 and state.announce_level_ups() == []
+    again = TableState(camp, str(table["world"]))                 # (kept across a restart)
+    assert again.announce_level_ups() == []
+
+
 def test_players_level_up_from_their_sheet(table):
     call, state, camp = table["call"], table["state"], table["camp"]
     path = camp / "character.json"

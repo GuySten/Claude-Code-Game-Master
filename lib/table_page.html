@@ -457,6 +457,8 @@
       leave: "Leave seat", leaveConfirm: "Give up your seat? You can take it again afterwards.",
       mySheet: "📜 My sheet", openSheet: "sheet ›", sheetLoading: "Loading…",
       sheet_hp: "HP", sheet_ac: "AC", sheet_level: "Level", sheet_xp: "XP", sheet_gold: "Gold",
+      sheet_current: "Current", sheet_next_level: "Next level", sheet_max: "Max", sheet_temp: "Temporary",
+      xpToGo: "{n} to level {l}", xpReady: "ready to level up",
       sheet_status: "Status", sheet_stats: "Abilities", sheet_skills: "Skills",
       sheet_saves: "Saving throws", sheet_features: "Features", sheet_spells: "Spells",
       sheet_spell_slots: "Spell slots", sheet_equipment: "Equipment", sheet_conditions: "Conditions",
@@ -517,6 +519,7 @@
       rolledNote: "Rolled with fair dice: 4d6 for each ability, lowest die dropped. Change the name and concept if you like, then Create — the table sees what you rolled.",
       rolledHp: "HP", rolledAc: "AC",
       ev_levelup: "⬆ {pc} reaches level {level}", ev_portrait: "🖼 {pc}'s portrait",
+      ev_levelready: "⬆ {pc} can reach level {level}: open the sheet (📜) and tap Level up",
       ev_place: "🖼 {location}", placesTitle: "Gallery", placeShow: "Places, people, foes and treasures",
       ev_foe: "⚔ {name}", ev_boss: "💀 {name}", ev_loot: "💎 {name}", lootFor: "for {pc}",
       galPlaces: "🗺 Places", galFoes: "⚔ Foes", galTreasures: "💎 Treasures", galPeople: "👤 People",
@@ -539,6 +542,8 @@
       leave: "עזיבת המושב", leaveConfirm: "לפנות את המושב? אפשר לחזור אליו אחר כך.",
       mySheet: "📜 הדף שלי", openSheet: "דף דמות ›", sheetLoading: "טוען…",
       sheet_hp: "נקודות חיים", sheet_ac: "דרגת שריון", sheet_level: "דרגה", sheet_xp: "ניסיון",
+      sheet_current: "נוכחי", sheet_next_level: "לדרגה הבאה", sheet_max: "מקסימום", sheet_temp: "זמני",
+      xpToGo: "עוד {n} לדרגה {l}", xpReady: "מוכנים לעלות דרגה",
       sheet_gold: "זהב", sheet_status: "מצב", sheet_stats: "תכונות", sheet_skills: "מיומנויות",
       sheet_saves: "הטלות הצלה", sheet_features: "יכולות", sheet_spells: "לחשים",
       sheet_spell_slots: "משבצות לחשים", sheet_equipment: "ציוד", sheet_conditions: "מצבים",
@@ -599,6 +604,7 @@
       rolledNote: "הוטל בקוביות הוגנות: 4d6 לכל תכונה, הקובייה הנמוכה נזרקת. שנו את השם והתיאור אם תרצו ולחצו צור — השולחן יראה מה הטלתם.",
       rolledHp: "נק״ח", rolledAc: "דרגת שריון",
       ev_levelup: "⬆ {pc} עולה לדרגה {level}", ev_portrait: "🖼 הדיוקן של {pc}",
+      ev_levelready: "⬆ {pc} יכול/ה לעלות לדרגה {level}: פתחו את הדף (📜) ולחצו עלייה בדרגה",
       ev_place: "🖼 {location}", placesTitle: "גלריה", placeShow: "מקומות, דמויות, אויבים ואוצרות",
       ev_foe: "⚔ {name}", ev_boss: "💀 {name}", ev_loot: "💎 {name}", lootFor: "של {pc}",
       galPlaces: "🗺 מקומות", galFoes: "⚔ אויבים", galTreasures: "💎 אוצרות", galPeople: "👤 דמויות",
@@ -1673,7 +1679,7 @@
       const b = document.createElement("div");
       b.className = "box";
       b.innerHTML = `<div class="k">${esc(k)}</div><div class="v" dir="ltr">${esc(v)}</div>` +
-                    (m !== undefined ? `<div class="m" dir="ltr">${esc(m)}</div>` : "");
+                    (m !== undefined ? `<div class="m" dir="auto">${esc(m)}</div>` : "");
       g.appendChild(b);
     });
     return g;
@@ -1706,7 +1712,18 @@
       vit.push([t("sheet_hp"), `${hp.current ?? "?"}/${hp.max ?? "?"}`, hp.temp ? `+${hp.temp}` : undefined]);
     if (s.ac !== undefined) vit.push([t("sheet_ac"), s.ac]);
     if (s.level !== undefined) vit.push([t("sheet_level"), s.level]);
-    if (s.xp !== undefined) vit.push([t("sheet_xp"), typeof s.xp === "object" ? itemLine(s.xp) : s.xp]);
+    if (s.xp !== undefined) {
+      // "300 / 900" and how far the next level is: numbers, in any language.
+      const xp = s.xp, cur = xp && typeof xp === "object" ? xp.current : xp;
+      const next = xp && typeof xp === "object" ? xp.next_level ?? xp.next : undefined;
+      if (typeof cur === "number" && typeof next === "number") {
+        const lvl = typeof s.level === "number" ? s.level + 1 : "";
+        vit.push([t("sheet_xp"), `${cur} / ${next}`, cur >= next ? t("xpReady")
+                  : t("xpToGo").replace("{n}", next - cur).replace("{l}", lvl).replace(/ +$/, "")]);
+      } else {
+        vit.push([t("sheet_xp"), typeof xp === "object" ? itemLine(xp) : xp]);
+      }
+    }
     if (s.gold !== undefined) vit.push([t("sheet_gold"), s.gold]);
     if (s.status && s.status !== "alive") vit.push([t("sheet_status"), String(s.status).toUpperCase()]);
     if (vit.length) sec("vitals", "", boxes(vit));
@@ -1945,6 +1962,7 @@
     if (ev.type === "place") return s.replace("{location}", ev.location || "");
     if (ev.type === "foe") return t(ev.boss ? "ev_boss" : "ev_foe").replace("{name}", ev.name || "");
     if (ev.type === "npc") return t("ev_npc").replace("{name}", ev.name || "");
+    if (ev.type === "levelready") return s.replace("{level}", ev.level);
     if (ev.type === "loot") return t("ev_loot").replace("{name}", ev.name || "")
       + (ev.owner ? " — " + t("lootFor").replace("{pc}", ev.owner) : "");
     if (ev.type === "levelup") {

@@ -339,6 +339,9 @@ class TableState:
         store = self._read_json(self.lore_store_path, {})
         self.lore_store: Dict[str, Dict[str, Any]] = store if isinstance(store, dict) else {}
         self.card_jobs: List[tuple] = []
+        self.level_notices_path = self.dir / "level-notices.json"
+        notices = self._read_json(self.level_notices_path, {})
+        self.level_notices: Dict[str, int] = notices if isinstance(notices, dict) else {}
         self.card_worker_on = False
         self.aliases_path = self.dir / "aliases.json"
         self.spelling_lock = threading.Lock()
@@ -695,11 +698,31 @@ class TableState:
         """In the background, after the GM speaks: learn the spellings it used,
         then get the hover cards of what it mentioned ready."""
         try:
+            self.announce_level_ups()
             if self.should_learn_spellings(msg.get("text") or ""):
                 self._learn_spellings(msg.get("text") or "", msg.get("lang") or "he")
             self.prepare_cards(msg)
         except Exception as e:
             print(f"[lore] after narration: {e}", flush=True)
+
+    def announce_level_ups(self) -> List[str]:
+        """A PC whose level rose (the GM awarded XP, or a milestone) is told so in
+        the story, once per level: open your sheet and level up there."""
+        told = []
+        for pc in self.party():
+            if not pc.get("level_up"):
+                continue
+            with self.lock:
+                if self.level_notices.get(pc["name"], 0) >= pc["level"]:
+                    continue
+                self.level_notices[pc["name"]] = pc["level"]
+                tmp = self.level_notices_path.with_suffix(".tmp")
+                tmp.write_text(json.dumps(self.level_notices, ensure_ascii=False), encoding="utf-8")
+                tmp.replace(self.level_notices_path)
+            self.append("system", f"{pc['name']} can level up.", pc=pc["name"],
+                        event={"type": "levelready", "level": pc["level"]})
+            told.append(pc["name"])
+        return told
 
     def queue_card(self, viewer: str, term: str) -> None:
         """Make (or bring up to date) a hover card in the background."""

@@ -452,8 +452,9 @@ Copy, fill in the link and code, and send:
    treasures) and conditions. It follows the story too, and whatever just changed flashes. It's
    in your language: in Hebrew, what's written on it is translated (the very first time it can
    show English for a few seconds).
-10. **Levelling up.** When you earn a level, **⬆** appears next to your name. Open your sheet
-    and tap **Level up**: roll your hit die at the table (or take the average), pick your
+10. **Levelling up.** When you earn a level (the GM awards the XP), the story tells you and
+    **⬆** appears next to your name. Your sheet shows your XP as *300 / 900*. Open it and tap
+    **Level up**: roll your hit die at the table (or take the average), pick your
     ability increases when your class gets them, and tell the GM what you'd like (a subclass,
     spells, a feat). The GM adds the new class features.
 
@@ -527,7 +528,8 @@ Copy, fill in the link and code, and send:
    תכונות, מיומנויות, יכולות, לחשים, ציוד (עם תמונות של אוצרות מיוחדים) ומצבים. גם הוא
    מתעדכן יחד עם הסיפור, ומה שהשתנה עכשיו מהבהב. הדף בשפה שלכם: בעברית, מה שכתוב בו מתורגם
    (בפעם הראשונה ממש הוא עשוי להופיע באנגלית לכמה שניות).
-10. **עלייה בדרגה.** כשאתם מרוויחים דרגה מופיע **⬆** ליד השם שלכם. פתחו את הדף ולחצו **עלייה
+10. **עלייה בדרגה.** כשאתם מרוויחים דרגה (מנהל המשחק מעניק את נקודות הניסיון), הסיפור מודיע
+    לכם ומופיע **⬆** ליד השם שלכם. הדף מראה את הניסיון כ־*300 / 900*. פתחו אותו ולחצו **עלייה
     בדרגה**: הטילו את קוביית החיים ליד השולחן (או קחו את הממוצע), בחרו שיפורי תכונות כשהמקצוע
     מקבל אותם, וכתבו למנהל המשחק מה תרצו (תת־מקצוע, לחשים, הישג). מנהל המשחק מוסיף את יכולות
     המקצוע החדשות.
