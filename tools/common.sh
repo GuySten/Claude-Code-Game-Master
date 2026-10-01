@@ -2,19 +2,41 @@
 # common.sh - Common utilities and environment setup for all GM tools
 # This file should be sourced by all other scripts: source "$(dirname "$0")/common.sh"
 
-# Detect Python executable - prefer uv, fallback to python3/python
+# Python speaks UTF-8 everywhere (Hebrew, emoji, accented names). Linux and macOS
+# already do; Windows otherwise reads and prints text in a legacy code page.
+export PYTHONUTF8=1 PYTHONIOENCODING=utf-8
+
+# True if "$@" is a working Python 3.11+. (On Windows, "python3" can be the
+# Microsoft Store placeholder, which exists but only opens the Store.)
+python_works() {
+    "$@" -c "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)" >/dev/null 2>&1
+}
+
+# One value from a JSON file (jq-free, so tools need only Python):
+#   json_get FILE dotted.path [DEFAULT]   ·   json_get FILE path --keys
+json_get() {
+    $PYTHON_CMD "$LIB_DIR/json_get.py" "$@" 2>/dev/null | tr -d '\r'
+}
+
+# Detect Python executable - prefer uv, fallback to python3/python/py
 find_python() {
-    # Try to find uv first
     if command -v uv >/dev/null 2>&1; then
         echo "uv run python"
-    elif command -v python3 >/dev/null 2>&1; then
-        echo "python3"
-    elif command -v python >/dev/null 2>&1; then
-        echo "python"
-    else
-        echo "Error: No Python interpreter found. Please install Python 3.11+" >&2
-        exit 1
+        return
     fi
+    local candidate
+    for candidate in python3 python; do
+        if command -v "$candidate" >/dev/null 2>&1 && python_works "$candidate"; then
+            echo "$candidate"
+            return
+        fi
+    done
+    if command -v py >/dev/null 2>&1 && python_works py -3; then
+        echo "py -3"                    # the Windows Python launcher
+        return
+    fi
+    echo "Error: No Python 3.11+ found. Run ./install.sh (or install.ps1 on Windows)." >&2
+    exit 1
 }
 
 # Set up Python command

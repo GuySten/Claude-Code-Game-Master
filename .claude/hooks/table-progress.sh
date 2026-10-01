@@ -8,7 +8,13 @@ set +e
 DIR="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "$0")/../.." && pwd)}"
 INPUT=$(cat 2>/dev/null)
 
-CMD=$(printf '%s' "$INPUT" | python3 -c "import sys, json
+# Any working Python (the project's venv first; on Windows "python3" may not exist).
+# Found next to this hook, wherever Claude Code's project directory points.
+HOOK_ROOT="$(cd "$(dirname "$0")/../.." 2>/dev/null && pwd)"
+PY=(python3)
+source "$HOOK_ROOT/tools/pyfind.sh" 2>/dev/null && pick_python "$HOOK_ROOT"
+
+CMD=$(printf '%s' "$INPUT" | "${PY[@]}" -c "import sys, json
 try:
     print(json.load(sys.stdin).get('tool_input', {}).get('command', ''))
 except Exception:
@@ -30,7 +36,7 @@ CAMPAIGN=$(cat "$BASE/active-campaign.txt" 2>/dev/null) || exit 0
 INFO="$BASE/campaigns/$CAMPAIGN/table/server.json"
 [ -f "$INFO" ] || exit 0
 
-( python3 - "$INFO" "$STAGE" <<'PY' >/dev/null 2>&1 & )
+( "${PY[@]}" - "$INFO" "$STAGE" <<'PY' >/dev/null 2>&1 & )
 import json, sys, urllib.request
 info = json.load(open(sys.argv[1]))
 req = urllib.request.Request(

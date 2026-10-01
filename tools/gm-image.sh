@@ -83,7 +83,8 @@ case "$ACTION" in
         fi
 
         IMG_PATH=$(echo "$RESULT" | $PYTHON_CMD -c "import sys,json; print(json.load(sys.stdin)['path'])")
-        SHORT_PATH=$(echo "$RESULT" | $PYTHON_CMD -c "import sys,json; d=json.load(sys.stdin); print(d.get('short_path') or d['path'])")
+        # A proper file:// URI on every OS (file:///C:/... on Windows).
+        SHORT_URI=$(echo "$RESULT" | $PYTHON_CMD -c "import sys,json,pathlib; d=json.load(sys.stdin); print(pathlib.Path(d.get('short_path') or d['path']).resolve().as_uri())")
         COST=$(echo "$RESULT" | $PYTHON_CMD -c "import sys,json; c=json.load(sys.stdin)['cost']; print('%.3f'%c if c is not None else '?')")
 
         log_token_usage "gm-image.generate" "quality=$QUALITY" "size=$SIZE" "est_cost_usd=$COST"
@@ -91,7 +92,7 @@ case "$ACTION" in
         # Short symlink so the file:// link stays on one line and stays clickable
         # (the deep campaign path wraps in the terminal, which breaks the click target).
         success "Image generated: ${TITLE:-untitled}"
-        echo "  open: file://$SHORT_PATH"
+        echo "  open: $SHORT_URI"
         echo "  est cost: \$$COST ($QUALITY $SIZE)"
         ;;
 

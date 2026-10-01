@@ -6,8 +6,14 @@ set +e
 DIR="${CLAUDE_PROJECT_DIR:-.}"
 INPUT=$(cat 2>/dev/null)
 
+# Any working Python (the project's venv first; on Windows "python3" may not exist).
+# Found next to this hook, wherever Claude Code's project directory points.
+HOOK_ROOT="$(cd "$(dirname "$0")/../.." 2>/dev/null && pwd)"
+PY=(python3)
+source "$HOOK_ROOT/tools/pyfind.sh" 2>/dev/null && pick_python "$HOOK_ROOT"
+
 # Best-effort extract of the bash command (no jq dependency).
-CMD=$(printf '%s' "$INPUT" | python3 -c "import sys, json
+CMD=$(printf '%s' "$INPUT" | "${PY[@]}" -c "import sys, json
 try:
     d = json.load(sys.stdin)
     print(d.get('tool_input', {}).get('command', ''))

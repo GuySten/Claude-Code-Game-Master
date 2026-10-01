@@ -76,6 +76,10 @@ OS="$(uname -s)"
 case "${OS}" in
     Darwin*) OS_TYPE="mac";;
     Linux*)  OS_TYPE="linux";;
+    MINGW*|MSYS*|CYGWIN*)
+        echo "This is Windows (Git Bash). Use the Windows installer instead — in PowerShell:"
+        echo "    powershell -ExecutionPolicy Bypass -File install.ps1"
+        exit 1;;
     *)       OS_TYPE="other";;
 esac
 
@@ -203,20 +207,20 @@ main() {
     fi
 
     # ------------------------------------------------------------------
-    # 4. jq (used by gm-extract.sh and other tools)
+    # 4. jq (optional — the tools read JSON with Python; jq is only handy for you)
     # ------------------------------------------------------------------
-    step "4/7  jq (JSON processor)"
+    step "4/7  jq (optional JSON tool)"
 
     if command -v jq >/dev/null 2>&1; then
         ok "jq found"
     else
-        warn "jq not found — some tools (gm-extract.sh) need it"
+        info "jq not found — not needed by the game (optional, for poking at JSON yourself)"
         if [ "$OS_TYPE" = "mac" ]; then
             if confirm "Install jq via Homebrew?"; then
                 brew install jq
                 ok "jq installed"
             else
-                warn "Skipping jq — some tools may not work correctly"
+                info "Skipping jq (optional)"
             fi
         elif [ "$OS_TYPE" = "linux" ]; then
             if command -v apt-get >/dev/null 2>&1; then
@@ -226,7 +230,7 @@ main() {
             elif command -v pacman >/dev/null 2>&1; then
                 warn "Run:  sudo pacman -S jq"
             fi
-            warn "Skipping jq — install it manually and re-run if needed"
+            info "Skipping jq (optional)"
         fi
     fi
 
@@ -346,13 +350,6 @@ ENVEOF
         info "RAG dependencies not installed (optional — install with: uv sync --extra rag)"
     fi
 
-    # jq
-    if command -v jq >/dev/null 2>&1; then
-        ok "jq available"
-        PASS=$((PASS + 1))
-    else
-        warn "jq missing — gm-extract.sh will have limited functionality"
-    fi
 
     # Claude Code
     if command -v claude >/dev/null 2>&1; then

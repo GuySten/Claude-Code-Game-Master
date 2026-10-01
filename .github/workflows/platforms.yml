@@ -1,0 +1,48 @@
+# Runs the game on Windows (natively, through Git Bash — no WSL), macOS and Linux.
+name: Platforms
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  game:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash          # Git Bash on Windows, like Claude Code
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Install (Windows installer)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File install.ps1 -Extras core
+
+      - name: Install (uv)
+        if: runner.os != 'Windows'
+        run: uv sync --locked
+
+      - name: Shell scripts keep Unix line endings
+        run: |
+          if grep -l $'\r' tools/*.sh .claude/hooks/*.sh; then echo "CRLF found"; exit 1; fi
+
+      - name: Smoke test the game tools
+        run: bash tests/smoke/game-smoke.sh
+
+      - name: Unit tests (table, players, models)
+        run: >
+          uv run --with pytest pytest -q
+          tests/test_table_server.py tests/test_multiplayer.py tests/test_model_presets.py
+          tests/test_identity_onboarding.py tests/test_game_core.py
+
+      - name: Full test suite (informational)
+        continue-on-error: true
+        run: uv run --with pytest pytest -q

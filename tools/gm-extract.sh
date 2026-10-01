@@ -300,8 +300,8 @@ review_content() {
 
         echo
         echo "To view full details:"
-        echo "  cat $CAMPAIGN_DIR/merged-results.json | jq '.npcs | keys'"
-        echo "  cat $CAMPAIGN_DIR/merged-results.json | jq '.locations | keys'"
+        echo "  bash tools/json-get.sh $CAMPAIGN_DIR/merged-results.json npcs --keys"
+        echo "  bash tools/json-get.sh $CAMPAIGN_DIR/merged-results.json locations --keys"
     else
         if [ ! -f "$EXTRACT_DIR/merged-results.json" ]; then
             echo "Error: No merged results to review."
@@ -313,8 +313,8 @@ review_content() {
 
         echo
         echo "To view full details:"
-        echo "  cat $EXTRACT_DIR/merged-results.json | jq '.npcs | keys'"
-        echo "  cat $EXTRACT_DIR/merged-results.json | jq '.locations | keys'"
+        echo "  bash tools/json-get.sh $EXTRACT_DIR/merged-results.json npcs --keys"
+        echo "  bash tools/json-get.sh $EXTRACT_DIR/merged-results.json locations --keys"
     fi
 }
 
@@ -393,9 +393,9 @@ list_campaigns() {
             if [ -d "$dir" ]; then
                 campaign_name=$(basename "$dir")
                 if [ -f "$dir/metadata.json" ]; then
-                    doc_name=$(jq -r '.document_name // "unknown"' "$dir/metadata.json" 2>/dev/null)
-                    date=$(jq -r '.extraction_date // "unknown"' "$dir/metadata.json" 2>/dev/null | cut -d'T' -f1)
-                    chunks=$(jq -r '.total_chunks // 0' "$dir/metadata.json" 2>/dev/null)
+                    doc_name=$(json_get "$dir/metadata.json" document_name unknown)
+                    date=$(json_get "$dir/metadata.json" extraction_date unknown | cut -d'T' -f1)
+                    chunks=$(json_get "$dir/metadata.json" total_chunks 0)
                     echo "  • $campaign_name"
                     echo "    Document: $doc_name"
                     echo "    Date: $date"
@@ -403,8 +403,8 @@ list_campaigns() {
 
                     # Check for merged results
                     if [ -f "$dir/merged-results.json" ]; then
-                        npcs=$(jq -r '.extraction_summary.npcs_extracted // 0' "$dir/merged-results.json" 2>/dev/null)
-                        locs=$(jq -r '.extraction_summary.locations_extracted // 0' "$dir/merged-results.json" 2>/dev/null)
+                        npcs=$(json_get "$dir/merged-results.json" extraction_summary.npcs_extracted 0)
+                        locs=$(json_get "$dir/merged-results.json" extraction_summary.locations_extracted 0)
                         echo "    Extracted: $npcs NPCs, $locs locations"
                     fi
                     echo
@@ -417,7 +417,7 @@ list_campaigns() {
 
     if [ -f "$EXTRACT_DIR/metadata.json" ]; then
         echo "  • [Default extraction]"
-        doc_name=$(jq -r '.document_name // "unknown"' "$EXTRACT_DIR/metadata.json" 2>/dev/null)
+        doc_name=$(json_get "$EXTRACT_DIR/metadata.json" document_name unknown)
         echo "    Document: $doc_name"
         echo
     fi

@@ -14,6 +14,10 @@ input=$(cat)  # Claude Code JSON payload on stdin (unused; we read state files)
 # Anchor to repo root via this script's location, not cwd.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+# Reads the sheets with Python (no jq needed, so it works on Windows too).
+source "$ROOT/tools/pyfind.sh"
+pick_python "$ROOT" || PY=(python3)
+
 # 256-color palette (kept light: docs warn multi-line + heavy ANSI can glitch)
 GREEN=$'\033[38;5;42m'
 AMBER=$'\033[38;5;214m'
@@ -47,7 +51,10 @@ divider() {
     printf '%s%s%s%s%s%s%s\n' "$rule" "$left" "$orn" "$mid" "$rule" "$right" "$RESET"
 }
 
-ACTIVE_FILE="$ROOT/world-state/active-campaign.txt"
+# Same world-state as every other tool (GM_WORLD_STATE_BASE, relative to the repo).
+BASE="${GM_WORLD_STATE_BASE:-$ROOT/world-state}"
+case "$BASE" in /*|[A-Za-z]:*) ;; *) BASE="$ROOT/$BASE" ;; esac
+ACTIVE_FILE="$BASE/active-campaign.txt"
 if [ ! -f "$ACTIVE_FILE" ] || [ ! -s "$ACTIVE_FILE" ]; then
     divider
     printf '%s⚔ %sGM%s  %sno campaign yet%s  %s  %s%s/gm%s %sto begin — import a book, build a world, or jump into a one-shot%s\n' \
@@ -57,7 +64,7 @@ if [ ! -f "$ACTIVE_FILE" ] || [ ! -s "$ACTIVE_FILE" ]; then
 fi
 ACTIVE=$(tr -d '[:space:]' < "$ACTIVE_FILE")
 
-CAMP="$ROOT/world-state/campaigns/$ACTIVE"
+CAMP="$BASE/campaigns/$ACTIVE"
 CHAR="$CAMP/character.json"
 OVER="$CAMP/campaign-overview.json"
 
@@ -71,29 +78,17 @@ fi
 
 # --- Character fields -------------------------------------------------------
 IFS=$'\t' read -r NAME RACE CLASS LEVEL AC GP HP_CUR HP_MAX XP_CUR XP_NEXT LOC < <(
-    jq -r '
-      [ (.name // .identity.name // "?"),
-        (.race // .identity.race // "?"),
-        (.class // .identity.class // "?"),
-        (.level // .progression.level // 1),
-        (.ac // .vitals.ac // "?"),
-        (.gold // .inventory.gold // 0),
-        (.hp.current // .vitals.hp.current // .hp // 0),
-        (.hp.max // .vitals.hp.max // .hp // 0),
-        (.xp.current // .progression.xp.current // .xp // 0),
-        (.xp.next_level // .progression.xp.next_level // 0),
-        (.current_location // .details.current_location // "?")
-      ] | @tsv' "$CHAR"
+    "${PY[@]}" "$ROOT/lib/hud_fields.py" char "$CHAR" | tr -d '\r'
 )
 
 # Conditions array -> status label; fall back to HP-derived state.
-CONDS=$(jq -r '(.conditions // []) | map(ascii_downcase) | join(", ")' "$CHAR" 2>/dev/null)
+CONDS=$("${PY[@]}" "$ROOT/lib/hud_fields.py" conds "$CHAR" 2>/dev/null | tr -d '\r')
 
 # --- Overview fields (location/time/date) -----------------------------------
 DATE="" ; TOD="" ; OLOC=""
 if [ -f "$OVER" ]; then
     IFS=$'\t' read -r DATE TOD OLOC < <(
-        jq -r '[ (.current_date // ""), (.time_of_day // ""), (.player_position.current_location // "") ] | @tsv' "$OVER"
+        "${PY[@]}" "$ROOT/lib/hud_fields.py" over "$OVER" | tr -d '\r'
     )
 fi
 # Prefer overview's live location if present.

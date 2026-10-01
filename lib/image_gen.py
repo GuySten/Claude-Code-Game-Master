@@ -17,6 +17,7 @@ so the project gains no new dependency.
 from __future__ import annotations
 
 import json
+import tempfile
 import os
 import re
 import sys
@@ -160,9 +161,10 @@ def _next_path(images_dir: Path, title: str) -> Path:
 
 # Short, shallow symlink dir so the clickable file:// link never line-wraps.
 # The deep campaign path (~110 chars) wraps in the terminal and the wrap kills
-# the click target; a symlink at /tmp/gm-img/<tag>-NNNN.png resolves to the real
-# PNG when clicked while staying ~30 chars on one line.
-SHORTLINK_DIR = Path("/tmp/gm-img")
+# the click target; a symlink at <temp>/gm-img/<tag>-NNNN.png resolves to the real
+# PNG when clicked while staying short on one line. (Where symlinks aren't allowed,
+# e.g. Windows without Developer Mode, the real path is used instead.)
+SHORTLINK_DIR = Path(tempfile.gettempdir()) / "gm-img"
 
 
 def _short_link(out_path: Path, campaign_dir: str) -> Path | None:

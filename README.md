@@ -110,7 +110,13 @@ cd Claude-Code-Game-Master
 ./install.sh
 ```
 
-The install script sets up everything — Python, uv, jq, and all dependencies. It works on macOS and Linux with zero prior setup. (You can also just launch Claude Code and ask it to set things up.)
+The install script sets up everything — Python, uv, and all dependencies. It works on macOS and Linux with zero prior setup. (You can also just launch Claude Code and ask it to set things up.)
+
+**On Windows** (natively, no WSL), run the PowerShell installer instead:
+`powershell -ExecutionPolicy Bypass -File install.ps1`. Claude Code on Windows runs its
+commands through Git Bash, and so do the game's tools; the installer sets up Git for
+Windows and uv if needed. Every push is tested on Windows, macOS and Linux
+(`.github/workflows/platforms.yml`).
 
 Then launch and play:
 

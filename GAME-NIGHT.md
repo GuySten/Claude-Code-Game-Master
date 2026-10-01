@@ -34,12 +34,23 @@ bash tools/gm-music-library.sh fetch  # music for every mood
 claude                                # then type /gm and say "my friends are joining online"
 ```
 
+On **Windows**, the same in PowerShell — no WSL needed:
+
+```powershell
+git clone https://github.com/GuySten/claude-code-game-master.git
+cd claude-code-game-master
+powershell -ExecutionPolicy Bypass -File install.ps1   # also sets the recommended models
+uv run python lib/music_library.py fetch                # music for every mood
+claude                                                  # then type /gm
+```
+
 ---
 
 ## One-time setup (host)
 
-You need: a Mac or Linux computer (on Windows, use [WSL](https://learn.microsoft.com/windows/wsl/install)),
-[Claude Code](https://docs.anthropic.com/en/docs/claude-code) signed in, and `git`.
+You need: a Windows, Mac or Linux computer,
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code) signed in, and `git`
+(on Windows, [Git for Windows](https://git-scm.com/download/win) — Claude Code needs it too).
 
 **1. Get the game and install it**
 
@@ -48,6 +59,18 @@ git clone https://github.com/GuySten/claude-code-game-master.git
 cd claude-code-game-master
 ./install.sh
 ```
+
+**On Windows** (natively — no WSL), in PowerShell:
+
+```powershell
+git clone https://github.com/GuySten/claude-code-game-master.git
+cd claude-code-game-master
+powershell -ExecutionPolicy Bypass -File install.ps1
+```
+
+It installs what's missing (Git for Windows, uv), the game, and the recommended models.
+Afterwards, run the game's `bash tools/...` commands from Claude Code or from **Git Bash**
+(Start menu), not plain PowerShell — that's where `bash` means the right thing.
 
 The installer asks what to install:
 
@@ -100,7 +123,8 @@ villain (`grimaldi.mp3`, `grimaldi-boss.mp3`) becomes that villain's theme.
 **4. Install a tunnel (only for friends outside your home network)**
 
 Install [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)
-(free, no account; on a Mac: `brew install cloudflared`). It gives your table an `https://`
+(free, no account; on a Mac: `brew install cloudflared`; on Windows:
+`winget install --id Cloudflare.cloudflared`). It gives your table an `https://`
 link that works from anywhere. **The microphone also needs that https link** — so even
 friends on your Wi-Fi need it if they want to talk instead of type.
 
@@ -273,6 +297,14 @@ and check **🎵** is on and the music volume isn't at zero.
 
 **"<Name> is already being played."** That seat is open somewhere else (another tab or
 device). The host runs `bash tools/gm-table.sh free "Name"`.
+
+**Windows: friends on the Wi-Fi can't connect.** The first time the table opens, Windows
+asks whether Python may accept connections — allow it for private networks. Missed it?
+Windows Security → Firewall → "Allow an app through firewall" → Python. Or use the tunnel
+link, which needs none of this.
+
+**Windows: `$'\r': command not found`.** The scripts got Windows line endings (a copy made
+before this fix). Run `install.ps1` again — it repairs them.
 
 **"Port already in use."** Something else is on 8765: `bash tools/gm-table.sh start --port 8800`
 (and use 8800 in the tunnel command).
