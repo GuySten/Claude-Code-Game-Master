@@ -142,10 +142,10 @@ def _claude(system: str, prompt: str) -> str:
     return done.stdout.strip()
 
 
-def _api(system: str, prompt: str) -> str:
+def _api(system: str, prompt: str, max_tokens: int = 400) -> str:
     import anthropic
     client = anthropic.Anthropic()
-    msg = client.messages.create(model=API_MODEL, max_tokens=400, system=system,
+    msg = client.messages.create(model=API_MODEL, max_tokens=max_tokens, system=system,
                                  messages=[{"role": "user", "content": prompt}])
     return "".join(getattr(b, "text", "") for b in msg.content).strip()
 
@@ -153,6 +153,70 @@ def _api(system: str, prompt: str) -> str:
 STOP = set("""the a an and or of to in on at for with what who whom whose which where when why how
 did does do was were is are be been we you i our us me my it its that this there their they
 again remember about tell said say name called mean happened happen""".split())
+
+
+TRANSLATE_RULES = """You translate the text of a tabletop role-playing game's character sheet \
+from English into {lang}. You get a JSON list of strings. Reply with ONLY a JSON object that maps \
+each string, exactly as given, to its translation. Use the usual {lang} terms of role-playing \
+games (Dungeons & Dragons) where they exist. Keep numbers, dice (1d8+2) and modifiers (+3) as \
+they are. Write personal and place names in {lang} letters. No notes, no markdown."""
+
+
+def translate(strings: List[str], lang: str,
+              ask: Optional[Callable[[str, str], str]] = None) -> Dict[str, str]:
+    """{english: translation} for ``strings`` (character-sheet text) — what the
+    model answered; {} for English, with no model, or on an unreadable answer."""
+    source = "test" if ask else backend()
+    if lang == "en" or not strings or source == "off":
+        return {}
+    system = TRANSLATE_RULES.format(lang=LANG_NAMES.get(lang, lang))
+    prompt = json.dumps(strings, ensure_ascii=False)
+    if ask:
+        text = ask(system, prompt)
+    elif source == "claude":
+        text = _claude(system, prompt)
+    else:
+        text = _api(system, prompt, max_tokens=8000)
+    start, end = text.find("{"), text.rfind("}")
+    try:
+        got = json.loads(text[start:end + 1]) if start >= 0 else {}
+    except ValueError:
+        return {}
+    wanted = set(strings)
+    return {k: v.strip() for k, v in got.items()
+            if k in wanted and isinstance(v, str) and v.strip()} if isinstance(got, dict) else {}
+
+
+FIND_NAMES_RULES = """You match names in a {lang} passage from a role-playing game to the game's \
+own list of names (written in English). You get JSON: {{"names": [...], "passage": "..."}}. Reply \
+with ONLY a JSON object mapping each listed name that the passage mentions to the exact spelling \
+the passage uses for it: copy the letters exactly as they appear in the passage, without a \
+one-letter prefix attached in front (ו ה ב ל מ ש כ). Leave out names the passage doesn't mention. \
+No notes, no markdown."""
+
+
+def find_names(passage: str, names: List[str], lang: str,
+               ask: Optional[Callable[[str, str], str]] = None) -> Dict[str, str]:
+    """{name: its spelling in ``passage``} for the listed names a non-English
+    passage mentions (only spellings that really occur in it)."""
+    source = "test" if ask else backend()
+    if lang == "en" or not names or not passage.strip() or source == "off":
+        return {}
+    system = FIND_NAMES_RULES.format(lang=LANG_NAMES.get(lang, lang))
+    prompt = json.dumps({"names": names, "passage": passage}, ensure_ascii=False)
+    text = ask(system, prompt) if ask else (_claude if source == "claude" else _api)(system, prompt)
+    start, end = text.find("{"), text.rfind("}")
+    try:
+        got = json.loads(text[start:end + 1]) if start >= 0 else {}
+    except ValueError:
+        return {}
+    listed = {n.lower(): n for n in names}
+    out = {}
+    for name, spelling in (got.items() if isinstance(got, dict) else []):
+        spelling = " ".join(str(spelling).split())
+        if str(name).lower() in listed and len(spelling) >= 2 and spelling in passage:
+            out[listed[str(name).lower()]] = spelling
+    return out
 
 
 def recall(lines: List[str], question: str, lang: str) -> str:

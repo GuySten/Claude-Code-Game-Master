@@ -25,7 +25,8 @@ HOST_KEY = "host-secret"
 
 
 @pytest.fixture
-def table(tmp_path):
+def table(tmp_path, monkeypatch):
+    monkeypatch.setenv("NARRATOR_BACKEND", "off")      # never the host's real model in tests
     world = tmp_path / "world-state"
     camp = world / "campaigns" / "camp"
     camp.mkdir(parents=True)
@@ -1167,6 +1168,86 @@ def test_hover_cards_show_what_the_player_knows_and_nothing_more(table):
     call("/api/lang", {"code": CODE, "token": pip, "lang": "he"})
     terms = {t["term"]: t for t in state.lore_terms("Pip")}
     assert terms["מרתה"]["of"] == "Marta" and terms["מרתה"]["kind"] == "npc"
+
+
+def wait_for(cond, limit=5.0):
+    end = time.time() + limit
+    while time.time() < end:
+        if cond():
+            return True
+        time.sleep(0.05)
+    return cond()
+
+
+def test_hebrew_narration_spellings_of_known_names_are_learned(table):
+    call, state, camp = table["call"], table["state"], table["camp"]
+    state.set_round_seconds(0)
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    call("/api/create", {"code": CODE, "name": "Bram", "concept": "a dwarf"})
+    (camp / "npcs.json").write_text(json.dumps({"Marta": {"description": "innkeeper"}, "Vex": {}}))
+    asked = []
+
+    def ask(system, prompt):
+        asked.append(json.loads(prompt))
+        return '{"Marta": "מרתה", "Bram": "בראם", "Vex": "וקס"}'   # Vex isn't in the passage
+
+    state.narrator_ask = ask
+    call("/api/lang", {"code": CODE, "token": pip, "lang": "he"})
+    call("/api/gm/say", {"text": "למרתה יש מפתח. בראם מהנהן.", "lang": "he"}, host=True)
+    assert wait_for(lambda: "Bram" in state.aliases().values())
+    assert state.aliases() == {"מרתה": "Marta", "בראם": "Bram"}       # only spellings really there
+    assert "Pip" in asked[0]["names"] and "Marta" in asked[0]["names"]
+    terms = {t["term"]: t for t in call(f"/api/info?code={CODE}&token={pip}")[1]["lore_terms"]}
+    assert terms["מרתה"]["of"] == "Marta" and terms["בראם"]["kind"] == "pc"   # hoverable at once
+    # English narration needs nothing learned; known spellings aren't asked again.
+    call("/api/gm/say", {"text": "Marta smiles."}, host=True)
+    call("/api/gm/say", {"text": "מרתה מחייכת.", "lang": "he"}, host=True)
+    time.sleep(0.3)
+    assert len(asked) == 2 and "Marta" not in asked[1]["names"]
+
+
+def test_every_player_character_has_a_card_and_the_sheet_speaks_the_players_language(table):
+    call, state, camp = table["call"], table["state"], table["camp"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    call("/api/create", {"code": CODE, "name": "Bram", "concept": "a dwarf"})
+    calls = []
+
+    def ask(system, prompt):
+        calls.append(system)
+        if "character sheet" in system:
+            return json.dumps({s: "ע:" + s for s in json.loads(prompt)})
+        return "Bram, a dwarf."
+
+    state.narrator_ask = ask
+    # Bram hasn't been in the story yet: still, everyone at the table knows who he is.
+    status, card = call(f"/api/lore?code={CODE}&token={pip}&term=Bram")
+    assert status == 200 and card["kind"] == "pc" and card["name"] == "Bram"
+
+    # An English reader: the sheet as written, nothing to translate.
+    assert call(f"/api/sheet-tr?code={CODE}&token={pip}&pc=Pip")[1] == {"ok": True, "tr": {}, "pending": False}
+    # A Hebrew reader: what's written on the sheet is translated, once, in the background.
+    call("/api/lang", {"code": CODE, "token": pip, "lang": "he"})
+    first = call(f"/api/sheet-tr?code={CODE}&token={pip}&pc=Pip")[1]
+    assert first["pending"] is True
+    assert wait_for(lambda: not call(f"/api/sheet-tr?code={CODE}&token={pip}&pc=Pip")[1]["pending"])
+    got = call(f"/api/sheet-tr?code={CODE}&token={pip}&pc=Pip")[1]["tr"]
+    assert got["a halfling rogue"] == "ע:a halfling rogue"
+    assert "Pip" not in got                                      # the name stays the name
+    n = len(calls)
+    call(f"/api/sheet-tr?code={CODE}&token={pip}&pc=Pip")
+    assert len(calls) == n                                       # kept: never asked twice
+    assert json.loads((state.dir / "sheet-tr-he.json").read_text(encoding="utf-8"))["a halfling rogue"]
+
+
+def test_sheet_strings_are_the_words_a_player_reads():
+    import table_server
+    got = table_server.sheet_strings({
+        "name": "Pip", "portrait": "p.png", "race": "Halfling", "hp": {"current": 7, "max": 9},
+        "stats": {"str": 8}, "spell_slots": {"1": 2}, "skills": {"stealth": 5},
+        "equipment": [{"name": "Shortsword", "damage": "1d6+2"}, "Thieves' tools", "קרן"]})
+    assert "Pip" not in got and "p.png" not in got and "1d6+2" not in got and "קרן" not in got
+    for s in ("Halfling", "Race", "Spell slots", "Stealth", "Shortsword", "Damage", "Thieves' tools", "Str"):
+        assert s in got, s
 
 
 def test_the_host_wrapper_knows_every_table_command():

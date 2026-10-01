@@ -254,8 +254,11 @@
                border-radius: 10px; box-shadow: 0 8px 28px rgba(0, 0, 0, .25);
                padding: 10px 12px; font-size: .9rem; }
   #lore-card .head { font-weight: bold; margin-bottom: 4px; }
+  #lore-card .sub { color: var(--muted); font-size: .8rem; margin: -2px 0 4px; }
   #lore-card .kind { color: var(--muted); font-weight: normal; font-size: .78rem; margin-inline-start: 6px; }
-  #lore-card img { width: 100%; max-height: 160px; object-fit: cover; border-radius: 6px; margin-bottom: 6px; }
+  /* The whole picture, never cropped: a tall portrait stands centred, a wide place fills the width. */
+  #lore-card img { display: block; width: auto; height: auto; max-width: 100%; max-height: min(260px, 45vh);
+                  margin: 0 auto 6px; border-radius: 6px; }
   #lore-card .text.loading { color: var(--muted); font-style: italic; }
   .chat-tabs { display: flex; gap: 4px; padding: 10px 10px 0; }
   #chat-close { flex: 0 0 auto; display: none; padding: 6px 10px; }
@@ -1533,7 +1536,7 @@
       const from = before ? hpPct(before) : pct;
       d.innerHTML = `<div><span class="open-sheet">${esc(t("openSheet"))}</span>` +
         (pc.portrait ? `<img class="avatar" alt="" src="${esc(imageUrl(pc.portrait))}">` : "") +
-        `<span class="name" dir="auto">${esc(pc.name)}</span>` +
+        `<span class="name lore" dir="auto" data-term="${esc(pc.name)}">${esc(pc.name)}</span>` +
         (pc.level_up && pc.name === me ? `<span class="lvl-ready">${esc(t("lvlBadge"))}</span>` : "") +
         tags.map((x) => `<span class="tag">${esc(x)}</span>`).join("") + `</div>` +
         `<div class="bar"><div style="width:${from}%;background:${color}"></div></div>` +
@@ -1586,33 +1589,56 @@
     const first = sheetShownRev === null;
     sheetShownRev = got;
     renderSheet(sheet, first);
+    loadSheetTr(sheetFor);
   }
   const SHEET_HIDE = new Set(["name", "id", "origin", "voice", "portrait", "image", "current_location",
                               "hp", "ac", "level", "xp", "gold", "status", "race", "class", "concept"]);
   const SIX = ["str", "dex", "con", "int", "wis", "cha", "strength", "dexterity", "constitution",
                "intelligence", "wisdom", "charisma"];
+  // What's written on a sheet, in this player's language: translated phrase by
+  // phrase on the host (the Narrator's model), fetched as the translations land.
+  const sheetTr = new Map();
+  let txOff = false;                   // (the untranslated text, for matching names)
+  const tx = (s) => (!txOff && typeof s === "string" && sheetTr.get(s.trim())) || s;
+  const prettyKey = (k) => String(k).replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
   function label(k) {
     const key = "sheet_" + k;
     const l = t(key);
-    return l && l !== key ? l : String(k).replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+    return l && l !== key ? l : tx(prettyKey(k));
   }
   const signed = (v) => typeof v === "number" ? (v >= 0 ? "+" : "") + v : String(v);
   function itemLine(o) {
-    if (o === null || typeof o !== "object") return String(o);
-    const name = o.name || o.title || o.item || "";
+    if (o === null || typeof o !== "object") return tx(String(o));
+    const name = tx(o.name || o.title || o.item || "");
     const rest = Object.entries(o)
       .filter(([k, v]) => !["name", "title", "item"].includes(k) && v !== null && v !== "" && v !== false)
       .map(([k, v]) => (k === "qty" || k === "quantity" || k === "count") ? "×" + v
         : typeof v === "object" ? label(k) + ": " + (Array.isArray(v) ? v.map(itemLine).join(", ") : itemLine(v))
-        : v === true ? label(k) : label(k) + ": " + v);
+        : v === true ? label(k) : label(k) + ": " + tx(String(v)));
     return [name, rest.join(", ")].filter(Boolean).join(" — ");
+  }
+  function plainLine(o) { txOff = true; try { return itemLine(o); } finally { txOff = false; } }
+  let sheetShown = null, sheetTrTimer = null;
+  async function loadSheetTr(name, tries = 0) {
+    clearTimeout(sheetTrTimer);
+    if (lang === "en" || sheetFor !== name) return;
+    const r = await api("/api/sheet-tr?pc=" + encodeURIComponent(name));
+    if (!r.ok || sheetFor !== name) return;
+    let added = 0;
+    Object.entries(r.tr || {}).forEach(([k, v]) => { if (sheetTr.get(k) !== v) { sheetTr.set(k, v); added++; } });
+    if (added && sheetShown && $("sheet").open) renderSheet(sheetShown, true);
+    if (r.pending && tries < 40) sheetTrTimer = setTimeout(() => loadSheetTr(name, tries + 1), 3000);
   }
   function sheetValue(v, sign) {
     if (v === null || v === undefined || v === "") return null;
     if (Array.isArray(v)) {
       if (!v.length) return null;
       const ul = document.createElement("ul");
-      v.forEach((x) => { const li = document.createElement("li"); li.dir = "auto"; li.textContent = itemLine(x); ul.appendChild(li); });
+      v.forEach((x) => {
+        const li = document.createElement("li"); li.dir = "auto";
+        li.textContent = itemLine(x); li.dataset.raw = plainLine(x);
+        ul.appendChild(li);
+      });
       return ul;
     }
     if (typeof v === "object") {
@@ -1626,14 +1652,14 @@
         const dd = document.createElement("dd"); dd.dir = "auto";
         const x = v[k];
         dd.textContent = typeof x === "object" ? (Array.isArray(x) ? x.map(itemLine).join(", ") : itemLine(x))
-                                               : sign ? signed(x) : String(x);
+                                               : sign ? signed(x) : tx(String(x));
         dl.append(dt, dd);
       });
       return dl;
     }
     const div = document.createElement("div");
     div.dir = "auto";
-    div.textContent = String(v);
+    div.textContent = tx(String(v));
     return div;
   }
   function boxes(pairs) {
@@ -1649,12 +1675,13 @@
     return g;
   }
   function renderSheet(s, first) {
+    sheetShown = s;
     const body = $("sheet-body");
     const before = new Map([...body.querySelectorAll(".sheet-sec")].map((x) => [x.dataset.key, x.textContent]));
     body.textContent = "";
     $("sheet-title").textContent = s.name || sheetFor;
-    $("sheet-sub").textContent = [s.race, s.class, s.level != null ? t("lvl") + " " + s.level : ""]
-      .filter(Boolean).join(" · ") + (s.concept ? " — " + s.concept : "");
+    $("sheet-sub").textContent = [tx(s.race), tx(s.class), s.level != null ? t("lvl") + " " + s.level : ""]
+      .filter(Boolean).join(" · ") + (s.concept ? " — " + tx(s.concept) : "");
     const sec = (key, title, content) => {
       if (!content) return;
       const d = document.createElement("section");
@@ -1683,7 +1710,7 @@
     if (stats.length) {
       const classic = stats.every(([k, v]) => SIX.includes(k.toLowerCase()) && typeof v === "number");
       sec("stats", t("sheet_stats"), boxes(stats.map(([k, v]) =>
-        [k, typeof v === "object" ? itemLine(v) : v,
+        [sheetTr.get(prettyKey(k)) || k, typeof v === "object" ? itemLine(v) : v,
          classic ? signed(Math.floor((v - 10) / 2)) : undefined])));
     }
     const order = ["conditions", "skills", "saves", "features", "spells", "spell_slots", "equipment",
@@ -1700,7 +1727,7 @@
     // A treasure that has a picture shows it beside the item.
     const eq = body.querySelector('.sheet-sec[data-key="equipment"]');
     if (eq) eq.querySelectorAll("li").forEach((li) => {
-      const text = li.textContent.toLowerCase();
+      const text = (li.dataset.raw || li.textContent).toLowerCase();
       const tr = gallery.treasures.find((x) => text.includes(x.name.toLowerCase()));
       if (!tr) return;
       const img = imageEl(tr.image);
@@ -2207,17 +2234,27 @@
     };
     const fill = (d, loading) => {
       card.textContent = "";
-      if (d && d.image) card.appendChild(imageEl(d.image));
+      if (d && d.image) {
+        const img = imageEl(d.image);
+        img.loading = "eager";
+        img.onload = place;             // its size is known now: keep the card on screen
+        card.appendChild(img);
+      }
       const head = document.createElement("div");
       head.className = "head"; head.dir = "auto"; head.textContent = (d && d.name) || term;
       const kind = document.createElement("span");
       kind.className = "kind"; kind.textContent = d ? t("lore_" + d.kind) : "";
       head.appendChild(kind);
+      const sub = document.createElement("div");
+      sub.className = "sub"; sub.dir = "auto";
+      sub.textContent = d && d.sub ? d.sub.replace(/^(.*?)level (\d+)$/, (_, a, n) => a + t("lvl") + " " + n) : "";
       const text = document.createElement("div");
       text.className = "text" + (loading ? " loading" : "");
       text.textContent = loading ? t("loreLoading") : (d.text || "");
       text.dir = dirFor(text.textContent);
-      card.append(head, text);
+      card.append(head);
+      if (sub.textContent) card.append(sub);
+      card.append(text);
       card.classList.remove("hidden");
       place();
     };
@@ -2229,13 +2266,13 @@
     if (loreFor === span) fill(r.ok ? r : { name: term, kind: "", text: r.error || "" });
   }
   function hideLore() { loreFor = null; $("lore-card").classList.add("hidden"); }
-  $("log").addEventListener("mouseover", (ev) => {
+  document.addEventListener("mouseover", (ev) => {
     const span = ev.target.closest && ev.target.closest(".lore");
     if (!span) return;
     clearTimeout(loreTimer);
     loreTimer = setTimeout(() => showLore(span), 250);
   });
-  $("log").addEventListener("mouseout", (ev) => {
+  document.addEventListener("mouseout", (ev) => {
     const span = ev.target.closest && ev.target.closest(".lore");
     if (!span) return;
     clearTimeout(loreTimer);
@@ -2280,9 +2317,14 @@
       const who = document.createElement("div");
       who.className = "who";
       const label = document.createElement("span");
-      label.textContent = m.kind === "gm"
-        ? t("gm") + (m.to ? " — " + t("whisper") : "")
-        : (m.pc || "?") + (m.voice ? " 🎤" : "") + (m.to ? " — " + t("toGm") : "");
+      if (m.kind === "gm") {
+        label.textContent = t("gm") + (m.to ? " — " + t("whisper") : "");
+      } else {
+        const name = document.createElement("span");      // hover: who they are
+        name.textContent = m.pc || "?";
+        if (m.pc) { name.className = "lore"; name.dataset.term = m.pc; name.tabIndex = 0; }
+        label.append(name, (m.voice ? " 🎤" : "") + (m.to ? " — " + t("toGm") : ""));
+      }
       who.appendChild(label);
       if (m.edited) {
         const ed = document.createElement("span");
@@ -2450,6 +2492,7 @@
     b.onclick = () => {
       lang = lang === "he" ? "en" : "he";
       store.set("lang", lang);
+      sheetTr.clear();
       applyLang();
       if (me) { api("/api/lang", { lang }); rerenderLog(); refreshInfo(); updateProgress(); fitTextDir(); }
       if (!$("seat-cards").classList.contains("hidden")) refreshSeats();

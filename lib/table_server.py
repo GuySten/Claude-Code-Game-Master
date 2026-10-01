@@ -60,6 +60,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import secrets
 import signal
 import socket
@@ -326,6 +327,12 @@ class TableState:
         self.narrator_ask = None                        # tests plug in a fake model
         self.lore_cache: Dict[tuple, Dict[str, Any]] = {}
         self.aliases_path = self.dir / "aliases.json"
+        self.spelling_lock = threading.Lock()
+        # Character sheets in the player's language: each phrase translated once by
+        # the Narrator's small model, in the background, and kept (table/sheet-tr-<lang>.json).
+        self.sheet_tr: Dict[str, Dict[str, str]] = {}
+        self.sheet_tr_busy: set = set()
+        self.sheet_tr_failed: Dict[str, float] = {}
         # Composed music: villains' and bosses' themes and the PCs' anthems are
         # composed in the background (lib/composer.py) when the composer is set up.
         self.music_jobs: List[Dict[str, Any]] = []
@@ -515,6 +522,37 @@ class TableState:
             tmp = self.aliases_path.with_suffix(".tmp")
             tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
             tmp.replace(self.aliases_path)
+            # Pages pick the new spelling up on their next refresh (not only after
+            # the next message).
+            self.lore_cache = {k: v for k, v in self.lore_cache.items() if k[0] != "terms"}
+
+    def learn_spellings(self, text: str, lang: Optional[str]) -> None:
+        """Narration in another language spells the campaign's names its own way
+        (מרתה for Marta): find which known names it mentions and remember those
+        spellings, so they get hover cards too. In the background (a small model)."""
+        import narrator
+        if not re.search(r"[\u0590-\u05FF]", text or ""):
+            return
+        if self.narrator_ask is None and narrator.backend() == "off":
+            return
+        threading.Thread(target=self._learn_spellings, args=(text, lang or "he"), daemon=True).start()
+
+    def _learn_spellings(self, text: str, lang: str) -> None:
+        import narrator
+        with self.spelling_lock:                 # one at a time
+            low = text.lower()
+            aliases = self.aliases()
+            spelled = {n.lower() for a, n in aliases.items() if a.lower() in low}
+            names = [n for n in self._named_things()
+                     if n.lower() not in low and n.lower() not in spelled][:200]
+            try:
+                found = narrator.find_names(text, names, lang, ask=self.narrator_ask)
+            except Exception as e:               # offline...: names just aren't hoverable
+                print(f"[lore] finding names: {e}", flush=True)
+                return
+            for name, spelling in found.items():
+                if spelling.lower() != name.lower() and spelling not in aliases:
+                    self.set_alias(name, spelling)
 
     def _named_things(self) -> Dict[str, str]:
         """Every name the campaign knows -> its kind (only names; never what the
@@ -569,6 +607,10 @@ class TableState:
         import narrator
         known = {t["term"].lower(): t for t in self.lore_terms(viewer)}
         hit = known.get(" ".join(str(term).split()).lower())
+        party = self.party()
+        if not hit:                             # everyone at the table knows who's at the table
+            pc = next((p["name"] for p in party if party_roster._same_name(p["name"], term)), None)
+            hit = {"term": pc, "kind": "pc"} if pc else None
         if not hit:
             return None                         # not met in the story: nothing to say
         name, kind = hit.get("of") or hit["term"], hit["kind"]
@@ -587,9 +629,14 @@ class TableState:
                 image = next((f["image"] for f in self.gallery()["foes"] if f["name"].lower() == name.lower()), None)
             elif kind == "treasure":
                 image = image_gen.treasure_art(name, self.campaign_dir) or None
-            elif kind == "pc":
-                image = next((p.get("portrait") for p in self.party() if p["name"] == name), None)
-            self.lore_cache[key] = {"term": hit["term"], "name": name, "kind": kind,
+            sub = ""
+            if kind == "pc":
+                pc = next((p for p in party if p["name"] == name), {})
+                image = pc.get("portrait")
+                sub = " ".join(str(x) for x in (pc.get("race"), pc.get("class")) if x)
+                if pc.get("level") is not None:
+                    sub = (sub + " · " if sub else "") + f"level {pc['level']}"
+            self.lore_cache[key] = {"term": hit["term"], "name": name, "kind": kind, "sub": sub,
                                     "text": got["answer"], "source": got["source"], "image": image}
         return self.lore_cache[key]
 
@@ -890,6 +937,8 @@ class TableState:
             self.messages.append(msg)
             if kind == "gm" and not to:
                 self._gm_spoke(lang if lang in LANGS else None)
+            if kind == "gm":
+                self.learn_spellings(text, lang)
             with open(self.log_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps({k: v for k, v in msg.items() if k != "rev"},
                                    ensure_ascii=False) + "\n")
@@ -1265,6 +1314,59 @@ class TableState:
                 if opts:
                     found["level_up"] = opts
         return found
+
+    # --- character sheets in the player's language ---
+    def _sheet_tr(self, lang: str) -> Dict[str, str]:
+        if lang not in self.sheet_tr:
+            data = self._read_json(self.dir / f"sheet-tr-{lang}.json", {})
+            self.sheet_tr[lang] = {k: v for k, v in data.items() if isinstance(v, str)} \
+                if isinstance(data, dict) else {}
+        return self.sheet_tr[lang]
+
+    def sheet_translation(self, viewer: Optional[str], name: str) -> Optional[Dict[str, Any]]:
+        """{tr: {english: translation}, pending}: the viewer's language for what's
+        written on ``name``'s sheet. Missing phrases are translated in the background
+        (``pending`` until they land); without a model the sheet stays as written."""
+        import narrator
+        lang = self.langs.get(viewer, "en") if viewer else "en"
+        found = self.sheet(viewer, name)
+        if found is None:
+            return None
+        if lang == "en":
+            return {"tr": {}, "pending": False}
+        strings = sheet_strings(found["sheet"])
+        with self.lock:
+            known = self._sheet_tr(lang)
+            tr = {s: known[s] for s in strings if s in known}
+            missing = [s for s in strings if s not in known]
+            can = self.narrator_ask is not None or narrator.backend() != "off"
+            pending = bool(missing) and can and time.time() - self.sheet_tr_failed.get(lang, 0) > 600
+            if pending and lang not in self.sheet_tr_busy:
+                self.sheet_tr_busy.add(lang)
+                threading.Thread(target=self._translate_sheet, args=(lang, missing), daemon=True).start()
+        return {"tr": tr, "pending": pending}
+
+    def _translate_sheet(self, lang: str, missing: List[str]) -> None:
+        import narrator
+        try:
+            for i in range(0, len(missing), 60):
+                got = narrator.translate(missing[i:i + 60], lang, ask=self.narrator_ask)
+                if not got:
+                    raise RuntimeError("no translation came back")
+                with self.lock:
+                    known = self._sheet_tr(lang)
+                    known.update(got)
+                    path = self.dir / f"sheet-tr-{lang}.json"
+                    tmp = path.with_suffix(".tmp")
+                    tmp.write_text(json.dumps(known, ensure_ascii=False, indent=1), encoding="utf-8")
+                    tmp.replace(path)
+        except Exception as e:                   # offline, not logged in...: the sheet stays as written
+            print(f"[sheet] translating to {lang}: {e}", flush=True)
+            with self.lock:
+                self.sheet_tr_failed[lang] = time.time()
+        finally:
+            with self.lock:
+                self.sheet_tr_busy.discard(lang)
 
     def party(self, sheets: bool = False) -> List[Dict[str, Any]]:
         """The PCs, summarised for the party panel. Each carries ``sheet_rev``, a
@@ -1710,6 +1812,46 @@ class TableState:
         return {"ok": True, "pc": result["character"].get("name", name)}
 
 
+SHEET_TR_SKIP = {"name", "id", "origin", "voice", "portrait", "image", "current_location"}
+
+
+def _pretty_key(k: Any) -> str:
+    """A sheet key as the page labels it (``spell_slots`` -> ``Spell slots``)."""
+    s = str(k).replace("_", " ")
+    return s[:1].upper() + s[1:]
+
+
+def sheet_strings(sheet: Dict[str, Any]) -> List[str]:
+    """The English words a player sees on a sheet: its values and the labels of its
+    keys (numbers, dice and already-translated text left out)."""
+    out: List[str] = []
+
+    def add(s: Any) -> None:
+        s = str(s).strip()
+        if (s and len(s) <= 800 and re.search(r"[A-Za-z]{2,}", s)
+                and not re.search(r"[\u0590-\u05FF]", s)):
+            out.append(s)
+
+    def walk(v: Any) -> None:
+        if isinstance(v, str):
+            add(v)
+        elif isinstance(v, list):
+            for x in v:
+                walk(x)
+        elif isinstance(v, dict):
+            for k, x in v.items():
+                if k not in ("name", "title", "item"):
+                    add(_pretty_key(k))
+                walk(x)
+
+    for k, v in (sheet or {}).items():
+        if k in SHEET_TR_SKIP:
+            continue
+        add(_pretty_key(k))
+        walk(v)
+    return list(dict.fromkeys(out))
+
+
 def warm_up() -> None:
     """At the start of the game, read the AI models into RAM, one after the other
     (not both at once from the disk): Forge's picture model, then the music model.
@@ -1834,6 +1976,13 @@ def make_handler(state: TableState, code: str, host_key: str):
                 except ValueError:
                     after = 0
                 return self._json({"ok": True, "messages": state.chat_since(after)})
+            if url.path == "/api/sheet-tr":
+                if not me:
+                    return self._err("Take a seat first.", 403)
+                got = state.sheet_translation(me, q.get("pc", ""))
+                if got is None:
+                    return self._err("No such character.", 404)
+                return self._json({"ok": True, **got})
             if url.path == "/api/sheet":
                 if not me:
                     return self._err("Take a seat first.", 403)

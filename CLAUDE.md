@@ -108,9 +108,13 @@ open the link, enter the code, and pick or create their PC. While the table is o
   plays, then the scene's music returns. Without the composer the victory music plays.
 **Hover cards.** Names of NPCs, places and factions that appear in your narration become
 hoverable on the players' pages, showing what THEY know (summed up from the story they saw,
-never from your files). So use each name exactly as the campaign records it. When you write
+never from your files). Only RECORDED names can be hovered: when a named NPC, place or
+faction first matters, record it (`gm-npc.sh`, `gm-location.sh`) right then. Use each name
+exactly as the campaign records it. When you write
 a name in another spelling (Hebrew narration of "Marta" → "מרתה"), record it once:
-`gm-table.sh alias "Marta" "מרתה"`.
+`gm-table.sh alias "Marta" "מרתה"`. (The table also spots spellings in Hebrew narration by
+itself, with a small model, a few seconds after each message; an alias you record is
+immediate and certain.)
 
 **The players' side chat is theirs.** The page has a players-only chat (table talk, plans,
 jokes). It is never sent to you and isn't stored anywhere you can read: never try to get it
