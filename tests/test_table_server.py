@@ -1150,7 +1150,7 @@ def test_the_host_wrapper_knows_every_table_command():
     """gm-table.sh passes only the actions it lists; a new table_server command must be added."""
     import re
     root = Path(__file__).resolve().parent.parent
-    commands = set(re.findall(r'sub\.add_parser\("([a-z-]+)"', (root / "lib" / "table_server.py").read_text()))
-    case = re.search(r'^\s*("serve"[^)]*)\)', (root / "tools" / "gm-table.sh").read_text(), re.M).group(1)
+    commands = set(re.findall(r'sub\.add_parser\("([a-z-]+)"', (root / "lib" / "table_server.py").read_text(encoding="utf-8")))
+    case = re.search(r'^\s*("serve"[^)]*)\)', (root / "tools" / "gm-table.sh").read_text(encoding="utf-8"), re.M).group(1)
     allowed = set(re.findall(r'"([a-z-]+)"', case))
     assert commands <= allowed, commands - allowed
