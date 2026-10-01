@@ -453,8 +453,7 @@ Copy, fill in the link and code, and send:
    treasures) and conditions. It follows the story too, and whatever just changed flashes. It's
    in your language: in Hebrew, skills, abilities, classes, races and conditions are always in
    Hebrew, and the rest of what's written on it is translated (the very first time that can
-   take a few seconds). Under your portrait, **🔄 Repaint portrait** paints a new one if it came
-   out wrong (choose *a man* or *a woman*).
+   take a few seconds).
 10. **Levelling up.** When you earn a level (the GM awards the XP), the story tells you and
     **⬆** appears next to your name. Your sheet shows your XP as *300 / 900*. Open it and tap
     **Level up**: roll your hit die at the table (or take the average), pick your
@@ -532,8 +531,7 @@ Copy, fill in the link and code, and send:
    תכונות, מיומנויות, יכולות, לחשים, ציוד (עם תמונות של אוצרות מיוחדים) ומצבים. גם הוא
    מתעדכן יחד עם הסיפור, ומה שהשתנה עכשיו מהבהב. הדף בשפה שלכם: בעברית, מיומנויות, תכונות,
    מקצועות, גזעים ומצבים תמיד בעברית, ושאר מה שכתוב בו מתורגם (בפעם הראשונה זה עשוי לקחת כמה
-   שניות). מתחת לדיוקן, **🔄 ציור דיוקן מחדש** מצייר דיוקן חדש אם הוא יצא לא נכון (בחרו *גבר* או
-   *אישה*).
+   שניות).
 10. **עלייה בדרגה.** כשאתם מרוויחים דרגה (מנהל המשחק מעניק את נקודות הניסיון), הסיפור מודיע
     לכם ומופיע **⬆** ליד השם שלכם. הדף מראה את הניסיון כ־*300 / 900*. פתחו אותו ולחצו **עלייה
     בדרגה**: הטילו את קוביית החיים ליד השולחן (או קחו את הממוצע), בחרו שיפורי תכונות כשהמקצוע
@@ -630,10 +628,9 @@ English, and the page translates it whole.
 that fight"*, or run `bash tools/gm-player.sh xp "Name" +300` yourself. The story then says
 who can level up, and they do it from their sheet (**📜** → **Level up**).
 
-**A portrait shows the wrong sex** (a woman for a male character). Open your sheet (**📜**),
-tap **🔄 Repaint portrait** under the portrait, choose *a man* or *a woman*, and tap **Paint**:
-a new one arrives in a minute or two, and it's remembered for every later picture. New
-characters: choose it on the join page (*Their portrait shows*).
+**A portrait shows the wrong sex** (a woman for a male character). Portraits are painted once
+and kept. For a new character, choose it on the join page (*Their portrait shows*: a man / a
+woman), and the portrait is painted that way.
 
 **My portrait isn't on my sheet.** Portraits need pictures turned on (Forge or OpenAI). The
 table waits about 3 minutes for the GM to describe a new character's look, then paints them

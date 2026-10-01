@@ -239,7 +239,6 @@ def cant_act(sheet: Dict[str, Any]) -> Optional[str]:
 PORTRAIT_GRACE = 180
 # A recorded NPC the narration has named this many times gets a portrait by itself.
 NPC_PORTRAIT_MENTIONS = 3
-REPAINT_GAP = 120          # a player can ask for a new portrait this often
 CARD_WORKERS = 2           # hover cards prepared at the same time
 WARM_CARDS = 12            # a player's most recently mentioned names kept ready
 THUMB_WIDTHS = (96, 200, 400, 800)   # the small versions of pictures pages ask for
@@ -348,8 +347,6 @@ class TableState:
         self.cards_warmed: set = set()
         self.after_busy = 0
         self.thumb_lock = threading.Lock()                            # narrations still being followed up
-        self.repaints: set = set()                     # PCs whose portrait is being redone
-        self.repaint_asked: Dict[str, float] = {}
         self.level_notices_path = self.dir / "level-notices.json"
         notices = self._read_json(self.level_notices_path, {})
         self.level_notices: Dict[str, int] = notices if isinstance(notices, dict) else {}
@@ -2046,21 +2043,6 @@ class TableState:
             tmp.replace(path)
         return True
 
-    def repaint(self, pc: str, sex: str = "") -> Dict[str, Any]:
-        """A player asks for a new portrait of their character (it came out wrong),
-        optionally saying whether they're a man or a woman."""
-        now = time.time()
-        with self.lock:
-            if now - self.repaint_asked.get(pc, 0) < REPAINT_GAP:
-                return {"ok": False, "error": "A new portrait is already on its way."}
-            self.repaint_asked[pc] = now
-            self.repaints.add(pc)
-            self.portrait_tried.pop(pc, None)
-        if sex:
-            self.set_sex(pc, sex)
-        self.portrait_wake.set()
-        return {"ok": True}
-
     def portrait_pass(self, now: Optional[float] = None) -> List[str]:
         """Draw the portrait of every PC who has none (one at a time; slow on a
         laptop GPU), and show it to the table. Returns the names drawn."""
@@ -2071,11 +2053,10 @@ class TableState:
         for path, raw in party_roster.all_pcs(self.campaign_dir):
             sheet = to_flat(raw)
             name = sheet.get("name") or path.stem
-            again = name in self.repaints
-            if not again and sheet.get("portrait") and (self.campaign_dir / "images" / sheet["portrait"]).is_file():
+            if sheet.get("portrait") and (self.campaign_dir / "images" / sheet["portrait"]).is_file():
                 continue
             first = self.portrait_seen.setdefault(name, now)
-            if not again and not sheet.get("visual_appearance") and now - first < PORTRAIT_GRACE:
+            if not sheet.get("visual_appearance") and now - first < PORTRAIT_GRACE:
                 continue                    # give the GM a moment to write their look
             if now - self.portrait_tried.get(name, -PORTRAIT_RETRY) < PORTRAIT_RETRY:
                 continue
@@ -2089,7 +2070,6 @@ class TableState:
             except Exception as e:          # no GPU memory, service down...: try later
                 print(f"[portrait] {name}: {e}", flush=True)
                 continue
-            self.repaints.discard(name)
             self.append("system", f"{name}'s portrait.", pc=name, image=filename,
                         event={"type": "portrait"})
             drawn.append(name)
@@ -2401,14 +2381,6 @@ def make_handler(state: TableState, code: str, host_key: str):
                 msg = state.append("player", text, pc=me, to=me if private else None,
                                    lang=lang, voice=bool(data.get("voice")))
                 return self._json({"ok": True, "message": msg})
-
-            if url.path == "/api/portrait":
-                if not me:
-                    return self._err("Take a seat first.", 403)
-                if not state._art_on(state.portrait_maker):
-                    return self._err("Pictures are off at this table.", 409)
-                result = state.repaint(me, str(data.get("sex", "")))
-                return self._json(result, 200 if result["ok"] else 429)
 
             if url.path == "/api/edit":
                 if not me:

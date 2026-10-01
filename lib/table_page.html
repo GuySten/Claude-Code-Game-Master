@@ -147,9 +147,6 @@
                 vertical-align: middle; margin-inline-end: 6px; border: 1px solid var(--line); }
   #sheet-body .portrait { float: inline-end; width: min(180px, 42%); border-radius: 10px;
                           margin: 4px 0 8px 12px; border: 1px solid var(--line); cursor: zoom-in; }
-  #sheet-body .repaint { font-size: .85rem; margin: 2px 0 8px; color: var(--muted); }
-  #sheet-body .repaint .linkish { border: 0; background: none; padding: 0; color: var(--accent);
-                                  text-decoration: underline dotted; cursor: pointer; font-size: inherit; }
   #sheet-body .portrait.big { float: none; width: 100%; margin: 4px 0 8px; cursor: zoom-out; }
   .msg.system img { max-width: 260px; margin: 6px auto 0; }
   .msg.system.place img { max-width: min(560px, 100%); }
@@ -462,7 +459,6 @@
       newChar: "Bring a new character", name: "Name", namePh: "Pip Underbough",
       concept: "One line about them", conceptPh: "a halfling thief with a debt",
       looks: "Their portrait shows", looksAny: "(let the GM decide)", looksMan: "a man", looksWoman: "a woman",
-      repaint: "🔄 Repaint portrait", repaintGo: "Paint", repaintBusy: "A new portrait is being painted (a minute or two)…",
       create: "Join as this character", nameless: "Just a nameless traveler",
       nameRequired: "Give your character a name.", badCode: "That code didn't work.",
       leave: "Leave seat", leaveConfirm: "Give up your seat? You can take it again afterwards.",
@@ -549,7 +545,6 @@
       newChar: "דמות חדשה", name: "שם", namePh: "נועה בת־הרוח",
       concept: "שורה אחת על הדמות", conceptPh: "גנבת ממוצא חצי־אלפי עם חוב ישן",
       looks: "הדיוקן מראה", looksAny: "(שמנהל המשחק יחליט)", looksMan: "גבר", looksWoman: "אישה",
-      repaint: "🔄 ציור דיוקן מחדש", repaintGo: "ציירו", repaintBusy: "דיוקן חדש מצויר (דקה או שתיים)…",
       create: "הצטרפו בדמות הזו", nameless: "סתם נווד/ת בלי שם",
       nameRequired: "תנו שם לדמות.", badCode: "הקוד לא עבד.",
       leave: "עזיבת המושב", leaveConfirm: "לפנות את המושב? אפשר לחזור אליו אחר כך.",
@@ -1747,7 +1742,6 @@
       img.onclick = () => img.classList.toggle("big");
       body.appendChild(img);
     }
-    if (s.portrait && sheetFor === me) body.appendChild(repaintBox(s));
     const hp = s.hp || {};
     const vit = [];
     if (hp.max !== undefined || hp.current !== undefined)
@@ -1810,41 +1804,6 @@
         if (was !== x.textContent) x.classList.add("changed");   // (or new)
       });
     }
-  }
-  // The portrait came out wrong (a woman for a man...): paint it again.
-  let repaintPending = null;
-  function repaintBox(s) {
-    const box = document.createElement("div");
-    box.className = "repaint";
-    if (repaintPending === s.portrait) {
-      box.textContent = t("repaintBusy");
-      return box;
-    }
-    const open = document.createElement("button");
-    open.type = "button"; open.className = "linkish"; open.textContent = t("repaint");
-    box.appendChild(open);
-    open.onclick = () => {
-      open.remove();
-      const va = s.visual_appearance || {};
-      const sex = /^(male|man|m)$/i.test(va.sex || "") ? "male" : /^(female|woman|f)$/i.test(va.sex || "") ? "female" : "";
-      const sel = document.createElement("select");
-      [["male", "looksMan"], ["female", "looksWoman"]].forEach(([v, k]) => {
-        const o = document.createElement("option"); o.value = v; o.textContent = t(k); o.selected = v === sex;
-        sel.appendChild(o);
-      });
-      const go = document.createElement("button");
-      go.type = "button"; go.textContent = t("repaintGo");
-      const note = document.createElement("span");
-      note.className = "muted";
-      go.onclick = async () => {
-        go.disabled = true;
-        const r = await api("/api/portrait", { sex: sel.value });
-        if (r.ok) { repaintPending = s.portrait; box.textContent = t("repaintBusy"); }
-        else { note.textContent = " " + (r.error || "?"); go.disabled = false; }
-      };
-      box.append(sel, " ", go, note);
-    };
-    return box;
   }
   // Levelling up: the server knows what this level offers (HP die, an ability
   // increase); the player chooses, and the GM adds the class features.
