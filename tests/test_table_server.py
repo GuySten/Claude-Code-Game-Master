@@ -1441,6 +1441,26 @@ def test_a_player_sitting_down_finds_their_recent_cards_ready(table):
     assert card["text"] == "A card." and len(asked) == n and time.time() - started < 1
 
 
+def test_pictures_are_kept_by_browsers_and_come_small_where_shown_small(table):
+    Image = pytest.importorskip("PIL.Image")
+    import io
+    camp, base, opener = table["camp"], table["base"], table["opener"]
+    (camp / "images").mkdir(exist_ok=True)
+    Image.effect_noise((1216, 832), 60).convert("RGB").save(camp / "images" / "crypt.png")
+    big = (camp / "images" / "crypt.png").stat().st_size
+
+    with opener.open(f"{base}/images/crypt.png?code={CODE}") as r:
+        assert r.headers["Content-Type"] == "image/png" and len(r.read()) == big
+        assert "max-age" in r.headers["Cache-Control"]          # kept: not fetched on every hover
+    with opener.open(f"{base}/images/crypt.png?code={CODE}&w=390") as r:
+        body = r.read()
+        assert r.headers["Content-Type"] == "image/jpeg" and len(body) < big / 4
+        assert Image.open(io.BytesIO(body)).size == (400, 274)   # the nearest size, same shape
+    assert (table["state"].dir / "thumbs" / "crypt-400.jpg").is_file()   # made once
+    with opener.open(f"{base}/images/crypt.png?code={CODE}&w=nonsense") as r:
+        assert r.headers["Content-Type"] == "image/png"          # the original, then
+
+
 def test_sheet_strings_are_the_words_a_player_reads():
     import table_server
     got = table_server.sheet_strings({

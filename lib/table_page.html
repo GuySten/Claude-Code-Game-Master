@@ -1558,7 +1558,7 @@
       const conds = (pc.conditions || []).join(", ");
       const from = before ? hpPct(before) : pct;
       d.innerHTML = `<div><span class="open-sheet">${esc(t("openSheet"))}</span>` +
-        (pc.portrait ? `<img class="avatar" alt="" src="${esc(imageUrl(pc.portrait))}">` : "") +
+        (pc.portrait ? `<img class="avatar" alt="" src="${esc(imageUrl(pc.portrait, 96))}">` : "") +
         `<span class="name lore" dir="auto" data-term="${esc(pc.name)}">${esc(pc.name)}</span>` +
         (pc.level_up && pc.name === me ? `<span class="lvl-ready">${esc(t("lvlBadge"))}</span>` : "") +
         tags.map((x) => `<span class="tag">${esc(x)}</span>`).join("") + `</div>` +
@@ -1714,7 +1714,7 @@
       body.appendChild(d);
     };
     if (s.portrait) {
-      const img = imageEl(s.portrait);
+      const img = imageEl(s.portrait, 400);
       img.className = "portrait";
       img.onclick = () => img.classList.toggle("big");
       body.appendChild(img);
@@ -1765,7 +1765,7 @@
       const text = (li.dataset.raw || li.textContent).toLowerCase();
       const tr = gallery.treasures.find((x) => text.includes(x.name.toLowerCase()));
       if (!tr) return;
-      const img = imageEl(tr.image);
+      const img = imageEl(tr.image, 96);
       img.className = "thumb";
       img.onclick = () => { $("sheet").close(); openGallery("treasures", tr.name); };
       li.prepend(img);
@@ -1895,7 +1895,7 @@
     if (items.length > 1) items.forEach((p) => {
       const b = document.createElement("button");
       b.type = "button"; b.dataset.name = p.name;
-      b.innerHTML = `<img alt="" loading="lazy" src="${esc(imageUrl(p.image))}"><span dir="auto">${esc(label(p))}</span>`;
+      b.innerHTML = `<img alt="" loading="lazy" src="${esc(imageUrl(p.image, 200))}"><span dir="auto">${esc(label(p))}</span>`;
       b.onclick = () => show(p);
       $("place-list").appendChild(b);
     });
@@ -2246,12 +2246,13 @@
     box.setSelectionRange(box.value.length, box.value.length);
   }
 
-  function imageUrl(name) {
-    return "/images/" + encodeURIComponent(name) + "?code=" + encodeURIComponent(code);
+  // Pictures shown small come as small JPEGs (w): much faster over the tunnel.
+  function imageUrl(name, w) {
+    return "/images/" + encodeURIComponent(name) + "?code=" + encodeURIComponent(code) + (w ? "&w=" + w : "");
   }
-  function imageEl(name) {
+  function imageEl(name, w) {
     const img = document.createElement("img");
-    img.alt = ""; img.loading = "lazy"; img.src = imageUrl(name);
+    img.alt = ""; img.loading = "lazy"; img.src = imageUrl(name, w);
     return img;
   }
 
@@ -2316,7 +2317,7 @@
     const fill = (d, loading) => {
       card.textContent = "";
       if (d && d.image) {
-        const img = imageEl(d.image);
+        const img = imageEl(d.image, 400);
         img.loading = "eager";
         img.onload = place;             // its size is known now: keep the card on screen
         card.appendChild(img);
@@ -2397,7 +2398,7 @@
       d.textContent = systemText(m);
       d.dir = dirFor(d.textContent);
       if (m.image) {
-        const img = imageEl(m.image);
+        const img = imageEl(m.image, 800);
         const ev = m.event || {};
         const tab = { place: "places", npc: "people", foe: "foes", loot: "treasures" }[ev.type];
         if (tab) {

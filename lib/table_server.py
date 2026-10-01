@@ -242,6 +242,7 @@ NPC_PORTRAIT_MENTIONS = 3
 REPAINT_GAP = 120          # a player can ask for a new portrait this often
 CARD_WORKERS = 2           # hover cards prepared at the same time
 WARM_CARDS = 12            # a player's most recently mentioned names kept ready
+THUMB_WIDTHS = (96, 200, 400, 800)   # the small versions of pictures pages ask for
 PORTRAIT_RETRY = 900
 # Ability score increases (5e): every class at these levels, plus a few extras.
 ASI_LEVELS = {4, 8, 12, 16, 19}
@@ -345,7 +346,8 @@ class TableState:
         self.card_workers = 0
         self.card_running: set = set()
         self.cards_warmed: set = set()
-        self.after_busy = 0                            # narrations still being followed up
+        self.after_busy = 0
+        self.thumb_lock = threading.Lock()                            # narrations still being followed up
         self.repaints: set = set()                     # PCs whose portrait is being redone
         self.repaint_asked: Dict[str, float] = {}
         self.level_notices_path = self.dir / "level-notices.json"
@@ -2000,6 +2002,33 @@ class TableState:
         except (OSError, ValueError):
             return []
 
+    def thumbnail(self, path: Path, width: Any) -> Optional[Path]:
+        """A small JPEG of a picture (for hover cards, avatars, the gallery's list),
+        made once and kept in the table folder: a fraction of the original's size,
+        which matters over the tunnel. None (send the original) when it can't be made."""
+        try:
+            w = min(THUMB_WIDTHS, key=lambda x: abs(x - int(width)))
+        except (TypeError, ValueError):
+            return None
+        out = self.dir / "thumbs" / f"{path.stem}-{w}.jpg"
+        try:
+            if out.is_file() and out.stat().st_mtime >= path.stat().st_mtime:
+                return out
+            from PIL import Image
+            with self.thumb_lock:
+                out.parent.mkdir(exist_ok=True)
+                with Image.open(path) as im:
+                    if im.width <= w:
+                        return None                 # small already
+                    im = im.convert("RGB")
+                    im.thumbnail((w, w * 4))
+                    tmp = out.with_suffix(".tmp")
+                    im.save(tmp, "JPEG", quality=82, optimize=True)
+                    tmp.replace(out)
+            return out
+        except Exception:                           # no Pillow, an odd file...: the original
+            return None
+
     def set_sex(self, pc: str, sex: str) -> bool:
         """Record a PC's sex in their appearance (what their portrait shows)."""
         sex = {"male": "male", "female": "female"}.get(str(sex).strip().lower(), "")
@@ -2167,11 +2196,11 @@ def make_handler(state: TableState, code: str, host_key: str):
             pass
 
         # --- helpers ---
-        def _send(self, status: int, body: bytes, ctype: str) -> None:
+        def _send(self, status: int, body: bytes, ctype: str, cache: str = "no-store") -> None:
             self.send_response(status)
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-store")
+            self.send_header("Cache-Control", cache)
             self.send_header("X-Content-Type-Options", "nosniff")
             self.end_headers()
             self.wfile.write(body)
@@ -2212,7 +2241,7 @@ def make_handler(state: TableState, code: str, host_key: str):
             if url.path.startswith("/images/"):
                 if not self._code_ok(q.get("code")):
                     return self._err("bad table code", 403)
-                return self._image(url.path[len("/images/"):])
+                return self._image(url.path[len("/images/"):], q.get("w"))
             if url.path.startswith("/api/gm/"):
                 if not self._is_host():
                     return self._err("host only", 403)
@@ -2652,13 +2681,18 @@ def make_handler(state: TableState, code: str, host_key: str):
                         return
                     remaining -= len(chunk)
 
-        def _image(self, name: str):
+        def _image(self, name: str, width: Optional[str] = None):
             name = Path(name).name
             path = state.campaign_dir / "images" / name
             ctype = IMAGE_TYPES.get(path.suffix.lower())
             if not ctype or not path.is_file():
                 return self._err("not found", 404)
-            return self._send(200, path.read_bytes(), ctype)
+            small = state.thumbnail(path, width) if width else None
+            if small is not None:
+                path, ctype = small, "image/jpeg"
+            # Every picture gets a new file name, so the browser may keep it: a
+            # hover card or gallery opened again doesn't fetch it again.
+            return self._send(200, path.read_bytes(), ctype, cache="private, max-age=604800")
 
     return Handler
 
