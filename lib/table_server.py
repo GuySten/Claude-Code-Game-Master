@@ -326,6 +326,13 @@ class TableState:
         self.narrator_slots = threading.Semaphore(2)
         self.narrator_ask = None                        # tests plug in a fake model
         self.lore_cache: Dict[tuple, Dict[str, Any]] = {}
+        # Hover cards, kept per player and language across restarts:
+        # "viewer|name|lang" -> {n (story lines mentioning it then), text, source}.
+        self.lore_store_path = self.dir / "lore-cards.json"
+        store = self._read_json(self.lore_store_path, {})
+        self.lore_store: Dict[str, Dict[str, Any]] = store if isinstance(store, dict) else {}
+        self.card_jobs: List[tuple] = []
+        self.card_worker_on = False
         self.aliases_path = self.dir / "aliases.json"
         self.spelling_lock = threading.Lock()
         # Character sheets in the player's language: each phrase translated once by
@@ -526,18 +533,15 @@ class TableState:
             # the next message).
             self.lore_cache = {k: v for k, v in self.lore_cache.items() if k[0] != "terms"}
 
-    def learn_spellings(self, text: str, lang: Optional[str]) -> None:
-        """Narration in another language spells the campaign's names its own way
-        (מרתה for Marta): find which known names it mentions and remember those
-        spellings, so they get hover cards too. In the background (a small model)."""
+    def should_learn_spellings(self, text: str) -> bool:
         import narrator
-        if not re.search(r"[\u0590-\u05FF]", text or ""):
-            return
-        if self.narrator_ask is None and narrator.backend() == "off":
-            return
-        threading.Thread(target=self._learn_spellings, args=(text, lang or "he"), daemon=True).start()
+        return bool(re.search(r"[\u0590-\u05FF]", text or "")) and (
+            self.narrator_ask is not None or narrator.backend() != "off")
 
     def _learn_spellings(self, text: str, lang: str) -> None:
+        """Narration in another language spells the campaign's names its own way
+        (מרתה for Marta): find which known names it mentions and remember those
+        spellings, so they get hover cards too (a small model)."""
         import narrator
         with self.spelling_lock:                 # one at a time
             low = text.lower()
@@ -582,27 +586,48 @@ class TableState:
             names[pc["name"]] = "pc"
         return {n: k for n, k in names.items() if len(n.strip()) >= 3}
 
-    def lore_terms(self, viewer: Optional[str]) -> List[Dict[str, str]]:
+    def _spellings(self) -> Dict[str, set]:
+        """name (lower case) -> every spelling of it the story may use."""
+        out: Dict[str, set] = {}
+        for alias, name in self.aliases().items():
+            out.setdefault(name.lower(), {name.lower()}).add(alias.lower())
+        return out
+
+    def lore_terms(self, viewer: Optional[str]) -> List[Dict[str, Any]]:
         """The names this player has met in the story (so they can be hovered).
-        A name only appears once the narration they saw has used it: no spoilers."""
+        A name only appears once the narration they saw has used it: no spoilers.
+        Each carries ``n``, how many story lines mention it: a card made at the
+        same ``n`` is still current."""
         import narrator
         lang = self.langs.get(viewer, "en") if viewer else "en"
         key = ("terms", viewer, self.rev, lang)
         if key in self.lore_cache:
             return self.lore_cache[key]["terms"]
-        seen = "\n".join(narrator.story_lines(self.since(0, viewer), viewer or "", lang)).lower()
+        lines = [l.lower() for l in narrator.story_lines(self.since(0, viewer), viewer or "", lang)]
+        seen = "\n".join(lines)
         things = self._named_things()
-        out = [{"term": n, "kind": k} for n, k in things.items() if n.lower() in seen]
+        spellings = self._spellings()
+
+        def mentions(name: str) -> int:
+            forms = spellings.get(name.lower(), {name.lower()})
+            return sum(1 for l in lines if any(f in l for f in forms))
+
+        out = [{"term": n, "kind": k, "n": mentions(n)} for n, k in things.items() if n.lower() in seen]
         for alias, name in self.aliases().items():
             kind = things.get(name) or next((k for n, k in things.items() if n.lower() == name.lower()), None)
             if kind and alias.lower() in seen:
-                out.append({"term": alias, "kind": kind, "of": name})
+                out.append({"term": alias, "kind": kind, "of": name, "n": mentions(name)})
         out.sort(key=lambda t: -len(t["term"]))
         self.lore_cache = {k: v for k, v in self.lore_cache.items() if k[0] != "terms" or k[1] != viewer}
         self.lore_cache[key] = {"terms": out}
         return out
 
-    def lore_card(self, viewer: str, term: str) -> Optional[Dict[str, Any]]:
+    def lore_card(self, viewer: str, term: str, refresh: bool = False) -> Optional[Dict[str, Any]]:
+        """What ``viewer`` knows about ``term``. A card is kept per player and
+        language (on disk too) and is current while no new story line mentions the
+        name. When the story has moved on, the last card is returned at once
+        (``stale``) and a fresh one is made in the background. ``refresh`` (the
+        background worker): make the card now if it's missing or out of date."""
         import image_gen
         import narrator
         known = {t["term"].lower(): t for t in self.lore_terms(viewer)}
@@ -614,31 +639,90 @@ class TableState:
         if not hit:
             return None                         # not met in the story: nothing to say
         name, kind = hit.get("of") or hit["term"], hit["kind"]
-        spellings = {name.lower()} | {a.lower() for a, n in self.aliases().items() if n.lower() == name.lower()}
+        forms = self._spellings().get(name.lower(), {name.lower()})
         lang = self.langs.get(viewer, "en")
         lines = [l for l in narrator.story_lines(self.since(0, viewer), viewer, lang)
-                 if any(s in l.lower() for s in spellings)]
-        key = ("card", viewer, name.lower(), len(lines), lang)
-        if key not in self.lore_cache:
+                 if any(f in l.lower() for f in forms)]
+        key = f"{viewer}|{name.lower()}|{lang}"
+        with self.lock:
+            have = self.lore_store.get(key)
+        stale = bool(have) and have["n"] != len(lines)
+        if refresh and have and not stale:
+            return None                         # current already
+        if refresh or not have:
             got = narrator.answer(f"{name}?", lines[-30:], narrator.lore_prompt(name, kind, lines[-30:], viewer),
                                   lang, ask=self.narrator_ask)
-            image = None
-            if kind == "place":
-                image = next((p["image"] for p in self.places() if p["name"].lower() == name.lower()), None)
-            elif kind == "foe":
-                image = next((f["image"] for f in self.gallery()["foes"] if f["name"].lower() == name.lower()), None)
-            elif kind == "treasure":
-                image = image_gen.treasure_art(name, self.campaign_dir) or None
-            sub = ""
-            if kind == "pc":
-                pc = next((p for p in party if p["name"] == name), {})
-                image = pc.get("portrait")
-                sub = " ".join(str(x) for x in (pc.get("race"), pc.get("class")) if x)
-                if pc.get("level") is not None:
-                    sub = (sub + " · " if sub else "") + f"level {pc['level']}"
-            self.lore_cache[key] = {"term": hit["term"], "name": name, "kind": kind, "sub": sub,
-                                    "text": got["answer"], "source": got["source"], "image": image}
-        return self.lore_cache[key]
+            have = {"n": len(lines), "text": got["answer"], "source": got["source"]}
+            with self.lock:
+                self.lore_store[key] = have
+                tmp = self.lore_store_path.with_suffix(".tmp")
+                tmp.write_text(json.dumps(self.lore_store, ensure_ascii=False), encoding="utf-8")
+                tmp.replace(self.lore_store_path)
+            stale = False
+        elif stale:
+            self.queue_card(viewer, term)       # the last one now, a fresh one shortly
+        image, sub = None, ""
+        if kind == "place":
+            image = next((p["image"] for p in self.places() if p["name"].lower() == name.lower()), None)
+        elif kind == "foe":
+            image = next((f["image"] for f in self.gallery()["foes"] if f["name"].lower() == name.lower()), None)
+        elif kind == "treasure":
+            image = image_gen.treasure_art(name, self.campaign_dir) or None
+        elif kind == "pc":
+            pc = next((p for p in party if p["name"] == name), {})
+            image = pc.get("portrait")
+            sub = " ".join(str(x) for x in (pc.get("race"), pc.get("class")) if x)
+            if pc.get("level") is not None:
+                sub = (sub + " · " if sub else "") + f"level {pc['level']}"
+        return {"term": hit["term"], "name": name, "kind": kind, "sub": sub, "image": image,
+                "text": have["text"], "source": have["source"], "n": have["n"], "stale": stale}
+
+    def _after_narration(self, msg: Dict[str, Any]) -> None:
+        """In the background, after the GM speaks: learn the spellings it used,
+        then get the hover cards of what it mentioned ready."""
+        try:
+            if self.should_learn_spellings(msg.get("text") or ""):
+                self._learn_spellings(msg.get("text") or "", msg.get("lang") or "he")
+            self.prepare_cards(msg)
+        except Exception as e:
+            print(f"[lore] after narration: {e}", flush=True)
+
+    def queue_card(self, viewer: str, term: str) -> None:
+        """Make (or bring up to date) a hover card in the background."""
+        with self.lock:
+            job = (viewer, term)
+            if job in self.card_jobs:
+                return
+            self.card_jobs.append(job)
+            if not self.card_worker_on:
+                self.card_worker_on = True
+                threading.Thread(target=self._card_worker, daemon=True).start()
+
+    def _card_worker(self) -> None:
+        while True:
+            with self.lock:
+                if not self.card_jobs:
+                    self.card_worker_on = False
+                    return
+                viewer, term = self.card_jobs.pop(0)
+            try:
+                self.lore_card(viewer, term, refresh=True)
+            except Exception as e:              # offline...: the old card stays
+                print(f"[lore] {term}: {e}", flush=True)
+
+    def prepare_cards(self, msg: Dict[str, Any]) -> None:
+        """After a narration: get the cards of the names it mentions ready for every
+        seated player who saw it, before anyone hovers them."""
+        import narrator
+        if self.narrator_ask is None and narrator.backend() == "off":
+            return                              # without a model, cards are instant anyway
+        low = (msg.get("text") or "").lower()
+        for pc in [p["name"] for p in self.party() if p.get("claimed")]:
+            if not self.visible_to(msg, pc):
+                continue
+            mentioned = [t["term"] for t in self.lore_terms(pc) if t["term"].lower() in low]
+            for term in mentioned[:8]:
+                self.queue_card(pc, term)
 
     def gm_read_since_narration(self) -> bool:
         """Has the GM read players' actions since it last narrated to everyone?"""
@@ -938,7 +1022,7 @@ class TableState:
             if kind == "gm" and not to:
                 self._gm_spoke(lang if lang in LANGS else None)
             if kind == "gm":
-                self.learn_spellings(text, lang)
+                threading.Thread(target=self._after_narration, args=(dict(msg),), daemon=True).start()
             with open(self.log_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps({k: v for k, v in msg.items() if k != "rev"},
                                    ensure_ascii=False) + "\n")

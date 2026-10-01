@@ -1188,6 +1188,8 @@ def test_hebrew_narration_spellings_of_known_names_are_learned(table):
     asked = []
 
     def ask(system, prompt):
+        if "passage" not in system:
+            return "A card."                                     # (hover cards being prepared)
         asked.append(json.loads(prompt))
         return '{"Marta": "מרתה", "Bram": "בראם", "Vex": "וקס"}'   # Vex isn't in the passage
 
@@ -1237,6 +1239,49 @@ def test_every_player_character_has_a_card_and_the_sheet_speaks_the_players_lang
     call(f"/api/sheet-tr?code={CODE}&token={pip}&pc=Pip")
     assert len(calls) == n                                       # kept: never asked twice
     assert json.loads((state.dir / "sheet-tr-he.json").read_text(encoding="utf-8"))["a halfling rogue"]
+
+
+def test_hover_cards_are_ready_before_the_hover_and_kept(table):
+    call, state, camp, world = table["call"], table["state"], table["camp"], table["world"]
+    state.set_round_seconds(0)
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    (camp / "npcs.json").write_text(json.dumps({"Marta": {"description": "innkeeper"}}))
+    asked, gate = [], threading.Event()
+    gate.set()
+
+    def ask(system, prompt):
+        gate.wait(10)
+        asked.append(prompt)
+        return f"Card #{len(asked)}"
+
+    state.narrator_ask = ask
+    # The narration mentions Marta: her card is made in the background, before any hover.
+    call("/api/gm/say", {"text": "Marta waves from the bar."}, host=True)
+    assert wait_for(lambda: len(asked) == 1)
+    status, card = call(f"/api/lore?code={CODE}&token={pip}&term=Marta")
+    assert status == 200 and card["text"] == "Card #1" and card["stale"] is False and len(asked) == 1
+    n1 = card["n"]
+    terms = {t["term"]: t for t in call(f"/api/info?code={CODE}&token={pip}")[1]["lore_terms"]}
+    assert terms["Marta"]["n"] == n1                     # the page knows its card is current
+
+    # The story moves on while the model is slow: the last card comes at once,
+    # marked stale, and the fresh one replaces it when it's written.
+    gate.clear()
+    call("/api/gm/say", {"text": "Marta slips a note under the door."}, host=True)
+    started = time.time()
+    status, card = call(f"/api/lore?code={CODE}&token={pip}&term=Marta")
+    assert time.time() - started < 2 and card["text"] == "Card #1" and card["stale"] is True
+    gate.set()
+    assert wait_for(lambda: not call(f"/api/lore?code={CODE}&token={pip}&term=Marta")[1]["stale"])
+    card = call(f"/api/lore?code={CODE}&token={pip}&term=Marta")[1]
+    assert card["text"] == "Card #2" and card["n"] > n1 and len(asked) == 2
+
+    # Kept on disk: a restarted table still has it, with no new model call.
+    again = TableState(camp, str(world))
+    again.narrator_ask = ask
+    again.langs = dict(state.langs)
+    again.messages = list(state.messages)
+    assert again.lore_card("Pip", "Marta")["text"] == "Card #2" and len(asked) == 2
 
 
 def test_sheet_strings_are_the_words_a_player_reads():

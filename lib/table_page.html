@@ -2258,12 +2258,26 @@
       card.classList.remove("hidden");
       place();
     };
+    // A card is kept until the story mentions the name again (its n changes);
+    // then the old one shows at once while the host brings it up to date.
+    const info = loreTerms.find((x) => x.term.toLowerCase() === term.toLowerCase());
     const cached = loreCards.get(term);
-    if (cached && Date.now() - cached.at < 60000) return fill(cached.data);
-    fill(null, true);
-    const r = await api("/api/lore?term=" + encodeURIComponent(term));
-    if (r.ok) loreCards.set(term, { data: r, at: Date.now() });
-    if (loreFor === span) fill(r.ok ? r : { name: term, kind: "", text: r.error || "" });
+    if (cached) {
+      fill(cached.data);
+      const current = info ? info.n === cached.data.n : Date.now() - cached.at < 60000;
+      if (current && !cached.data.stale) return;
+    } else {
+      fill(null, true);
+    }
+    for (let tries = 0; tries < 10; tries++) {
+      const r = await api("/api/lore?term=" + encodeURIComponent(term));
+      if (r.ok) loreCards.set(term, { data: r, at: Date.now() });
+      if (loreFor !== span) return;
+      if (r.ok || !cached) fill(r.ok ? r : { name: term, kind: "", text: r.error || "" });
+      if (!r.ok || !r.stale) return;
+      await new Promise((ok) => setTimeout(ok, 3000));   // the fresh one is being written
+      if (loreFor !== span) return;
+    }
   }
   function hideLore() { loreFor = null; $("lore-card").classList.add("hidden"); }
   document.addEventListener("mouseover", (ev) => {
@@ -2493,6 +2507,7 @@
       lang = lang === "he" ? "en" : "he";
       store.set("lang", lang);
       sheetTr.clear();
+      loreCards.clear();
       applyLang();
       if (me) { api("/api/lang", { lang }); rerenderLog(); refreshInfo(); updateProgress(); fitTextDir(); }
       if (!$("seat-cards").classList.contains("hidden")) refreshSeats();
