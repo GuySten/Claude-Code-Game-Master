@@ -451,8 +451,10 @@ Copy, fill in the link and code, and send:
 9. **Your sheet.** Tap **📜 My sheet**, or any character in the party panel, for the full
    sheet: portrait, abilities, skills, features, spells, equipment (with pictures of special
    treasures) and conditions. It follows the story too, and whatever just changed flashes. It's
-   in your language: in Hebrew, what's written on it is translated (the very first time it can
-   show English for a few seconds).
+   in your language: in Hebrew, skills, abilities, classes, races and conditions are always in
+   Hebrew, and the rest of what's written on it is translated (the very first time that can
+   take a few seconds). Under your portrait, **🔄 Repaint portrait** paints a new one if it came
+   out wrong (choose *a man* or *a woman*).
 10. **Levelling up.** When you earn a level (the GM awards the XP), the story tells you and
     **⬆** appears next to your name. Your sheet shows your XP as *300 / 900*. Open it and tap
     **Level up**: roll your hit die at the table (or take the average), pick your
@@ -528,8 +530,10 @@ Copy, fill in the link and code, and send:
 
 9. **הדף שלכם.** לחצו **📜 הדף שלי**, או על כל דמות בפאנל החבורה, כדי לראות את הדף המלא: דיוקן,
    תכונות, מיומנויות, יכולות, לחשים, ציוד (עם תמונות של אוצרות מיוחדים) ומצבים. גם הוא
-   מתעדכן יחד עם הסיפור, ומה שהשתנה עכשיו מהבהב. הדף בשפה שלכם: בעברית, מה שכתוב בו מתורגם
-   (בפעם הראשונה ממש הוא עשוי להופיע באנגלית לכמה שניות).
+   מתעדכן יחד עם הסיפור, ומה שהשתנה עכשיו מהבהב. הדף בשפה שלכם: בעברית, מיומנויות, תכונות,
+   מקצועות, גזעים ומצבים תמיד בעברית, ושאר מה שכתוב בו מתורגם (בפעם הראשונה זה עשוי לקחת כמה
+   שניות). מתחת לדיוקן, **🔄 ציור דיוקן מחדש** מצייר דיוקן חדש אם הוא יצא לא נכון (בחרו *גבר* או
+   *אישה*).
 10. **עלייה בדרגה.** כשאתם מרוויחים דרגה (מנהל המשחק מעניק את נקודות הניסיון), הסיפור מודיע
     לכם ומופיע **⬆** ליד השם שלכם. הדף מראה את הניסיון כ־*300 / 900*. פתחו אותו ולחצו **עלייה
     בדרגה**: הטילו את קוביית החיים ליד השולחן (או קחו את הממוצע), בחרו שיפורי תכונות כשהמקצוע
@@ -610,11 +614,16 @@ campaign's names by itself, a few seconds after each message (with the Narrator'
 name still isn't underlined, either the GM never recorded that character or place (ask: *"record
 Marta as an NPC"*), or the spelling wasn't caught: `bash tools/gm-table.sh alias "Marta" "מרתה"`.
 
-**Hover cards or the sheet's Hebrew are slow, or the sheet stays in English.** Both use the
-Narrator's model (the host's Claude Code login). A card is prepared after each message and
-kept, so it normally opens at once; the first card of a name nobody hovered can take 5–10
-seconds. If the host's `claude` isn't signed in, cards quote the story instead and the sheet
-stays as written.
+**Hover cards or the sheet's Hebrew are slow, or the sheet stays partly in English.** Both use
+the Narrator's model (the host's Claude Code login). Each player's cards for the names their
+story mentioned most recently are prepared when they sit down and after each message, and
+kept, so they open at once; an older name nobody hovered yet can take 5–10 seconds the first
+time. Pictures on cards come in a small version and the browser keeps them, so cards stay
+quick over the tunnel. The game's standard words (skills, abilities, classes, races,
+conditions) are always in Hebrew; spells, items and features need the model: if the host's
+`claude` isn't signed in, those stay as written (and cards quote the story instead). An entry
+the GM wrote half in English, half in Hebrew stays that way: ask the GM to rewrite it in
+English, and the page translates it whole.
 
 **Nobody was told to level up.** A level only rises when the GM *awards* the XP
 (`gm-player.sh xp`), not when it just mentions it in the story. Ask the GM *"award the XP from
