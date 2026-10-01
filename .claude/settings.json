@@ -1,4 +1,8 @@
 {
+  "env": {
+    "PYTHONUTF8": "1",
+    "PYTHONIOENCODING": "utf-8"
+  },
   "statusLine": {
     "type": "command",
     "command": "bash tools/gm-statusline.sh"

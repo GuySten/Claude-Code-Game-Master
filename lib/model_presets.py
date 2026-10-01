@@ -178,5 +178,16 @@ def main() -> None:
           "(same model, higher price).")
 
 
+def _utf8_console() -> None:
+    """Print emoji and Hebrew on any console (Windows defaults to a legacy code page)."""
+    import sys
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
+
 if __name__ == "__main__":
+    _utf8_console()
     main()
