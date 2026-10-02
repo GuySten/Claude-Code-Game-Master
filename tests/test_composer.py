@@ -25,11 +25,14 @@ FAKE_SERVER = (
     "        try: fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)\n"
     "        except OSError: return True\n"
     "        fcntl.flock(f, fcntl.LOCK_UN); return False\n"
-    "print(json.dumps({'ready': True, 'device': os.environ.get('FAKE_DEVICE', 'cuda')}), flush=True)\n"
+    "device = os.environ.get('COMPOSE_DEVICE') or os.environ.get('FAKE_DEVICE', 'cuda')\n"
+    "print(json.dumps({'ready': True, 'device': device}), flush=True)\n"
     "for line in sys.stdin:\n"
     "    job = json.loads(line)\n"
     "    if 'HANG' in job['prompt']: time.sleep(60)\n"
     "    if 'DIE' in job['prompt']: sys.exit(3)\n"
+    "    if os.environ.get('CRASH_ON_GPU') and device != 'cpu':\n"
+    "        print('[compose] composing 5 s on cuda', file=sys.stderr, flush=True); os._exit(139)\n"
     "    if 'FAIL' in job['prompt']:\n"
     "        print(json.dumps({'ok': False, 'id': job['id'], 'error': 'RuntimeError: boom'}), flush=True); continue\n"
     "    p = pathlib.Path(job['out']); p.parent.mkdir(parents=True, exist_ok=True); p.write_bytes(b'OggS')\n"
@@ -53,6 +56,8 @@ def fake_composer(tmp_path, monkeypatch, mod=composer):
     monkeypatch.setattr(mod, "SCRIPT", fake)
     monkeypatch.setattr(mod, "SERVER_LOG", tmp_path / "composer.log")
     monkeypatch.setattr(mod, "composer_python", lambda: sys.executable)
+    monkeypatch.setattr(mod, "_cpu_only", False)
+    monkeypatch.delenv("COMPOSE_DEVICE", raising=False)
     released = []
     monkeypatch.setattr(mod, "_free_the_card", lambda: released.append(True))
     mod.stop_server()
@@ -131,7 +136,9 @@ def test_a_failed_piece_a_crash_or_a_hang_doesnt_sink_the_rest(tmp_path, fake):
     # The composer dies mid-way: it's started again for the next piece.
     got = composer.compose_many([{"prompt": "DIE", "seconds": 5, "out": out("c"), "loop": False},
                                  {"prompt": "fine", "seconds": 5, "out": out("d"), "loop": False}])
-    assert got[0] is None and got[1]["path"] == out("d") and log.read_text() == "load\nload\n"
+    # (the dead piece got one more try on the CPU, in vain: three loads)
+    assert got[0] is None and got[1]["path"] == out("d") and log.read_text() == "load\nload\nload\n"
+    assert composer._cpu_only is True
     # It hangs: stopped after the time limit, and the next piece still comes.
     got = composer.compose_many([{"prompt": "HANG", "seconds": 5, "out": out("e"), "loop": False},
                                  {"prompt": "fine", "seconds": 5, "out": out("f"), "loop": False}],
@@ -140,6 +147,17 @@ def test_a_failed_piece_a_crash_or_a_hang_doesnt_sink_the_rest(tmp_path, fake):
     with pytest.raises(composer.ComposeError, match="boom"):
         composer.compose("FAIL", 5, tmp_path / "x.ogg")
     assert composer.compose_many([]) == []
+
+
+def test_a_composer_that_dies_on_the_graphics_card_carries_on_on_the_cpu(tmp_path, fake, monkeypatch, capsys):
+    log, _ = fake
+    monkeypatch.setenv("CRASH_ON_GPU", "1")
+    got = composer.compose_many([{"prompt": "a waltz", "seconds": 5, "out": str(tmp_path / "a.ogg"), "loop": False},
+                                 {"prompt": "a march", "seconds": 5, "out": str(tmp_path / "b.ogg"), "loop": False}])
+    assert got[0] and got[1] and got[0]["path"] == str(tmp_path / "a.ogg")   # both came, on the CPU
+    assert composer._cpu_only is True and log.read_text() == "load\nload\n"  # restarted once
+    said = capsys.readouterr().err
+    assert "stopped while composing piece 1" in said and "composing on the CPU from now on" in said
 
 
 def test_a_broken_composer_says_why(tmp_path, fake, monkeypatch):

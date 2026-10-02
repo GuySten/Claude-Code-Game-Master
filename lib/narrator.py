@@ -132,11 +132,12 @@ def _claude(system: str, prompt: str) -> str:
     exe = shutil.which("claude")
     env = {k: v for k, v in os.environ.items() if k not in ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT")}
     with tempfile.TemporaryDirectory() as empty:     # no project files, settings or hooks
-        done = subprocess.run(
+        done = subprocess.run(  # (no console window on Windows)
             [exe, "-p", "--model", NARRATOR_MODEL, "--tools", "", "--no-session-persistence",
              "--strict-mcp-config", "--system-prompt", system],
             input=prompt, capture_output=True, text=True, timeout=TIMEOUT, cwd=empty, env=env,
-            encoding="utf-8")
+            encoding="utf-8",
+            **({"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0)} if os.name == "nt" else {}))
     if done.returncode != 0 or not done.stdout.strip():
         raise RuntimeError((done.stderr or done.stdout or "no answer").strip()[-300:])
     return done.stdout.strip()

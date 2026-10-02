@@ -18,6 +18,7 @@ downloaded from Hugging Face on first use. Its weights are licensed CC-BY-NC
 """
 
 import argparse
+import faulthandler
 import json
 import os
 import sys
@@ -148,13 +149,17 @@ def generate(prompt: str, seconds: float, device: str):
     import torch
     seconds = max(1.0, min(float(seconds), MAX_SECONDS))
     processor, model = _load()
+    step = lambda what: print(f"[compose] {what}", file=sys.stderr, flush=True)  # noqa: E731
     try:
+        step(f"moving the model to {device}")
         model.to(device, torch.float32)
         inputs = processor(text=[prompt], padding=True, return_tensors="pt").to(device)
+        step(f"composing {seconds:.0f} s on {device}")
         with torch.no_grad():
             audio = model.generate(**inputs, do_sample=True, guidance_scale=3.0,
                                    max_new_tokens=int(seconds * TOKENS_PER_SECOND) + 3)
         samples = audio[0, 0].float().cpu().numpy()
+        step("composed")
     except RuntimeError as e:          # torch.cuda.OutOfMemoryError is a RuntimeError
         if device == "cpu" or "out of memory" not in str(e).lower():
             raise
@@ -236,6 +241,9 @@ def main() -> None:
         return
 
     if args.serve:
+        # A crash inside torch/CUDA kills the process with no Python error at all:
+        # this writes where it happened to the log (stderr), Windows crashes included.
+        faulthandler.enable(file=sys.stderr, all_threads=True)
         # Stay running: the model is read from disk ONCE and waits in RAM. One JSON
         # job per line in, one JSON answer per line out (with the job's "id").
         _, model = _load()

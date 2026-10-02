@@ -653,6 +653,10 @@ portrait or says what's wrong (often *"Can't reach Forge"*: start `run.bat`).
 (`"device": "cuda"`). *"no kernel image is available"* means the PyTorch build doesn't support the
 card: run `bash tools/gm-music-compose.sh remove`, then `setup --cpu`. Composing happens in the
 background, so a first theme can take a few minutes to arrive; until then the built-in theme plays.
+If composing on the graphics card crashes, the table switches the composer to the CPU for the
+rest of the session (slower, but the music comes) and writes why in its window and in
+`table/server.log` (lines starting `[compose]`). The composer's own log, with where it crashed,
+is `gm-composer.log` in the temp folder (`cat "$TEMP/gm-composer.log"` in Git Bash).
 
 **Composed music is too quiet.** New pieces come out at a normal loudness. For older ones, run
 `bash tools/gm-music-compose.sh normalize` once (it fixes every composed piece in the campaign).

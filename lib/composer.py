@@ -99,6 +99,14 @@ _server_device = ""
 _server_lock = threading.RLock()
 
 
+# No console window for it on Windows: the table runs in the background, so Windows
+# would open one, and closing that window kills the composer without a word.
+NO_WINDOW = {"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0)} if os.name == "nt" else {}
+# After composing on the graphics card crashed, the rest of the session composes on
+# the CPU (slower, but the music comes).
+_cpu_only = False
+
+
 def _spawn() -> Optional[subprocess.Popen]:
     global _server, _server_device
     if _server is not None and _server.poll() is None:
@@ -106,12 +114,35 @@ def _spawn() -> Optional[subprocess.Popen]:
     py = composer_python()
     if py is None:
         return None
+    env = {**os.environ, "PYTHONUTF8": "1", "PYTHONFAULTHANDLER": "1"}
+    if _cpu_only:
+        env["COMPOSE_DEVICE"] = "cpu"
     with open(SERVER_LOG, "w", encoding="utf-8", errors="replace") as log:
         _server = subprocess.Popen([str(py), str(SCRIPT), "--serve"], stdin=subprocess.PIPE,
                                    stdout=subprocess.PIPE, stderr=log, text=True, encoding="utf-8",
-                                   errors="replace", env={**os.environ, "PYTHONUTF8": "1"})
+                                   errors="replace", env=env, **NO_WINDOW)
     _server_device = ""
     return _server
+
+
+# How a process that died says why (Windows exit codes, and signals elsewhere).
+EXIT_MEANINGS = {
+    3221225477: "it crashed inside a native library (access violation, 0xC0000005)",
+    3221226505: "it crashed inside a native library (0xC0000409: often CUDA / the graphics driver)",
+    3221225495: "Windows refused it memory (0xC0000017: RAM and page file full)",
+    3221225725: "it crashed (stack overflow, 0xC00000FD)",
+    3221225786: "it was stopped (its window was closed, or Ctrl+C, 0xC000013A)",
+    1: "it stopped with an error (see the composer's log)",
+    -9: "it was killed (out of memory?)", 137: "it was killed (out of memory?)",
+    -11: "it crashed inside a native library (segmentation fault)",
+}
+
+
+def _why_it_died(proc: subprocess.Popen) -> str:
+    code = proc.poll()
+    if code is None:
+        return "it stopped answering"
+    return EXIT_MEANINGS.get(code, f"it stopped (exit code {code})")
 
 
 def _log_tail() -> str:
@@ -192,6 +223,7 @@ def compose_many(jobs: List[Dict[str, Any]], on_piece: Optional[Callable[[int, D
     on the graphics card (pictures wait for it, and it for them), with Forge's model
     moved off the card first. ``on_piece(index, result)`` is called as each one
     lands. Returns one result per job (None where that piece failed)."""
+    global _cpu_only
     if not jobs:
         return []
     if composer_python() is None:
@@ -214,8 +246,24 @@ def compose_many(jobs: List[Dict[str, Any]], on_piece: Optional[Callable[[int, D
                 except OSError:
                     r = None
             if r is None:                            # it died, or hung and was stopped
-                errors.append(_log_tail() or "it took too long")
+                why = "it took too long" if proc.poll() is None else _why_it_died(proc)
+                errors.append(f"the composer stopped: {why}. Its log ends: {_log_tail()}")
+                print(f"[compose] the composer stopped while composing piece {i + 1}: {why}"
+                      f" (log: {SERVER_LOG})", file=sys.stderr, flush=True)
+                gpu = _server_device not in ("", "cpu")
                 stop_server()
+                if gpu and not _cpu_only:            # crashed on the graphics card: CPU from now on
+                    _cpu_only = True
+                    print("[compose] composing on the CPU from now on (slower)", file=sys.stderr, flush=True)
+                    try:
+                        retry = compose_many([job], timeout_each=timeout_each)[0]
+                    except ComposeError as e:
+                        errors.append(str(e))
+                        retry = None
+                    if retry:
+                        results[i] = retry
+                        if on_piece is not None:
+                            on_piece(i, retry)
                 continue
             if not r.get("ok"):
                 errors.append(r.get("error") or "that piece failed")
@@ -360,7 +408,7 @@ def normalize_files(campaign_dir) -> List[Dict[str, Any]]:
                    if f.suffix.lower() in (".ogg", ".wav"))
     if not files:
         return []
-    done = subprocess.run([str(py), str(SCRIPT), "--normalize", *files], capture_output=True, text=True,
+    done = subprocess.run([str(py), str(SCRIPT), "--normalize", *files], capture_output=True, text=True, **NO_WINDOW,
                           encoding="utf-8", errors="replace", timeout=600, env={**os.environ, "PYTHONUTF8": "1"})
     got = [json.loads(l) for l in done.stdout.splitlines() if l.strip().startswith("{")]
     if not got:
