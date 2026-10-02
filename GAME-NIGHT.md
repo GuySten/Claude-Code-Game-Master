@@ -264,6 +264,11 @@ bash tools/gm-image.sh chronicler --name "Astreus" --style "ink-and-watercolor f
 Players find all of it in the **🖼** gallery next to the location name: *Places*, *People*,
 *Foes* and *Treasures*, listing only what they've already seen.
 
+The picture model is only ever told how things *look*, never their names (a name's words get
+drawn literally: a snake called "Old Mother Coil" came out as a woman). Scene pictures also get
+the stored description of the place the party is in, so places described when the party
+arrives look right.
+
 To keep characters on-model, every PC and NPC needs a stored appearance. Ask the GM *"write
 appearances for everyone in the party"*: characters created on the join page don't have one yet.
 

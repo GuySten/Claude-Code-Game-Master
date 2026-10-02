@@ -159,8 +159,26 @@ def test_no_style_lock_skips_only_the_style(dcc_world):
     assert "boxer shorts" in out
 
 
-def test_both_locks_off_leaves_the_prompt_untouched(dcc_world):
+def test_every_lock_off_leaves_the_prompt_untouched(dcc_world):
     campaign, name = _campaign_with_style_and_appearance(dcc_world)
     prompt = f"{name} as a stained-glass saint"
-    assert build_prompt(prompt, [name], campaign,
-                        style_lock=False, appearance_lock=False) == prompt
+    assert build_prompt(prompt, [name], campaign, style_lock=False, appearance_lock=False,
+                        keep_names=True) == prompt
+
+
+def test_the_picture_model_gets_looks_not_names(dcc_world):
+    campaign, name = _campaign_with_style_and_appearance(dcc_world)
+    out = build_prompt(f"{name} kicks in the door; {name}'s gauntlet glows", [name], campaign)
+    assert name not in out
+    assert out.startswith("the man kicks in the door; the man's gauntlet glows")
+
+
+def test_the_place_lock_adds_how_the_setting_looks(dcc_world):
+    import json as _json
+    campaign, name = _campaign_with_style_and_appearance(dcc_world)
+    (campaign / "locations.json").write_text(_json.dumps({"The Crooked Lantern": {
+        "position": "on the river road", "description": "a smoky inn with a sagging roof"}}))
+    out = build_prompt("a brawl breaks out", [], campaign, place="the crooked lantern")
+    assert "Setting (render faithfully): a smoky inn with a sagging roof. on the river road." in out
+    assert "Crooked Lantern" not in out                               # its look, not its name
+    assert "Setting" not in build_prompt("a brawl", [], campaign)     # no place: nothing added

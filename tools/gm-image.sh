@@ -63,6 +63,8 @@ case "$ACTION" in
                 --character) CHARS+=(--character "$2") ; shift 2 ;;
                 --no-style-lock)      LOCKS+=(--no-style-lock)      ; shift ;;
                 --no-appearance-lock) LOCKS+=(--no-appearance-lock) ; shift ;;
+                --no-place-lock)      LOCKS+=(--no-place-lock)      ; shift ;;
+                --place)     LOCKS+=(--place "$2") ; shift 2 ;;
                 *) error "Unknown flag: $1" ; exit 1 ;;
             esac
         done

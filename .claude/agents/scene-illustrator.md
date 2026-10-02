@@ -38,9 +38,21 @@ bash tools/gm-image.sh generate --title "<title>" \
 # --quality low (gag) | medium (default) | high (marquee)
 ```
 
-`--character` auto-injects that character's appearance and the locked style is
-auto-appended — but still open with the style and describe each character so
-recurring faces stay on-model.
+`--character` auto-injects that character's appearance, the locked style is
+auto-appended, and so is the look of the place the party is in now (its stored
+description). Still open with the style and describe each character so recurring
+faces stay on-model.
+
+**No names in the prompt.** The image model doesn't know who "Old Mother Coil" or
+"The Crooked Lantern" is, and draws the words literally (a woman, a lantern).
+Describe everyone and everything by how they look ("the halfling rogue with red
+curls", "a coiled giant serpent", "a smoky riverside inn"). Recorded characters'
+names are replaced by such descriptions anyway, but places, items and anyone
+unrecorded are not.
+
+**Somewhere else?** `--place "<location>"` when the scene isn't where the party is
+now (a place they're looking at, a memory of a known place); `--no-place-lock` for
+a dream, vision or flashback.
 
 **Deliberate breaks** (only when the beat brief asks for one — a transformation,
 disguise, dream, or flashback): the flags suppress the auto-append, so YOU must

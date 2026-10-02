@@ -132,7 +132,8 @@ def test_portraits_are_drawn_and_kept_on_the_record(forge):
     assert (sent["width"], sent["height"]) == (832, 1216)                 # a portrait shape
     # Her sex leads the prompt (models weigh the start most), and Forge is told
     # what NOT to draw.
-    assert sent["prompt"].startswith("Character portrait of a woman: Pip, a female Halfling Rogue.")
+    assert sent["prompt"].startswith("Character portrait of a woman, a female Halfling Rogue.")
+    assert "Pip" not in sent["prompt"]                                   # looks, never names
     assert sent["negative_prompt"].startswith("man, male, masculine face, beard")
     assert "red curls" in sent["prompt"] and "ink and watercolor" in sent["prompt"]
     assert json.loads((camp / "character.json").read_text())["portrait"] == out["portrait"]
@@ -141,7 +142,7 @@ def test_portraits_are_drawn_and_kept_on_the_record(forge):
     npc = image_gen.generate_portrait("Grimnar", camp)
     sent = forge["seen"]["requests"][-1]
     assert "dwarf blacksmith" in sent["prompt"]
-    assert sent["prompt"].startswith("Character portrait of Grimnar")      # sex unknown: no guess
+    assert sent["prompt"].startswith("Character portrait of a person")     # sex unknown: no guess
     assert not sent["negative_prompt"].startswith(("man,", "woman,"))
     assert json.loads((camp / "npcs.json").read_text())["Grimnar"]["portrait"] == npc["portrait"]
     with pytest.raises(image_gen.ImageGenError, match="No character"):
@@ -159,7 +160,8 @@ def test_places_are_painted_and_kept_on_the_location(forge):
     out = image_gen.generate_location_image("the crooked lantern", camp)
     sent = forge["seen"]["requests"][-1]
     assert (sent["width"], sent["height"]) == (1216, 832)
-    assert "Establishing view of The Crooked Lantern" in sent["prompt"] and "green lantern" in sent["prompt"]
+    assert "Establishing view of a place." in sent["prompt"] and "green lantern" in sent["prompt"]
+    assert "Crooked Lantern" not in sent["prompt"]
     saved = json.loads((camp / "locations.json").read_text())
     assert saved["The Crooked Lantern"]["image"] == out["image"]
     with pytest.raises(image_gen.ImageGenError, match="No location"):
@@ -171,7 +173,7 @@ def test_foes_bosses_and_treasures_are_painted_and_kept(forge):
     (camp / "npcs.json").write_text(json.dumps({"Grimaldi": {"description": "a rotting circus ringmaster"}}))
     foe = image_gen.generate_enemy_portrait("grimaldi", camp)
     sent = forge["seen"]["requests"][-1]
-    assert "Menacing portrait of Grimaldi, a rotting circus ringmaster" in sent["prompt"]
+    assert "Menacing portrait of a rotting circus ringmaster" in sent["prompt"] and "Grimaldi" not in sent["prompt"]
     assert (sent["width"], sent["height"], sent["steps"]) == (832, 1216, 6)
     boss = image_gen.generate_enemy_portrait("Grimaldi", camp, boss=True)
     sent = forge["seen"]["requests"][-1]
@@ -185,7 +187,7 @@ def test_foes_bosses_and_treasures_are_painted_and_kept(forge):
 
     item = image_gen.generate_item_image("Sword of Dawn", camp, look="a sunsteel blade", owner="Pip")
     sent = forge["seen"]["requests"][-1]
-    assert "Treasure art of Sword of Dawn: a sunsteel blade" in sent["prompt"]
+    assert "Treasure art of a sunsteel blade" in sent["prompt"] and "Dawn" not in sent["prompt"]
     assert (sent["width"], sent["height"]) == (1024, 1024)
     assert json.loads((camp / "treasures.json").read_text())["Sword of Dawn"] == {
         "image": item["image"], "look": "a sunsteel blade", "owner": "Pip"}
@@ -263,5 +265,5 @@ def test_a_creature_is_painted_as_a_creature_whatever_its_name(forge):
     image_gen.generate_portrait("Ember", camp)
     assert forge["seen"]["requests"][-1]["prompt"].startswith("Portrait of an owl")
     image_gen.generate_portrait("Marta", camp)                       # a person with a pet snake
-    assert forge["seen"]["requests"][-1]["prompt"].startswith("Character portrait of Marta")
+    assert forge["seen"]["requests"][-1]["prompt"].startswith("Character portrait of a person")
     assert image_gen.creature_of({"description": "נחשה ענקית"}) == "snake"

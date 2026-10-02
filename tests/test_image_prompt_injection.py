@@ -29,8 +29,8 @@ def test_injects_even_when_prompt_names_the_character(dcc_world):
     campaign, name = _campaign_with_appearance(dcc_world)
     prompt = f"{name} swings a club at the Terror Clown"
     out = inject_appearances(prompt, [name], campaign)
-    assert "Character (render exactly):" in out
-    assert "boxer shorts" in out
+    assert "The man (render exactly): male, late 20s, Human" in out     # labelled by look, not name
+    assert "boxer shorts" in out and f"{name} —" not in out
 
 
 def test_injection_is_idempotent(dcc_world):

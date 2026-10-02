@@ -373,25 +373,113 @@ def _forge_generate(prompt: str, quality: str, size: str, avoid: str = ""):
         raise ImageGenError("Forge answered without an image.") from e
 
 
-def inject_appearances(prompt: str, characters, campaign_dir=None) -> str:
-    """Append each named character's canonical look to the prompt. Idempotent.
-
-    Always injects when a stored appearance exists — a beat prompt naturally
-    names its characters ("Carl swings the club..."), and until 2026-08-13 that
-    name-mention suppressed the injection, letting recurring characters drift
-    off-model. Only an appearance line already present verbatim is skipped.
-    """
-    out = prompt
-    for cname in (characters or []):
-        line = appearance_line(cname, campaign_dir)
-        if line and line not in out:
-            out = f"{out.rstrip()}\n\nCharacter (render exactly): {line}"
+def character_records(campaign_dir) -> dict:
+    """Every recorded PC and NPC: name -> record."""
+    out: dict = {}
+    if not campaign_dir:
+        return out
+    import party_roster
+    from character_schema import to_flat
+    for _path, raw in party_roster.all_pcs(Path(campaign_dir)):
+        rec = to_flat(raw)
+        if rec.get("name"):
+            out[str(rec["name"])] = rec
+    try:
+        npcs = json.loads((Path(campaign_dir) / "npcs.json").read_text(encoding="utf-8"))
+        npcs = npcs["npcs"] if isinstance(npcs.get("npcs"), dict) else npcs
+        for key, data in npcs.items():
+            if isinstance(data, dict):
+                out.setdefault(key, dict(data, name=key))
+    except (OSError, ValueError, AttributeError):
+        pass
     return out
+
+
+def visual_tag(rec: dict) -> str:
+    """A character as a picture model can draw them, without their name:
+    'the halfling woman', 'the snake', 'the dwarf'. (A name means nothing to the
+    model, and its words get drawn: "Old Mother Coil" became a woman.)"""
+    creature = creature_of(rec)
+    if creature:
+        return f"the {creature}"
+    va = va_mod.normalize(rec.get("visual_appearance"))
+    kind = (va["species"] or va["race"] or str(rec.get("race") or "")).strip().lower()
+    noun = {"male": "man", "female": "woman"}.get(sex_of(rec), "")
+    if kind and noun and kind not in ("human",):
+        return f"the {kind} {noun}"
+    return f"the {noun or kind or 'figure'}"
+
+
+def visual_tags(names, records: dict) -> dict:
+    """name -> visual tag, told apart when two would read the same."""
+    tags = {n: visual_tag(records[n]) for n in names if n in records}
+    seen: dict = {}
+    for n, tag in tags.items():
+        seen.setdefault(tag, []).append(n)
+    for tag, same in seen.items():
+        if len(same) > 1:
+            for i, n in enumerate(same):
+                va = va_mod.normalize(records[n].get("visual_appearance"))
+                extra = (f"with {va['hair']} hair" if va["hair"] else
+                         f"in {va['clothing']}" if va["clothing"] else f"number {i + 1}")
+                tags[n] = f"{tag} {extra}"
+    return tags
+
+
+def scrub_names(text: str, records: dict) -> tuple:
+    """Replace the recorded characters' names in ``text`` with their visual tags
+    ("Pip's dagger" -> "the halfling woman's dagger"). -> (text, {name: tag})."""
+    present = [n for n in sorted(records, key=len, reverse=True)
+               if re.search(r"(?<![\w])" + re.escape(n) + r"(?![\w])", text)]
+    tags = visual_tags(present, records)
+    for n in present:
+        text = re.sub(r"(?<![\w])" + re.escape(n) + r"(?![\w])", tags[n], text)
+    return text, tags
+
+
+def inject_appearances(prompt: str, characters, campaign_dir=None, tags=None) -> str:
+    """Append each named character's canonical look to the prompt, labelled by how
+    they look ("The halfling woman (render exactly): ..."), never by name.
+    Idempotent: an appearance already in the prompt isn't added again."""
+    records = character_records(campaign_dir or resolve_campaign_dir())
+    wanted = [c for c in (characters or []) if c in records or
+              any(k.lower() == str(c).lower() for k in records)]
+    names = [next(k for k in records if k.lower() == str(c).lower()) for c in wanted]
+    tags = {**visual_tags(names, records), **(tags or {})}
+    out = prompt
+    for name in names:
+        line = va_mod.format_line(name, records[name].get("visual_appearance"))
+        if not line:
+            continue
+        body = line[len(name) + 3:] if line.startswith(f"{name} — ") else line
+        if body not in out:
+            label = tags.get(name, "the figure")
+            out = f"{out.rstrip()}\n\n{label[:1].upper() + label[1:]} (render exactly): {body}"
+    return out
+
+
+def current_place(campaign_dir) -> Optional[str]:
+    """Where the party is now (the campaign overview), or None."""
+    try:
+        data = json.loads((Path(campaign_dir) / "campaign-overview.json").read_text(encoding="utf-8"))
+        here = (data.get("player_position") or {}).get("current_location")
+        return str(here).strip() if here and str(here).strip() else None
+    except (OSError, ValueError, AttributeError, TypeError):
+        return None
+
+
+def place_setting(name: str, campaign_dir) -> str:
+    """How a recorded place looks (its description and position), without its name."""
+    found = find_location(name, campaign_dir) if name and campaign_dir else None
+    if not found:
+        return ""
+    bits = [str(found[2].get(k) or "").strip() for k in ("description", "position")]
+    return " ".join(b.rstrip(".") + "." for b in bits if b and b.lower() != "unknown")
 
 
 def build_prompt(prompt: str, characters=None, campaign_dir=None, *,
                  style_lock: bool = True, appearance_lock: bool = True,
-                 chronicler=None) -> str:
+                 chronicler=None, keep_names: bool = False, place: Optional[str] = None) -> str:
     """The prompt actually sent to the model: the caller's text plus the two locks.
 
     Both locks default ON and stay belt-and-braces — they fire even on a direct
@@ -400,7 +488,17 @@ def build_prompt(prompt: str, characters=None, campaign_dir=None, *,
     (``style_lock=False``), or a transformation, disguise, or vision where the
     stored look is deliberately wrong (``appearance_lock=False``).
     """
-    final = inject_appearances(prompt, characters, campaign_dir) if appearance_lock else prompt
+    # No names for the picture model: recorded characters become how they look.
+    tags: dict = {}
+    final = prompt
+    if not keep_names:
+        final, tags = scrub_names(prompt, character_records(campaign_dir or resolve_campaign_dir()))
+    if appearance_lock:
+        final = inject_appearances(final, characters, campaign_dir, tags)
+    if place:                                  # the place lock: how the setting looks
+        setting = place_setting(place, campaign_dir)
+        if setting and setting not in final:
+            final = f"{final.rstrip()}\n\nSetting (render faithfully): {setting}"
 
     # Lock the campaign's art-style signature into every prompt so the gallery
     # reads like one artbook even if the caller forgets to restate the style.
@@ -417,7 +515,7 @@ def build_prompt(prompt: str, characters=None, campaign_dir=None, *,
 def generate_image(prompt: str, *, title: str = "", quality: str = DEFAULT_QUALITY,
                    size: str = DEFAULT_SIZE, model: str = DEFAULT_MODEL,
                    characters=None, style_lock: bool = True,
-                   appearance_lock: bool = True, campaign_dir=None, avoid: str = "") -> dict:
+                   appearance_lock: bool = True, campaign_dir=None, avoid: str = "", place: Optional[str] = None) -> dict:
     """Generate one image and save it under the active campaign's images/ dir.
 
     ``characters`` is an optional list of character names in frame; each one's
@@ -448,7 +546,7 @@ def generate_image(prompt: str, *, title: str = "", quality: str = DEFAULT_QUALI
     chronicler = load_chronicler(campaign_dir)
     final_prompt = build_prompt(prompt, characters, campaign_dir,
                                 style_lock=style_lock, appearance_lock=appearance_lock,
-                                chronicler=chronicler)
+                                chronicler=chronicler, place=place)
 
     if source == "forge":
         image_bytes, model, size = _forge_generate(final_prompt, quality, size, avoid)
@@ -571,19 +669,19 @@ def portrait_prompt(record: dict) -> str:
     about = record.get("concept") or record.get("description") or ""
     creature = creature_of(record)
     if creature:
-        # What it IS comes first; the name comes last (a name like "Old Mother
-        # Coil" would otherwise make it a woman).
+        # What it IS comes first, and no name (a name like "Old Mother Coil"
+        # made it a woman).
         a = "an" if creature[0] in "aeiou" else "a"
         lines = [f"Portrait of {a} {creature}, an animal, not a person" + (f": {about}" if about else "") + "."]
-        lines.append("Close-up of the creature, its head and body, simple softly lit background, no "
-                     f"text. (It is called {name}.)")
+        lines.append("Close-up of the creature, its head and body, simple softly lit background, "
+                     "no text.")
         return " ".join(lines)
     sex = sex_of(record)
     if sex:
         adj, noun, _ = SEXES[sex]
-        lines = [f"Character portrait of a {noun}: {name}, a {adj} {who or noun}."]
+        lines = [f"Character portrait of a {noun}, a {adj} {who or noun}."]
     else:
-        lines = [f"Character portrait of {name}" + (f", {who}" if who else "") + "."]
+        lines = [f"Character portrait of a {who or 'person'}."]
     if about:
         lines.append(f"Who they are: {about}.")
     lines.append("Head-and-shoulders portrait facing the viewer, expressive detailed face, "
@@ -644,11 +742,10 @@ def location_is_important(rec: dict) -> bool:
 
 
 def location_prompt(name: str, rec: dict) -> str:
-    bits = [f"Establishing view of {name}."]
-    for k in ("description", "position"):
-        v = str(rec.get(k) or "").strip()
-        if v and v.lower() != "unknown":
-            bits.append(v.rstrip(".") + ".")
+    seen = [str(rec.get(k) or "").strip() for k in ("description", "position")]
+    seen = [v.rstrip(".") + "." for v in seen if v and v.lower() != "unknown"]
+    # What it looks like, not what it's called ("The Crooked Lantern" isn't a lantern).
+    bits = ["Establishing view of a place."] + seen if seen else [f"Establishing view of {name}."]
     bits.append("Wide cinematic environment art with the place itself as the subject: "
                 "architecture, landscape, light and atmosphere; no close-up figures, no text.")
     return " ".join(bits)
@@ -712,8 +809,11 @@ def treasure_art(name: str, campaign_dir) -> str:
     return f if f and (Path(campaign_dir) / "images" / f).is_file() else ""
 
 
-def enemy_prompt(name: str, about: str, boss: bool) -> str:
-    who = f"{name}" + (f", {about.rstrip('.')}" if about else "")
+def enemy_prompt(name: str, about: str, boss: bool, recorded: bool = False) -> str:
+    """A recorded character is described by how they look, never their name; an
+    unrecorded foe's name is what it is ("Cave Troll"), so it stays."""
+    about = about.rstrip(".")
+    who = about if (recorded and about) else (f"{name}, {about}" if about else name)
     if boss:
         return (f"Epic boss portrait of {who}. The climactic villain of the story: towering, "
                 "terrifying and magnificent, seen from a low heroic angle, dramatic backlight and "
@@ -731,7 +831,7 @@ def generate_enemy_portrait(name: str, campaign_dir=None, boss: bool = False, lo
     found = _find_character(name, campaign_dir)
     rec = found[2] if found else {}
     about = look or rec.get("description") or rec.get("concept") or ""
-    out = generate_image(enemy_prompt(rec.get("name", name), about, boss),
+    out = generate_image(enemy_prompt(rec.get("name", name), about, boss, recorded=bool(found)),
                          title=f"{'boss' if boss else 'foe'} {name}",
                          quality=quality or ("high" if boss else DEFAULT_QUALITY), size="1024x1536",
                          characters=[rec["name"]] if found else None, campaign_dir=campaign_dir)
@@ -747,7 +847,7 @@ def generate_enemy_portrait(name: str, campaign_dir=None, boss: bool = False, lo
 
 
 def item_prompt(name: str, look: str) -> str:
-    return (f"Treasure art of {name}" + (f": {look.rstrip('.')}" if look else "") + ". The object "
+    return (f"Treasure art of {look.rstrip('.') if look else name}. The object "
             "alone as the hero of the picture, on a dark backdrop with dramatic light, fine "
             "craftsmanship, glowing with magic if it is magical, rich detail, no text.")
 
@@ -833,6 +933,11 @@ def main() -> None:
                         help="Character in frame; auto-injects their visual_appearance. Repeatable.")
     parser.add_argument("--no-style-lock", dest="style_lock", action="store_false",
                         help="Skip the campaign art-style injection (dream sequence, flashback)")
+    parser.add_argument("--place", metavar="NAME",
+                        help="Where the scene happens (default: where the party is now); "
+                             "its stored description goes into the picture")
+    parser.add_argument("--no-place-lock", dest="place_lock", action="store_false",
+                        help="Don't add the place's look (a dream, a flashback, a vision)")
     parser.add_argument("--no-appearance-lock", dest="appearance_lock", action="store_false",
                         help="Skip the visual_appearance injection (transformation, disguise, vision)")
     parser.add_argument("--portrait", metavar="NAME",
@@ -931,10 +1036,13 @@ def main() -> None:
     prompt = args.prompt if args.prompt is not None else sys.stdin.read()
 
     try:
+        place = None
+        if args.place_lock:
+            place = args.place or current_place(resolve_campaign_dir())
         result = generate_image(prompt, title=args.title, quality=args.quality,
                                 size=args.size, characters=args.character,
                                 style_lock=args.style_lock,
-                                appearance_lock=args.appearance_lock)
+                                appearance_lock=args.appearance_lock, place=place)
     except ImageGenError as e:
         print(f"[ERROR] {e}", file=sys.stderr)
         sys.exit(1)
