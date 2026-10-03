@@ -25,8 +25,11 @@ import subprocess
 import tempfile
 from typing import Any, Callable, Dict, Iterable, List, Optional
 
-NARRATOR_MODEL = os.environ.get("NARRATOR_MODEL", "haiku")
-API_MODEL = os.environ.get("NARRATOR_API_MODEL", "claude-haiku-4-5")
+# Sonnet, not Haiku: hover cards, answers and translations are read by players in
+# their own language, and Haiku's Hebrew was visibly broken. With thinking off
+# (see _claude) Sonnet answers as fast. NARRATOR_MODEL / NARRATOR_API_MODEL override.
+NARRATOR_MODEL = os.environ.get("NARRATOR_MODEL", "sonnet")
+API_MODEL = os.environ.get("NARRATOR_API_MODEL", "claude-sonnet-5-5")
 LOG_CHARS = 40000          # the newest part of the story the narrator reads
 TIMEOUT = 90
 RULES_CHARS = 8000       # the most of a table's rules the narrator reads
