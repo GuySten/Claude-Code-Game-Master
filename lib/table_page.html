@@ -2296,11 +2296,16 @@
   // ---------------------------------------------- hover cards for names ---
   let loreTerms = [], loreSig = "", loreRe = null;
   const loreCards = new Map();          // term -> {data, at}
+  // Hebrew vowel points (niqqud): a name matches with or without them (קֶסְטְרֶל, קסטרל).
+  const NIQQUD = /[\u0591-\u05BD\u05BF\u05C1\u05C2\u05C4\u05C5\u05C7]/g;
+  const unpointed = (s) => s.replace(NIQQUD, "");
   function buildLoreRe() {
     if (!loreTerms.length) { loreRe = null; return; }
     const esc_ = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pointable = (s) => [...unpointed(s)].map((ch) => esc_(ch) +
+      (/[\u05D0-\u05EA]/.test(ch) ? "[\\u0591-\\u05BD\\u05BF\\u05C1\\u05C2\\u05C4\\u05C5\\u05C7]*" : "")).join("");
     loreRe = new RegExp(loreTerms.map((t) => /[A-Za-z]/.test(t.term)
-      ? "(?<![\\p{L}\\p{N}])" + esc_(t.term) + "(?![\\p{L}\\p{N}])" : esc_(t.term)).join("|"), "giu");
+      ? "(?<![\\p{L}\\p{N}])" + esc_(t.term) + "(?![\\p{L}\\p{N}])" : pointable(t.term)).join("|"), "giu");
   }
   function wrapLore(body) {
     if (!loreRe || !body) return;
@@ -2320,7 +2325,7 @@
       while ((mm = loreRe.exec(text))) {
         if (mm.index > last) frag.appendChild(document.createTextNode(text.slice(last, mm.index)));
         const span = document.createElement("span");
-        span.className = "lore"; span.textContent = mm[0]; span.dataset.term = mm[0];
+        span.className = "lore"; span.textContent = mm[0]; span.dataset.term = unpointed(mm[0]);
         span.tabIndex = 0;
         frag.appendChild(span);
         last = mm.index + mm[0].length;

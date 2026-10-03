@@ -18,6 +18,9 @@ from typing import Dict, Iterable, List, Optional
 
 DEFAULT = ["en"]
 
+# Hebrew vowel points and cantillation (not the maqaf ־ or other punctuation).
+NIQQUD = re.compile("[\u0591-\u05BD\u05BF\u05C1\u05C2\u05C4\u05C5\u05C7]")
+
 # code -> (English name, the language's own name)
 KNOWN: Dict[str, tuple] = {
     "en": ("English", "English"), "he": ("Hebrew", "עברית"), "ar": ("Arabic", "العربية"),

@@ -207,6 +207,9 @@ def translate(strings: List[str], lang: str,
     if not strings or source == "off":
         return {}
     system = (UI_RULES if kind == "ui" else TRANSLATE_RULES).format(lang=LANG_NAMES.get(lang, lang))
+    if _languages.base(lang) == "he" and kind != "ui":
+        # A name from another language is hard to read in Hebrew letters alone.
+        system += " Write every personal and place name with full niqqud (vowel points)."
     # Numbered: the answer comes back by number, so a phrase the model retypes a
     # little differently (or translates) can't lose its translation.
     numbered = {str(i + 1): s for i, s in enumerate(strings)}
@@ -280,9 +283,11 @@ def find_names(passage: str, names: List[str], lang: str,
         return {}
     listed = {n.lower(): n for n in names}
     out = {}
+    # Compared without niqqud: the passage may point a name the model copies bare.
+    plain = lambda s: _languages.NIQQUD.sub("", s)
     for name, spelling in (got.items() if isinstance(got, dict) else []):
-        spelling = " ".join(str(spelling).split())
-        if str(name).lower() in listed and len(spelling) >= 2 and spelling in passage:
+        spelling = plain(" ".join(str(spelling).split()))
+        if str(name).lower() in listed and len(spelling) >= 2 and spelling in plain(passage):
             out[listed[str(name).lower()]] = spelling
     return out
 

@@ -1413,6 +1413,23 @@ def test_hebrew_narration_spellings_of_known_names_are_learned(table):
     assert len(asked) == 2 and "Marta" not in asked[1]["names"]
 
 
+def test_a_name_written_with_niqqud_is_the_same_name(table):
+    call, state, camp = table["call"], table["state"], table["camp"]
+    state.set_round_seconds(0)
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    (camp / "npcs.json").write_text(json.dumps({"Marta": {"description": "innkeeper"}}))
+    state.narrator_ask = lambda system, prompt: "{}" if "passage" in system else "A card."
+    state.set_alias("Marta", "מָרְתָּה")                        # recorded pointed: kept plain
+    assert state.aliases() == {"מרתה": "Marta"}
+    call("/api/lang", {"code": CODE, "token": pip, "lang": "he"})
+    call("/api/gm/say", {"text": "מָרְתָּה פותחת את הדלת.", "lang": "he"}, host=True)
+    terms = {t["term"]: t for t in call(f"/api/info?code={CODE}&token={pip}")[1]["lore_terms"]}
+    assert terms["מרתה"]["of"] == "Marta" and terms["מרתה"]["n"] == 1   # pointed narration counts
+    status, card = call(f"/api/lore?code={CODE}&token={pip}&term=" +
+                        urllib.parse.quote("מָרְתָּה"))
+    assert status == 200 and card
+
+
 def test_every_player_character_has_a_card_and_the_sheet_speaks_the_players_language(table):
     call, state, camp = table["call"], table["state"], table["camp"]
     pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]

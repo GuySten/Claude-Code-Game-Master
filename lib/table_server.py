@@ -83,6 +83,12 @@ import table_tts
 from campaign_manager import CampaignManager
 from character_schema import to_flat
 
+
+def fold_name(s: str) -> str:
+    """A name as compared: lower case, without niqqud, so קֶסְטְרֶל is קסטרל."""
+    return languages.NIQQUD.sub("", str(s)).lower()
+
+
 MAX_TEXT = 4000            # longest single message (GM narration can be long)
 MAX_PLAYER_TEXT = 1200     # longest player action
 MAX_BODY = 16 * 1024
@@ -584,7 +590,7 @@ class TableState:
     def set_alias(self, name: str, alias: str) -> None:
         with self.lock:
             data = self.aliases()
-            data[" ".join(alias.split())] = " ".join(name.split())
+            data[" ".join(languages.NIQQUD.sub("", alias).split())] = " ".join(name.split())
             tmp = self.aliases_path.with_suffix(".tmp")
             tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
             tmp.replace(self.aliases_path)
@@ -605,18 +611,18 @@ class TableState:
         spellings, so they get hover cards too (a small model)."""
         import narrator
         with self.spelling_lock:                 # one at a time
-            low = text.lower()
+            low = fold_name(text)
             aliases = self.aliases()
-            spelled = {n.lower() for a, n in aliases.items() if a.lower() in low}
+            spelled = {n.lower() for a, n in aliases.items() if fold_name(a) in low}
             names = [n for n in self._named_things()
-                     if n.lower() not in low and n.lower() not in spelled][:200]
+                     if fold_name(n) not in low and n.lower() not in spelled][:200]
             try:
                 found = narrator.find_names(text, names, lang, ask=self.narrator_ask)
             except Exception as e:               # offline...: names just aren't hoverable
                 print(f"[lore] finding names: {e}", flush=True)
                 return
             for name, spelling in found.items():
-                if spelling.lower() != name.lower() and spelling not in aliases:
+                if fold_name(spelling) != fold_name(name) and languages.NIQQUD.sub("", spelling) not in aliases:
                     self.set_alias(name, spelling)
 
     def _named_things(self) -> Dict[str, str]:
@@ -651,7 +657,7 @@ class TableState:
         """name (lower case) -> every spelling of it the story may use."""
         out: Dict[str, set] = {}
         for alias, name in self.aliases().items():
-            out.setdefault(name.lower(), {name.lower()}).add(alias.lower())
+            out.setdefault(name.lower(), {fold_name(name)}).add(fold_name(alias))
         return out
 
     def lore_terms(self, viewer: Optional[str], lang: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -664,21 +670,22 @@ class TableState:
         key = ("terms", viewer, self.rev, lang)
         if key in self.lore_cache:
             return self.lore_cache[key]["terms"]
-        lines = [l.lower() for l in narrator.story_lines(self.since(0, viewer), viewer or "", lang)]
+        # Compared without niqqud: narration may point a name (קֶסְטְרֶל) or not.
+        lines = [fold_name(l) for l in narrator.story_lines(self.since(0, viewer), viewer or "", lang)]
         seen = "\n".join(lines)
         things = self._named_things()
         spellings = self._spellings()
 
         def mentions(name: str) -> Dict[str, int]:
             """How many story lines mention it, and the latest one that does."""
-            forms = spellings.get(name.lower(), {name.lower()})
+            forms = spellings.get(name.lower(), {fold_name(name)})
             hits = [i for i, l in enumerate(lines) if any(f in l for f in forms)]
             return {"n": len(hits), "last": hits[-1] if hits else -1}
 
-        out = [{"term": n, "kind": k, **mentions(n)} for n, k in things.items() if n.lower() in seen]
+        out = [{"term": n, "kind": k, **mentions(n)} for n, k in things.items() if fold_name(n) in seen]
         for alias, name in self.aliases().items():
             kind = things.get(name) or next((k for n, k in things.items() if n.lower() == name.lower()), None)
-            if kind and alias.lower() in seen:
+            if kind and fold_name(alias) in seen:
                 out.append({"term": alias, "kind": kind, "of": name, **mentions(name)})
         out.sort(key=lambda t: -len(t["term"]))
         self.lore_cache = {k: v for k, v in self.lore_cache.items()
@@ -696,8 +703,8 @@ class TableState:
         import image_gen
         import narrator
         lang = self.lang_for(viewer, lang)
-        known = {t["term"].lower(): t for t in self.lore_terms(viewer, lang)}
-        hit = known.get(" ".join(str(term).split()).lower())
+        known = {fold_name(t["term"]): t for t in self.lore_terms(viewer, lang)}
+        hit = known.get(fold_name(" ".join(str(term).split())))
         party = self.party()
         if not hit:                             # everyone at the table knows who's at the table
             pc = next((p["name"] for p in party if party_roster._same_name(p["name"], term)), None)
@@ -705,9 +712,9 @@ class TableState:
         if not hit:
             return None                         # not met in the story: nothing to say
         name, kind = hit.get("of") or hit["term"], hit["kind"]
-        forms = self._spellings().get(name.lower(), {name.lower()})
+        forms = self._spellings().get(name.lower(), {fold_name(name)})
         lines = [l for l in narrator.story_lines(self.since(0, viewer), viewer, lang)
-                 if any(f in l.lower() for f in forms)]
+                 if any(f in fold_name(l) for f in forms)]
         key = f"{viewer}|{name.lower()}|{lang}"
         for _ in range(150):                    # no card yet, but one is being made: wait for it
             with self.lock:
