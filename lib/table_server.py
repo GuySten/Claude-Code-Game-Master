@@ -77,6 +77,7 @@ from urllib.parse import parse_qs, urlparse
 sys.path.insert(0, str(Path(__file__).parent))
 
 import composer
+import languages
 import party_roster
 import table_tts
 from campaign_manager import CampaignManager
@@ -88,7 +89,7 @@ MAX_BODY = 16 * 1024
 DEFAULT_PORT = 8765
 IMAGE_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
                ".webp": "image/webp", ".gif": "image/gif"}
-LANGS = {"en": "English", "he": "Hebrew"}
+lang_name = languages.name          # "he" -> "Hebrew" (the adventure's languages: lib/languages.py)
 AUDIO_TYPES = {".mp3": "audio/mpeg", ".ogg": "audio/ogg", ".oga": "audio/ogg",
                ".opus": "audio/ogg", ".m4a": "audio/mp4", ".aac": "audio/aac",
                ".wav": "audio/wav", ".flac": "audio/flac", ".webm": "audio/webm"}
@@ -295,6 +296,12 @@ class TableState:
         self.seats: Dict[str, str] = self._read_json(self.seats_path, {})
         self.langs_path = self.dir / "langs.json"
         self.langs: Dict[str, str] = self._read_json(self.langs_path, {})
+        self._languages: List[str] = []
+        self._languages_at: Optional[float] = None
+        # The page's own words in the adventure's other languages (translated once,
+        # by the Narrator's small model; table/ui-<lang>.json).
+        self.ui_busy: set = set()
+        self.ui_failed: Dict[str, float] = {}
         self.music_path = self.dir / "music.json"
         self.music: Dict[str, Any] = self._read_json(self.music_path, {})
         self.settings_path = self.dir / "settings.json"
@@ -388,8 +395,38 @@ class TableState:
         tmp.write_text(json.dumps(self.seats, indent=2), encoding="utf-8")
         tmp.replace(self.seats_path)
 
+    # --- the adventure's languages ---
+    @property
+    def languages(self) -> List[str]:
+        """The languages this adventure is played in (``gm-table.sh languages``),
+        the first being the one it is mainly told in. English alone by default."""
+        p = languages.path(self.campaign_dir)
+        try:
+            mtime = p.stat().st_mtime
+        except OSError:
+            return languages.load(self.campaign_dir)   # never chosen: follows the players
+        if mtime != self._languages_at:
+            self._languages_at, self._languages = mtime, languages.load(self.campaign_dir)
+        return self._languages
+
+    def multilingual(self) -> bool:
+        return len(self.languages) > 1
+
+    def lang_for(self, viewer: Optional[str], lang: Optional[str] = None) -> str:
+        """``lang`` if the table plays in it, else the viewer's own, else the main one."""
+        langs = self.languages
+        if lang in langs:
+            return lang
+        mine = self.langs.get(viewer) if viewer else None
+        return mine if mine in langs else langs[0]
+
+    def table_langs(self) -> List[str]:
+        """Every language the table's text must exist in: all the adventure's
+        languages, and any a seated player reads."""
+        return list(dict.fromkeys(self.languages + list(self.seated_langs().values())))
+
     def set_lang(self, pc: str, lang: Optional[str]) -> None:
-        if lang not in LANGS or not pc:
+        if not pc or lang not in self.languages:
             return
         with self.lock:
             if self.langs.get(pc) == lang:
@@ -555,9 +592,11 @@ class TableState:
             # the next message).
             self.lore_cache = {k: v for k, v in self.lore_cache.items() if k[0] != "terms"}
 
-    def should_learn_spellings(self, text: str) -> bool:
+    def should_learn_spellings(self, text: str, lang: Optional[str] = None) -> bool:
+        """Narration not in English may spell the campaign's names its own way."""
         import narrator
-        return bool(re.search(r"[\u0590-\u05FF]", text or "")) and (
+        lang = lang or self.text_lang(text or "")
+        return bool(text) and languages.base(lang) != "en" and (
             self.narrator_ask is not None or narrator.backend() != "off")
 
     def _learn_spellings(self, text: str, lang: str) -> None:
@@ -615,13 +654,13 @@ class TableState:
             out.setdefault(name.lower(), {name.lower()}).add(alias.lower())
         return out
 
-    def lore_terms(self, viewer: Optional[str]) -> List[Dict[str, Any]]:
+    def lore_terms(self, viewer: Optional[str], lang: Optional[str] = None) -> List[Dict[str, Any]]:
         """The names this player has met in the story (so they can be hovered).
         A name only appears once the narration they saw has used it: no spoilers.
         Each carries ``n``, how many story lines mention it: a card made at the
         same ``n`` is still current."""
         import narrator
-        lang = self.langs.get(viewer, "en") if viewer else "en"
+        lang = self.lang_for(viewer, lang)
         key = ("terms", viewer, self.rev, lang)
         if key in self.lore_cache:
             return self.lore_cache[key]["terms"]
@@ -642,11 +681,13 @@ class TableState:
             if kind and alias.lower() in seen:
                 out.append({"term": alias, "kind": kind, "of": name, **mentions(name)})
         out.sort(key=lambda t: -len(t["term"]))
-        self.lore_cache = {k: v for k, v in self.lore_cache.items() if k[0] != "terms" or k[1] != viewer}
+        self.lore_cache = {k: v for k, v in self.lore_cache.items()
+                           if k[0] != "terms" or k[1] != viewer or k[3] != lang}
         self.lore_cache[key] = {"terms": out}
         return out
 
-    def lore_card(self, viewer: str, term: str, refresh: bool = False) -> Optional[Dict[str, Any]]:
+    def lore_card(self, viewer: str, term: str, refresh: bool = False,
+                  lang: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """What ``viewer`` knows about ``term``. A card is kept per player and
         language (on disk too) and is current while no new story line mentions the
         name. When the story has moved on, the last card is returned at once
@@ -654,7 +695,8 @@ class TableState:
         background worker): make the card now if it's missing or out of date."""
         import image_gen
         import narrator
-        known = {t["term"].lower(): t for t in self.lore_terms(viewer)}
+        lang = self.lang_for(viewer, lang)
+        known = {t["term"].lower(): t for t in self.lore_terms(viewer, lang)}
         hit = known.get(" ".join(str(term).split()).lower())
         party = self.party()
         if not hit:                             # everyone at the table knows who's at the table
@@ -664,7 +706,6 @@ class TableState:
             return None                         # not met in the story: nothing to say
         name, kind = hit.get("of") or hit["term"], hit["kind"]
         forms = self._spellings().get(name.lower(), {name.lower()})
-        lang = self.langs.get(viewer, "en")
         lines = [l for l in narrator.story_lines(self.since(0, viewer), viewer, lang)
                  if any(f in l.lower() for f in forms)]
         key = f"{viewer}|{name.lower()}|{lang}"
@@ -698,7 +739,7 @@ class TableState:
                 tmp.replace(self.lore_store_path)
             stale = False
         elif stale:
-            self.queue_card(viewer, term)       # the last one now, a fresh one shortly
+            self.queue_card(viewer, term, lang=lang)    # the last one now, a fresh one shortly
         image, sub = None, ""
         if kind == "place":
             image = next((p["image"] for p in self.places() if p["name"].lower() == name.lower()), None)
@@ -722,8 +763,10 @@ class TableState:
         then get the hover cards of what it mentioned ready."""
         try:
             self.announce_level_ups()
-            if self.should_learn_spellings(msg.get("text") or ""):
-                self._learn_spellings(msg.get("text") or "", msg.get("lang") or "he")
+            text = msg.get("text") or ""
+            lang = msg.get("lang") or self.text_lang(text)
+            if self.should_learn_spellings(text, lang):
+                self._learn_spellings(text, lang)
             self.prepare_cards(msg)
         except Exception as e:
             print(f"[lore] after narration: {e}", flush=True)
@@ -750,11 +793,11 @@ class TableState:
             told.append(pc["name"])
         return told
 
-    def queue_card(self, viewer: str, term: str, soon: bool = True) -> None:
+    def queue_card(self, viewer: str, term: str, soon: bool = True, lang: Optional[str] = None) -> None:
         """Make (or bring up to date) a hover card in the background: ``soon`` ones
         (just mentioned) before the rest."""
         with self.lock:
-            job = (viewer, term)
+            job = (viewer, term, self.lang_for(viewer, lang))
             if job in self.card_jobs:
                 if not soon:
                     return
@@ -774,15 +817,18 @@ class TableState:
         import narrator
         if self.narrator_ask is None and narrator.backend() == "off":
             return
-        lang = self.langs.get(viewer, "en")
-        for pc in self.party():                 # and every sheet, in their language
-            self.sheet_translation(viewer, pc["name"])
-        with self.lock:
-            have = set(self.lore_store)
-        terms = sorted(self.lore_terms(viewer), key=lambda t: -t.get("last", -1))
-        for t in terms[:WARM_CARDS]:
-            if f"{viewer}|{(t.get('of') or t['term']).lower()}|{lang}" not in have:
-                self.queue_card(viewer, t["term"], soon=False)
+        # Every language the table plays in, the player's own first: switching
+        # language shows the cards and sheets at once.
+        mine = self.lang_for(viewer)
+        for lang in [mine] + [l for l in self.table_langs() if l != mine]:
+            for pc in self.party():                 # and every sheet, in that language
+                self.sheet_translation(viewer, pc["name"], lang)
+            with self.lock:
+                have = set(self.lore_store)
+            terms = sorted(self.lore_terms(viewer, lang), key=lambda t: -t.get("last", -1))
+            for t in terms[:WARM_CARDS]:
+                if f"{viewer}|{(t.get('of') or t['term']).lower()}|{lang}" not in have:
+                    self.queue_card(viewer, t["term"], soon=False, lang=lang)
 
     def _card_worker(self) -> None:
         while True:
@@ -790,9 +836,9 @@ class TableState:
                 if not self.card_jobs:
                     self.card_workers -= 1
                     return
-                viewer, term = self.card_jobs.pop(0)
+                viewer, term, lang = self.card_jobs.pop(0)
             try:
-                self.lore_card(viewer, term, refresh=True)
+                self.lore_card(viewer, term, refresh=True, lang=lang)
             except Exception as e:              # offline...: the old card stays
                 print(f"[lore] {term}: {e}", flush=True)
 
@@ -806,9 +852,11 @@ class TableState:
         for pc in [p["name"] for p in self.party() if p.get("claimed")]:
             if not self.visible_to(msg, pc):
                 continue
-            mentioned = [t["term"] for t in self.lore_terms(pc) if t["term"].lower() in low]
-            for term in mentioned[:8]:
-                self.queue_card(pc, term)
+            # (a beat told in one language: that language's cards)
+            for lang in [msg["lang"]] if msg.get("lang") else self.table_langs():
+                mentioned = [t["term"] for t in self.lore_terms(pc, lang) if t["term"].lower() in low]
+                for term in mentioned[:8]:
+                    self.queue_card(pc, term, lang=lang)
             self.warm_cards(pc)
 
     def gm_read_since_narration(self) -> bool:
@@ -1097,7 +1145,7 @@ class TableState:
                 msg["to"] = to
             if image:
                 msg["image"] = image
-            if lang in LANGS:
+            if lang and languages.valid(lang):
                 msg["lang"] = lang
             if voice:
                 msg["voice"] = True
@@ -1107,7 +1155,7 @@ class TableState:
             msg["rev"] = self.rev
             self.messages.append(msg)
             if kind == "gm" and not to:
-                self._gm_spoke(lang if lang in LANGS else None)
+                self._gm_spoke(lang if lang and languages.valid(lang) else None)
             if kind == "gm":
                 self.after_busy += 1            # (tests wait for this to reach 0)
                 threading.Thread(target=self._after_narration, args=(dict(msg),), daemon=True).start()
@@ -1204,12 +1252,9 @@ class TableState:
             return {"ok": True, "message": dict(msg)}
 
     # --- translation: every player reads one language ---
-    @staticmethod
-    def text_lang(text: str) -> str:
-        """'he' or 'en', by which script most of the letters are in."""
-        he = sum(1 for ch in text if "\u0590" <= ch <= "\u05ff")
-        latin = sum(1 for ch in text if ch.isascii() and ch.isalpha())
-        return "he" if he > latin else "en"
+    def text_lang(self, text: str) -> str:
+        """Which of the table's languages ``text`` is in, by its writing system."""
+        return languages.guess(text, self.table_langs())
 
     # --- the public dice log: the table rolls, everyone sees ---
     def roll(self, spec: Dict[str, Any]) -> Dict[str, Any]:
@@ -1236,7 +1281,7 @@ class TableState:
                 "outcome": dice.judge(result, target)}
         why = " ".join(str(spec.get("why") or "").split())[:120] or None
         why_tr = {l: " ".join(str(t).split())[:120] for l, t in (spec.get("why_tr") or {}).items()
-                  if l in LANGS and str(t).strip()}
+                  if languages.valid(l) and str(t).strip()}
         pc = " ".join(str(spec.get("pc") or "").split())[:60] or None
         secret = bool(spec.get("secret"))
         with self.lock:
@@ -1256,24 +1301,46 @@ class TableState:
                 "secret": secret}
 
     def needs_translation(self, ids: Optional[List[int]] = None) -> List[Dict[str, Any]]:
-        """Public player actions that some seated player can't read yet:
-        [{id, pc, from, to: [langs], text}] — at a mixed table, or when someone writes
-        in a language the rest of the table doesn't read."""
-        langs = set(self.seated_langs().values())
-        if not langs:
-            return []
+        """What some language at the table can't read yet: [{id, pc, kind, from, to:
+        [langs], text}]. Players' public actions, and GM narration posted without
+        --lang (or whispered), each into every language the adventure is played in
+        (and any a seated player reads), so a player who switches language finds
+        it all there."""
+        langs = set(self.table_langs())
         out = []
         with self.lock:
-            pool = [m for m in self.messages if m["kind"] == "player" and not m.get("to")]
+            pool = [m for m in self.messages if (m["kind"] == "player" and not m.get("to"))
+                    or (m["kind"] == "gm" and not m.get("lang") and (m.get("text") or "").strip())]
             if ids is not None:
                 pool = [m for m in pool if m["id"] in ids]
             for m in pool[-20:]:
                 src = m.get("lang") or self.text_lang(m.get("text", ""))
                 missing = sorted(l for l in langs if l != src and l not in (m.get("tr") or {}))
                 if missing:
-                    out.append({"id": m["id"], "pc": m.get("pc"), "from": src,
-                                "to": missing, "text": m.get("text", "")})
+                    out.append({"id": m["id"], "pc": m.get("pc") or ("GM" if m["kind"] == "gm" else None),
+                                "kind": m["kind"], "from": src, "to": missing,
+                                "text": m.get("text", "")})
         return out
+
+    def missing_versions(self) -> Dict[str, int]:
+        """At a multilingual table: how many of the GM's latest beats (since the
+        players last acted) each language is still missing, e.g. {"he": 1}: the
+        English version is up, the Hebrew one isn't yet."""
+        langs = self.languages
+        if len(langs) < 2:
+            return {}
+        told: List[str] = []
+        with self.lock:
+            for m in reversed(self.messages):
+                if m["kind"] == "player" and not m.get("to"):
+                    break
+                if m["kind"] == "gm" and not m.get("to") and m.get("lang"):
+                    told.append(m["lang"])
+        if not told:
+            return {}
+        counts = {l: told.count(l) for l in langs}
+        top = max(counts.values())
+        return {l: top - n for l, n in counts.items() if n < top}
 
     def translate(self, translations: Dict[str, Dict[str, str]]) -> List[int]:
         """Store translations {message id: {lang: text}}; returns the ids updated."""
@@ -1285,10 +1352,11 @@ class TableState:
                     msg = by_id.get(int(raw_id))
                 except (TypeError, ValueError):
                     continue
-                if msg is None or msg.get("to") or not isinstance(versions, dict):
+                if msg is None or not isinstance(versions, dict) or (
+                        msg.get("to") and msg["kind"] != "gm"):     # (a GM whisper: yes)
                     continue
                 clean = {l: str(t).strip()[:MAX_TEXT] for l, t in versions.items()
-                         if l in LANGS and str(t).strip()}
+                         if languages.valid(l) and str(t).strip()}
                 if not clean:
                     continue
                 msg.setdefault("tr", {}).update(clean)
@@ -1332,7 +1400,9 @@ class TableState:
         now = time.time()
         if self.turn and now - self.turn["started_at"] < STALE_TURN_SECONDS:
             return            # still answering the earlier actions
-        langs = {self.langs.get(n, "en") for n in self.seats.values()} or {"en"}
+        # Every language the adventure is played in has its version of the beat.
+        langs = set(self.table_langs()) if self.multilingual() else (
+            {self.langs.get(n, self.languages[0]) for n in self.seats.values()} or {self.languages[0]})
         self.turn = {"started_at": now, "start_id": self.messages[-1]["id"],
                      "estimate": round(self.turn_estimate(), 1),
                      "stage": "reading", "stage_at": now,
@@ -1513,12 +1583,13 @@ class TableState:
                 if isinstance(data, dict) else {}
         return self.sheet_tr[lang]
 
-    def sheet_translation(self, viewer: Optional[str], name: str) -> Optional[Dict[str, Any]]:
+    def sheet_translation(self, viewer: Optional[str], name: str,
+                          lang: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """{tr: {english: translation}, pending}: the viewer's language for what's
         written on ``name``'s sheet. Missing phrases are translated in the background
         (``pending`` until they land); without a model the sheet stays as written."""
         import narrator
-        lang = self.langs.get(viewer, "en") if viewer else "en"
+        lang = self.lang_for(viewer, lang)
         found = self.sheet_for(viewer, name)          # (another's: only what's public)
         if found is None:
             return None
@@ -1533,6 +1604,68 @@ class TableState:
                 self.sheet_tr_busy.add(lang)
                 threading.Thread(target=self._translate_sheet, args=(lang, missing), daemon=True).start()
         return {"tr": tr, "pending": pending}
+
+    # --- the page's own words, in the adventure's languages ---
+    def ui_strings(self, lang: str) -> Optional[Dict[str, Any]]:
+        """{strings, pending} for the page in ``lang`` (one of the adventure's
+        languages). English and Hebrew come with the page; any other is translated
+        once by the Narrator's small model (in the background) and kept in
+        table/ui-<lang>.json. None: the table isn't played in ``lang``."""
+        import narrator
+        if lang not in self.languages:
+            return None
+        builtin = page_strings()
+        if lang in builtin:
+            return {"strings": builtin[lang], "pending": False}
+        path = self.dir / f"ui-{lang}.json"
+        have = self._read_json(path, {})
+        have = {k: v for k, v in have.items() if isinstance(v, str)} if isinstance(have, dict) else {}
+        missing = [k for k in builtin["en"] if k not in have]
+        can = self.narrator_ask is not None or narrator.backend() != "off"
+        with self.lock:
+            pending = bool(missing) and can and time.time() - self.ui_failed.get(lang, 0) > 600
+            if pending and lang not in self.ui_busy:
+                self.ui_busy.add(lang)
+                threading.Thread(target=self._translate_ui, args=(lang, missing, path),
+                                 daemon=True).start()
+        return {"strings": have, "pending": pending}
+
+    def ui_status(self, lang: str) -> str:
+        if lang in page_strings():
+            return "built in"
+        if lang in self.ui_busy:
+            return "translating"
+        got = self.ui_strings(lang) or {}
+        if not got.get("pending") and len(got.get("strings") or {}) >= len(page_strings()["en"]):
+            return "ready"
+        return "translating" if got.get("pending") else "no model to translate it (the page shows English)"
+
+    def _translate_ui(self, lang: str, keys: List[str], path: Path) -> None:
+        import narrator
+        en = page_strings()["en"]
+        try:
+            todo = [k for k in keys if re.search(r"[^\W\d_]", en[k])]
+            got: Dict[str, str] = {k: en[k] for k in keys if k not in todo}   # (just ⬆, emoji...)
+            for i in range(0, len(todo), 60):
+                part = todo[i:i + 60]
+                tr = narrator.translate([en[k] for k in part], lang, ask=self.narrator_ask, kind="ui")
+                if not tr:
+                    raise RuntimeError("no translation came back")
+                got.update({k: tr[en[k]] for k in part if en[k] in tr})
+            with self.lock:
+                have = self._read_json(path, {})
+                have = have if isinstance(have, dict) else {}
+                have.update(got)
+                tmp = path.with_suffix(".tmp")
+                tmp.write_text(json.dumps(have, ensure_ascii=False, indent=1), encoding="utf-8")
+                tmp.replace(path)
+        except Exception as e:                   # offline...: the page shows English meanwhile
+            print(f"[ui] translating the page to {lang}: {e}", flush=True)
+            with self.lock:
+                self.ui_failed[lang] = time.time()
+        finally:
+            with self.lock:
+                self.ui_busy.discard(lang)
 
     def _translate_sheet(self, lang: str, missing: List[str]) -> None:
         import narrator
@@ -2135,17 +2268,34 @@ def _pretty_key(k: Any) -> str:
     return s[:1].upper() + s[1:]
 
 
+_PAGE_STRINGS: Dict[str, Dict[str, str]] = {}
+
+
+def page_strings() -> Dict[str, Dict[str, str]]:
+    """The page's words in the languages it ships with (lib/table_strings.json)."""
+    if not _PAGE_STRINGS:
+        _PAGE_STRINGS.update(json.loads((Path(__file__).parent / "table_strings.json")
+                                        .read_text(encoding="utf-8")))
+    return _PAGE_STRINGS
+
+
+def page_html() -> str:
+    """table_page.html with its words put in (they live in table_strings.json)."""
+    page = (Path(__file__).parent / "table_page.html").read_text(encoding="utf-8")
+    return page.replace("/*TABLE_STRINGS*/", json.dumps(page_strings(), ensure_ascii=False) + " || ", 1)
+
+
 def sheet_strings(sheet: Dict[str, Any], lang: str = "he") -> List[str]:
     """What a ``lang`` reader would find in another language on a sheet: its values
-    and the labels of its keys (numbers and dice left out). For Hebrew, whatever has
-    English words; for English, whatever has Hebrew. A phrase that mixes the two
-    ("Fire Bolt (קרן אש, 1d10)") is in either way: it comes back all in ``lang``."""
+    and the labels of its keys (numbers and dice left out) — words in another
+    writing system, or, for a language written like English, any words. A phrase
+    that mixes two ("Fire Bolt (קרן אש, 1d10)") is in either way: it comes back
+    all in ``lang``."""
     out: List[str] = []
-    foreign = re.compile(r"[\u0590-\u05FF]") if lang == "en" else re.compile(r"[A-Za-z]{2,}")
 
     def add(s: Any) -> None:
         s = str(s).strip()
-        if s and len(s) <= 800 and foreign.search(s):
+        if s and len(s) <= 800 and languages.foreign_to(s, lang):
             out.append(s)
 
     def walk(v: Any) -> None:
@@ -2182,15 +2332,15 @@ def _held_note(rnd: Dict[str, Any]) -> str:
 
 def warm_up() -> None:
     """At the start of the game, read the AI models into RAM, one after the other
-    (not both at once from the disk): Forge's picture model, then the music model.
+    (not both at once from the disk): the picture model, then the music model.
     They wait there all evening, each on the graphics card only while it works;
     the music model is released when the table stops, Forge's when Forge is closed."""
     try:
         import image_gen
-        if image_gen.forge_warm_up():
-            print("[art] Forge's picture model is loaded (in RAM)", flush=True)
+        if image_gen.warm_up():
+            print("[art] the picture model is loaded (in RAM)", flush=True)
     except Exception as e:
-        print(f"[art] Forge warm-up: {e}", flush=True)
+        print(f"[art] picture warm-up: {e}", flush=True)
     if composer.available() and composer.start_server():
         print("[compose] the music model is loaded (in RAM)", flush=True)
 
@@ -2198,7 +2348,7 @@ def warm_up() -> None:
 # ============================================================ HTTP layer =====
 
 def make_handler(state: TableState, code: str, host_key: str):
-    page = (Path(__file__).parent / "table_page.html").read_text(encoding="utf-8")
+    page = page_html()
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "GMTable/1.0"
@@ -2264,7 +2414,8 @@ def make_handler(state: TableState, code: str, host_key: str):
                                    "unread": len(state.gm_unread(mark=False)),
                                    "waiting_on": state.waiting_on(),
                                    "seated": sorted(set(state.seats.values())),
-                                   "langs": state.seated_langs()})
+                                   "langs": state.seated_langs(),
+                                   "languages": state.languages})
                 return self._err("not found", 404)
             if not self._code_ok(q.get("code")):
                 return self._err("bad table code", 403)
@@ -2280,7 +2431,9 @@ def make_handler(state: TableState, code: str, host_key: str):
                                    "progress": state.progress(), "tts": state.tts_ready(),
                                    "places": state.places(), **state.gallery(),
                                    "round": state.round_state(),
-                                   "lore_terms": state.lore_terms(me),
+                                   "lore_terms": state.lore_terms(me, q.get("lang")),
+                                   "languages": languages.describe(state.languages),
+                                   "lang": state.lang_for(me),
                                    "narration_id": state.last_narration(me),
                                    **state.overview()})
             if url.path == "/api/messages":
@@ -2298,7 +2451,7 @@ def make_handler(state: TableState, code: str, host_key: str):
             if url.path == "/api/lore":
                 if not me:
                     return self._err("Take a seat first.", 403)
-                card = state.lore_card(me, q.get("term", ""))
+                card = state.lore_card(me, q.get("term", ""), lang=q.get("lang"))
                 if card is None:
                     return self._err("Nothing known about that yet.", 404)
                 return self._json({"ok": True, **card})
@@ -2313,9 +2466,15 @@ def make_handler(state: TableState, code: str, host_key: str):
             if url.path == "/api/sheet-tr":
                 if not me:
                     return self._err("Take a seat first.", 403)
-                got = state.sheet_translation(me, q.get("pc", ""))
+                got = state.sheet_translation(me, q.get("pc", ""), q.get("lang"))
                 if got is None:
                     return self._err("No such character.", 404)
+                return self._json({"ok": True, **got})
+            if url.path == "/api/ui":
+                # The page's own words in one of the adventure's languages.
+                got = state.ui_strings(q.get("lang", ""))
+                if got is None:
+                    return self._err("This table isn't played in that language.", 404)
                 return self._json({"ok": True, **got})
             if url.path == "/api/sheet":
                 if not me:
@@ -2357,7 +2516,7 @@ def make_handler(state: TableState, code: str, host_key: str):
                 return self._json(result, 200 if result["ok"] else 409)
 
             if url.path == "/api/roll-character":
-                lang = data.get("lang") if data.get("lang") in LANGS else None
+                lang = data.get("lang") if data.get("lang") in state.languages else None
                 return self._json(state.roll_character(lang, data.get("previous")))
 
             if url.path == "/api/create":
@@ -2405,7 +2564,7 @@ def make_handler(state: TableState, code: str, host_key: str):
                 if len(text) > MAX_PLAYER_TEXT:
                     return self._err(f"Keep it under {MAX_PLAYER_TEXT} characters.")
                 private = bool(data.get("private"))
-                lang = data.get("lang") if data.get("lang") in LANGS else None
+                lang = data.get("lang") if data.get("lang") in state.languages else None
                 state.set_lang(me, lang)
                 msg = state.append("player", text, pc=me, to=me if private else None,
                                    lang=lang, voice=bool(data.get("voice")))
@@ -2469,11 +2628,14 @@ def make_handler(state: TableState, code: str, host_key: str):
                     # their actions wait.
                     return self._json({"ok": True, "messages": [], "held": True, "round": rnd,
                                        "waiting_on": rnd["waiting_on"], "langs": state.seated_langs(),
+                                       "languages": state.languages,
                                        "music": state.music, "auto_music": state.auto_music})
                 unread = state.gm_unread(mark=True)
                 return self._json({"ok": True, "messages": unread,
                                    "waiting_on": state.waiting_on(),
                                    "langs": state.seated_langs(),
+                                   "languages": state.languages,
+                                   "missing": state.missing_versions(),
                                    "translate": state.needs_translation(),
                                    "music": state.music, "auto_music": state.auto_music})
             if path == "/api/gm/say":
@@ -2499,8 +2661,10 @@ def make_handler(state: TableState, code: str, host_key: str):
                         return self._err(f"no player character named {to}")
                     to = (party_roster._read(path_) or {}).get("name", to)
                 lang = data.get("lang")
-                if lang and lang not in LANGS:
-                    return self._err(f"unknown language {lang} (use: {', '.join(LANGS)})")
+                if lang and lang not in state.table_langs():
+                    return self._err(f"this adventure isn't played in {lang} (its languages: "
+                                     f"{', '.join(state.languages)}; change them with "
+                                     f"gm-table.sh languages)")
                 mood = data.get("mood")
                 if mood and mood not in MOODS and mood != SILENCE:
                     return self._err(f"unknown mood {mood} (use: {', '.join(list(MOODS) + [SILENCE])})")
@@ -2535,15 +2699,19 @@ def make_handler(state: TableState, code: str, host_key: str):
                     want = seated.get(to) or next((l for n, l in seated.items()
                                                    if party_roster._same_name(n, to)), None)
                     if want and text and state.text_lang(text) != want:
-                        warning = (f"{to} plays in {LANGS[want]} — whisper in {LANGS[want]}.")
-                elif not lang and text and len(table_langs) > 1:
+                        warning = (f"{to} plays in {lang_name(want)} — whisper in {lang_name(want)} "
+                                   f"(then translate it for the table's other languages).")
+                elif not lang and text and len(set(state.table_langs())) > 1:
                     wrote = state.text_lang(text)
-                    others = sorted(LANGS[l] for l in table_langs if l != wrote)
-                    warning = (f"Mixed table: this beat has no --lang, so {', '.join(others)} "
-                               f"players get it in {LANGS[wrote]}. Next time post one version "
-                               f"per language with --lang.")
+                    others = sorted(lang_name(l) for l in state.table_langs() if l != wrote)
+                    warning = (f"This beat has no --lang: until you translate it (see wait), "
+                               f"{', '.join(others)} readers get it in {lang_name(wrote)}. Post one "
+                               f"version per language: say --lang " + " / say --lang ".join(state.languages))
+                missing = state.missing_versions() if lang and not to else {}
+                reminder = ("Now the same beat in " + ", ".join(
+                    f"{lang_name(l)} (say --lang {l})" for l in missing) + ".") if missing else None
                 return self._json({"ok": True, "message": msg, "music": music,
-                                   "warning": warning})
+                                   "warning": warning, "reminder": reminder})
             if path == "/api/gm/music":
                 if "auto" in data:
                     state.set_auto_music(bool(data["auto"]))
@@ -2621,6 +2789,16 @@ def make_handler(state: TableState, code: str, host_key: str):
                         return self._err("seconds must be a number (0 = off)")
                 return self._json({"ok": True, "seconds": state.round_seconds,
                                    "round": state.round_state()})
+            if path == "/api/gm/languages":
+                if data.get("languages"):
+                    try:
+                        languages.save(state.campaign_dir, data["languages"])
+                    except ValueError as e:
+                        return self._err(str(e))
+                    for l in state.languages:           # the page's words, ready
+                        state.ui_strings(l)
+                return self._json({"ok": True, "languages": languages.describe(state.languages),
+                                   "ui": {l: state.ui_status(l) for l in state.languages}})
             if path == "/api/gm/alias":
                 name, alias = str(data.get("name", "")).strip(), str(data.get("alias", "")).strip()
                 if not name or not alias:
@@ -2976,8 +3154,8 @@ def _print_translate_request(needed: List[dict]) -> None:
         return
     print("\nTRANSLATE for the table (players each read one language) — one call, before you narrate:")
     for item in needed:
-        to = ", ".join(LANGS[l] for l in item["to"])
-        print(f"  #{item['id']} {item.get('pc') or '?'} ({LANGS.get(item['from'], item['from'])} -> {to}): "
+        to = ", ".join(lang_name(l) for l in item["to"])
+        print(f"  #{item['id']} {item.get('pc') or '?'} ({lang_name(item['from'])} -> {to}): "
               f"{item['text']}")
     example = {str(item["id"]): {l: "..." for l in item["to"]} for item in needed}
     print("  bash tools/gm-table.sh translate --stdin <<'JSON'")
@@ -2988,7 +3166,9 @@ def _print_translate_request(needed: List[dict]) -> None:
 def _print_messages(messages: List[dict], waiting_on: List[str],
                     langs: Optional[Dict[str, str]] = None,
                     music: Optional[Dict[str, Any]] = None, auto_music: bool = True,
-                    translate: Optional[List[dict]] = None) -> None:
+                    translate: Optional[List[dict]] = None,
+                    table_languages: Optional[List[str]] = None,
+                    missing: Optional[Dict[str, int]] = None) -> None:
     if not messages:
         print("(no new player messages)")
     for m in messages:
@@ -3022,7 +3202,7 @@ def _print_messages(messages: List[dict], waiting_on: List[str],
                       f"--clothing … --gear … --demeanor … --size …): the table draws their "
                       f"portrait from it within a few minutes.")
         else:
-            tags = [LANGS[m["lang"]]] if m.get("lang") in LANGS else []
+            tags = [lang_name(m["lang"])] if m.get("lang") else []
             if m.get("voice"):
                 tags.append("spoken")
             if m.get("to"):
@@ -3033,13 +3213,18 @@ def _print_messages(messages: List[dict], waiting_on: List[str],
             print(f"[#{m['id']} {m.get('pc', '?')}{tag}] {m['text']}")
     if waiting_on:
         print(f"Still waiting on: {', '.join(waiting_on)}")
-    if langs:
-        used = sorted(set(langs.values()))
-        if len(used) > 1:
-            print("Table languages: " + ", ".join(f"{pc}={LANGS.get(l, l)}" for pc, l in langs.items())
-                  + "  -> post each beat once per language: say --lang he / say --lang en")
-        elif used and used[0] != "en":
-            print(f"Table language: {LANGS.get(used[0], used[0])} -> narrate in it")
+    table = list(dict.fromkeys(list(table_languages or []) + sorted(set((langs or {}).values()))))
+    if len(table) > 1:
+        print("Languages: " + ", ".join(lang_name(l) for l in table)
+              + (" (players: " + ", ".join(f"{pc}={lang_name(l)}" for pc, l in langs.items()) + ")"
+                 if langs else "")
+              + "\n  -> tell EVERY beat once per language, the same story in each: "
+              + " then ".join(f"say --lang {l}" for l in table))
+    elif table and table[0] != "en":
+        print(f"Language: {lang_name(table[0])} -> narrate in it")
+    if missing:
+        print("[MISSING] Your last beat isn't told yet in: "
+              + ", ".join(f"{lang_name(l)} (say --lang {l})" for l in missing))
     _print_translate_request(translate or [])
     if auto_music and music is not None:
         mood = music.get("mood")
@@ -3083,7 +3268,7 @@ def main() -> None:
     s.add_argument("--stdin", action="store_true", help="Read the narration from stdin")
     s.add_argument("--to", help="Whisper to one player character only")
     s.add_argument("--image", help="Attach an image from the campaign's images/ folder")
-    s.add_argument("--lang", choices=sorted(LANGS),
+    s.add_argument("--lang", metavar="CODE",
                    help="This is the version of the beat for players in this language only")
     s.add_argument("--mood", choices=list(MOODS) + [SILENCE],
                    help="The scene's mood; the music follows it (no change if it's the same)")
@@ -3126,6 +3311,11 @@ def main() -> None:
     al.add_argument("name", help="The name as the campaign knows it (NPC, place, faction)")
     al.add_argument("alias", help="The other spelling, as it appears in the narration")
 
+    lg = sub.add_parser("languages", help="The languages this adventure is played in "
+                                          "(choose them when it starts; default: English only)")
+    lg.add_argument("codes", nargs="*", help="ISO codes, the main one first: en he fr ... "
+                                             "(omit to show the current ones)")
+
     ro = sub.add_parser("round", help="How long the GM waits for everyone once the first player acts")
     ro.add_argument("value", nargs="?", help="Seconds (default 60), or 'off'. Omit to show it.")
 
@@ -3163,7 +3353,7 @@ def main() -> None:
         print(f"  Same Wi-Fi/network: {info['lan_url']}")
         print(f"  Table code:         {info['code']}")
         langs = pending.get("langs") or {}
-        seated = [f"{pc} ({LANGS.get(langs.get(pc, 'en'), '?')})" for pc in pending.get("seated") or []]
+        seated = [f"{pc} ({lang_name(langs.get(pc, 'en'))})" for pc in pending.get("seated") or []]
         print(f"  Seated players:     {', '.join(seated) or '(nobody yet)'}")
         print(f"  Unread actions:     {pending.get('unread', 0)}")
         return
@@ -3173,6 +3363,31 @@ def main() -> None:
         if not r.get("ok"):
             sys.exit(f"[ERROR] {r.get('error')}")
         print(f"ALIAS {args.alias} -> {args.name}")
+        return
+
+    if args.action == "languages":
+        info = _server_info(campaign_dir)
+        if info and _alive(info.get("pid")):
+            r = _call(campaign_dir, "POST", "/api/gm/languages",
+                      {"languages": args.codes} if args.codes else {})
+            if not r.get("ok"):
+                sys.exit(f"[ERROR] {r.get('error')}")
+            codes, ui = [x["code"] for x in r["languages"]], r.get("ui") or {}
+        else:
+            try:
+                codes = languages.save(campaign_dir, args.codes) if args.codes else languages.load(campaign_dir)
+            except ValueError as e:
+                sys.exit(f"[ERROR] {e}")
+            ui = {}
+        print("LANGUAGES: " + ", ".join(f"{lang_name(c)} ({c})" for c in codes)
+              + ("  — the main one is " + lang_name(codes[0]) if len(codes) > 1 else ""))
+        for c, how in ui.items():
+            if how not in ("built in", "ready"):
+                print(f"  the page in {lang_name(c)}: {how}")
+        if len(codes) > 1:
+            print("Tell every beat once per language, the same story in each: "
+                  + " then ".join(f"say --lang {c}" for c in codes)
+                  + ". wait lists the players' actions to translate.")
         return
 
     if args.action == "round":
@@ -3191,7 +3406,7 @@ def main() -> None:
             return
         return _print_messages(r.get("messages", []), r.get("waiting_on", []), r.get("langs"),
                                r.get("music"), r.get("auto_music", True),
-                               r.get("translate"))
+                               r.get("translate"), r.get("languages"), r.get("missing"))
 
     if args.action == "wait":
         deadline = time.time() + args.timeout
@@ -3231,7 +3446,7 @@ def main() -> None:
                 f"{n} ({why})" for n, why in rnd["out_of_action"].items()))
         return _print_messages(r["messages"], r.get("waiting_on", []), r.get("langs"),
                                r.get("music"), r.get("auto_music", True),
-                               r.get("translate"))
+                               r.get("translate"), r.get("languages"), r.get("missing"))
 
     if args.action == "translate":
         raw = sys.stdin.read() if args.stdin else (args.json or "")
@@ -3260,10 +3475,12 @@ def main() -> None:
         m = r["message"]
         who = f" (whisper to {m['to']})" if m.get("to") else " to the whole table"
         if m.get("lang"):
-            who += f", {LANGS[m['lang']]} speakers only"
+            who += f", {lang_name(m['lang'])} readers only"
         print(f"POSTED #{m['id']}{who}")
         if r.get("warning"):
             print(f"[WARNING] {r['warning']}")
+        if r.get("reminder"):
+            print(f"[NEXT] {r['reminder']}")
         if r.get("music"):
             mu_ = r["music"]
             print(f"MUSIC -> {mu_.get('title') if mu_.get('track') else 'silence'} "

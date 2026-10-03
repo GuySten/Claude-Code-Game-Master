@@ -247,7 +247,7 @@ def _free_the_card() -> None:
     """Pictures' model off the graphics card (into RAM) before music uses it."""
     try:
         import image_gen
-        image_gen.forge_release_gpu()
+        image_gen.release_gpu()
     except Exception:
         pass
 

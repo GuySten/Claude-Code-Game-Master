@@ -42,7 +42,18 @@ rule on game mechanics. You are not the Game Master and you can't change the gam
 - Quote or closely paraphrase the log. Mention who said it or when, if that helps.
 - Answer in {lang}, in 1-4 short sentences. Plain text, no markdown headings."""
 
-LANG_NAMES = {"en": "English", "he": "Hebrew"}
+try:
+    import languages as _languages
+except ImportError:                         # (imported as lib.narrator)
+    from lib import languages as _languages
+
+
+class _Names(dict):
+    def get(self, code, default=None):
+        return _languages.name(code) if code else default
+
+
+LANG_NAMES = _Names()         # "he" -> "Hebrew", for any language code
 
 
 def backend() -> str:
@@ -67,6 +78,7 @@ def story_lines(messages: List[Dict[str, Any]], viewer: str, lang: str) -> List[
         if kind == "gm":
             if m.get("lang") and m.get("lang") != lang:
                 continue                         # the other language's version
+            text = ((m.get("tr") or {}).get(lang) or text).strip()   # (a translated beat)
             who = "GM, privately to you" if m.get("to") else "GM"
             if text:
                 out.append(f"[{who}] {text}")
@@ -157,8 +169,8 @@ again remember about tell said say name called mean happened happen""".split())
 
 
 TRANSLATE_RULES = """You translate the text of a tabletop role-playing game's character sheet \
-into {lang} (from English or Hebrew). Some strings mix the two languages: give those entirely \
-in {lang}, without repeating anything. You get a JSON object of numbered strings, like {{"1": "Stealth", \
+into {lang} (from whatever language each is in). Some strings mix two languages: give those \
+entirely in {lang}, without repeating anything. A string already in {lang} comes back as it is. You get a JSON object of numbered strings, like {{"1": "Stealth", \
 "2": "Fire Bolt (1d10)"}}. Reply with ONLY a JSON object with the same numbers, each mapped to \
 its translation, like {{"1": "...", "2": "..."}}. Translate every one. Use the usual {lang} terms \
 of role-playing games (Dungeons & Dragons) where they exist. Keep numbers, dice (1d8+2) and \
@@ -166,14 +178,24 @@ modifiers (+3) as they are. Write personal and place names in {lang} letters. No
 markdown."""
 
 
+UI_RULES = """You translate the words of a web page where friends play a tabletop \
+role-playing game together online, with an AI Game Master, into {lang}. You get a JSON object \
+of numbered strings: buttons, labels, notices. Reply with ONLY a JSON object with the same \
+numbers, each mapped to its translation. Keep every {{placeholder}} in curly braces exactly as \
+it is (they are filled in later: {{pc}} is a character's name, {{n}} a number, {{t}} a time), \
+keep emoji and symbols, and keep it short: they are buttons and labels. Use the usual {lang} \
+terms of role-playing games (Dungeons & Dragons). No notes, no markdown."""
+
+
 def translate(strings: List[str], lang: str,
-              ask: Optional[Callable[[str, str], str]] = None) -> Dict[str, str]:
-    """{english: translation} for ``strings`` (character-sheet text) — what the
-    model answered; {} for English, with no model, or on an unreadable answer."""
+              ask: Optional[Callable[[str, str], str]] = None, kind: str = "sheet") -> Dict[str, str]:
+    """{original: translation} for ``strings`` (character-sheet text, or the
+    page's own words with ``kind="ui"``) — what the model answered; {} with no
+    model, or on an unreadable answer."""
     source = "test" if ask else backend()
     if not strings or source == "off":
         return {}
-    system = TRANSLATE_RULES.format(lang=LANG_NAMES.get(lang, lang))
+    system = (UI_RULES if kind == "ui" else TRANSLATE_RULES).format(lang=LANG_NAMES.get(lang, lang))
     # Numbered: the answer comes back by number, so a phrase the model retypes a
     # little differently (or translates) can't lose its translation.
     numbered = {str(i + 1): s for i, s in enumerate(strings)}

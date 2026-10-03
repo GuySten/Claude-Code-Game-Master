@@ -40,7 +40,11 @@ player's PC is `players/<name>.json`. `gm-session.sh context` lists them all und
 
 ## Online table (players on their own computers)
 `bash tools/gm-table.sh start` opens a browser table (prints links + a table code). Players
-open the link, enter the code, and pick or create their PC. While the table is open:
+open the link, enter the code, and pick or create their PC. **Languages are chosen when the
+adventure starts:** ask the host which languages the table plays in, then
+`gm-table.sh languages en he` (any ISO codes, the main one first; English alone is the
+default, and `languages` alone shows them). Every player then switches between them at any
+moment and finds everything in their language. While the table is open:
 1. `bash tools/gm-table.sh wait` (≈9 min max; rerun on timeout) — blocks until the ROUND
    closes and prints the actions (`[#12 Bram] I kick the door`), joins, and who hasn't acted.
    A round opens when the first player acts and closes when every seated player has acted,
@@ -81,16 +85,23 @@ open the link, enter the code, and pick or create their PC. While the table is o
 - **Voice & language.** Players may speak their actions (lines tagged `spoken`: expect
   speech-to-text slips — read for intent, never mock a transcription) and hear the narration
   read aloud, so write `say` text for the ear too: no HP bars, tables or box art there, short
-  sentences, dice as one plain line. Each action is tagged with the player's language
-  (English/Hebrew). Answer in it — natural Hebrew, not transliteration. **Every player
-  reads one language.** Mixed table (`wait` prints `Table languages`): post each beat once
-  per language, `say --lang en` and `say --lang he`; each player sees only their own
-  (an untagged `say` reaches everyone untranslated, and `say` warns you). Whisper in the
-  recipient's language. When `wait` prints **TRANSLATE**, first thing in your turn send
-  every listed action's translation in ONE call — `gm-table.sh translate --stdin` with
-  `{"<id>": {"<lang>": "<translation>"}}` (the command is printed, ready to fill) — so
+  sentences, dice as one plain line. Each action is tagged with the player's language.
+  Write each language naturally (natural Hebrew, not transliteration). **A multilingual
+  adventure (`wait` prints `Languages: …`) has EVERYTHING in every one of its languages,
+  whoever is reading now — players switch at any moment.** Tell each beat once per
+  language, the same story in each: `say --lang en`, then `say --lang he` (…and every
+  other). `say` prints `[NEXT]` until each language has the beat, and `wait` prints
+  `[MISSING]` if one is still owed; the players' progress bar waits for the last one. An
+  untagged `say` gets listed for translation instead. Put `--mood`/`--theme`/`--image` on
+  the first version (the music changes once; a picture on a tagged beat shows only to
+  that language, so give each version its `--image`). Whisper in the recipient's language
+  (it's listed for translation into the others). When `wait` prints **TRANSLATE**, first
+  thing in your turn send every listed item's translations in ONE call —
+  `gm-table.sh translate --stdin` with `{"<id>": {"<lang>": "<translation>", ...}}` (the
+  command is printed, ready to fill; each item needs every language listed for it) — so
   players see each other's actions in their own language. Translate faithfully: same
-  meaning and tone, names unchanged, no additions.
+  meaning and tone, names unchanged, no additions. Hover cards, sheets and the page's own
+  words are translated by the table itself, in the background.
 - **Music is automatic — you pick the mood, the table picks the track.** Tag EVERY `say`
   with the scene's mood: `--mood calm|tavern|travel|mystery|dread|dungeon|combat|boss|sad|
   storm|victory|silence`. Same mood = the track keeps playing; a new mood switches it
@@ -119,7 +130,7 @@ never from your files). Only RECORDED names can be hovered: when a named NPC, pl
 faction first matters, record it (`gm-npc.sh`, `gm-location.sh`) right then. Use each name
 exactly as the campaign records it. When you write
 a name in another spelling (Hebrew narration of "Marta" → "מרתה"), record it once:
-`gm-table.sh alias "Marta" "מרתה"`. (The table also spots spellings in Hebrew narration by
+`gm-table.sh alias "Marta" "מרתה"`. (The table also spots spellings in non-English narration by
 itself, with a small model, a few seconds after each message; an alias you record is
 immediate and certain.)
 
@@ -199,8 +210,9 @@ command. Never inline dice, never invent a number.
   The command prints the verdict (✓/✗, natural 20/1); narrate exactly that.
 - **With the online table open, the TABLE rolls** and shows every roll to every player
   the moment you see it ("🎯 Pip — Stealth · DC 15 / 🎲 [12] + 5 = 17 ✓"). So: no silent
-  re-rolls (a re-roll only when a rule grants one, and say which); at a mixed table add
-  `--why-he "<Hebrew>"` (or `--why-en`). An NPC's hidden roll (an ambusher's Stealth):
+  re-rolls (a re-roll only when a rule grants one, and say which); at a multilingual table
+  add the reason in each other language: `--why-he "<Hebrew>"`, `--why-en`, or
+  `--why-tr fr="<French>"` for any language (repeat it). An NPC's hidden roll (an ambusher's Stealth):
   `--secret` — players see that you rolled, not the result. Your narration's numbers
   must match the posted roll.
 **Player-rolls mode:** scene context reports it. When ON, the player CHOOSES the

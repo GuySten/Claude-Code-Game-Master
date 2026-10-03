@@ -233,6 +233,9 @@ def main():
     parser.add_argument("--why", help="What the roll is for: 'Stealth', 'dagger damage'...")
     parser.add_argument("--why-he", help="The same, in Hebrew (shown to Hebrew players)")
     parser.add_argument("--why-en", help="The same, in English (shown to English players)")
+    parser.add_argument("--why-tr", action="append", default=[], metavar="LANG=TEXT",
+                        help="The same in another of the adventure's languages: --why-tr fr=Discrétion "
+                             "(repeat for each)")
     parser.add_argument("--secret", action="store_true",
                         help="A hidden roll: players see that the GM rolled, not the result")
     parser.add_argument("--local", action="store_true",
@@ -256,7 +259,9 @@ def main():
         shown = roll_at_table({
             "notation": args.notation, "target": goal, "target_label": label,
             "pc": args.pc, "why": args.why,
-            "why_tr": {k: v for k, v in (("he", args.why_he), ("en", args.why_en)) if v},
+            "why_tr": {**{k: v for k, v in (("he", args.why_he), ("en", args.why_en)) if v},
+                       **{k.strip(): v.strip() for k, _, v in (x.partition("=") for x in args.why_tr)
+                          if k.strip() and v.strip()}},
             "secret": args.secret}) if roll_at_table else None
         if shown is not None:
             if not shown.get("ok"):

@@ -42,7 +42,7 @@ jobs:
           uv run --with pytest pytest -q
           tests/test_table_server.py tests/test_multiplayer.py tests/test_model_presets.py
           tests/test_identity_onboarding.py tests/test_game_core.py
-          tests/test_cloud_table.py tests/test_gpu_remote.py
+          tests/test_cloud_table.py tests/test_gpu_remote.py tests/test_comfyui.py tests/test_languages.py
 
       - name: Full test suite (informational)
         continue-on-error: true

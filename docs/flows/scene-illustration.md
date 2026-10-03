@@ -5,6 +5,7 @@ description: Beat to picture — the enablement gate, the background agent, and 
 sources:
   - { resource: /lib/image_gen.py }
   - { resource: /lib/gpu_remote.py }
+  - { resource: /lib/comfy.py }
   - { resource: /lib/visual_appearance.py }
   - { resource: /tools/gm-image.sh }
   - { resource: /.claude/agents/scene-illustrator.md }
@@ -19,8 +20,8 @@ look like one artist drew one cast is state on disk, injected into every prompt.
 ## The path
 
 1. **Gate.** The session brief reports `Scene images: ENABLED` or `DISABLED` from
-   `image_gen.images_status()`: an OpenAI key, a local Forge that answers, or the host
-   laptop's GPU server (`GPU_SERVER_URL`, CLOUD-TABLE.md) that answers. Disabled means never call the tool and never mention
+   `image_gen.images_status()`: an OpenAI key, a local Forge or ComfyUI that answers, or
+   the host's GPU server (`GPU_SERVER_URL`, CLOUD-TABLE.md) that answers. Disabled means never call the tool and never mention
    images — an unmentioned absence, not an apology.
 2. **Spawn `scene-illustrator` in the background** with a one-line beat brief and the
    campaign's locked art style passed verbatim. The slow API call stays off the critical

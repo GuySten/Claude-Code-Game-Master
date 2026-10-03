@@ -42,13 +42,16 @@ Instead:
 - Players: a claude.ai account each. Share the table Artifact with them with **edit**
   access (its Share menu): edit access is what lets their page send actions. Anyone
   with view access can watch.
-- Optional: a laptop with an NVIDIA GPU for pictures and composed music.
+- Optional: a computer with a GPU (NVIDIA, or AMD with ComfyUI) for pictures and composed music.
 
 ## Pictures and music from your laptop's GPU
 
 The laptop does the same work it does at home ([GAME-NIGHT.md](GAME-NIGHT.md), steps 5
-and 6). Set those up first: Forge with `--api` and a model, and the music composer.
-Then, on the laptop, in the game folder:
+and 6). Set those up first: Forge with `--api` and a model (or ComfyUI, with
+`IMAGE_BACKEND=comfyui` in the laptop's `.env`), and the music composer. The picture
+settings (`FORGE_*` / `COMFY_*`) belong in the **laptop's** `.env` too: the laptop owns
+the models, and the session only says what to paint. Then, on the laptop, in the game
+folder:
 
 ```bash
 bash tools/gm-gpu-server.sh                       # prints a password; keep the window open
@@ -67,8 +70,8 @@ GPU_SERVER_PASSWORD=the password gm-gpu-server.sh printed
   `GPU_SERVER_PASSWORD=...` in the laptop's `.env`.
 - **The link changes** each time cloudflared starts a quick tunnel. A free named Cloudflare
   tunnel gives a fixed one.
-- **Start Forge first** (`run.bat`), then `gm-gpu-server.sh`. Its first lines say whether
-  Forge and the composer are ready.
+- **Start Forge (or ComfyUI) first**, then `gm-gpu-server.sh`. Its first lines say
+  whether pictures and the composer are ready.
 - Jobs run one at a time and take turns on the card, as at home. A tunnel drops any
   request longer than about 100 seconds, so the session submits a job and collects it
   when it's done.
