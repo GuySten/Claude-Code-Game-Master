@@ -2,8 +2,11 @@
 """The host laptop's graphics card, offered to a game running elsewhere.
 
 When Claude hosts the table from a cloud session (CLOUD-TABLE.md), that machine
-has no GPU. This small server runs on the host's laptop next to Forge and the
-music composer, and does their work for it (lib/gpu_remote.py is the other end):
+has no GPU. This small server runs on the host's computer next to its picture
+program (Forge, or ComfyUI with IMAGE_BACKEND=comfyui in this machine's .env) and
+the music composer, and does their work for it (lib/gpu_remote.py is the other
+end). The picture settings (FORGE_* / COMFY_*) are this machine's too: it owns
+the models.
 
     bash tools/gm-gpu-server.sh                       # port 7861, prints its password
     cloudflared tunnel --url http://localhost:7861    # the https link to give the GM
@@ -13,8 +16,10 @@ home; lib/gpu_turn.py still applies). A job is submitted with ``POST /jobs`` and
 fetched with ``GET /jobs/<id>`` when done, so no single request outlives a
 tunnel's ~100 s limit.
 
-  txt2img        Forge's own txt2img payload -> {"images": [png base64]}
-  warmup         read Forge's picture model into RAM now
+  image          {prompt, quality, size, avoid} -> {image: png base64, model, size},
+                 painted by this machine's Forge or ComfyUI with its own settings
+  txt2img        Forge's own txt2img payload -> {"images": [png base64]} (older games)
+  warmup         read the picture model into RAM now
   compose        {prompt, seconds, loop, ext} -> {audio: base64, ext, seconds, device}
   compose-start  read the music model into RAM now
 
@@ -40,6 +45,7 @@ from typing import Any, Dict
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+import comfy  # noqa: E402
 import composer  # noqa: E402
 import image_gen  # noqa: E402
 from gpu_turn import gpu_turn  # noqa: E402
@@ -98,7 +104,21 @@ def _forge(path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         return json.loads(r.read().decode("utf-8"))
 
 
+def pictures_backend() -> str:
+    """How this machine paints: 'comfyui' (IMAGE_BACKEND=comfyui) or 'forge'."""
+    chosen = os.environ.get("IMAGE_BACKEND", "").strip().lower()
+    return "comfyui" if chosen in ("comfyui", "comfy") else "forge"
+
+
 def run_job(kind: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    if kind == "image":
+        args = (str(payload.get("prompt", "")), str(payload.get("quality") or image_gen.DEFAULT_QUALITY),
+                str(payload.get("size") or image_gen.DEFAULT_SIZE), str(payload.get("avoid") or ""))
+        if pictures_backend() == "comfyui":
+            data, model, size = image_gen._comfy_generate(*args)
+        else:
+            data, model, size = image_gen._forge_generate(*args)
+        return {"image": base64.b64encode(data).decode("ascii"), "model": model, "size": size}
     if kind == "txt2img":
         try:
             with gpu_turn("pictures"):
@@ -110,6 +130,8 @@ def run_job(kind: str, payload: Dict[str, Any]) -> Dict[str, Any]:
                                f"(run.bat) with --api") from e
         return {"images": (body.get("images") or [])[:1]}
     if kind == "warmup":
+        if pictures_backend() == "comfyui":
+            return {"ok": comfy.warm_up()}
         return {"ok": image_gen.forge_warm_up(local=True)}
     if kind == "compose-start":
         return {"ok": composer_ready() and composer.start_server(local=True)}
@@ -130,8 +152,11 @@ def composer_ready() -> bool:
 
 
 def health() -> Dict[str, Any]:
-    ok, why = image_gen.forge_status()
-    return {"ok": True, "forge": ok, "forge_why": why, "composer": composer_ready()}
+    backend = pictures_backend()
+    ok, why = comfy.status() if backend == "comfyui" else image_gen.forge_status()
+    # ("forge"/"forge_why": what games from before ComfyUI support read)
+    return {"ok": True, "pictures": ok, "pictures_why": why, "pictures_backend": backend,
+            "forge": ok, "forge_why": why, "composer": composer_ready()}
 
 
 def make_handler(jobs: Jobs, password: str):
@@ -193,10 +218,15 @@ def main() -> None:
     ap.add_argument("--password", default=os.environ.get("GPU_SERVER_PASSWORD", ""))
     args = ap.parse_args()
     password = args.password or secrets.token_urlsafe(18)
+    # This machine paints and composes itself: never forward to another GPU server,
+    # and free its own picture model's card before composing.
+    os.environ.pop("GPU_SERVER_URL", None)
+    os.environ["IMAGE_BACKEND"] = pictures_backend()
     server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(Jobs(), password))
     h = health()
     print(f"GPU server listening on http://localhost:{args.port}")
-    print(f"  Pictures: {'Forge is ready' if h['forge'] else h['forge_why']}")
+    name = "ComfyUI" if h["pictures_backend"] == "comfyui" else "Forge"
+    print(f"  Pictures: {name + ' is ready' if h['pictures'] else h['pictures_why']}")
     print(f"  Music:    {'the composer is set up' if h['composer'] else 'not set up (bash tools/gm-music-compose.sh setup)'}")
     print()
     print("Give the GM these two lines (the link comes from the tunnel):")

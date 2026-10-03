@@ -241,6 +241,22 @@ FORGE_SAMPLER=DPM++ 2M
 ```
 (Use the model's name exactly as Forge shows it.)
 
+**Or ComfyUI instead of Forge** (works the same on NVIDIA and AMD cards; on AMD, use
+ComfyUI's ROCm install). Run ComfyUI, put the model in `ComfyUI/models/checkpoints/`, and
+in `.env`:
+```
+IMAGE_BACKEND=comfyui
+COMFY_MODEL=dreamshaperXL_lightningDPMSDE.safetensors
+```
+The defaults suit the same DreamShaper XL Lightning model (`COMFY_URL` `http://127.0.0.1:8188`,
+`COMFY_STEPS` 6, `COMFY_CFG` 2, `COMFY_SAMPLER` `dpmpp_sde`, `COMFY_SCHEDULER` `karras`;
+sizes `COMFY_LANDSCAPE`/`PORTRAIT`/`SQUARE` as for Forge). For **Flux** (a single-file
+checkpoint): `COMFY_STEPS=20`, `COMFY_CFG=1`, `COMFY_SAMPLER=euler`,
+`COMFY_SCHEDULER=simple`, `COMFY_GUIDANCE=3.5`. Any other setup (GGUF models, LoRAs,
+upscaling): build it in ComfyUI, **Export (API)**, write `{{prompt}}`, `{{negative}}`,
+`{{seed}}`, `{{width}}`, `{{height}}` where the game's values go, and point
+`COMFY_WORKFLOW=/path/to/workflow.json` at it.
+
 **Set the art style** once per campaign (new campaigns get one when the world is created).
 Ask the GM *"lock an art style for this campaign"*, or run:
 ```bash

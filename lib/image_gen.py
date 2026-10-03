@@ -6,7 +6,9 @@ Image sources (``IMAGE_BACKEND`` in .env):
            --api: free, private, runs on the host's own GPU. FORGE_* settings tune
            it (defaults suit an SDXL "Lightning" model such as DreamShaper XL
            Lightning on a 6 GB laptop GPU; see GAME-NIGHT.md → Pictures).
-  remote — that same Forge, on ANOTHER computer: the host's laptop runs
+  comfyui — a local ComfyUI (lib/comfy.py; COMFY_* settings, or your own
+           exported workflow). Runs on NVIDIA and AMD (ROCm) cards alike.
+  remote — Forge or ComfyUI on ANOTHER computer: the host's laptop runs
            tools/gm-gpu-server.sh behind a tunnel (GPU_SERVER_URL, GPU_SERVER_PASSWORD;
            see CLOUD-TABLE.md). The default when GPU_SERVER_URL is set.
   off    — no images (the default with no key).
@@ -45,6 +47,7 @@ from campaign_manager import CampaignManager
 import visual_appearance as va_mod
 from gpu_turn import gpu_turn
 import gpu_remote
+import comfy
 
 
 def resolve_campaign_dir(world_state_dir: str = "world-state"):
@@ -215,11 +218,13 @@ class ImageGenError(Exception):
 
 # --------------------------------------------------------------- sources ----
 def backend() -> str:
-    """'openai', 'forge', 'remote' or 'off' — from IMAGE_BACKEND, else whether a
-    GPU server or a key is set."""
+    """'openai', 'forge', 'comfyui', 'remote' or 'off' — from IMAGE_BACKEND, else
+    whether a GPU server or a key is set."""
     chosen = os.environ.get("IMAGE_BACKEND", "").strip().lower()
     if chosen in ("forge", "a1111", "automatic1111", "sdwebui", "local"):
         return "forge"
+    if chosen in ("comfyui", "comfy"):
+        return "comfyui"
     if chosen in ("off", "none", "no"):
         return "off"
     if chosen == "openai":
@@ -285,6 +290,24 @@ def forge_warm_up(local: bool = False) -> bool:
         return False
 
 
+def release_gpu() -> bool:
+    """This machine's picture model off the graphics card (Forge or ComfyUI), so
+    music can use it. False when pictures aren't made here."""
+    b = backend()
+    if b == "forge":
+        return forge_release_gpu()
+    if b == "comfyui":
+        return comfy.release_gpu()
+    return False
+
+
+def warm_up(local: bool = False) -> bool:
+    """Read the picture model into RAM now, wherever pictures are made."""
+    if backend() == "comfyui":
+        return comfy.warm_up()
+    return forge_warm_up(local=True) if local else forge_warm_up()
+
+
 def images_status(probe: bool = True):
     """(enabled, backend, why) — what the session brief tells the GM."""
     b = backend()
@@ -304,9 +327,12 @@ def images_status(probe: bool = True):
         if h is None:
             return False, b, (f"the host's GPU server isn't answering at {gpu_remote.url()} — "
                               f"start gm-gpu-server.sh and its tunnel on the laptop")
-        if not h.get("forge"):
-            return False, b, "the host's laptop answers, but its Forge doesn't: " + str(h.get("forge_why"))
+        if not h.get("pictures", h.get("forge")):
+            return False, b, ("the host's GPU server answers, but its pictures don't: "
+                              + str(h.get("pictures_why") or h.get("forge_why")))
         return True, b, f"the host's GPU at {gpu_remote.url()}"
+    if b == "comfyui":
+        return (True, b, f"ComfyUI at {comfy.url()}") if not probe else (lambda r: (r[0], b, r[1]))(comfy.status())
     if not probe:
         return True, b, f"local Forge at {forge_url()}"
     ok, why = forge_status()
@@ -387,13 +413,32 @@ def _forge_image(body: dict, model: str, w: int, h: int):
 
 
 def _remote_generate(prompt: str, quality: str, size: str, avoid: str = ""):
-    """The same image, painted by the host laptop's Forge (lib/gpu_server.py)."""
+    """The same image, painted by the host's GPU machine (lib/gpu_server.py) with
+    its own picture program and settings (Forge or ComfyUI)."""
+    timeout = int(os.environ.get("FORGE_TIMEOUT", "600")) + 300
+    try:
+        got = gpu_remote.run("image", {"prompt": prompt, "quality": quality, "size": size, "avoid": avoid},
+                             timeout=timeout)
+        return base64.b64decode(got["image"]), got.get("model") or "remote", got.get("size") or size
+    except gpu_remote.GpuRemoteError as e:
+        if "unknown job kind" not in str(e):
+            raise ImageGenError(f"The host's GPU couldn't paint it: {e}") from e
+    except (KeyError, TypeError, ValueError) as e:
+        raise ImageGenError("The host's GPU answered without a picture.") from e
+    # A GPU server from before "image" jobs: send it Forge's own request.
     payload, model, w, h = _forge_payload(prompt, quality, size, avoid)
     try:
-        body = gpu_remote.run("txt2img", payload, timeout=int(os.environ.get("FORGE_TIMEOUT", "600")) + 300)
+        body = gpu_remote.run("txt2img", payload, timeout=timeout)
     except gpu_remote.GpuRemoteError as e:
         raise ImageGenError(f"The host's GPU couldn't paint it: {e}") from e
     return _forge_image(body, model, w, h)
+
+
+def _comfy_generate(prompt: str, quality: str, size: str, avoid: str = ""):
+    try:
+        return comfy.generate(prompt, quality, size, avoid)
+    except comfy.ComfyError as e:
+        raise ImageGenError(str(e)) from e
 
 
 def _forge_generate(prompt: str, quality: str, size: str, avoid: str = ""):
@@ -585,6 +630,7 @@ def generate_image(prompt: str, *, title: str = "", quality: str = DEFAULT_QUALI
         raise ImageGenError(
             "No image source. Add OPENAI_API_KEY=sk-... to .env, or run a local Stable "
             "Diffusion WebUI Forge with --api and set IMAGE_BACKEND=forge in .env "
+            "(or ComfyUI: IMAGE_BACKEND=comfyui) "
             "(GAME-NIGHT.md → Pictures)."
         )
 
@@ -600,8 +646,8 @@ def generate_image(prompt: str, *, title: str = "", quality: str = DEFAULT_QUALI
                                 style_lock=style_lock, appearance_lock=appearance_lock,
                                 chronicler=chronicler, place=place)
 
-    if source in ("forge", "remote"):
-        make = _forge_generate if source == "forge" else _remote_generate
+    if source in ("forge", "comfyui", "remote"):
+        make = {"forge": _forge_generate, "comfyui": _comfy_generate, "remote": _remote_generate}[source]
         image_bytes, model, size = make(final_prompt, quality, size, avoid)
         cost = 0.0
     else:

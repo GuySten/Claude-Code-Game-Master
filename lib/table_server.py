@@ -2182,15 +2182,15 @@ def _held_note(rnd: Dict[str, Any]) -> str:
 
 def warm_up() -> None:
     """At the start of the game, read the AI models into RAM, one after the other
-    (not both at once from the disk): Forge's picture model, then the music model.
+    (not both at once from the disk): the picture model, then the music model.
     They wait there all evening, each on the graphics card only while it works;
     the music model is released when the table stops, Forge's when Forge is closed."""
     try:
         import image_gen
-        if image_gen.forge_warm_up():
-            print("[art] Forge's picture model is loaded (in RAM)", flush=True)
+        if image_gen.warm_up():
+            print("[art] the picture model is loaded (in RAM)", flush=True)
     except Exception as e:
-        print(f"[art] Forge warm-up: {e}", flush=True)
+        print(f"[art] picture warm-up: {e}", flush=True)
     if composer.available() and composer.start_server():
         print("[compose] the music model is loaded (in RAM)", flush=True)
 
