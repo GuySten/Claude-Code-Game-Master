@@ -220,6 +220,7 @@ EDIT_GRACE = 5.0
 # GM endpoint, so the GM (and Claude, who can read the campaign's files) can't
 # see it. It clears when the table restarts.
 CHAT_KEEP = 500
+CHAT_WAIT_MAX = 25.0     # longest a page's chat request is held open (long polling)
 CHAT_TEXT = 500
 # A PC in one of these states can't act, so a round never waits for them.
 CANT_ACT = ("dead", "dying", "unconscious", "incapacitated", "paralyzed", "paralysed",
@@ -273,6 +274,7 @@ class TableState:
         self.seats_path = self.dir / "seats.json"
         self.cursor_path = self.dir / "gm-cursor"
         self.lock = threading.RLock()       # re-entrant: party() runs inside turn bookkeeping
+        self.chat_changed = threading.Condition(self.lock)   # wakes pages waiting on the chat
         self.messages: List[Dict[str, Any]] = []
         self.rev = 0          # bumps on every new message AND every translation
         if self.log_path.exists():
@@ -549,11 +551,21 @@ class TableState:
                    "t": _stamp(), "pc": pc, "text": text}
             self.chat.append(msg)
             del self.chat[:-CHAT_KEEP]
+            self.chat_changed.notify_all()
             return dict(msg)
 
-    def chat_since(self, after: int) -> List[Dict[str, Any]]:
+    def chat_since(self, after: int, wait: float = 0) -> List[Dict[str, Any]]:
+        """Messages after ``after``. With ``wait``, hold the request open (long
+        polling) until one arrives or ``wait`` seconds pass, so a line reaches the
+        other players at once instead of on their next poll."""
+        deadline = time.time() + max(0.0, min(wait, CHAT_WAIT_MAX))
         with self.lock:
-            return [dict(m) for m in self.chat if m["id"] > after]
+            while True:
+                new = [dict(m) for m in self.chat if m["id"] > after]
+                left = deadline - time.time()
+                if new or left <= 0:
+                    return new
+                self.chat_changed.wait(left)
 
     # --- the Narrator: reminds a player of the story so far (private, read-only) ---
     def narrator_question(self, pc: str, question: str) -> Dict[str, Any]:
@@ -2481,9 +2493,10 @@ def make_handler(state: TableState, code: str, host_key: str):
                     return self._err("Take a seat first.", 403)
                 try:
                     after = int(q.get("after", 0))
+                    wait = float(q.get("wait", 0))
                 except ValueError:
-                    after = 0
-                return self._json({"ok": True, "messages": state.chat_since(after)})
+                    after, wait = 0, 0.0
+                return self._json({"ok": True, "messages": state.chat_since(after, wait)})
             if url.path == "/api/sheet-tr":
                 if not me:
                     return self._err("Take a seat first.", 403)

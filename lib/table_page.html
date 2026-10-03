@@ -265,6 +265,7 @@
   #lore-card .text.loading { color: var(--muted); font-style: italic; }
   .chat-tabs { display: flex; gap: 4px; padding: 10px 10px 0; }
   #chat-close { flex: 0 0 auto; display: none; padding: 6px 10px; }
+  #chat-clear { flex: 0 0 auto; padding: 6px 10px; }
   #chat.open #chat-close { display: inline-block; }
   .chat-tabs button { flex: 1; padding: 6px 8px; font-size: .85rem; }
   .chat-tabs button[aria-pressed="true"] { border-color: var(--accent); }
@@ -454,6 +455,7 @@
     <div class="chat-tabs">
       <button type="button" id="tab-talk" aria-pressed="true" data-i18n="chatTitle"></button>
       <button type="button" id="tab-narrator" aria-pressed="false" data-i18n="narTitle"></button>
+      <button type="button" id="chat-clear" data-i18n-label="chatClear">🧹</button>
       <button type="button" id="chat-close" aria-label="✕">✕</button>
     </div>
     <div id="talk-pane">
@@ -1377,7 +1379,12 @@
   // ------------------------------------------------- the players' side chat ---
   let chatLast = 0, chatUnread = 0, chatPolling = false, chatLoaded = false;
   const chatVisible = () => getComputedStyle($("chat")).display !== "none";
+  // "Clear" empties this player's own view of the chat (not anyone else's):
+  // lines up to the one shown when they cleared stay hidden, also after a reload.
+  const chatClearedKey = () => "chatCleared." + code;
+  const chatCleared = () => Number(store.get(chatClearedKey()) || 0);
   function addChat(m) {
+    if (m.id <= chatCleared()) return;
     const d = document.createElement("div");
     d.className = "chat-msg" + (m.pc === me ? " mine" : "");
     const from = document.createElement("div");
@@ -1392,9 +1399,13 @@
     $("chat-unread").textContent = String(n);
     $("chat-unread").classList.toggle("hidden", !n);
   }
+  // Long polling: the server holds this request until a line arrives (or ~25 s),
+  // so chat lands at once instead of on the next poll.
   async function pollChat() {
+    let ok = false;
     try {
-      const r = await api("/api/chat?after=" + chatLast);
+      const r = await api("/api/chat?after=" + chatLast + (chatLoaded ? "&wait=25" : ""));
+      ok = !!r.ok;
       const first = !chatLoaded;              // the history on arrival isn't "unread"
       if (r.ok) chatLoaded = true;
       if (r.ok && r.messages.length) {
@@ -1407,19 +1418,27 @@
         if (atBottom || first) log.scrollTop = log.scrollHeight;
       }
     } catch (e) {}
-    setTimeout(pollChat, 2000);
+    setTimeout(pollChat, ok ? 50 : 2000);
   }
   $("chat-form").onsubmit = async (ev) => {
     ev.preventDefault();
     const text = $("chat-text").value.trim();
     if (!text) return;
-    const r = await api("/api/chat", { text });
-    if (!r.ok) { setStatus(r.error || "?"); return; }
-    $("chat-text").value = "";
+    $("chat-text").value = "";                  // cleared at once; put back if it fails
+    const r = await api("/api/chat", { text }).catch(() => ({ ok: false }));
+    if (!r.ok) {
+      if (!$("chat-text").value) $("chat-text").value = text;
+      setStatus(r.error || "?"); return;
+    }
     if (r.message && r.message.id > chatLast) {
       addChat(r.message); chatLast = r.message.id;
       $("chat-log").scrollTop = $("chat-log").scrollHeight;
     }
+  };
+  $("chat-clear").onclick = () => {
+    store.set(chatClearedKey(), String(chatLast));
+    $("chat-log").textContent = "";
+    setUnread(0);
   };
   $("chat-text").addEventListener("input", () => {
     $("chat-text").dir = $("chat-text").value.trim() ? dirFor($("chat-text").value) : "auto";

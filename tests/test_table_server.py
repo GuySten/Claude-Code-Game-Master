@@ -1258,6 +1258,29 @@ def test_the_round_never_waits_for_a_pc_who_cannot_act(table):
     assert table_server.cant_act({"conditions": ["poisoned", "prone"]}) is None
 
 
+def test_a_waiting_chat_request_gets_the_line_at_once(table):
+    call, state = table["call"], table["state"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    bram = call("/api/create", {"code": CODE, "name": "Bram", "concept": "a dwarf"})[1]["token"]
+    got = {}
+
+    def listen():
+        t0 = time.time()
+        got["r"] = call(f"/api/chat?code={CODE}&token={bram}&after=0&wait=10")[1]
+        got["took"] = time.time() - t0
+
+    t = threading.Thread(target=listen)
+    t.start()
+    time.sleep(0.3)                                   # Bram's page is waiting
+    call("/api/chat", {"code": CODE, "token": pip, "text": "now"})
+    t.join(5)
+    assert [m["text"] for m in got["r"]["messages"]] == ["now"]
+    assert got["took"] < 3                            # woken by the line, not the timeout
+    t0 = time.time()                                  # nothing new: it gives up after `wait`
+    assert call(f"/api/chat?code={CODE}&token={bram}&after=1&wait=0.5")[1]["messages"] == []
+    assert 0.4 < time.time() - t0 < 3
+
+
 def test_table_talk_is_for_the_players_only(table):
     call, state, camp = table["call"], table["state"], table["camp"]
     pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]

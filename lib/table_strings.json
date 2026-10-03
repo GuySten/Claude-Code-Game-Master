@@ -212,7 +212,8 @@
   "voiceHello": "Hello, I'll read the adventure to you.",
   "readOnSpoken": "Reading aloud is on.",
   "language": "Language",
-  "menu": "Menu"
+  "menu": "Menu",
+  "chatClear": "Clear the chat (only on your screen)"
  },
  "he": {
   "title": "השולחן",
@@ -427,6 +428,7 @@
   "voiceHello": "שלום, אני אקריא לכם את ההרפתקה.",
   "readOnSpoken": "ההקראה פועלת.",
   "language": "שפה",
-  "menu": "תפריט"
+  "menu": "תפריט",
+  "chatClear": "ניקוי הצ'אט (רק אצלך)"
  }
 }
