@@ -143,6 +143,9 @@ def lore_prompt(name: str, kind: str, lines: List[str], viewer: str) -> str:
 def _claude(system: str, prompt: str) -> str:
     exe = shutil.which("claude")
     env = {k: v for k, v in os.environ.items() if k not in ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT")}
+    # No extended thinking: these are short lookups and translations, and `claude -p`
+    # thinks by default — ~10k hidden tokens a sheet, 90 s+ instead of ~5 s.
+    env["MAX_THINKING_TOKENS"] = "0"
     with tempfile.TemporaryDirectory() as empty:     # no project files, settings or hooks
         done = subprocess.run(  # (no console window on Windows)
             [exe, "-p", "--model", NARRATOR_MODEL, "--tools", "", "--no-session-persistence",
