@@ -21,7 +21,7 @@ look like one artist drew one cast is state on disk, injected into every prompt.
 
 1. **Gate.** The session brief reports `Scene images: ENABLED` or `DISABLED` from
    `image_gen.images_status()`: an OpenAI key, a local Forge or ComfyUI that answers, or
-   the host's GPU server (`GPU_SERVER_URL`, CLOUD-TABLE.md) that answers. Disabled means never call the tool and never mention
+   the host's GPU server (`GPU_SERVER_URL`, GAME-NIGHT.md) that answers. Disabled means never call the tool and never mention
    images — an unmentioned absence, not an apology.
 2. **Spawn `scene-illustrator` in the background** with a one-line beat brief and the
    campaign's locked art style passed verbatim. The slow API call stays off the critical

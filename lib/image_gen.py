@@ -10,7 +10,7 @@ Image sources (``IMAGE_BACKEND`` in .env):
            exported workflow). Runs on NVIDIA and AMD (ROCm) cards alike.
   remote — Forge or ComfyUI on ANOTHER computer: the host's laptop runs
            tools/gm-gpu-server.sh behind a tunnel (GPU_SERVER_URL, GPU_SERVER_PASSWORD;
-           see CLOUD-TABLE.md). The default when GPU_SERVER_URL is set.
+           see GAME-NIGHT.md). The default when GPU_SERVER_URL is set.
   off    — no images (the default with no key).
 
 The GM calls this at high-impact beats (new location, boss reveal, big loot) to

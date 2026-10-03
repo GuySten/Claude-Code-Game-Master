@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """The host laptop's graphics card, offered to a game running elsewhere.
 
-When Claude hosts the table from a cloud session (CLOUD-TABLE.md), that machine
-has no GPU. This small server runs on the host's computer next to its picture
+When the game runs on a computer without a graphics card (GAME-NIGHT.md), another
+machine's can do the work. This small server runs on the host's computer next to its picture
 program (Forge, or ComfyUI with IMAGE_BACKEND=comfyui in this machine's .env) and
 the music composer, and does their work for it (lib/gpu_remote.py is the other
 end). The picture settings (FORGE_* / COMFY_*) are this machine's too: it owns

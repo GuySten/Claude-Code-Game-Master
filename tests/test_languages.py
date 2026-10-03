@@ -7,8 +7,7 @@ import json
 
 import pytest
 
-from lib import cloud_table, languages
-from tests.test_cloud_table import bridge, docs  # noqa: F401  (the cloud bridge)
+from lib import languages
 from tests.test_table_server import CODE, set_languages, table, wait_for  # noqa: F401
 
 
@@ -133,31 +132,6 @@ def test_the_languages_command_sets_them_for_the_adventure(table):
     assert state.languages == ["he", "en", "es"] and body["ui"]["en"] == "built in"
     assert json.loads((camp / "table" / "languages.json").read_text())["languages"] == ["he", "en", "es"]
     assert call("/api/gm/languages", {"languages": ["not a code"]}, host=True)[0] == 400
-
-
-def test_the_cloud_table_carries_every_language(bridge):
-    b, player = bridge["b"], bridge["player"]
-    camp, state = bridge["camp"], bridge["state"]
-    set_languages(camp, ["en", "he", "fr"])
-    (camp / "table" / "ui-fr.json").write_text(json.dumps({"send": "Envoyer"}))
-    (camp / "npcs.json").write_text(json.dumps({"Marta": {"description": "innkeeper"}}))
-    state.narrator_ask = lambda system, prompt: "כרטיס" if "in Hebrew" in system else "A card."
-    player("/api/claim", {"pc": "Pip"}, client="c_page1")
-    b.pull(bridge["inbox"])
-    bridge["call"]("/api/gm/say", {"text": "Marta waves from the bar."}, host=True)
-    assert wait_for(lambda: {"Pip|marta|en", "Pip|marta|he"} <= set(state.lore_store))
-    got = docs(b.push(bridge["out"]))
-    merged = {}
-    for d in got:
-        for k in ("lore", "ui", "views"):
-            merged.setdefault(k, {}).update(d.get(k) or {})
-    assert merged["lore"]["Pip|he"]["marta"]["text"] == "כרטיס"
-    assert merged["lore"]["Pip|en"]["marta"]["text"] == "A card."
-    assert set(merged["views"]["Pip"]["terms"]) == {"en", "he", "fr"}
-    assert merged["ui"]["fr"]["send"] == "Envoyer" and "en" not in merged["ui"]
-    # The page itself carries English and Hebrew words, the table's languages arrive with it.
-    page = cloud_table.build_page()
-    assert '"Send"' in page and "/*TABLE_STRINGS*/" not in page
 
 
 def test_a_translated_beat_is_part_of_each_readers_story():

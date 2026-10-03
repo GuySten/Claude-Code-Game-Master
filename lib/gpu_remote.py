@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Pictures and composed music made on ANOTHER computer's graphics card.
 
-When the game runs somewhere without a GPU (a cloud session hosting the table),
+When the game runs somewhere without a GPU (a computer without a graphics card),
 the host's own laptop can still do the painting and the composing: it runs
 ``bash tools/gm-gpu-server.sh`` (lib/gpu_server.py) next to Forge, behind an
 https tunnel, and this machine sends it jobs.
