@@ -29,17 +29,24 @@ NARRATOR_MODEL = os.environ.get("NARRATOR_MODEL", "haiku")
 API_MODEL = os.environ.get("NARRATOR_API_MODEL", "claude-haiku-4-5")
 LOG_CHARS = 40000          # the newest part of the story the narrator reads
 TIMEOUT = 90
+RULES_CHARS = 8000       # the most of a table's rules the narrator reads
 
 RULES = """You are the Narrator's memory at a tabletop role-playing game. A player asks you about \
-the story so far, because they forgot something. You answer ONLY from the story log you are \
-given: what this player has seen and heard at the table.
+the story so far, because they forgot something, or about how the game's rules work. Story \
+questions you answer ONLY from the story log you are given: what this player has seen and \
+heard at the table. Rules questions you answer from the GAME RULES you are given (this \
+table's own rules) and the standard rules of the game system they name.
 
 Rules:
 - Remind, don't invent. If the log doesn't say it, say you don't know, and that the Game \
 Master may tell them in play. Never guess, never fill gaps, never make up names or facts.
 - Never reveal or speculate about secrets, plans, enemies' intentions, what lies ahead, or \
-anything the log doesn't show this player. Never give advice on what to do next, and never \
-rule on game mechanics. You are not the Game Master and you can't change the game.
+anything the log doesn't show this player. Never give advice on what to do next.
+- Rules: explain how a rule works, in general and for this player's own sheet (what a \
+feature does, how a check or a rest works). This table's own rules come first where they \
+differ from the standard ones. Don't decide a particular moment (whether something hits, \
+what a difficulty is, what an enemy has): the Game Master makes the call in play. You are not \
+the Game Master and you can't change the game.
 - Quote or closely paraphrase the log. Mention who said it or when, if that helps.
 - Answer in {lang}, in 1-4 short sentences. Plain text, no markdown headings."""
 
@@ -106,7 +113,7 @@ def story_lines(messages: List[Dict[str, Any]], viewer: str, lang: str) -> List[
 
 def build_prompt(lines: List[str], sheet: Optional[Dict[str, Any]], party: List[Dict[str, Any]],
                  location: Optional[str], history: List[Dict[str, str]], question: str,
-                 viewer: str) -> str:
+                 viewer: str, rules: str = "") -> str:
     log = "\n".join(lines)
     if len(log) > LOG_CHARS:
         log = "…" + log[-LOG_CHARS:]
@@ -118,9 +125,12 @@ def build_prompt(lines: List[str], sheet: Optional[Dict[str, Any]], party: List[
             f"{p['name']} ({' '.join(x for x in (p.get('race'), p.get('class')) if x) or 'adventurer'}, "
             f"HP {p.get('hp')}/{p.get('hp_max')})" for p in party))
     if sheet:
-        keep = {k: sheet[k] for k in ("name", "race", "class", "level", "hp", "conditions",
-                                      "equipment", "features", "gold", "xp") if k in sheet}
+        keep = {k: sheet[k] for k in ("name", "race", "class", "level", "hp", "ac", "stats",
+                                      "skills", "saves", "conditions", "equipment", "features",
+                                      "gold", "xp") if k in sheet}
         parts.append(f"{viewer}'s character sheet: {json.dumps(keep, ensure_ascii=False)}")
+    if rules:
+        parts.append("GAME RULES (this table's):\n" + rules[:RULES_CHARS])
     parts.append("STORY LOG (oldest first):\n" + (log or "(nothing has happened yet)"))
     for qa in history[-6:]:
         parts.append(f"Earlier, {viewer} asked: {qa['q']}\nYou answered: {qa['a']}")

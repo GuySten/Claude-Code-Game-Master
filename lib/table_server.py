@@ -580,7 +580,8 @@ class TableState:
             shown = self.sheet(pc, pc)
             history = [{"q": x["q"], "a": x["a"]} for x in self.narrator_log.get(pc, [])]
             prompt = narrator.build_prompt(lines, shown and shown["sheet"], self.party_for(pc),
-                                           self.overview().get("location"), history, question, pc)
+                                           self.overview().get("location"), history, question, pc,
+                                           rules=self.rules_brief())
             with self.narrator_slots:
                 got = narrator.answer(question, lines, prompt, lang, ask=self.narrator_ask)
             entry = {"id": len(self.narrator_log.get(pc, [])) + 1, "t": _stamp(),
@@ -592,6 +593,32 @@ class TableState:
         finally:
             with self.lock:
                 self.narrator_busy.discard(pc)
+
+    def rules_brief(self) -> str:
+        """The game's rules as a player may know them, for the narrator's rules
+        answers: the system (ruleset.json) and this table's own rules (rules.md)."""
+        ruleset = self._read_json(self.campaign_dir / "ruleset.json", {})
+        parts = []
+        if isinstance(ruleset, dict) and ruleset:
+            kit = ruleset.get("kit") or "custom"
+            system = "Dungeons & Dragons 5th edition" if kit == "dnd5e" else f"{kit} (this world's own)"
+            parts.append(f"Game system: {system}.")
+            prog = ruleset.get("progression")
+            prog = prog.get("model") if isinstance(prog, dict) else prog
+            if prog:
+                parts.append(f"Advancement: {prog}.")
+            leth = ruleset.get("lethality")
+            leth = leth.get("model") if isinstance(leth, dict) else leth
+            if leth:
+                parts.append(f"At 0 HP: {leth}.")
+        doc = ruleset.get("rules_doc") if isinstance(ruleset, dict) else None
+        path = self.campaign_dir / (doc or "rules.md")
+        try:
+            if path.is_file():
+                parts.append(path.read_text(encoding="utf-8").strip())
+        except OSError:
+            pass
+        return "\n\n".join(p for p in parts if p)
 
     # --- hover cards: what a player knows about a name in the story ---
     def aliases(self) -> Dict[str, str]:

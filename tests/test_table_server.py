@@ -1303,6 +1303,26 @@ def test_table_talk_is_for_the_players_only(table):
     assert call("/api/chat", {"code": CODE, "token": pip, "text": "x" * 501})[0] == 400
 
 
+def test_the_narrator_knows_the_tables_rules(table):
+    call, state, camp = table["call"], table["state"], table["camp"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    (camp / "ruleset.json").write_text(json.dumps({"kit": "dnd5e", "rules_doc": "rules.md",
+                                                   "progression": {"model": "xp-levels"}}))
+    (camp / "rules.md").write_text("## The Shudder\nAttacks have disadvantage while the Keep walks.")
+    seen = {}
+
+    def ask(system, prompt):
+        seen["system"], seen["prompt"] = system, prompt
+        return "While the Keep walks, attacks have disadvantage."
+
+    state.narrator_ask = ask
+    status, body = call("/api/narrator", {"code": CODE, "token": pip, "question": "How does the Shudder work?"})
+    assert status == 200
+    assert "GAME RULES" in seen["prompt"] and "The Shudder" in seen["prompt"]
+    assert "Dungeons & Dragons 5th edition" in seen["prompt"]
+    assert "how the game's rules work" in seen["system"]
+
+
 def test_the_narrator_remembers_only_what_this_player_saw(table):
     import narrator
     call, state = table["call"], table["state"]
