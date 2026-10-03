@@ -229,6 +229,7 @@ Under the hood, `/gm` calls these for you — you never have to run them yoursel
 | `/world-check` | Validate campaign consistency |
 | `/reset` | Clear campaign state |
 | `/setup` | Verify/fix installation |
+| `/host-setup` | Get this computer ready to host the online table, and open it: campaigns repo, pictures, tunnel, link and code for the players |
 | `/models` | Choose which Claude models run the GM and its helpers (recommended / budget / premium) |
 | `/help` | Full command reference |
 

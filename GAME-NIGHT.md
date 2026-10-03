@@ -345,6 +345,11 @@ The model's license (CC BY-NC 4.0) allows this for a home game, but not selling 
 
 ## Each game night (host)
 
+**The quick way:** start Claude Code in the game folder and type `/host-setup`. Claude checks
+and sets up everything on this computer (the program, your campaigns repository, Forge,
+the tunnel), opens the table, and gives you the link and code to send. The steps below are
+what it does, if you'd rather do them yourself.
+
 **1. Start Claude Code in the game folder**
 
 ```bash
