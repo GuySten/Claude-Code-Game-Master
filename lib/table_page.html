@@ -1412,6 +1412,7 @@
         const log = $("chat-log");
         const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 60;
         r.messages.forEach((m) => {
+          if (m.id <= chatLast) return;       // shown already (our own line, from the send)
           addChat(m); chatLast = Math.max(chatLast, m.id);
           if (!first && m.pc !== me && !chatVisible()) setUnread(chatUnread + 1);
         });
