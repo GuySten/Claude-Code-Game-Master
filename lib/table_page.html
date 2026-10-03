@@ -1312,6 +1312,7 @@
     try { r = await api(path, body); } finally { $("seat-cards").classList.remove("busy"); }
     $("seat-error").textContent = "";
     if (!r.ok) { $("seat-error").textContent = r.error || "?"; refreshSeats(); return; }
+    if (me) return;                                  // (already seated meanwhile)
     token = r.token; me = r.pc; store.set("token", token);
     api("/api/lang", { lang });
     openTable(await api("/api/info"));
@@ -2581,7 +2582,10 @@
   document.querySelectorAll(".lang-pick").forEach((sel) => { sel.onchange = () => setLang(sel.value); });
   async function refreshSeats() {
     const info = await api("/api/info");
-    if (info.ok) { setLanguages(info.languages); showSeats(info); }
+    if (!info.ok) return;
+    setLanguages(info.languages);
+    if (info.me && !me) { me = info.me; return openTable(info); }   // our join was answered
+    showSeats(info);
   }
   // Keep the "who are you" list current while choosing (someone may join meanwhile).
   setInterval(() => {
