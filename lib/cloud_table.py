@@ -17,6 +17,7 @@ home (``gm-table.sh start``), and the GM plays with the same commands.
     sync DIR OUT             pull, then push: one step per wake
     status                   The Artifact, the last request seen, what to do next
     set-url URL              Remember the Artifact's link
+    set-session ID           The GM's session: pages message it directly to wake it
 
 The relay keeps its state in <campaign>/table/cloud/bridge.json. It never reads
 the players' "chat" collection: their table talk is theirs (CLAUDE.md).
@@ -313,6 +314,9 @@ class Bridge:
         parts: List[Tuple[str, Any, Any]] = []      # (field, key, value)
         if full_push or _changed(hashes, "pub", full["pub"]):
             parts.append(("pub", None, full["pub"]))
+        wake = {"session_id": self.state["session"]} if self.state.get("session") else None
+        if wake and (full_push or _changed(hashes, "wake", wake)):
+            parts.append(("wake", None, wake))
         for c, pc in full["seats"].items():
             if _changed(hashes, "seat|" + c, pc):
                 parts.append(("seats", c, pc))
@@ -447,6 +451,7 @@ def main() -> None:
     sy.add_argument("out")
     sub.add_parser("status")
     sub.add_parser("set-url").add_argument("url")
+    sub.add_parser("set-session").add_argument("session_id")
     args = ap.parse_args()
 
     if args.cmd == "page":
@@ -454,7 +459,11 @@ def main() -> None:
         print(f"Page written: {args.out}")
         return
     bridge = Bridge(_campaign_dir())
-    if args.cmd == "set-url":
+    if args.cmd == "set-session":
+        bridge.state["session"] = args.session_id
+        bridge.save()
+        print(f"Pages will wake session {args.session_id} directly (next push)")
+    elif args.cmd == "set-url":
         bridge.state["url"] = args.url
         bridge.save()
         print(f"Artifact: {args.url}")
