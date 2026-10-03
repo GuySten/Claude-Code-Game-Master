@@ -158,7 +158,10 @@ def lore_prompt(name: str, kind: str, lines: List[str], viewer: str,
             f"In one or two short sentences, sum up what {viewer} knows about {what}, {name}, "
             f"from these lines only. Write about {name} alone: who or what they are, and what "
             f"they did or what was done to them. Leave out other people and events that don't "
-            f"involve {name}. Don't write about {viewer} or what {viewer} saw. "
+            f"involve {name}, and never attach to {name} something the lines say about someone "
+            f"else nearby. Don't write about {viewer} or what {viewer} saw. Write only what is "
+            f"known: if that's little, say the little in one short sentence, and never mention "
+            f"the story log, the Game Master, or what isn't known. "
             f"No preamble; start with the facts.")
 
 
