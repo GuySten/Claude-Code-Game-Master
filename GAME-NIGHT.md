@@ -4,8 +4,7 @@ Claude is the Game Master. One person, **the host**, runs the game on their comp
 everyone else just opens a link in their browser. Players can type or **speak** (English or
 Hebrew), **hear the story read aloud**, and the music follows the scene by itself.
 
-No computer to keep on as the server? Claude can host the table from a cloud session:
-see [CLOUD-TABLE.md](CLOUD-TABLE.md) (your laptop can still paint the pictures and compose the music).
+
 
 - [What your table gets](#what-your-table-gets)
 - [The recommended setup at a glance](#the-recommended-setup-at-a-glance)
@@ -598,6 +597,31 @@ Copy, fill in the link and code, and send:
     מהמארח לפנות אותו).
 
 ---
+
+## Pictures from another computer's GPU (optional)
+
+The game makes its pictures and music on the computer it runs on. If that computer has no
+good graphics card but another one does (a gaming PC, say), the other computer can do that
+work. On it, in the game folder, with Forge (or ComfyUI) and the composer set up as above:
+
+```bash
+bash tools/gm-gpu-server.sh                       # prints a password; keep the window open
+cloudflared tunnel --url http://localhost:7861    # in a second window; prints an https link
+```
+
+Then, in the `.env` of the computer that hosts the game:
+
+```
+GPU_SERVER_URL=https://something-random.trycloudflare.com
+GPU_SERVER_PASSWORD=the password gm-gpu-server.sh printed
+```
+
+- **The password protects that GPU.** To keep the same one every night, put
+  `GPU_SERVER_PASSWORD=...` in that computer's `.env` too.
+- **The link changes** each time cloudflared starts a quick tunnel.
+- **Start Forge (or ComfyUI) first**, then `gm-gpu-server.sh`: its first lines say whether
+  pictures and the composer are ready. The picture settings (`FORGE_*` / `COMFY_*`) belong
+  in that computer's `.env`.
 
 ## Host cheat sheet
 
