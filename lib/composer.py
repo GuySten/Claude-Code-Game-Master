@@ -17,6 +17,7 @@ fight), listed in music-composed.json:
 
 import atexit
 import base64
+import hashlib
 import json
 import os
 import re
@@ -86,7 +87,15 @@ def available() -> bool:
 
 
 def slug(name: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "-", str(name).lower()).strip("-")[:40] or "piece"
+    """A file-name stem for a piece. A name with letters outside a-z (קסטרל)
+    gets a short fingerprint of the whole name, or every Hebrew name would come
+    out as the same "piece" and overwrite the others' music."""
+    name = str(name)
+    base = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:40]
+    if re.fullmatch(r"[\x00-\x7f]*", name) and base:
+        return base
+    tag = hashlib.sha1(name.strip().encode("utf-8")).hexdigest()[:8]
+    return f"{base}-{tag}" if base else f"piece-{tag}"
 
 
 def flavor(campaign_dir) -> str:

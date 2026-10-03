@@ -214,3 +214,13 @@ def test_composed_music_is_brought_up_to_a_steady_loudness_without_clipping():
     assert not np.abs(mc.normalize(np.zeros(500, "float32"), rate)).any()               # silence stays silent
     theme = mc.finish(quiet, rate, loop=True)
     assert theme[0] == 0 and abs(theme[-1]) < 1e-3                      # still fades at the seam
+
+
+def test_every_name_gets_its_own_music_file():
+    # Hebrew names used to all come out as "piece": three PCs shared one anthem file.
+    names = ["קסטרל", "לגולס", "איזרין צל הלילה", "Pip", "Grimaldi the Grey", "Zoë"]
+    stems = [composer.slug(n) for n in names]
+    assert len(set(stems)) == len(names)
+    assert composer.slug("Pip") == "pip" and composer.slug("Grimaldi the Grey") == "grimaldi-the-grey"
+    assert composer.slug("קסטרל") == composer.slug("קסטרל")          # stable across runs
+    assert all(s and all(c.isascii() for c in s) for s in stems)      # still safe in a URL
