@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional, Tuple
 sys.path.insert(0, str(Path(__file__).parent))
 
 from json_ops import JsonOperations
-from campaign_manager import CampaignManager
+from campaign_manager import CampaignManager, load_project_env
 
 _REQUIRED = ('name', 'voice', 'tone', 'themes', 'factions', 'geography', 'signature_systems')
 
@@ -148,6 +148,7 @@ def main():
     json_mode = wants_json()
     args = parser.parse_args(strip_json_flag(sys.argv[1:]))
 
+    load_project_env()      # run directly, not through a wrapper: find the campaigns .env names
     wb = WorldBible()
     if args.action == 'validate':
         ok, errs = wb.validate()

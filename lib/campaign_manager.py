@@ -21,6 +21,33 @@ from character_schema import to_flat
 DEFAULT_WORLD_STATE = "world-state"
 
 
+def load_project_env() -> None:
+    """Load the project's .env the way tools/common.sh does, for a script run
+    directly (`uv run python lib/world_bible.py validate`) rather than through a
+    wrapper: variables already in the environment win, and a relative
+    GM_WORLD_STATE_BASE is anchored at the project root (as the wrappers' cd
+    does), so the script finds the campaigns from any directory."""
+    root = Path(__file__).resolve().parent.parent
+    env_file = root / ".env"
+    try:
+        lines = env_file.read_text(encoding="utf-8").splitlines() if env_file.is_file() else []
+    except OSError:
+        lines = []
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.removeprefix("export ").partition("=")
+        key, value = key.strip(), value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
+            value = value[1:-1]
+        if key and key not in os.environ:
+            os.environ[key] = value
+    base = os.environ.get("GM_WORLD_STATE_BASE")
+    if base and not Path(base).is_absolute():
+        os.environ["GM_WORLD_STATE_BASE"] = str(root / base)
+
+
 def resolve_world_state_base(world_state_dir):
     """Where "the default world-state" points.
 
