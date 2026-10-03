@@ -19,11 +19,11 @@ def bridge(table, tmp_path):
     inbox = tmp_path / "saved"
     sent = []
 
-    def player(path, body=None, client="", t=None):
+    def player(path, body=None, client="", t=None, viewer=""):
         """A page saving one request into the Artifact's "rq" collection."""
         rid = f"r{len(sent) + 1:03d}"
         doc = {"id": rid, "t": t if t is not None else 1_700_000_000_000 + len(sent),
-               "path": path, "body": body or {}, "client": client}
+               "path": path, "body": body or {}, "client": client, "viewer": viewer}
         (inbox / "rq").mkdir(parents=True, exist_ok=True)
         # As ArtifactData saves it: the document, sometimes wrapped with its metadata.
         wrapped = {"id": rid, "version": 1, "data": doc} if len(sent) % 2 else doc
@@ -141,3 +141,18 @@ def test_the_page_runs_the_cloud_transport_first():
     first_script = page.index("<script>")
     assert "window.tableTransport" in page[first_script:page.index("</script>", first_script)]
     assert len(re.findall(r"<style>", page)) >= 1
+
+
+def test_a_player_takes_their_own_character_back_from_a_new_tab(bridge):
+    """A reload (or another device) while the seat is held by the old tab: the same
+    person gets their character back; anyone else is still refused."""
+    b, player = bridge["b"], bridge["player"]
+    player("/api/create", {"name": "Bram"}, client="c_tab1", viewer="u_noa")
+    b.pull(bridge["inbox"])
+    assert b.seated() == {"c_tab1": "Bram"}
+    other = player("/api/claim", {"pc": "Bram"}, client="c_tab9", viewer="u_someone")
+    again = player("/api/create", {"name": "Bram"}, client="c_tab2", viewer="u_noa")
+    lines = b.pull(bridge["inbox"])
+    assert "refused" in lines[0] and "refused" not in lines[1]
+    assert not b.state["outbox"][other]["ok"] and b.state["outbox"][again]["token"] == "c_tab2"
+    assert b.seated() == {"c_tab2": "Bram"}

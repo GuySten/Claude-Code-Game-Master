@@ -143,10 +143,33 @@ class Bridge:
         self.save()
         return lines
 
+    def _reseat(self, path: str, body: Dict[str, Any], viewer: str) -> Optional[str]:
+        """The same person asking again for the character they play, from a new tab
+        (a reload, another device): free the old tab's seat so this one takes it.
+        Returns the PC, or None unless this viewer is the one who played it last."""
+        name = str(body.get("pc") or body.get("name") or "").strip()
+        if not viewer or not name or self.state.setdefault("owners", {}).get(_norm(name)) != viewer:
+            return None
+        party = self.call("GET", "/api/info").get("party") or []
+        pc = next((p.get("name") for p in party if _norm(p.get("name")) == _norm(name)), None)
+        if not pc:
+            return None
+        held = [c for c, seated in self.seated().items() if _norm(seated) == _norm(pc)]
+        if held:
+            self.call("POST", "/api/gm/free", {"pc": pc}, host=True)
+            for c in held:
+                self.state["tokens"].pop(c, None)
+        return pc
+
     def _relay(self, rid: str, r: Dict[str, Any]) -> str:
         path, client = str(r["path"]), str(r.get("client") or "")
+        viewer = str(r.get("viewer") or "")
         body = r.get("body") if isinstance(r.get("body"), dict) else {}
         body = {k: v for k, v in body.items() if k not in ("code", "token")}
+        if path in ("/api/create", "/api/claim"):
+            again = self._reseat(path, body, viewer)
+            if again:                          # (their own character: take it back)
+                path, body = "/api/claim", {"pc": again}
         if path not in PLAYER_POSTS:
             resp = {"ok": False, "error": "not found"}
         else:
@@ -157,6 +180,8 @@ class Bridge:
                              timeout=180 if path in ("/api/narrator", "/api/level-up") else 30)
             if path in ("/api/create", "/api/claim") and resp.get("ok") and resp.get("token"):
                 self.state["tokens"][client] = resp["token"]
+                if viewer:                     # who plays it: theirs to take back
+                    self.state.setdefault("owners", {})[_norm(resp.get("pc"))] = viewer
                 resp = {**resp, "token": client}
             if path == "/api/leave":
                 self.state["tokens"].pop(client, None)
