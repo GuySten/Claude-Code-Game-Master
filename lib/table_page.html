@@ -283,12 +283,65 @@
     #chat-toggle { display: none; }
   }
 
+  /* The ⋯ menu exists only on a phone; elsewhere its buttons sit in the row. */
+  .more-menu { display: contents; }
+  #leave { order: 1; }
+  #more-toggle { display: none; }
+
   @media (max-width: 760px) {
     #table { grid-template-columns: 1fr; }
     aside { display: none; position: fixed; inset: 56px 0 auto 0; max-height: 65vh;
             background: var(--panel); border: 0; border-bottom: 1px solid var(--line); z-index: 5; }
     aside.open { display: block; }
     #party-toggle { display: inline-block; }
+
+    /* Phone: the story gets the screen. One slim header row: title on the left,
+       one-tap icons for sheet / party / chat, and the ⋯ menu for the rest. */
+    header { padding: 4px 6px 4px 10px; flex-wrap: nowrap; gap: 6px; }
+    header > div:first-child { min-width: 0; flex: 1 1 auto; }
+    header .title, header .where { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    header .title { font-size: .9rem; }
+    header .where { font-size: .75rem; }
+    header .tools { flex-wrap: nowrap; flex: none; gap: 4px; }
+    #sheet-toggle, #party-toggle, #chat-toggle, #more-toggle {
+      display: inline-flex; align-items: center; justify-content: center; position: relative;
+      min-width: 42px; height: 42px; padding: 0 6px; font-size: 0; border-radius: 10px; }
+    #sheet-toggle::before { content: "📜"; font-size: 1.25rem; }
+    #party-toggle::before { content: "👥"; font-size: 1.25rem; }
+    #chat-toggle > span[data-i18n] { font-size: 0; }
+    #chat-toggle::before { content: "💬"; font-size: 1.25rem; }
+    #chat-toggle .badge { position: absolute; top: 2px; inset-inline-end: 2px; margin: 0; }
+    #more-toggle { font-size: 1.4rem; line-height: 1; }
+    .more-menu { display: none; position: fixed; inset-inline-end: 6px; top: 56px; z-index: 8;
+                 flex-direction: column; gap: 6px; padding: 8px; min-width: 220px;
+                 background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+                 box-shadow: 0 8px 24px rgba(0, 0, 0, .25); }
+    .more-menu.open { display: flex; }
+    .more-menu button, .more-menu .lang-pick { width: 100%; max-width: none; min-height: 44px;
+                                               text-align: start; padding: 8px 12px; }
+    #leave { order: 0; color: var(--hp-low); }
+
+    /* The story: a little more of it on screen. */
+    #log { padding: 10px 8px; }
+    .msg { margin-bottom: 10px; padding: 9px 12px; }
+    #status { padding: 2px 10px; }
+    #progress { padding: 6px 10px 2px; }
+
+    /* The action box: compact but easy to hit. 16px text keeps iPhones from
+       zooming the page when the box is tapped. */
+    form#say { padding: 6px 8px 8px; }
+    .input-row textarea { height: 52px; font-size: 16px; padding: 8px 10px; }
+    #mic { min-width: 52px; font-size: 1.3rem; padding: 0 8px; }
+    .say-row { margin-top: 4px; font-size: .8rem; gap: 6px 10px; flex-wrap: nowrap; }
+    .say-row .opts { flex: 1 1 auto; min-width: 0; gap: 2px 10px; }
+    .say-row #me { display: none; }
+    #send { min-height: 40px; padding: 6px 18px; }
+    #chat input, #narrator-form input { font-size: 16px; }
+
+    /* Drawers and dialogs use the whole phone. */
+    #chat.open { width: 100%; }
+    dialog#sheet, dialog#places { width: 100%; max-width: 100%; height: 100dvh; max-height: 100dvh;
+                                  margin: 0; border: 0; border-radius: 0; }
   }
 </style>
 </head>
@@ -343,13 +396,19 @@
         <div class="where" id="where"></div>
       </div>
       <div class="tools">
-        <button id="music-toggle" type="button" aria-pressed="true"></button>
-        <button id="read-toggle" type="button" aria-pressed="false"></button>
-        <select class="lang-pick hidden" data-i18n-label="language"></select>
+        <!-- On a phone the rarely-used buttons fold into the ⋯ menu; elsewhere
+             .more-menu is display: contents and they sit in the row as before. -->
+        <div class="more-menu" id="more-menu">
+          <button id="music-toggle" type="button" aria-pressed="true"></button>
+          <button id="read-toggle" type="button" aria-pressed="false"></button>
+          <select class="lang-pick hidden" data-i18n-label="language"></select>
+          <button id="leave" type="button" data-i18n="leave"></button>
+        </div>
         <button id="sheet-toggle" type="button" data-i18n="mySheet"></button>
         <button id="chat-toggle" type="button"><span data-i18n="chatButton"></span><span class="badge hidden" id="chat-unread"></span></button>
         <button id="party-toggle" type="button" data-i18n="party"></button>
-        <button id="leave" type="button" data-i18n="leave"></button>
+        <button id="more-toggle" type="button" aria-expanded="false" aria-controls="more-menu"
+                data-i18n-label="menu">⋯</button>
       </div>
     </header>
     <div id="log" aria-live="polite"></div>
@@ -2597,7 +2656,31 @@
     $("party").style.top = headerBottom() + "px";
     $("party").classList.toggle("open");
     $("chat").classList.remove("open");
+    setMoreMenu(false);
   };
+  // The ⋯ menu (phone only): music, reading aloud, language, leaving. It closes
+  // after a choice, on a tap anywhere else, and when another drawer opens.
+  function setMoreMenu(open) {
+    const menu = $("more-menu");
+    if (open) menu.style.top = (headerBottom() + 4) + "px";
+    menu.classList.toggle("open", open);
+    $("more-toggle").setAttribute("aria-expanded", String(open));
+  }
+  $("more-toggle").onclick = (ev) => {
+    ev.stopPropagation();
+    const open = !$("more-menu").classList.contains("open");
+    if (open) { $("party").classList.remove("open"); $("chat").classList.remove("open"); }
+    setMoreMenu(open);
+  };
+  $("more-menu").addEventListener("click", (ev) => {
+    if (ev.target.closest("button")) setMoreMenu(false);
+    else ev.stopPropagation();                  // (the language list: keep it open)
+  });
+  $("more-menu").addEventListener("change", () => setMoreMenu(false));
+  document.addEventListener("click", (ev) => {
+    if (!ev.target.closest("#more-menu")) setMoreMenu(false);
+  });
+  $("chat-toggle").addEventListener("click", () => setMoreMenu(false));
   $("code-go").onclick = enterCode;
   $("code").addEventListener("keydown", (ev) => { if (ev.key === "Enter") enterCode(); });
   // Rolling a character: the server rolls and keeps the numbers; we show them,

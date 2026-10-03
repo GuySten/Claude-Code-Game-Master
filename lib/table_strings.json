@@ -211,7 +211,8 @@
   "voiceFor": "{lang} voice",
   "voiceHello": "Hello, I'll read the adventure to you.",
   "readOnSpoken": "Reading aloud is on.",
-  "language": "Language"
+  "language": "Language",
+  "menu": "Menu"
  },
  "he": {
   "title": "השולחן",
@@ -425,6 +426,7 @@
   "voiceFor": "קול: {lang}",
   "voiceHello": "שלום, אני אקריא לכם את ההרפתקה.",
   "readOnSpoken": "ההקראה פועלת.",
-  "language": "שפה"
+  "language": "שפה",
+  "menu": "תפריט"
  }
 }
