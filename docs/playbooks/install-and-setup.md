@@ -56,9 +56,11 @@ Enumerated from `os.environ.get` across `lib/` and `tools/`:
 | Variable | Read by | Effect |
 |---|---|---|
 | `OPENAI_API_KEY` | `image_gen`, `session_manager` | turns scene images on through OpenAI. With neither this nor `IMAGE_BACKEND=forge` the session brief says DISABLED |
-| `IMAGE_BACKEND` | `image_gen`, `session_manager` | `openai` · `forge` (a local Stable Diffusion WebUI Forge / AUTOMATIC1111 with `--api`, free) · `off`. Default: `openai` when a key is set, else `off` |
+| `IMAGE_BACKEND` | `image_gen`, `session_manager` | `openai` · `forge` (a local Stable Diffusion WebUI Forge / AUTOMATIC1111 with `--api`, free) · `remote` (that Forge on the host's laptop, through `GPU_SERVER_URL`) · `off`. Default: `remote` when `GPU_SERVER_URL` is set, else `openai` when a key is set, else `off` |
+| `GPU_SERVER_URL`, `GPU_SERVER_PASSWORD` | `gpu_remote`, `image_gen`, `composer` | the host laptop's `gm-gpu-server.sh` behind a tunnel: pictures and composed music are made there (CLOUD-TABLE.md). On the laptop, `GPU_SERVER_PASSWORD` is the password the server accepts |
+| `GPU_SERVER_PORT` | `gpu_server` | the laptop server's port (default `7861`) |
 | `FORGE_URL`, `FORGE_MODEL`, `FORGE_STEPS`, `FORGE_CFG`, `FORGE_SAMPLER`, `FORGE_SCHEDULER`, `FORGE_LANDSCAPE`/`PORTRAIT`/`SQUARE`, `FORGE_TIMEOUT` | `image_gen` | local Forge tuning; defaults suit DreamShaper XL Lightning (GAME-NIGHT.md → 5. Pictures) |
-| `MUSIC_COMPOSE` | `composer` | `off` turns the local composer off (default: on when `.compose-venv` exists) |
+| `MUSIC_COMPOSE` | `composer` | `off` turns composing off · `remote` composes on the GPU server even when `.compose-venv` exists here (default: here when `.compose-venv` exists, else on the GPU server when `GPU_SERVER_URL` is set) |
 | `COMPOSE_MODEL`, `COMPOSE_DEVICE` | `music_compose` | MusicGen model (default `facebook/musicgen-small`) · `auto`/`cuda`/`cpu` |
 | `COMPOSE_LOUDNESS` | `music_compose` | loudness composed pieces are brought to, dB (default `-14`) |
 | `COMPOSE_RAM_HALF` | `music_compose` | `0` keeps the waiting music model in full precision in RAM (default: half, with a GPU) |

@@ -45,6 +45,19 @@ PYTHON_CMD=$(find_python)
 # Get project root directory (parent of tools/)
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+# Load .env first: it can move the campaigns (GM_WORLD_STATE_BASE, below). A
+# GM_WORLD_STATE_BASE already in the environment (tests, a one-off run) wins.
+if [ -f "$PROJECT_ROOT/.env" ]; then
+    _gm_base_before="${GM_WORLD_STATE_BASE-}"
+    set -a
+    source "$PROJECT_ROOT/.env"
+    set +a
+    if [ -n "$_gm_base_before" ]; then
+        GM_WORLD_STATE_BASE="$_gm_base_before"
+    fi
+    unset _gm_base_before
+fi
+
 # The managers default to the RELATIVE path "world-state", so they resolve it
 # against the working directory. Run every wrapper from the project root, or a
 # call made from anywhere else reads the wrong tree (and silently creates a
@@ -244,9 +257,3 @@ check_env() {
     return 0
 }
 
-# Load .env file if it exists
-if [ -f "$PROJECT_ROOT/.env" ]; then
-    set -a
-    source "$PROJECT_ROOT/.env"
-    set +a
-fi

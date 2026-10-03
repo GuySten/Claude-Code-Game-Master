@@ -4,6 +4,9 @@ Claude is the Game Master. One person, **the host**, runs the game on their comp
 everyone else just opens a link in their browser. Players can type or **speak** (English or
 Hebrew), **hear the story read aloud**, and the music follows the scene by itself.
 
+No computer to keep on as the server? Claude can host the table from a cloud session:
+see [CLOUD-TABLE.md](CLOUD-TABLE.md) (your laptop can still paint the pictures and compose the music).
+
 - [What your table gets](#what-your-table-gets)
 - [The recommended setup at a glance](#the-recommended-setup-at-a-glance)
 - [One-time setup (host)](#one-time-setup-host)

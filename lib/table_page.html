@@ -649,7 +649,10 @@
   }
 
   // -------------------------------------------------------------- api ---
-  let code = new URLSearchParams(location.search).get("code") || store.get("code") || "";
+  // Hosted from a cloud session (CLOUD-TABLE.md), the page runs inside a claude.ai
+  // Artifact and lib/table_cloud.js carries its requests: no table code, no server.
+  const transport = window.tableTransport || null;
+  let code = (transport && transport.code) || new URLSearchParams(location.search).get("code") || store.get("code") || "";
   let token = store.get("token");
   let me = null, lastId = 0, lastRev = 0, polling = false, historyLoaded = false;
   const allMessages = [];
@@ -666,6 +669,7 @@
   }
 
   async function api(path, body) {
+    if (transport) return transport.api(path, body, { token });
     const opts = body ? { method: "POST", headers: { "Content-Type": "application/json" },
                           body: JSON.stringify(Object.assign({ code, token }, body)) } : {};
     const sep = path.includes("?") ? "&" : "?";
@@ -985,7 +989,7 @@
     el.preload = "auto";
     el.loop = !!m.loop;
     el.volume = 0;
-    el.src = m.kind === "url" ? m.src
+    el.src = m.kind === "url" ? m.src : transport ? transport.media("music", m.src)
       : "/music/" + encodeURIComponent(m.src) + "?code=" + encodeURIComponent(code);
     let level = musicLevel(), live = true;
     const start = () => {
@@ -2288,6 +2292,7 @@
 
   // Pictures shown small come as small JPEGs (w): much faster over the tunnel.
   function imageUrl(name, w) {
+    if (transport) return transport.media("images", name);
     return "/images/" + encodeURIComponent(name) + "?code=" + encodeURIComponent(code) + (w ? "&w=" + w : "");
   }
   function imageEl(name, w) {
@@ -2509,7 +2514,7 @@
         const img = document.createElement("img");
         img.alt = "";
         img.loading = "lazy";
-        img.src = "/images/" + encodeURIComponent(m.image) + "?code=" + encodeURIComponent(code);
+        img.src = imageUrl(m.image);
         d.appendChild(img);
       }
     }

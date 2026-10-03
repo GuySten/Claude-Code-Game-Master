@@ -67,6 +67,10 @@ open the link, enter the code, and pick or create their PC. While the table is o
    spells for that level (and whatever they asked for, if the rules allow).
    Illustrations: `say "…" --image <file in images/>`.
 4. Go back to 1. A new player joining arrives as a JOIN line: welcome them in the fiction.
+   **Hosting from a cloud session (the Cloud Table)?** Same steps, but players reach the
+   table through a claude.ai Artifact: follow CLOUD-TABLE.md → "For the GM: the turn loop".
+   Each wake starts with `gm-cloud.sh sync`, and after every `say` players see NOTHING until
+   `gm-cloud.sh push` and its ArtifactData batch are written.
    A JOIN line with `Rolled: STR … (Race Class, HP, AC)` is a character the player rolled
    with the table's fair dice: those numbers are already on their sheet, so build on them
    (equipment, features, appearance) and never re-roll or overwrite them.
@@ -121,7 +125,8 @@ immediate and certain.)
 
 **The players' side chat is theirs.** The page has a players-only chat (table talk, plans,
 jokes). It is never sent to you and isn't stored anywhere you can read: never try to get it
-(no tokens, no player endpoints, no asking the host to relay it), and don't act on anything
+(no tokens, no player endpoints, no reading the Cloud Table's `chat` collection, no asking
+the host to relay it), and don't act on anything
 you think was said there. The host's own terminal messages are table-talk instructions to you unless they say they're
 playing; the host can also play through the browser. `gm-table.sh status` / `stop` / `free "<pc>"`.
 
