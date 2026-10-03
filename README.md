@@ -125,7 +125,8 @@ Then launch and play:
 
 **Playing with friends on their own computers?** Follow **[GAME-NIGHT.md](GAME-NIGHT.md)** —
 host setup, the link and code to send, a player guide in English and Hebrew, and fixes for
-common problems.
+common problems. **No machine to host on?** [CLOUD-TABLE.md](CLOUD-TABLE.md): Claude hosts
+the table from a cloud session, and your laptop's GPU can still make the pictures and music.
 
 `/gm` is the only command you need. It offers a **New Adventure** — author an original world (`/new-game`), import a book you've dropped in `source-material/` (`/import`), or spin up a quick one-shot — then builds your character and runs the game. First thing it asks once a world exists: **"Who are you in this world?"** — play a character lifted straight from the source, an original of your own, or a nameless traveler who wanders in. The mechanics get figured out behind the scenes.
 

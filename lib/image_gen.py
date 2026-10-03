@@ -6,6 +6,9 @@ Image sources (``IMAGE_BACKEND`` in .env):
            --api: free, private, runs on the host's own GPU. FORGE_* settings tune
            it (defaults suit an SDXL "Lightning" model such as DreamShaper XL
            Lightning on a 6 GB laptop GPU; see GAME-NIGHT.md → Pictures).
+  remote — that same Forge, on ANOTHER computer: the host's laptop runs
+           tools/gm-gpu-server.sh behind a tunnel (GPU_SERVER_URL, GPU_SERVER_PASSWORD;
+           see CLOUD-TABLE.md). The default when GPU_SERVER_URL is set.
   off    — no images (the default with no key).
 
 The GM calls this at high-impact beats (new location, boss reveal, big loot) to
@@ -41,6 +44,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from campaign_manager import CampaignManager
 import visual_appearance as va_mod
 from gpu_turn import gpu_turn
+import gpu_remote
 
 
 def resolve_campaign_dir(world_state_dir: str = "world-state"):
@@ -211,7 +215,8 @@ class ImageGenError(Exception):
 
 # --------------------------------------------------------------- sources ----
 def backend() -> str:
-    """'openai', 'forge' or 'off' — from IMAGE_BACKEND, else whether a key is set."""
+    """'openai', 'forge', 'remote' or 'off' — from IMAGE_BACKEND, else whether a
+    GPU server or a key is set."""
     chosen = os.environ.get("IMAGE_BACKEND", "").strip().lower()
     if chosen in ("forge", "a1111", "automatic1111", "sdwebui", "local"):
         return "forge"
@@ -219,6 +224,8 @@ def backend() -> str:
         return "off"
     if chosen == "openai":
         return "openai"
+    if chosen == "remote" or gpu_remote.enabled():
+        return "remote"
     return "openai" if os.environ.get("OPENAI_API_KEY") else "off"
 
 
@@ -247,11 +254,18 @@ def forge_release_gpu() -> bool:
         return False
 
 
-def forge_warm_up() -> bool:
+def forge_warm_up(local: bool = False) -> bool:
     """At the start of a game: have Forge read its picture model into RAM now (one
     tiny throwaway picture), then move it off the graphics card. The first real
     picture then doesn't wait on the disk. False if Forge isn't in use or isn't up."""
-    if backend() != "forge" or not images_status()[0]:
+    if not local and backend() == "remote":
+        try:
+            return bool(gpu_remote.run("warmup", timeout=900).get("ok"))
+        except gpu_remote.GpuRemoteError:
+            return False
+    if not local and backend() != "forge":
+        return False
+    if not forge_status()[0]:
         return False
     payload = {"prompt": "warm-up", "steps": 1, "width": 64, "height": 64, "seed": 1,
                "batch_size": 1, "n_iter": 1, "send_images": False, "save_images": False}
@@ -281,22 +295,40 @@ def images_status(probe: bool = True):
         if not os.environ.get("OPENAI_API_KEY"):
             return False, b, "IMAGE_BACKEND=openai but OPENAI_API_KEY is not set"
         return True, b, "OpenAI gpt-image-2"
+    if b == "remote":
+        if not gpu_remote.enabled():
+            return False, b, "IMAGE_BACKEND=remote but GPU_SERVER_URL is not set"
+        if not probe:
+            return True, b, f"the host's GPU at {gpu_remote.url()}"
+        h = gpu_remote.health()
+        if h is None:
+            return False, b, (f"the host's GPU server isn't answering at {gpu_remote.url()} — "
+                              f"start gm-gpu-server.sh and its tunnel on the laptop")
+        if not h.get("forge"):
+            return False, b, "the host's laptop answers, but its Forge doesn't: " + str(h.get("forge_why"))
+        return True, b, f"the host's GPU at {gpu_remote.url()}"
     if not probe:
         return True, b, f"local Forge at {forge_url()}"
+    ok, why = forge_status()
+    return ok, b, why
+
+
+def forge_status():
+    """(answering with a model, why) for the Forge at FORGE_URL on this machine."""
     try:
         with _forge_open(urllib.request.Request(forge_url() + "/sdapi/v1/sd-models"), 3) as r:
             models = json.loads(r.read().decode("utf-8")) or []
     except urllib.error.HTTPError as e:
         if e.code == 404:                       # the web UI answers, its API doesn't
-            return False, b, ("Forge is running but its API is off — add --api to "
-                              "COMMANDLINE_ARGS in webui\\webui-user.bat and restart it")
-        return False, b, f"Forge answered with an error ({e.code})"
+            return False, ("Forge is running but its API is off — add --api to "
+                           "COMMANDLINE_ARGS in webui\\webui-user.bat and restart it")
+        return False, f"Forge answered with an error ({e.code})"
     except (urllib.error.URLError, OSError, ValueError):
-        return False, b, (f"Forge isn't answering at {forge_url()} — start it (run.bat) "
-                          f"with --api, then images turn on")
+        return False, (f"Forge isn't answering at {forge_url()} — start it (run.bat) "
+                       f"with --api, then images turn on")
     if not models:
-        return False, b, "Forge is running but has no model — put one in models/Stable-diffusion"
-    return True, b, f"local Forge at {forge_url()}"
+        return False, "Forge is running but has no model — put one in models/Stable-diffusion"
+    return True, f"local Forge at {forge_url()}"
 
 
 # Requested size (OpenAI terms) -> the size the local model is good at.
@@ -319,9 +351,8 @@ FORGE_NEGATIVE = ("text, words, letters, watermark, signature, logo, frame, bord
                   "bad hands, bad anatomy")
 
 
-def _forge_generate(prompt: str, quality: str, size: str, avoid: str = ""):
-    """One image from the local Forge/AUTOMATIC1111 API -> (png bytes, model, WxH).
-    ``avoid``: more for the negative prompt (a man's portrait avoids "woman")."""
+def _forge_payload(prompt: str, quality: str, size: str, avoid: str = ""):
+    """Forge's txt2img request for one image -> (payload, model, w, h)."""
     w, h = _forge_dims(size)
     steps = int(os.environ.get("FORGE_STEPS", "6"))
     if quality == "low":
@@ -342,6 +373,33 @@ def _forge_generate(prompt: str, quality: str, size: str, avoid: str = ""):
     if model:
         payload["override_settings"] = {"sd_model_checkpoint": model}
         payload["override_settings_restore_afterwards"] = False
+    return payload, model, w, h
+
+
+def _forge_image(body: dict, model: str, w: int, h: int):
+    try:
+        b64 = body["images"][0]
+        if "," in b64[:64]:
+            b64 = b64.split(",", 1)[1]          # a data: URI
+        return base64.b64decode(b64), "forge:" + (model or "current model"), f"{w}x{h}"
+    except (KeyError, IndexError, TypeError, ValueError) as e:
+        raise ImageGenError("Forge answered without an image.") from e
+
+
+def _remote_generate(prompt: str, quality: str, size: str, avoid: str = ""):
+    """The same image, painted by the host laptop's Forge (lib/gpu_server.py)."""
+    payload, model, w, h = _forge_payload(prompt, quality, size, avoid)
+    try:
+        body = gpu_remote.run("txt2img", payload, timeout=int(os.environ.get("FORGE_TIMEOUT", "600")) + 300)
+    except gpu_remote.GpuRemoteError as e:
+        raise ImageGenError(f"The host's GPU couldn't paint it: {e}") from e
+    return _forge_image(body, model, w, h)
+
+
+def _forge_generate(prompt: str, quality: str, size: str, avoid: str = ""):
+    """One image from the local Forge/AUTOMATIC1111 API -> (png bytes, model, WxH).
+    ``avoid``: more for the negative prompt (a man's portrait avoids "woman")."""
+    payload, model, w, h = _forge_payload(prompt, quality, size, avoid)
     req = urllib.request.Request(forge_url() + "/sdapi/v1/txt2img",
                                  data=json.dumps(payload).encode("utf-8"),
                                  headers={"Content-Type": "application/json"}, method="POST")
@@ -364,13 +422,7 @@ def _forge_generate(prompt: str, quality: str, size: str, avoid: str = ""):
     except (urllib.error.URLError, OSError) as e:
         raise ImageGenError(f"Can't reach Forge at {forge_url()} — is it running (with --api)? "
                             f"({getattr(e, 'reason', e)})") from e
-    try:
-        b64 = body["images"][0]
-        if "," in b64[:64]:
-            b64 = b64.split(",", 1)[1]          # a data: URI
-        return base64.b64decode(b64), "forge:" + (model or "current model"), f"{w}x{h}"
-    except (KeyError, IndexError, TypeError, ValueError) as e:
-        raise ImageGenError("Forge answered without an image.") from e
+    return _forge_image(body, model, w, h)
 
 
 def character_records(campaign_dir) -> dict:
@@ -548,8 +600,9 @@ def generate_image(prompt: str, *, title: str = "", quality: str = DEFAULT_QUALI
                                 style_lock=style_lock, appearance_lock=appearance_lock,
                                 chronicler=chronicler, place=place)
 
-    if source == "forge":
-        image_bytes, model, size = _forge_generate(final_prompt, quality, size, avoid)
+    if source in ("forge", "remote"):
+        make = _forge_generate if source == "forge" else _remote_generate
+        image_bytes, model, size = make(final_prompt, quality, size, avoid)
         cost = 0.0
     else:
         image_bytes = _openai_generate(final_prompt, api_key, model, quality, size)

@@ -16,6 +16,7 @@ fight), listed in music-composed.json:
 """
 
 import atexit
+import base64
 import json
 import os
 import re
@@ -28,6 +29,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from gpu_turn import gpu_turn  # noqa: E402
+import gpu_remote  # noqa: E402
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 COMPOSE_VENV = PROJECT_ROOT / ".compose-venv"
@@ -40,10 +42,36 @@ class ComposeError(Exception):
     pass
 
 
+def _turned_off() -> bool:
+    return os.environ.get("MUSIC_COMPOSE", "").strip().lower() in ("off", "0", "no", "false")
+
+
+def remote() -> bool:
+    """Composing on the host laptop's GPU server (lib/gpu_remote.py) instead of here:
+    MUSIC_COMPOSE=remote, or a GPU server is set and there's no composer here."""
+    if _turned_off() or not gpu_remote.enabled():
+        return False
+    chosen = os.environ.get("MUSIC_COMPOSE", "").strip().lower()
+    return chosen == "remote" or _local_python() is None
+
+
 def composer_python() -> Optional[Path]:
-    """The composer environment's Python, or None (not set up, or turned off)."""
-    if os.environ.get("MUSIC_COMPOSE", "").strip().lower() in ("off", "0", "no", "false"):
+    """The composer environment's Python, or None (not set up, turned off, or
+    composing on the host's laptop instead)."""
+    if _turned_off() or remote():
         return None
+    return _local_python()
+
+
+def _python(local: bool = False) -> Optional[Path]:
+    """composer_python(), or with ``local`` this machine's composer even when a GPU
+    server is set (the GPU server itself composes with this)."""
+    if not local:
+        return composer_python()
+    return None if _turned_off() else _local_python()
+
+
+def _local_python() -> Optional[Path]:
     for p in (COMPOSE_VENV / "Scripts" / "python.exe", COMPOSE_VENV / "bin" / "python"):
         if p.is_file():
             return p
@@ -51,6 +79,9 @@ def composer_python() -> Optional[Path]:
 
 
 def available() -> bool:
+    if remote():
+        h = gpu_remote.health()
+        return bool(h and h.get("composer"))
     return composer_python() is not None
 
 
@@ -107,11 +138,11 @@ NO_WINDOW = {"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0)} if os.
 _cpu_only = False
 
 
-def _spawn() -> Optional[subprocess.Popen]:
+def _spawn(local: bool = False) -> Optional[subprocess.Popen]:
     global _server, _server_device
     if _server is not None and _server.poll() is None:
         return _server
-    py = composer_python()
+    py = _python(local)
     if py is None:
         return None
     env = {**os.environ, "PYTHONUTF8": "1", "PYTHONFAULTHANDLER": "1"}
@@ -172,12 +203,17 @@ def _read(proc: subprocess.Popen, want, timeout: float) -> Optional[Dict[str, An
         watchdog.cancel()
 
 
-def start_server(timeout: float = 1800) -> bool:
+def start_server(timeout: float = 1800, local: bool = False) -> bool:
     """Start the composer and let it read the model into RAM (once). Blocks until
     it's ready; True if it is. The table calls this in the background at start."""
     global _server_device
+    if not local and remote():
+        try:
+            return bool(gpu_remote.run("compose-start", timeout=timeout).get("ok"))
+        except gpu_remote.GpuRemoteError:
+            return False
     with _server_lock:
-        proc = _spawn()
+        proc = _spawn(local)
         if proc is None:
             return False
         if _server_device:
@@ -217,7 +253,7 @@ def _free_the_card() -> None:
 
 
 def compose_many(jobs: List[Dict[str, Any]], on_piece: Optional[Callable[[int, Dict[str, Any]], None]] = None,
-                 timeout_each: int = 1800) -> List[Optional[Dict[str, Any]]]:
+                 timeout_each: int = 1800, local: bool = False) -> List[Optional[Dict[str, Any]]]:
     """Compose pieces ({prompt, seconds, out, loop}) with the running composer: its
     model stays in RAM, so it's read from disk only once. Each piece takes its turn
     on the graphics card (pictures wait for it, and it for them), with Forge's model
@@ -226,13 +262,15 @@ def compose_many(jobs: List[Dict[str, Any]], on_piece: Optional[Callable[[int, D
     global _cpu_only
     if not jobs:
         return []
-    if composer_python() is None:
+    if not local and remote():
+        return _compose_remote(jobs, on_piece, timeout_each)
+    if _python(local) is None:
         raise ComposeError("the composer isn't set up (bash tools/gm-music-compose.sh setup)")
     results: List[Optional[Dict[str, Any]]] = [None] * len(jobs)
     errors: List[str] = []
     with _server_lock:
         for i, job in enumerate(jobs):
-            if not start_server():                   # (re)started if it isn't running
+            if not start_server(local=local):        # (re)started if it isn't running
                 errors.append(_log_tail() or "it didn't start")
                 break
             proc = _server
@@ -256,7 +294,7 @@ def compose_many(jobs: List[Dict[str, Any]], on_piece: Optional[Callable[[int, D
                     _cpu_only = True
                     print("[compose] composing on the CPU from now on (slower)", file=sys.stderr, flush=True)
                     try:
-                        retry = compose_many([job], timeout_each=timeout_each)[0]
+                        retry = compose_many([job], timeout_each=timeout_each, local=local)[0]
                     except ComposeError as e:
                         errors.append(str(e))
                         retry = None
@@ -276,11 +314,39 @@ def compose_many(jobs: List[Dict[str, Any]], on_piece: Optional[Callable[[int, D
     return results
 
 
+def _compose_remote(jobs: List[Dict[str, Any]], on_piece, timeout_each: int
+                    ) -> List[Optional[Dict[str, Any]]]:
+    """compose_many() on the host laptop's GPU server: the piece comes back as
+    bytes and is written where the job asked, the same as a local one."""
+    results: List[Optional[Dict[str, Any]]] = [None] * len(jobs)
+    errors: List[str] = []
+    for i, job in enumerate(jobs):
+        out = Path(job["out"])
+        try:
+            r = gpu_remote.run("compose", {"prompt": job["prompt"], "seconds": job.get("seconds", 30),
+                                           "loop": bool(job.get("loop")), "ext": out.suffix or ".ogg"},
+                               timeout=timeout_each)
+            path = out.with_suffix(r.get("ext") or out.suffix)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(base64.b64decode(r["audio"]))
+        except (gpu_remote.GpuRemoteError, KeyError, ValueError, OSError) as e:
+            errors.append(str(e))
+            continue
+        results[i] = {"ok": True, "path": str(path), "seconds": r.get("seconds"),
+                      "device": r.get("device"), "elapsed": r.get("elapsed"), "id": i}
+        if on_piece is not None:
+            on_piece(i, results[i])
+    if not any(results):
+        raise ComposeError("the host's composer failed: " + (errors[-1] if errors else "no answer"))
+    return results
+
+
 def compose(prompt: str, seconds: float, out: Path, loop: bool = False,
-            timeout: int = 3600) -> Dict[str, Any]:
-    """Compose one piece (blocking: a minute or two on a GPU, several on a CPU)."""
+            timeout: int = 3600, local: bool = False) -> Dict[str, Any]:
+    """Compose one piece (blocking: a minute or two on a GPU, several on a CPU).
+    ``local``: on this machine's composer even when a GPU server is set."""
     return compose_many([{"prompt": prompt, "seconds": seconds, "out": str(out), "loop": loop}],
-                        timeout_each=timeout)[0]
+                        timeout_each=timeout, local=local)[0]
 
 
 # --- what has been composed for this campaign ---

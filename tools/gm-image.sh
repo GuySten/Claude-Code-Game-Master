@@ -98,7 +98,7 @@ case "$ACTION" in
         success "Image generated: ${TITLE:-untitled}"
         echo "  open: $SHORT_URI"
         if [ "$COST" = "0.000" ]; then
-            echo "  made locally (free)"
+            echo "  made on the host's own GPU (free)"
         else
             echo "  est cost: \$$COST ($QUALITY $SIZE)"
         fi

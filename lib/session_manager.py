@@ -697,7 +697,7 @@ class SessionManager(EntityManager):
             images_on, image_source, image_why = False, "off", f"image setup error: {e}"
         if images_on:
             cost_note = ("images are free here (a local model, ~30-60 s each: always in the "
-                         "background)" if image_source == "forge"
+                         "background)" if image_source in ("forge", "remote")
                          else "images cost ~$0.04")
             lines.append(f"Scene images: ENABLED ({image_why}) — illustrate GENEROUSLY and with glee "
                          f"({cost_note}; lean toward YES). New location, monster/boss "
