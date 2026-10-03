@@ -2581,6 +2581,7 @@
   }
   document.querySelectorAll(".lang-pick").forEach((sel) => { sel.onchange = () => setLang(sel.value); });
   async function refreshSeats() {
+    if (!me) token = store.get("token") || token;     // (a join sent from this browser)
     const info = await api("/api/info");
     if (!info.ok) return;
     setLanguages(info.languages);
