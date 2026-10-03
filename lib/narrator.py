@@ -78,6 +78,7 @@ def story_lines(messages: List[Dict[str, Any]], viewer: str, lang: str) -> List[
         if kind == "gm":
             if m.get("lang") and m.get("lang") != lang:
                 continue                         # the other language's version
+            text = ((m.get("tr") or {}).get(lang) or text).strip()   # (a translated beat)
             who = "GM, privately to you" if m.get("to") else "GM"
             if text:
                 out.append(f"[{who}] {text}")

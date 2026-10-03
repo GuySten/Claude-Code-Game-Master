@@ -158,3 +158,12 @@ def test_the_cloud_table_carries_every_language(bridge):
     # The page itself carries English and Hebrew words, the table's languages arrive with it.
     page = cloud_table.build_page()
     assert '"Send"' in page and "/*TABLE_STRINGS*/" not in page
+
+
+def test_a_translated_beat_is_part_of_each_readers_story():
+    """A beat told in one language and translated afterwards: the hover cards and
+    the Narrator of a reader in the other language go by the translation."""
+    import narrator
+    beat = {"kind": "gm", "text": "מרתה מנגבת ספל.", "tr": {"en": "Marta wipes a mug."}}
+    assert narrator.story_lines([beat], "Pip", "en") == ["[GM] Marta wipes a mug."]
+    assert narrator.story_lines([beat], "Pip", "he") == ["[GM] מרתה מנגבת ספל."]
