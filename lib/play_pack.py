@@ -10,7 +10,8 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional
+import re
+from typing import Any, Dict, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -139,6 +140,16 @@ def _load_json(cdir: Path, name: str) -> dict:
 
 def _save_json(cdir: Path, name: str, data: dict) -> None:
     (cdir / name).write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def split_exit(text: str) -> Tuple[str, str]:
+    """An exit written "The Stair of Tallies, up to the Middle Ward" is a place
+    called "The Stair of Tallies" (and what it is). A short name before the first
+    comma, dash or colon is the name; with none, the whole text is."""
+    m = re.match(r"\s*(.{2,40}?)\s*(?:,|:|\s[-\u2013\u2014]\s)\s*(.+)$", text)
+    if m:
+        return m.group(1).strip(), m.group(2).strip()
+    return text.strip(), ""
 
 
 def _ensure_location(locations: dict, name: str, position: str, description: str = "") -> bool:
@@ -274,10 +285,11 @@ def apply_stage(campaign_dir, world_state_dir: Optional[str] = None) -> Dict[str
         pack.get("whose_story") or "opening stage",
         pack["primer"] or pack["hook"],
     )
-    for exit_name in pack["exits"]:
-        if _ensure_location(locations, exit_name, f"exit from {pack['room']}"):
+    for exit_text in pack["exits"]:
+        exit_name, what = split_exit(exit_text)
+        if _ensure_location(locations, exit_name, f"exit from {pack['room']}", what):
             created["exits"].append(exit_name)
-        _connect(locations, pack["room"], exit_name, "visible from here")
+        _connect(locations, pack["room"], exit_name, what or "visible from here")
 
     for name in pack["present"]:
         existing = resolve_or_merge_key(name, npcs)

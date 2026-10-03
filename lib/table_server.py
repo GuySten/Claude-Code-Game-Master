@@ -621,8 +621,20 @@ class TableState:
             except Exception as e:               # offline...: names just aren't hoverable
                 print(f"[lore] finding names: {e}", flush=True)
                 return
+            # A small model can slide a spelling onto the wrong name (קסטרל, a PC's own
+            # name, came back as "Ma Grisk"). Never take a spelling that already is
+            # another name or another name's alias, nor one given for two names.
+            taken = {fold_name(n): n for n in self._named_things()}
+            taken.update({fold_name(a): n for a, n in aliases.items()})
+            counts: Dict[str, int] = {}
+            for spelling in found.values():
+                counts[fold_name(spelling)] = counts.get(fold_name(spelling), 0) + 1
             for name, spelling in found.items():
-                if fold_name(spelling) != fold_name(name) and languages.NIQQUD.sub("", spelling) not in aliases:
+                key = fold_name(spelling)
+                owner = taken.get(key)
+                if key == fold_name(name) or counts[key] > 1 or (owner and owner.lower() != name.lower()):
+                    continue
+                if languages.NIQQUD.sub("", spelling) not in aliases:
                     self.set_alias(name, spelling)
 
     def _named_things(self) -> Dict[str, str]:
@@ -732,7 +744,9 @@ class TableState:
                         return None             # the other worker has it
                     self.card_running.add(key)
             try:
-                got = narrator.answer(f"{name}?", lines[-30:], narrator.lore_prompt(name, kind, lines[-30:], viewer),
+                spelled = [a for a, n in self.aliases().items() if n.lower() == name.lower()]
+                got = narrator.answer(f"{name}?", lines[-30:],
+                                      narrator.lore_prompt(name, kind, lines[-30:], viewer, spelled),
                                       lang, ask=self.narrator_ask)
             finally:
                 if refresh:

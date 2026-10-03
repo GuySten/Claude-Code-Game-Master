@@ -23,7 +23,7 @@ import re
 import shutil
 import subprocess
 import tempfile
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, Iterable, List, Optional
 
 NARRATOR_MODEL = os.environ.get("NARRATOR_MODEL", "haiku")
 API_MODEL = os.environ.get("NARRATOR_API_MODEL", "claude-haiku-4-5")
@@ -128,8 +128,10 @@ def build_prompt(lines: List[str], sheet: Optional[Dict[str, Any]], party: List[
     return "\n\n".join(parts)
 
 
-def lore_prompt(name: str, kind: str, lines: List[str], viewer: str) -> str:
-    """A hover card: what this player knows about one name, from the story only."""
+def lore_prompt(name: str, kind: str, lines: List[str], viewer: str,
+                spellings: Iterable[str] = ()) -> str:
+    """A hover card: what this player knows about one name, from the story only.
+    ``spellings``: how the story writes the name in other languages (חרכי הירי)."""
     what = {"npc": "this person", "place": "this place", "faction": "this group",
             "pc": "this player character", "foe": "this foe", "treasure": "this item"}.get(kind, "this")
     log = "\n".join(lines)
@@ -137,7 +139,9 @@ def lore_prompt(name: str, kind: str, lines: List[str], viewer: str) -> str:
         log = "…" + log[-(LOG_CHARS // 2):]
     # The lines are whole story beats, so they're full of other people: keep the
     # card on its subject, and about the subject rather than about the reader.
-    return (f"STORY LOG lines that mention {name} (oldest first):\n{log}\n\n"
+    other = [w for w in dict.fromkeys(spellings) if w.lower() != name.lower()]
+    also = f" (the story also writes it as: {', '.join(other)})" if other else ""
+    return (f"STORY LOG lines that mention {name}{also} (oldest first):\n{log}\n\n"
             f"In one or two short sentences, sum up what {viewer} knows about {what}, {name}, "
             f"from these lines only. Write about {name} alone: who or what they are, and what "
             f"they did or what was done to them. Leave out other people and events that don't "
@@ -263,7 +267,9 @@ own list of names (written in English). You get JSON: {{"names": [...], "passage
 with ONLY a JSON object mapping each listed name that the passage mentions to the exact spelling \
 the passage uses for it: copy the letters exactly as they appear in the passage, without a \
 one-letter prefix attached in front (ו ה ב ל מ ש כ). Leave out names the passage doesn't mention. \
-No notes, no markdown."""
+Map a name only to words that really are that name (its spelling, or its translation for a place \
+or group), never to an ordinary word like "the guard" or "the door", and never to a word that \
+names someone or something else on the list. When unsure, leave it out. No notes, no markdown."""
 
 
 def find_names(passage: str, names: List[str], lang: str,

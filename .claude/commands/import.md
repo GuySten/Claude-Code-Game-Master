@@ -209,7 +209,7 @@ bash tools/gm-playpack.sh set --json '{
   "whose_story": "<who they came to meet or be>",
   "room": "<this room, not a kingdom>",
   "present": ["<2-4 names in the room>"],
-  "exits": ["<what you can see from here>"],
+  "exits": ["<Short Name>, <what you can see from here>"],
   "hook": "<the problem that will not wait>",
   "offstage": ["<horizon names — do not build>"],
   "primer": "<one short GM paragraph>"

@@ -1413,6 +1413,25 @@ def test_hebrew_narration_spellings_of_known_names_are_learned(table):
     assert len(asked) == 2 and "Marta" not in asked[1]["names"]
 
 
+def test_a_spelling_that_belongs_to_someone_else_is_not_learned(table):
+    call, state, camp = table["call"], table["state"], table["camp"]
+    state.set_round_seconds(0)
+    call("/api/claim", {"code": CODE, "pc": "Pip"})
+    call("/api/create", {"code": CODE, "name": "קסטרל", "concept": "an elf"})
+    (camp / "npcs.json").write_text(json.dumps({"Ma Grisk": {}, "Rusk": {}, "Hane": {}}))
+
+    def ask(system, prompt):
+        if "passage" not in system:
+            return "A card."
+        # slid onto the wrong names: a PC's own name as an NPC, one word for two names
+        return '{"Ma Grisk": "קסטרל", "Rusk": "השומר", "Hane": "השומר"}'
+
+    state.narrator_ask = ask
+    call("/api/gm/say", {"text": "קסטרל רואה את השומר.", "lang": "he"}, host=True)
+    time.sleep(0.5)
+    assert state.aliases() == {}
+
+
 def test_a_name_written_with_niqqud_is_the_same_name(table):
     call, state, camp = table["call"], table["state"], table["camp"]
     state.set_round_seconds(0)

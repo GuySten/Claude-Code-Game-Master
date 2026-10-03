@@ -124,7 +124,7 @@ bash tools/gm-playpack.sh set --json '{
   "whose_story": "<who they are or came to meet>",
   "room": "<one street / room / deck>",
   "present": ["<2-4 people here>"],
-  "exits": ["<what you can see>"],
+  "exits": ["<Short Name>, <what it is>"],
   "hook": "<the problem that will not wait>",
   "offstage": ["<horizon names>"],
   "primer": "<GM paragraph: where the plot starts>"

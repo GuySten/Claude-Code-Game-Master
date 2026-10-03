@@ -95,7 +95,7 @@ Most of these are created lazily — a campaign that has never been illustrated 
     "whose_story": "string",
     "room": "this room, not a kingdom",
     "present": ["names in the room"],
-    "exits": ["what you can see from here"],
+    "exits": ["Short Name, what you can see from here"],
     "hook": "the problem that will not wait",
     "offstage": ["horizon names — do not build"],
     "primer": "one short GM paragraph"
@@ -113,7 +113,8 @@ their own keys here (the shipped DCC fixture carries `viewer_stats`, `pending_bo
 
 **`play_pack` is tonight's table**, not a gazetteer. `lib/play_pack.py` writes it;
 `get_full_context` renders a `--- PRIMER ---` block when any field is set. `stage`
-persists the room, present NPCs, and exit stubs into the journal. `from-book` writes
+persists the room, present NPCs, and exit stubs into the journal (an exit written
+"Name, what it is" becomes a place called *Name*, described by the rest). `from-book` writes
 exactly one name when play walks toward it. Setting a pack must not fabricate a
 session (`### Session Ended`). See [the dream](conventions/the-dream.md).
 

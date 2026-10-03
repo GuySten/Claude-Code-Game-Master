@@ -138,3 +138,21 @@ def test_from_book_writes_one_location(tmp_path):
     assert r["ok"] is True
     locs = json.loads((cdir / "locations.json").read_text())
     assert list(locs) == ["The Tower of the Elephant"]
+
+
+def test_an_exit_with_a_description_is_named_by_its_short_name(tmp_path):
+    # "The Stair of Tallies, up to the Middle Ward" used to become a place with the
+    # whole sentence as its name, which then showed up on hover cards.
+    cdir = _campaign(tmp_path)
+    save_pack(cdir, {
+        "room": "The Hip",
+        "exits": ["The Stair of Tallies, up to the Middle Ward", "North Gate: closed at dusk",
+                  "the corridor"],
+        "hook": "x", "primer": "y",
+    })
+    assert apply_stage(cdir)["ok"] is True
+    locs = json.loads((cdir / "locations.json").read_text())
+    assert set(locs) == {"The Hip", "The Stair of Tallies", "North Gate", "the corridor"}
+    assert locs["The Stair of Tallies"]["description"] == "up to the Middle Ward"
+    assert any(c.get("to") == "North Gate" and c.get("path") == "closed at dusk"
+               for c in locs["The Hip"]["connections"])
