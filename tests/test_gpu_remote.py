@@ -88,3 +88,22 @@ def test_the_laptop_never_forwards_its_own_jobs(monkeypatch):
     assert seen.get("local") is True
     result = gpu_server.run_job("compose", {"prompt": "x", "seconds": 1})
     assert base64.b64decode(result["audio"])[:20] == open(__file__, "rb").read()[:20]
+
+
+def test_a_laptop_that_goes_away_mid_job_is_given_up_quickly(laptop, monkeypatch):
+    """The tunnel or the laptop dies while a picture is painting: fail in seconds,
+    not after the whole job timeout."""
+    import time
+    monkeypatch.setattr(gpu_remote, "LOST_AFTER_SECONDS", 0.2)
+    real = gpu_remote._call
+
+    def flaky(method, path, data=None, timeout=30):
+        if method == "GET" and path.startswith("/jobs/"):
+            raise gpu_remote.GpuRemoteError("the GPU server answered 530: error")
+        return real(method, path, data, timeout)
+
+    monkeypatch.setattr(gpu_remote, "_call", flaky)
+    started = time.time()
+    with pytest.raises(gpu_remote.GpuRemoteError, match="lost the laptop"):
+        gpu_remote.run("warmup", timeout=600)
+    assert time.time() - started < 5

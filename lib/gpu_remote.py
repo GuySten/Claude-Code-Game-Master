@@ -22,6 +22,9 @@ import urllib.request
 from typing import Any, Dict, Optional
 
 POLL_SECONDS = 2.0
+# The laptop unreachable this long while a job runs (its tunnel closed, WSL or the
+# laptop went down): give up instead of waiting out the whole job timeout.
+LOST_AFTER_SECONDS = 45.0
 
 
 class GpuRemoteError(Exception):
@@ -85,12 +88,18 @@ def run(kind: str, payload: Optional[dict] = None, timeout: float = 1800) -> Dic
     if not job_id:
         raise GpuRemoteError(job.get("error") or "the GPU server took no job")
     deadline = time.time() + timeout
+    lost_since = None
     while time.time() < deadline:
         time.sleep(POLL_SECONDS)
         try:
-            state = _call("GET", "/jobs/" + job_id, timeout=60)
-        except GpuRemoteError:
-            continue                    # a dropped poll: the job keeps running there
+            state = _call("GET", "/jobs/" + job_id, timeout=30)
+            lost_since = None
+        except GpuRemoteError as e:
+            # A dropped poll: the job keeps running there. Gone for long: give up.
+            lost_since = lost_since or time.time()
+            if time.time() - lost_since >= LOST_AFTER_SECONDS:
+                raise GpuRemoteError(f"lost the laptop's GPU server during the {kind} job: {e}") from e
+            continue
         if state.get("status") == "done":
             return state.get("result") or {}
         if state.get("status") == "failed":
