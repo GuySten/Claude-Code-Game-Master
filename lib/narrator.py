@@ -16,6 +16,7 @@ The answers come from a small, quick model (Haiku):
     match the question, which needs no model at all.
 """
 
+import difflib
 import json
 import os
 import re
@@ -134,9 +135,14 @@ def lore_prompt(name: str, kind: str, lines: List[str], viewer: str) -> str:
     log = "\n".join(lines)
     if len(log) > LOG_CHARS // 2:
         log = "…" + log[-(LOG_CHARS // 2):]
+    # The lines are whole story beats, so they're full of other people: keep the
+    # card on its subject, and about the subject rather than about the reader.
     return (f"STORY LOG lines that mention {name} (oldest first):\n{log}\n\n"
             f"In one or two short sentences, sum up what {viewer} knows about {what}, {name}, "
-            f"from these lines only. No preamble; start with the facts.")
+            f"from these lines only. Write about {name} alone: who or what they are, and what "
+            f"they did or what was done to them. Leave out other people and events that don't "
+            f"involve {name}. Don't write about {viewer} or what {viewer} saw. "
+            f"No preamble; start with the facts.")
 
 
 # --------------------------------------------------------------- answers ----
@@ -175,7 +181,8 @@ TRANSLATE_RULES = """You translate the text of a tabletop role-playing game's ch
 into {lang} (from whatever language each is in). Some strings mix two languages: give those \
 entirely in {lang}, without repeating anything. A string already in {lang} comes back as it is. You get a JSON object of numbered strings, like {{"1": "Stealth", \
 "2": "Fire Bolt (1d10)"}}. Reply with ONLY a JSON object with the same numbers, each mapped to \
-its translation, like {{"1": "...", "2": "..."}}. Translate every one. Use the usual {lang} terms \
+a pair: the original string copied exactly, then its translation, like \
+{{"1": ["Stealth", "..."], "2": ["Fire Bolt (1d10)", "..."]}}. Translate every one. Use the usual {lang} terms \
 of role-playing games (Dungeons & Dragons) where they exist. Keep numbers, dice (1d8+2) and \
 modifiers (+3) as they are. Write personal and place names in {lang} letters. No notes, no \
 markdown."""
@@ -184,7 +191,8 @@ markdown."""
 UI_RULES = """You translate the words of a web page where friends play a tabletop \
 role-playing game together online, with an AI Game Master, into {lang}. You get a JSON object \
 of numbered strings: buttons, labels, notices. Reply with ONLY a JSON object with the same \
-numbers, each mapped to its translation. Keep every {{placeholder}} in curly braces exactly as \
+numbers, each mapped to a pair: the original string copied exactly, then its translation, like \
+{{"1": ["Send", "..."]}}. Keep every {{placeholder}} in curly braces exactly as \
 it is (they are filled in later: {{pc}} is a character's name, {{n}} a number, {{t}} a time), \
 keep emoji and symbols, and keep it short: they are buttons and labels. Use the usual {lang} \
 terms of role-playing games (Dungeons & Dragons). No notes, no markdown."""
@@ -216,12 +224,35 @@ def translate(strings: List[str], lang: str,
         return {}
     if not isinstance(got, dict):
         return {}
+    # A model that drops or merges one entry shifts every later number onto the
+    # wrong phrase ("Skills" -> "Athletics"). So each answer carries the original
+    # back, and an entry is kept only if that copy is the phrase we sent under
+    # its number. A bare translation (no copy) is trusted only when the answer
+    # has exactly our numbers, nothing missing or extra.
+    exact_numbers = set(map(str, got)) == set(numbered)
     out = {}
     for k, v in got.items():
         src = numbered.get(str(k).strip()) or (k if k in strings else None)
-        if src and isinstance(v, str) and v.strip():
-            out[src] = v.strip()
+        if not src:
+            continue
+        if isinstance(v, (list, tuple)) and len(v) == 2 and all(isinstance(x, str) for x in v):
+            echo, tr = v
+            if not _same_phrase(echo, src):
+                continue
+        elif isinstance(v, str) and exact_numbers:
+            tr = v
+        else:
+            continue
+        if tr.strip():
+            out[src] = tr.strip()
     return out
+
+
+def _same_phrase(echo: str, src: str) -> bool:
+    """The model's copy of a phrase is that phrase (allowing a retyped quote or space)."""
+    norm = lambda s: " ".join(s.casefold().replace("’", "'").split())
+    a, b = norm(echo), norm(src)
+    return a == b or difflib.SequenceMatcher(None, a, b).ratio() >= 0.9
 
 
 FIND_NAMES_RULES = """You match names in a {lang} passage from a role-playing game to the game's \

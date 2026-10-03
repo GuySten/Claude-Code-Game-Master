@@ -1547,6 +1547,31 @@ def test_sheet_translations_come_back_by_number():
     assert got == {"Arcana": "ידע קסום", "Persuasion": "שכנוע"}      # the blank one is left out
 
 
+def test_a_shifted_sheet_translation_is_not_saved_under_the_wrong_phrase():
+    import narrator
+    strings = ["Skills", "Athletics", "Survival", "Perception"]
+
+    def skipped_one(system, prompt):
+        # the model skipped "Skills" and numbered the rest from 1: every pair is off by one
+        return json.dumps({"1": ["Athletics", "אתלטיקה"], "2": ["Survival", "הישרדות"],
+                           "3": ["Perception", "תפיסה"]}, ensure_ascii=False)
+
+    assert narrator.translate(strings, "he", ask=skipped_one) == {}
+
+    def bare_and_short(system, prompt):     # no copies, and one number missing
+        return '{"1": "אתלטיקה", "2": "הישרדות", "3": "תפיסה"}'
+
+    assert narrator.translate(strings, "he", ask=bare_and_short) == {}
+
+    def right(system, prompt):              # copies match (one retyped in another case)
+        return json.dumps({"1": ["skills", "מיומנויות"], "2": ["Athletics", "אתלטיקה"],
+                           "3": ["Survival", "הישרדות"], "4": ["Perception", "תפיסה"]},
+                          ensure_ascii=False)
+
+    assert narrator.translate(strings, "he", ask=right) == {
+        "Skills": "מיומנויות", "Athletics": "אתלטיקה", "Survival": "הישרדות", "Perception": "תפיסה"}
+
+
 def test_sheet_strings_are_the_words_a_player_reads():
     import table_server
     got = table_server.sheet_strings({
