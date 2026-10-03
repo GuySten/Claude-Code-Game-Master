@@ -840,7 +840,7 @@ def portrait_prompt(record: dict) -> str:
                    "middle-aged, weathered " if _MIDDLE.search(age) else
                    "young " if _YOUNG.search(age) else "")
         article = "an" if oldness[:1] in ("o",) else "a"
-        bits = [f"Portrait of {article} {oldness}{noun}"]
+        bits = [f"Close-up portrait of {article} {oldness}{noun}"]
         hair = str(va.get("hair") or "").strip()
         if hair and not re.search(r"\b(hair|bald|shaved|head|curls?|braids?|locks|bun|ponytail|mane)\b",
                                   hair, re.I):
@@ -848,7 +848,7 @@ def portrait_prompt(record: dict) -> str:
         bits += [x for x in (age, who, hair, str(va.get("face") or "").strip()) if x]
         if about and not any(str(v or "").strip() for v in va.values()):
             bits.append(about)              # no recorded look: what they are is all there is
-        return ", ".join(bits) + ", head and shoulders, plain background."
+        return ", ".join(bits) + ", close-up of the face, head and shoulders only, plain background."
     if sex:
         adj, noun, _ = SEXES[sex]
         lines = [f"Character portrait of a {noun}, a {adj} {who or noun}."]

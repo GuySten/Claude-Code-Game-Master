@@ -89,6 +89,22 @@ def fold_name(s: str) -> str:
     return languages.NIQQUD.sub("", str(s)).lower()
 
 
+_HEB = re.compile("[\u05d0-\u05ea]")
+
+
+def name_in(form: str, text: str) -> bool:
+    """Does folded ``text`` mention the folded name ``form`` as a word? A Hebrew
+    name may carry up to two one-letter prefixes (ולספי) but must end the word
+    (ספי is not in הספיק); any other name is matched as a whole word."""
+    if not form:
+        return False
+    if _HEB.search(form):
+        pat = r"(?<![^\W\d_])(?:[והבלמשכ]{0,2})" + re.escape(form) + r"(?![^\W\d_])"
+    else:
+        pat = r"(?<![\w])" + re.escape(form) + r"(?![\w])"
+    return re.search(pat, text) is not None
+
+
 MAX_TEXT = 4000            # longest single message (GM narration can be long)
 MAX_PLAYER_TEXT = 1200     # longest player action
 MAX_BODY = 16 * 1024
@@ -652,9 +668,9 @@ class TableState:
         with self.spelling_lock:                 # one at a time
             low = fold_name(text)
             aliases = self.aliases()
-            spelled = {n.lower() for a, n in aliases.items() if fold_name(a) in low}
+            spelled = {n.lower() for a, n in aliases.items() if name_in(fold_name(a), low)}
             names = [n for n in self._named_things()
-                     if fold_name(n) not in low and n.lower() not in spelled][:200]
+                     if not name_in(fold_name(n), low) and n.lower() not in spelled][:200]
             try:
                 found = narrator.find_names(text, names, lang, ask=self.narrator_ask)
             except Exception as e:               # offline...: names just aren't hoverable
@@ -730,13 +746,13 @@ class TableState:
         def mentions(name: str) -> Dict[str, int]:
             """How many story lines mention it, and the latest one that does."""
             forms = spellings.get(name.lower(), {fold_name(name)})
-            hits = [i for i, l in enumerate(lines) if any(f in l for f in forms)]
+            hits = [i for i, l in enumerate(lines) if any(name_in(f, l) for f in forms)]
             return {"n": len(hits), "last": hits[-1] if hits else -1}
 
-        out = [{"term": n, "kind": k, **mentions(n)} for n, k in things.items() if fold_name(n) in seen]
+        out = [{"term": n, "kind": k, **mentions(n)} for n, k in things.items() if name_in(fold_name(n), seen)]
         for alias, name in self.aliases().items():
             kind = things.get(name) or next((k for n, k in things.items() if n.lower() == name.lower()), None)
-            if kind and fold_name(alias) in seen:
+            if kind and name_in(fold_name(alias), seen):
                 out.append({"term": alias, "kind": kind, "of": name, **mentions(name)})
         out.sort(key=lambda t: -len(t["term"]))
         self.lore_cache = {k: v for k, v in self.lore_cache.items()
@@ -765,7 +781,7 @@ class TableState:
         name, kind = hit.get("of") or hit["term"], hit["kind"]
         forms = self._spellings().get(name.lower(), {fold_name(name)})
         lines = [l for l in narrator.story_lines(self.since(0, viewer), viewer, lang)
-                 if any(f in fold_name(l) for f in forms)]
+                 if any(name_in(f, fold_name(l)) for f in forms)]
         key = f"{viewer}|{name.lower()}|{lang}"
         for _ in range(150):                    # no card yet, but one is being made: wait for it
             with self.lock:

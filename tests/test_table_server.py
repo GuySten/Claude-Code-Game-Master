@@ -1475,6 +1475,16 @@ def test_a_spelling_that_belongs_to_someone_else_is_not_learned(table):
     assert state.aliases() == {}
 
 
+def test_a_hebrew_name_inside_another_word_is_not_that_name():
+    import table_server
+    f = table_server.fold_name
+    assert not table_server.name_in(f("ספי"), f("זה הספיק."))       # Sefi is not "was enough"
+    assert table_server.name_in(f("ספי"), f("ולספי יש מפתח"))        # prefixes are fine
+    assert table_server.name_in(f("קסטרל"), f("לקֶסְטְרֶל נשארו"))
+    assert not table_server.name_in(f("קסטרל"), f("קסטרלים"))
+    assert table_server.name_in("hane", "hane smiled") and not table_server.name_in("hane", "chane")
+
+
 def test_a_name_written_with_niqqud_is_the_same_name(table):
     call, state, camp = table["call"], table["state"], table["camp"]
     state.set_round_seconds(0)

@@ -137,7 +137,7 @@ def test_portraits_are_drawn_and_kept_on_the_record(forge):
     assert (sent["width"], sent["height"]) == (832, 1216)                 # a portrait shape
     # On Forge the style's headline comes first, then the subject, sex first
     # (the model weighs the start most), and Forge is told what NOT to draw.
-    assert subject(sent["prompt"]).startswith("Portrait of a woman, Halfling Rogue, red curls")
+    assert subject(sent["prompt"]).startswith("Close-up portrait of a woman, Halfling Rogue, red curls")
     assert "Pip" not in sent["prompt"]                                   # looks, never names
     assert sent["negative_prompt"].startswith("man, male, masculine face, beard")
     assert "red curls" in sent["prompt"] and "ink and watercolor" in sent["prompt"]
@@ -147,7 +147,7 @@ def test_portraits_are_drawn_and_kept_on_the_record(forge):
     npc = image_gen.generate_portrait("Grimnar", camp)
     sent = forge["seen"]["requests"][-1]
     assert "dwarf blacksmith" in sent["prompt"]
-    assert subject(sent["prompt"]).startswith("Portrait of a person")      # sex unknown: no guess
+    assert subject(sent["prompt"]).startswith("Close-up portrait of a person")      # sex unknown: no guess
     assert not sent["negative_prompt"].startswith(("man,", "woman,"))
     assert json.loads((camp / "npcs.json").read_text())["Grimnar"]["portrait"] == npc["portrait"]
     with pytest.raises(image_gen.ImageGenError, match="No character"):
@@ -270,7 +270,7 @@ def test_a_creature_is_painted_as_a_creature_whatever_its_name(forge):
     image_gen.generate_portrait("Ember", camp)
     assert subject(forge["seen"]["requests"][-1]["prompt"]).startswith("Portrait of an owl")
     image_gen.generate_portrait("Marta", camp)                       # a person with a pet snake
-    assert subject(forge["seen"]["requests"][-1]["prompt"]).startswith("Portrait of a person")
+    assert subject(forge["seen"]["requests"][-1]["prompt"]).startswith("Close-up portrait of a person")
     assert image_gen.creature_of({"description": "נחשה ענקית"}) == "snake"
 
 

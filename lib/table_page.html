@@ -2324,8 +2324,12 @@
     const esc_ = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const pointable = (s) => [...unpointed(s)].map((ch) => esc_(ch) +
       (/[\u05D0-\u05EA]/.test(ch) ? "[\\u0591-\\u05BD\\u05BF\\u05C1\\u05C2\\u05C4\\u05C5\\u05C7]*" : "")).join("");
+    // A Hebrew name may carry up to two one-letter prefixes (ולספי) but must end the
+    // word: ספי (Sefi) is not in הספיק ("was enough").
+    const hebrewWord = (t) => "(?<=(?:^|[^\\p{L}\\p{M}\\p{N}])(?:[והבלמשכ][\\u0591-\\u05BD\\u05BF\\u05C1\\u05C2\\u05C4\\u05C5\\u05C7]*){0,2})" +
+      pointable(t) + "(?![\\p{L}\\p{N}])";
     loreRe = new RegExp(loreTerms.map((t) => /[A-Za-z]/.test(t.term)
-      ? "(?<![\\p{L}\\p{N}])" + esc_(t.term) + "(?![\\p{L}\\p{N}])" : pointable(t.term)).join("|"), "giu");
+      ? "(?<![\\p{L}\\p{N}])" + esc_(t.term) + "(?![\\p{L}\\p{N}])" : hebrewWord(t.term)).join("|"), "giu");
   }
   function wrapLore(body) {
     if (!loreRe || !body) return;
