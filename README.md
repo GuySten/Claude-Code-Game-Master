@@ -149,9 +149,11 @@ asides to the GM, whispers back, and live HP bars for the party.
 - **Players see the GM working.** While Claude takes its turn, every screen shows what it's
   doing — reading the actions, rolling dice, updating sheets, writing the story — with a
   progress bar and a time estimate learned from this table's recent turns.
-- **Everyone reads one language.** Each player sees the whole table — the story and
-  every other player's actions — in their own language (English or Hebrew); Claude
-  translates the actions as part of its turn, and the original is a tap away.
+- **Any languages, switched at any moment.** The adventure's languages are chosen when it
+  starts (`gm-table.sh languages en he fr`; English alone by default). Claude tells every beat
+  in each and translates the players' actions as part of its turn; the table translates the
+  sheets, the hover cards and the page itself. Each player reads everything in their own
+  language, switches whenever they like, and the original is a tap away.
 - **Fair dice, in public.** With the table open, the table itself rolls (the OS random
   source) and shows every roll to everyone the moment the GM sees it, with the DC or AC
   fixed in the same command, before the dice land. Secret rolls are announced too.
@@ -159,8 +161,8 @@ asides to the GM, whispers back, and live HP bars for the party.
   the voice when it's read aloud, and the party panel follows it: a PC's HP changes when the
   story reaches their name. Players can open any character's full sheet (📜), which follows
   the story the same way.
-- **Talk instead of type.** Players tap 🎤 and speak their action, in **English or Hebrew**
-  (the page switches fully to Hebrew, right-to-left, with one tap), and can turn on 🔊 to
+- **Talk instead of type.** Players tap 🎤 and speak their action in their language (the page
+  switches fully, right-to-left for Hebrew or Arabic, from its language menu), and can turn on 🔊 to
   hear the story read aloud. Hebrew is read by a natural neural voice that the host's
   computer makes (Microsoft's free online voices, via `edge-tts`), because most devices
   have no Hebrew voice of their own; English uses the device's voice. Players can pick
@@ -273,7 +275,7 @@ The harness is plumbing you can poke at: bash wrappers (`tools/`) → Python man
 | `gm-session.sh` | Session lifecycle, party movement, save/restore |
 | `gm-context.sh` | Assemble scene context (world state + source passages) |
 | `gm-player.sh` | Player stats — health, progression, gold, inventory (every PC; `join`/`party`/`leave` for multiplayer) |
-| `gm-table.sh` | Online table — players join from their own browsers (voice, Hebrew/English, mood-driven music, enemy themes); `wait` / `say` / `music` run the loop |
+| `gm-table.sh` | Online table — players join from their own browsers (voice, the adventure's languages, mood-driven music, enemy themes); `wait` / `say` / `music` run the loop |
 | `gm-music-library.sh` | Download the starter music library into `music/` (sorted by mood, credited) |
 | `gm-models.sh` | Model presets: which Claude model plays the GM and each helper agent |
 | `gm-npc.sh` | NPCs — creation, updates, mood/goal/voice, party members |

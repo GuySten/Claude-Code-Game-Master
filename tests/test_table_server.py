@@ -25,6 +25,13 @@ CODE = "ember-123"
 HOST_KEY = "host-secret"
 
 
+def set_languages(camp, codes):
+    """gm-table.sh languages, for a test (the table reads the file when it changes)."""
+    path = camp / "table" / "languages.json"
+    path.write_text(json.dumps({"languages": codes}))
+    os.utime(path, (time.time() + 1, time.time() + 1))
+
+
 @pytest.fixture
 def table(tmp_path, monkeypatch):
     monkeypatch.setenv("NARRATOR_BACKEND", "off")      # never the host's real model in tests
@@ -38,6 +45,9 @@ def table(tmp_path, monkeypatch):
         "campaign_name": "Camp", "opening_matched_to_pc": True,
         "player_position": {"current_location": "The Rusty Tankard"}}))
     IdentityOnboarding(str(world)).onboard("original", name="Pip", concept="a halfling rogue")
+    # A table played in English and Hebrew (gm-table.sh languages en he).
+    (camp / "table").mkdir(exist_ok=True)
+    (camp / "table" / "languages.json").write_text(json.dumps({"languages": ["en", "he"]}))
 
     state = TableState(camp, str(world))
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(state, CODE, HOST_KEY))
@@ -455,7 +465,7 @@ def test_untagged_narration_at_a_mixed_table_warns_the_gm(table):
     noa = call("/api/create", {"code": CODE, "name": "Noa"})[1]["token"]
     call("/api/lang", {"code": CODE, "token": noa, "lang": "he"})
     _, body = call("/api/gm/say", {"text": "The door creaks open."}, host=True)
-    assert "Hebrew players get it in English" in body["warning"]
+    assert "Hebrew readers get it in English" in body["warning"]
     _, body = call("/api/gm/say", {"text": "The door creaks open.", "lang": "en"}, host=True)
     assert body["warning"] is None
     _, body = call("/api/gm/say", {"text": "Psst.", "to": "Noa"}, host=True)
@@ -1438,6 +1448,7 @@ def test_every_player_character_has_a_card_and_the_sheet_speaks_the_players_lang
 
 def test_hover_cards_are_ready_before_the_hover_and_kept(table):
     call, state, camp, world = table["call"], table["state"], table["camp"], table["world"]
+    set_languages(camp, ["en"])                    # (one language: one card per name)
     state.cards_warmed.add("Pip")                  # (sitting-down warm-up: its own test)
     state.set_round_seconds(0)
     pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]

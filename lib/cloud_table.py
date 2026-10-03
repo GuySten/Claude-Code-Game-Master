@@ -197,17 +197,20 @@ class Bridge:
         by_pc: Dict[str, str] = {}
         for client, pc in seats.items():
             by_pc.setdefault(pc, self.state["tokens"][client])
-        try:
-            langs = json.loads((self.campaign_dir / "table" / "langs.json").read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            langs = {}
         items: Dict[str, Dict[str, Any]] = {k: {} for k in
-                                            ("views", "narrator", "sheets", "sheet_tr", "lore")}
+                                            ("views", "narrator", "sheets", "sheet_tr", "lore", "ui")}
         msgs: Dict[int, Dict[str, Any]] = {}
         after, rev = (0, 0) if everything else (self.state["msg_max"], self.state["rev"])
         pub = self.call("GET", "/api/info")
         pub.pop("ok", None)
         pub.pop("me", None)
+        # Every language the adventure is played in: a player who switches finds
+        # their cards, sheets and the page's own words already there.
+        langs = [x["code"] for x in pub.get("languages") or [] if x.get("code")] or ["en"]
+        for lang in langs:
+            ui = self.call("GET", "/api/ui", query={"lang": lang}, timeout=10)
+            if ui.get("ok") and lang not in ("en", "he") and ui.get("strings"):
+                items["ui"][lang] = ui["strings"]
         top_rev = self.state["rev"]
         for token in [None] + list(by_pc.values()):
             got = self.call("GET", "/api/messages", token=token, query={"after": after, "rev": rev})
@@ -217,7 +220,9 @@ class Bridge:
         for pc, token in by_pc.items():
             info = self.call("GET", "/api/info", token=token)
             info.pop("ok", None)
-            items["views"][pc] = {"info": info}
+            terms = {lang: self.call("GET", "/api/info", token=token, query={"lang": lang}).get("lore_terms")
+                     or [] for lang in langs}
+            items["views"][pc] = {"info": info, "terms": terms}
             items["narrator"][pc] = self.call("GET", "/api/narrator", token=token).get("entries") or []
             for member in info.get("party") or []:
                 name = member.get("name")
@@ -228,21 +233,24 @@ class Bridge:
                 if sheet.get("ok"):
                     sheet.pop("ok")
                     items["sheets"][key] = sheet
-                if langs.get(pc, "en") != "en":
-                    tr = self.call("GET", "/api/sheet-tr", token=token, query={"pc": name}, timeout=60)
-                    if tr.get("ok"):
+                for lang in langs:
+                    tr = self.call("GET", "/api/sheet-tr", token=token,
+                                   query={"pc": name, "lang": lang}, timeout=60)
+                    if tr.get("ok") and tr.get("tr"):
                         tr.pop("ok")
-                        items["sheet_tr"][key] = tr
-            cards = {}
-            for term in info.get("lore_terms") or []:
-                word = term.get("term") if isinstance(term, dict) else term
-                if not word:
-                    continue
-                card = self.call("GET", "/api/lore", token=token, query={"term": word}, timeout=4)
-                if card.get("ok"):
-                    card.pop("ok")
-                    cards[_norm(word)] = card
-            items["lore"][pc] = cards
+                        items["sheet_tr"][f"{key}|{lang}"] = tr
+            for lang in langs:
+                cards = {}
+                for term in terms[lang]:
+                    word = term.get("term") if isinstance(term, dict) else term
+                    if not word:
+                        continue
+                    card = self.call("GET", "/api/lore", token=token,
+                                     query={"term": word, "lang": lang}, timeout=4)
+                    if card.get("ok"):
+                        card.pop("ok")
+                        cards[_norm(word)] = card
+                items["lore"][f"{pc}|{lang}"] = cards
         full = {"pub": pub, "seats": {c: seats.get(c) for c in self.state["tokens"]},
                 "msgs": msgs, "rev": top_rev, **items}
         return full, {"msg_max": max([self.state["msg_max"]] + list(msgs)), "rev": top_rev}
@@ -322,7 +330,7 @@ class Bridge:
                 parts.append(("seats", c, pc))
         for mid in sorted(full["msgs"]):
             parts.append(("msgs", None, full["msgs"][mid]))
-        for field in ("views", "narrator", "sheets", "sheet_tr", "lore"):
+        for field in ("views", "narrator", "sheets", "sheet_tr", "lore", "ui"):
             for k, v in full[field].items():
                 if _changed(hashes, f"{field}|{k}", v):
                     parts.append((field, k, v))
@@ -417,6 +425,8 @@ def build_page() -> str:
     """table_page.html as an Artifact's content: its title, styles and body, with
     table_cloud.js running before the page's own script."""
     html = (LIB / "table_page.html").read_text(encoding="utf-8")
+    strings = json.loads((LIB / "table_strings.json").read_text(encoding="utf-8"))
+    html = html.replace("/*TABLE_STRINGS*/", json.dumps(strings, ensure_ascii=False) + " || ", 1)
     head = re.search(r"<head>(.*?)</head>", html, re.S).group(1)
     body = re.search(r"<body[^>]*>(.*)</body>", html, re.S).group(1)
     title = re.search(r"<title>.*?</title>", head, re.S).group(0)

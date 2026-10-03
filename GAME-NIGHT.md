@@ -23,8 +23,10 @@ see [CLOUD-TABLE.md](CLOUD-TABLE.md) (your laptop can still paint the pictures a
 Everything below works with the basic install. The items marked *optional* need one extra
 setup step on the host's computer, and the game plays fine without them.
 
-- **Play from anywhere, in English or Hebrew.** Each player reads, speaks and hears the game in
-  their own language; the GM translates the other players' actions.
+- **Play from anywhere, in your languages.** Choose the adventure's languages when it starts
+  (English alone by default; English and Hebrew, or any others). Each player reads, speaks and
+  hears the game in their own, and switches at any moment: the story, the other players'
+  actions, the sheets and the page itself are already there in every one.
 - **Voice.** Speak your actions; hear the story read aloud (Hebrew in a natural voice).
 - **A fair, shared table.** Every die roll is public, with the DC set before the dice land.
   Rounds: the GM answers when everyone has acted, or a minute after the first player did, with
@@ -371,8 +373,9 @@ as much per reply; type `/fast` again to turn it off.
 Type `/gm`. Pick **New Adventure** (create a world, import a book, or a quick one-shot) or
 continue a saved campaign. Then tell Claude:
 
-> My friends are joining online tonight.
+> My friends are joining online tonight, in English and Hebrew.
 
+Name the languages you'll play in (Claude asks if you don't; English alone is the default).
 Claude opens the table and shows you a **link** and a **table code** (like `ember-482`).
 (Manual way: `bash tools/gm-table.sh start`.)
 
@@ -510,9 +513,10 @@ Copy, fill in the link and code, and send:
     places, factions) work the same way: hover over one, or tap it on a phone, for a card of
     what you know, with their picture. So do the players' names, in the party panel and on
     their messages. Cards are prepared as the story is told, so they open at once.
-15. **Language.** **עברית / English** switches the whole page, your microphone, and the language
-    the GM answers you in. You read everything in your language, including the other players'
-    actions, which the GM translates (marked 🌐; tap **show original** to see what they wrote).
+15. **Language.** When the adventure is played in more than one language, the language menu at
+    the top switches the whole page, your microphone, and the language the GM answers you in,
+    at any moment. You read everything in your language, including the other players' actions,
+    which the GM translates (marked 🌐; tap **show original** to see what they wrote).
 16. **Refreshing** the page keeps your seat. To switch devices, tap **Leave seat** first (or ask
     the host to free it).
 
@@ -603,6 +607,7 @@ You rarely need these — Claude runs them — but they're yours to use:
 |---|---|
 | `bash tools/gm-table.sh start` / `stop` | Open / close the table |
 | `bash tools/gm-table.sh status` | Link, code, who's seated, unread actions |
+| `bash tools/gm-table.sh languages en he` | The adventure's languages, the main one first (any ISO codes: `fr`, `es`, `ar`…; default English only) |
 | `bash tools/gm-table.sh free "Name"` | Free a seat (player switching devices) |
 | `bash tools/gm-table.sh round 90` · `round off` | How long the GM waits for everyone once the first player acts (default 60 s) |
 | `bash tools/gm-table.sh alias "Marta" "מרתה"` | Another spelling of a name, so its hover card works in Hebrew too (the table usually learns these by itself) |

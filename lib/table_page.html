@@ -66,6 +66,7 @@
   header .where { font-size: .9rem; color: var(--muted); }
   header .tools { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
   header .tools button { padding: 6px 10px; }
+  .lang-pick { padding: 5px 8px; width: auto; max-width: 11em; }
   #log { flex: 1; overflow-y: auto; padding: 16px; }
   .msg { max-width: 760px; margin: 0 auto 14px; padding: 10px 14px; border-radius: 10px; position: relative; }
   .msg.gm { background: var(--gm); border: 1px solid var(--line); }
@@ -293,7 +294,7 @@
 <body>
 
 <section id="join">
-  <div class="topline"><button class="lang-toggle" type="button"></button></div>
+  <div class="topline"><select class="lang-pick hidden" data-i18n-label="language"></select></div>
   <h1 data-i18n="title"></h1>
   <p class="muted" data-i18n="intro"></p>
 
@@ -343,7 +344,7 @@
       <div class="tools">
         <button id="music-toggle" type="button" aria-pressed="true"></button>
         <button id="read-toggle" type="button" aria-pressed="false"></button>
-        <button class="lang-toggle" type="button"></button>
+        <select class="lang-pick hidden" data-i18n-label="language"></select>
         <button id="sheet-toggle" type="button" data-i18n="mySheet"></button>
         <button id="chat-toggle" type="button"><span data-i18n="chatButton"></span><span class="badge hidden" id="chat-unread"></span></button>
         <button id="party-toggle" type="button" data-i18n="party"></button>
@@ -385,10 +386,7 @@
         <option value="1" selected data-i18n="normal"></option>
         <option value="1.15" data-i18n="faster"></option>
       </select>
-      <label for="voice-en" data-i18n="voiceEn"></label>
-      <select id="voice-en"></select>
-      <label for="voice-he" data-i18n="voiceHe"></label>
-      <select id="voice-he"></select>
+      <div id="voice-menus"></div>
       <p class="muted hidden" id="edge-hint" data-i18n="edgeHint"></p>
     </div>
   </aside>
@@ -452,196 +450,81 @@
   };
 
   // ------------------------------------------------------------- i18n ---
-  const STRINGS = {
-    en: {
-      title: "The Table", intro: "Your Game Master is waiting. Enter the table code the host gave you.",
-      codeLabel: "Table code", enter: "Enter", who: "Who are you in this world?",
-      empty: "No heroes yet — make the first one below.", taken: "taken", fallen: "fallen", play: "play",
-      newChar: "Bring a new character", name: "Name", namePh: "Pip Underbough",
-      concept: "One line about them", conceptPh: "a halfling thief with a debt",
-      looks: "Their portrait shows", looksAny: "(let the GM decide)", looksMan: "a man", looksWoman: "a woman",
-      create: "Join as this character", nameless: "Just a nameless traveler",
-      nameRequired: "Give your character a name.", badCode: "That code didn't work.",
-      leave: "Leave seat", leaveConfirm: "Give up your seat? You can take it again afterwards.",
-      mySheet: "📜 My sheet", openSheet: "sheet ›", sheetLoading: "Loading…",
-      sheet_hp: "HP", sheet_ac: "AC", sheet_level: "Level", sheet_xp: "XP", sheet_gold: "Gold",
-      sheetPublic: "Their abilities, skills, spells and gear are theirs to know.",
-      sheet_companions: "Companions", ev_npc_of: "🖼 {name} — {pc}'s companion",
-      sheet_current: "Current", sheet_next_level: "Next level", sheet_max: "Max", sheet_temp: "Temporary",
-      xpToGo: "{n} to level {l}", xpReady: "ready to level up",
-      sheet_status: "Status", sheet_stats: "Abilities", sheet_skills: "Skills",
-      sheet_saves: "Saving throws", sheet_features: "Features", sheet_spells: "Spells",
-      sheet_spell_slots: "Spell slots", sheet_equipment: "Equipment", sheet_conditions: "Conditions",
-      sheet_concept: "Who they are", sheet_background: "Background", sheet_alignment: "Alignment",
-      sheet_traits: "Traits", sheet_ideals: "Ideals", sheet_bonds: "Bonds", sheet_flaws: "Flaws",
-      sheet_notes: "Notes", sheet_visual_appearance: "Appearance", sheet_pronouns: "Pronouns",
-      sheet_more: "More",
-      lvlReady: "⬆ Level {n} is ready!", lvlGo: "Level up", lvlHp: "Hit points",
-      lvlRoll: "🎲 Roll {d} at the table", lvlAvg: "Take the average: {n}",
-      lvlNoHp: "The GM will set your hit points.", lvlAsi: "Ability score increase: +1 and +1 (pick the same one twice for +2)",
-      lvlAsiSkip: "— (I'd rather ask for a feat)", lvlWish: "What do you want from this level? (subclass, spells, a feat…) The GM adds your class features.",
-      lvlDone: "⬆ You're level {n}!", lvlBadge: "⬆",
-      chatButton: "💬 Chat", chatNote: "Just the players: the GM can't see this.",
-      chatPh: "Say something to the other players…", chatSend: "Send",
-      lore_npc: "👤 person", lore_place: "📍 place", lore_faction: "⚑ faction", lore_pc: "🛡 hero",
-      lore_foe: "⚔ foe", lore_treasure: "💎 treasure", loreLoading: "📖 Remembering…",
-      chatTitle: "💬 Table talk", narTitle: "📖 Narrator", narAsk: "Ask", narThinking: "📖 Remembering…",
-      narNote: "Forgot something? Ask about the story so far. The narrator only remembers what you've seen; it can't change the game, and only you see this.",
-      narPh: "Who gave us the key? What did the oracle say?…",
-      party: "Party", partyTitle: "The party", placeholder: "What do you do? (type, or tap 🎤 and speak)",
-      private: "Only the GM sees this", autoSend: "Send when I stop talking", send: "Send",
-      roundYours: "⏳ {t} to act — the GM answers when everyone has acted",
-      roundHurry: "⚠ Only {t} left — act now!", roundWaiting: "⏳ Waiting for {names} — {t}",
-      roundOut: "💤 You can't act right now ({why}), so the table won't wait for you — {t}",
-      playingAs: "Playing as", waiting: "Waiting on: ", considering: "The GM is considering…",
-      reconnecting: "Reconnecting…", gm: "Game Master", whisper: "whispered to you", toGm: "to the GM only",
-      edit: "Edit", edited: "(edited)", editSave: "Save", editCancel: "Cancel",
-      editTooLate: "The GM already answered that — write a new action.",
-      lead: "lead", you: "you", emptySeat: "empty seat", lvl: "Lvl",
-      readOn: "🔊 Reading aloud", readOff: "🔈 Read aloud", replay: "Read this aloud",
-      listening: "Listening… tap 🎤 again to stop", heard: "Got it — sending…",
-      noMic: "This browser can't do voice input. Chrome, Edge or Safari can.",
-      needHttps: "The microphone only works on a secure link (https). Ask the host for the tunnel link.",
-      micDenied: "The microphone is blocked. Allow it from the icon in the address bar, then try again.",
-      noHeVoice: "No Hebrew voice on this device, so Hebrew is read with the default voice. You can add one in your system's language settings.",
-      noTts: "This browser can't read aloud.",
-      onlineVoice: "natural, online",
-      onlineVoiceFailed: "The natural online voice isn't reachable right now — using this device's voice.",
-      edgeHint: "For the natural Hebrew voice, open this page in Microsoft Edge.",
-      speed: "Reading speed", slower: "Slower", normal: "Normal", faster: "Faster",
-      voiceEn: "English voice", voiceHe: "Hebrew voice", auto: "Automatic", other: "עברית",
-      musicOn: "🎵 Music", musicOff: "🔇 Music", musicVol: "Music volume",
-      nowPlaying: "Now playing: ", silence: "No music right now", tapForMusic: "Tap anywhere to start the music.",
-      st_reading: "📖 The GM is reading everyone's actions", st_lore: "📚 The GM is consulting the lore",
-      st_dice: "🎲 The GM is rolling dice", st_sheets: "📜 The GM is updating the character sheets",
-      st_moving: "🗺️ The GM is moving the party", st_threads: "🕸️ The GM is weaving story threads",
-      st_image: "🎨 The GM is painting the scene", st_writing: "✍️ The GM is writing the story",
-      st_translating: "🌐 The GM is writing your language's version",
-      etaLeft: "about {t} left", etaLonger: "taking a little longer than usual",
-      sec: "{n} sec", min: "{n} min", sent: "✉️ Sent — the GM will pick it up in a moment",
-      sentWaiting: "✉️ Sent — waiting for {names}",
-      rollDC: "DC", rollAC: "AC", rollSuccess: "✓ Success", rollFailure: "✗ Failure",
-      rollNat20: "⚔ Natural 20!", rollNat1: "💀 Natural 1!", rollDropped: "dropped",
-      rollSecret: "🎲 The GM rolled in secret", rollBy: "the GM",
-      trFrom: "🌐 Translated from {lang}", trShowOriginal: "show original",
-      trShowTranslation: "show translation", trWaiting: "🌐 Translating…",
-      lang_en: "English", lang_he: "Hebrew",
-      rollChar: "🎲 Roll a character", rollAgain: "🎲 Roll again", rollTry: "roll #{n}",
-      rolledNote: "Rolled with fair dice: 4d6 for each ability, lowest die dropped. Change the name and concept if you like, then Create — the table sees what you rolled.",
-      rolledHp: "HP", rolledAc: "AC",
-      ev_levelup: "⬆ {pc} reaches level {level}", ev_portrait: "🖼 {pc}'s portrait",
-      ev_levelready: "⬆ {pc} can reach level {level}: open the sheet (📜) and tap Level up",
-      ev_place: "🖼 {location}", placesTitle: "Gallery", placeShow: "Places, people, foes and treasures",
-      ev_foe: "⚔ {name}", ev_boss: "💀 {name}", ev_loot: "💎 {name}", lootFor: "for {pc}",
-      galPlaces: "🗺 Places", galFoes: "⚔ Foes", galTreasures: "💎 Treasures", galPeople: "👤 People",
-      ev_npc: "🖼 {name}",
-      ev_seat: "{pc} takes their seat at the table.", ev_join: "A new player joins: {pc}",
-      ev_leave: "{pc} steps away from the table.", ev_music_stop: "🎵 The music fades away.",
-      amb_wind: "Howling wind", amb_rain: "Steady rain", amb_storm: "Rain with rolling thunder",
-      amb_cave: "Dripping cave", amb_fire: "Crackling fire", amb_dungeon: "Dark dungeon drone",
-      amb_peaceful: "Soft chords", amb_battle: "War drums", amb_mystery: "Shimmering mystery",
-      amb_epic: "Boss battle", themeOf: "{name}'s theme", bossThemeOf: "⚔ {name} — boss battle",
-    },
-    he: {
-      title: "השולחן", intro: "מנהל המשחק מחכה לכם. הכניסו את קוד השולחן שקיבלתם מהמארח.",
-      codeLabel: "קוד השולחן", enter: "כניסה", who: "מי אתם בעולם הזה?",
-      empty: "עוד אין גיבורים — צרו את הראשון למטה.", taken: "תפוס", fallen: "נפל/ה", play: "שחקו",
-      newChar: "דמות חדשה", name: "שם", namePh: "נועה בת־הרוח",
-      concept: "שורה אחת על הדמות", conceptPh: "גנבת ממוצא חצי־אלפי עם חוב ישן",
-      looks: "הדיוקן מראה", looksAny: "(שמנהל המשחק יחליט)", looksMan: "גבר", looksWoman: "אישה",
-      create: "הצטרפו בדמות הזו", nameless: "סתם נווד/ת בלי שם",
-      nameRequired: "תנו שם לדמות.", badCode: "הקוד לא עבד.",
-      leave: "עזיבת המושב", leaveConfirm: "לפנות את המושב? אפשר לחזור אליו אחר כך.",
-      mySheet: "📜 הדף שלי", openSheet: "דף דמות ›", sheetLoading: "טוען…",
-      sheet_hp: "נקודות חיים", sheet_ac: "דרגת שריון", sheet_level: "דרגה", sheet_xp: "ניסיון",
-      sheetPublic: "התכונות, המיומנויות, הלחשים והציוד שלהם — רק הם יודעים.",
-      sheet_companions: "בני לוויה", ev_npc_of: "🖼 {name} — בן הלוויה של {pc}",
-      sheet_current: "נוכחי", sheet_next_level: "לדרגה הבאה", sheet_max: "מקסימום", sheet_temp: "זמני",
-      xpToGo: "עוד {n} לדרגה {l}", xpReady: "מוכנים לעלות דרגה",
-      sheet_gold: "זהב", sheet_status: "מצב", sheet_stats: "תכונות", sheet_skills: "מיומנויות",
-      sheet_saves: "הטלות הצלה", sheet_features: "יכולות", sheet_spells: "לחשים",
-      sheet_spell_slots: "משבצות לחשים", sheet_equipment: "ציוד", sheet_conditions: "מצבים",
-      sheet_concept: "מי הדמות", sheet_background: "רקע", sheet_alignment: "נטייה",
-      sheet_traits: "תכונות אופי", sheet_ideals: "אידיאלים", sheet_bonds: "קשרים",
-      sheet_flaws: "חולשות", sheet_notes: "הערות", sheet_visual_appearance: "מראה",
-      sheet_pronouns: "לשון פנייה", sheet_more: "עוד",
-      lvlReady: "⬆ דרגה {n} מוכנה!", lvlGo: "עלייה בדרגה", lvlHp: "נקודות חיים",
-      lvlRoll: "🎲 להטיל {d} ליד השולחן", lvlAvg: "לקחת את הממוצע: {n}",
-      lvlNoHp: "מנהל המשחק יקבע את נקודות החיים.", lvlAsi: "שיפור תכונות: ‎+1 ו-‎+1 (בחרו אותה תכונה פעמיים ל-‎+2)",
-      lvlAsiSkip: "— (אעדיף לבקש הישג)", lvlWish: "מה תרצו מהדרגה הזו? (תת־מקצוע, לחשים, הישג…) מנהל המשחק מוסיף את יכולות המקצוע.",
-      lvlDone: "⬆ עליתם לדרגה {n}!", lvlBadge: "⬆",
-      chatButton: "💬 צ'אט", chatNote: "רק השחקנים: מנהל המשחק לא רואה את זה.",
-      chatPh: "כתבו משהו לשאר השחקנים…", chatSend: "שליחה",
-      lore_npc: "👤 דמות", lore_place: "📍 מקום", lore_faction: "⚑ פלג", lore_pc: "🛡 גיבור",
-      lore_foe: "⚔ אויב", lore_treasure: "💎 אוצר", loreLoading: "📖 נזכר…",
-      chatTitle: "💬 שיחת שולחן", narTitle: "📖 המספר", narAsk: "שאלו", narThinking: "📖 נזכר…",
-      narNote: "שכחתם משהו? שאלו על הסיפור עד עכשיו. המספר זוכר רק מה שראיתם; הוא לא יכול לשנות את המשחק, ורק אתם רואים את זה.",
-      narPh: "מי נתן לנו את המפתח? מה אמרה האורקל?…",
-      party: "החבורה", partyTitle: "החבורה", placeholder: "מה אתם עושים? (הקלידו, או לחצו 🎤 ודברו)",
-      private: "רק מנהל המשחק יראה", autoSend: "לשלוח כשאני מסיים/ת לדבר", send: "שליחה",
-      roundYours: "⏳ נותרו {t} לפעול — מנהל המשחק עונה כשכולם פעלו",
-      roundHurry: "⚠ נותרו רק {t} — פעלו עכשיו!", roundWaiting: "⏳ מחכים ל{names} — {t}",
-      roundOut: "💤 אינכם יכולים לפעול כרגע ({why}), לכן השולחן לא מחכה לכם — {t}",
-      playingAs: "משחקים בתור", waiting: "מחכים ל: ", considering: "מנהל המשחק חושב…",
-      reconnecting: "מתחבר מחדש…", gm: "מנהל המשחק", whisper: "לחש לך", toGm: "רק למנהל המשחק",
-      edit: "עריכה", edited: "(נערך)", editSave: "שמירה", editCancel: "ביטול",
-      editTooLate: "מנהל המשחק כבר ענה על זה — כתבו פעולה חדשה.",
-      lead: "מוביל/ה", you: "את/ה", emptySeat: "מושב פנוי", lvl: "דרגה",
-      readOn: "🔊 מקריא", readOff: "🔈 הקראה", replay: "הקריאו את זה",
-      listening: "מקשיב… לחצו שוב על 🎤 כדי לעצור", heard: "הבנתי — שולח…",
-      noMic: "הדפדפן הזה לא תומך בדיבור. נסו Chrome, Edge או Safari.",
-      needHttps: "המיקרופון עובד רק בקישור מאובטח (https). בקשו מהמארח את קישור המנהרה.",
-      micDenied: "הגישה למיקרופון חסומה. אפשרו אותה דרך הסמל בשורת הכתובת ונסו שוב.",
-      noHeVoice: "אין קול עברי מותקן במכשיר, לכן העברית מוקראת בקול ברירת המחדל. אפשר להוסיף קול בהגדרות השפה של המערכת.",
-      noTts: "הדפדפן הזה לא יודע להקריא.",
-      onlineVoice: "טבעי, מקוון",
-      onlineVoiceFailed: "הקול הטבעי המקוון לא זמין כרגע — מקריא בקול של המכשיר.",
-      edgeHint: "לקול עברי טבעי, פתחו את הדף בדפדפן Microsoft Edge.",
-      speed: "מהירות הקראה", slower: "לאט", normal: "רגיל", faster: "מהר",
-      voiceEn: "קול באנגלית", voiceHe: "קול בעברית", auto: "אוטומטי", other: "English",
-      musicOn: "🎵 מוזיקה", musicOff: "🔇 מוזיקה", musicVol: "עוצמת המוזיקה",
-      nowPlaying: "מתנגן עכשיו: ", silence: "אין מוזיקה כרגע", tapForMusic: "הקישו במקום כלשהו כדי להפעיל את המוזיקה.",
-      st_reading: "📖 מנהל המשחק קורא את הפעולות של כולם", st_lore: "📚 מנהל המשחק מעיין בספרי הידע",
-      st_dice: "🎲 מנהל המשחק מטיל קוביות", st_sheets: "📜 מנהל המשחק מעדכן את דפי הדמויות",
-      st_moving: "🗺️ מנהל המשחק מזיז את החבורה", st_threads: "🕸️ מנהל המשחק טווה חוטי עלילה",
-      st_image: "🎨 מנהל המשחק מצייר את הסצנה", st_writing: "✍️ מנהל המשחק כותב את הסיפור",
-      st_translating: "🌐 מנהל המשחק כותב את הגרסה בשפה שלך",
-      etaLeft: "עוד בערך {t}", etaLonger: "לוקח קצת יותר זמן מהרגיל",
-      sec: "{n} שניות", min: "{n} דקות", sent: "✉️ נשלח — מנהל המשחק יקרא את זה עוד רגע",
-      sentWaiting: "✉️ נשלח — מחכים ל{names}",
-      rollDC: "דרגת קושי", rollAC: "דרגת שריון", rollSuccess: "✓ הצלחה", rollFailure: "✗ כישלון",
-      rollNat20: "⚔ 20 טבעי!", rollNat1: "💀 1 טבעי!", rollDropped: "נזרק",
-      rollSecret: "🎲 מנהל המשחק הטיל קובייה בסתר", rollBy: "מנהל המשחק",
-      trFrom: "🌐 תורגם מ{lang}", trShowOriginal: "הצג מקור",
-      trShowTranslation: "הצג תרגום", trWaiting: "🌐 מתרגם…",
-      lang_en: "אנגלית", lang_he: "עברית",
-      rollChar: "🎲 הטלת דמות", rollAgain: "🎲 להטיל שוב", rollTry: "הטלה מס' {n}",
-      rolledNote: "הוטל בקוביות הוגנות: 4d6 לכל תכונה, הקובייה הנמוכה נזרקת. שנו את השם והתיאור אם תרצו ולחצו צור — השולחן יראה מה הטלתם.",
-      rolledHp: "נק״ח", rolledAc: "דרגת שריון",
-      ev_levelup: "⬆ {pc} עולה לדרגה {level}", ev_portrait: "🖼 הדיוקן של {pc}",
-      ev_levelready: "⬆ {pc} יכול/ה לעלות לדרגה {level}: פתחו את הדף (📜) ולחצו עלייה בדרגה",
-      ev_place: "🖼 {location}", placesTitle: "גלריה", placeShow: "מקומות, דמויות, אויבים ואוצרות",
-      ev_foe: "⚔ {name}", ev_boss: "💀 {name}", ev_loot: "💎 {name}", lootFor: "של {pc}",
-      galPlaces: "🗺 מקומות", galFoes: "⚔ אויבים", galTreasures: "💎 אוצרות", galPeople: "👤 דמויות",
-      ev_npc: "🖼 {name}",
-      ev_seat: "{pc} מתיישב/ת ליד השולחן.", ev_join: "שחקן/ית חדש/ה מצטרף/ת: {pc}",
-      ev_leave: "{pc} קם/ה מהשולחן.", ev_music_stop: "🎵 המוזיקה דועכת.",
-      amb_wind: "רוח מייללת", amb_rain: "גשם יורד", amb_storm: "סערה ורעמים",
-      amb_cave: "טפטופים במערה", amb_fire: "אש מפצפצת", amb_dungeon: "זמזום אפל של מבוך",
-      amb_peaceful: "אקורדים רכים", amb_battle: "תופי מלחמה", amb_mystery: "מסתורין מנצנץ",
-      amb_epic: "קרב בוס", themeOf: "הנושא של {name}", bossThemeOf: "⚔ {name} — קרב בוס",
-    },
-  };
-  let lang = store.get("lang") || ((navigator.language || "").toLowerCase().startsWith("he") ? "he" : "en");
+  // The page's words, from lib/table_strings.json (put in where the page is served);
+  // the adventure's other languages come from the table (/api/ui) when chosen.
+  const STRINGS = /*TABLE_STRINGS*/{ en: {} };
+  // The languages this adventure is played in (chosen by the GM when it starts;
+  // English alone by default): [{code, name, native, rtl}]. The table says which.
+  let LANGS = [{ code: "en", name: "English", native: "English", rtl: false }];
+  const RTL = new Set(["he", "yi", "ar", "fa", "ur"]);
+  const isRtl = (l) => RTL.has(String(l || "").split("-")[0]);
+  const langBase = (l) => String(l || "").split("-")[0].toLowerCase();
+  let langChosen = !!store.get("lang");
+  let lang = store.get("lang") || "en";
+  // The best of the table's languages for this player: their choice, else their
+  // browser's, else the language the adventure is mainly told in.
+  function pickLang(want) {
+    const codes = LANGS.map((x) => x.code);
+    const tries = [want, store.get("lang"), ...(navigator.languages || [navigator.language || ""])];
+    for (const w of tries.filter(Boolean)) {
+      if (codes.includes(w)) return w;
+      const hit = codes.find((c) => langBase(c) === langBase(w));
+      if (hit) return hit;
+    }
+    return codes[0];
+  }
   const t = (k) => (STRINGS[lang] && STRINGS[lang][k]) || STRINGS.en[k] || k;
+  const langLabel = (code) => (STRINGS[lang] && STRINGS[lang]["lang_" + code])
+    || (LANGS.find((x) => x.code === code) || {}).native || code;
+
+  // The page's words in a language it doesn't ship with: translated by the table.
+  const uiLoading = new Set();
+  async function loadStrings(l, tries = 0) {
+    if (STRINGS[l] && STRINGS[l].__done) return;
+    if (uiLoading.has(l) && !tries) return;
+    uiLoading.add(l);
+    const r = await api("/api/ui?lang=" + encodeURIComponent(l));
+    if (r.ok) {
+      STRINGS[l] = Object.assign({}, STRINGS[l] || {}, r.strings || {});
+      if (!r.pending) STRINGS[l].__done = true;
+      if (l === lang) { applyLang(); if (me) rerenderLog(); }
+    }
+    if (r.ok && r.pending && tries < 40) setTimeout(() => loadStrings(l, tries + 1), 5000);
+    else uiLoading.delete(l);
+  }
+  // The table told us its languages: offer them, and settle on one.
+  function setLanguages(list) {
+    if (!Array.isArray(list) || !list.length) return;
+    if (list.map((x) => x.code).join() !== LANGS.map((x) => x.code).join()) LANGS = list;
+    fillLangPickers();
+    const best = pickLang(langChosen ? lang : null);
+    if (best !== lang) setLang(best, false);
+    else if (!STRINGS[lang]) loadStrings(lang);
+  }
+  function fillLangPickers() {
+    document.querySelectorAll(".lang-pick").forEach((sel) => {
+      if (sel.dataset.sig !== LANGS.map((x) => x.code).join()) {
+        sel.textContent = "";
+        LANGS.forEach((x) => {
+          const o = document.createElement("option");
+          o.value = x.code; o.textContent = x.native || x.name || x.code;
+          sel.appendChild(o);
+        });
+        sel.dataset.sig = LANGS.map((x) => x.code).join();
+      }
+      sel.value = lang;
+      sel.classList.toggle("hidden", LANGS.length < 2);
+    });
+  }
 
   function applyLang() {
     document.documentElement.lang = lang;
-    document.documentElement.dir = lang === "he" ? "rtl" : "ltr";
+    document.documentElement.dir = isRtl(lang) ? "rtl" : "ltr";
     document.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t(el.dataset.i18n); });
     updateEdgeHint();
     document.querySelectorAll("[data-i18n-ph]").forEach((el) => { el.placeholder = t(el.dataset.i18nPh); });
-    document.querySelectorAll(".lang-toggle").forEach((el) => { el.textContent = t("other"); });
+    document.querySelectorAll("[data-i18n-label]").forEach((el) => { el.setAttribute("aria-label", t(el.dataset.i18nLabel)); });
+    fillLangPickers();
     $("me").textContent = me ? `${t("playingAs")} ${me}` : "";
     updateReadToggle();
     updateMusicToggle();
@@ -669,7 +552,11 @@
   }
 
   async function api(path, body) {
-    if (transport) return transport.api(path, body, { token });
+    // Hover cards, sheet translations and the table's state come in the language
+    // being read now (even before the table has heard about a switch).
+    if (!body && /^\/api\/(info|lore|sheet-tr)\b/.test(path) && !/[?&]lang=/.test(path))
+      path += (path.includes("?") ? "&" : "?") + "lang=" + encodeURIComponent(lang);
+    if (transport) return transport.api(path, body, { token, lang });
     const opts = body ? { method: "POST", headers: { "Content-Type": "application/json" },
                           body: JSON.stringify(Object.assign({ code, token }, body)) } : {};
     const sep = path.includes("?") ? "&" : "?";
@@ -696,9 +583,10 @@
   // dir="auto" looks only at the first letter and would lay the whole paragraph out
   // left-to-right, throwing the name to the wrong end of the sentence.
   function dirFor(text) {
-    const he = (String(text).match(/[\u0590-\u05FF]/g) || []).length;
-    const latin = (String(text).match(/[A-Za-z]/g) || []).length;
-    return he > latin ? "rtl" : latin > he ? "ltr" : (lang === "he" ? "rtl" : "ltr");
+    const s = String(text);
+    const rtl = (s.match(/[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\uFB1D-\uFDFF\uFE70-\uFEFF]/g) || []).length;
+    const ltr = (s.match(/\p{L}/gu) || []).length - rtl;
+    return rtl > ltr ? "rtl" : ltr > rtl ? "ltr" : (isRtl(lang) ? "rtl" : "ltr");
   }
 
   // --- tiny, safe markdown: escape first, then a few inline rules ---
@@ -728,8 +616,10 @@
   function loadVoices() { voices = synth ? synth.getVoices() : []; fillVoiceMenus(); }
   const voicesFor = (l) => voices.filter((v) => {
     const vl = (v.lang || "").toLowerCase().replace("_", "-");
-    return l === "he" ? (vl.startsWith("he") || vl.startsWith("iw")) : vl.startsWith("en");
+    return vl.startsWith(langBase(l)) || (langBase(l) === "he" && vl.startsWith("iw"));
   });
+  // What the browser's speech engines call a language.
+  const speechTag = (l) => ({ he: "he-IL", en: "en-US" })[l] || l;
   // Natural voices the HOST makes (lib/table_tts.py): the same on every device,
   // and the only Hebrew voice many devices have (Chrome on Windows ships none).
   const ONLINE_VOICES = {
@@ -738,8 +628,33 @@
   };
   let ttsOk = false, ttsDownUntil = 0;
   const onlineUsable = () => ttsOk && Date.now() >= ttsDownUntil;
+  // One voice menu per language the adventure is played in.
   function fillVoiceMenus() {
-    ["en", "he"].forEach((l) => {
+    const box = $("voice-menus");
+    if (!box) return;
+    if (box.dataset.sig !== LANGS.map((x) => x.code).join()) {
+      box.textContent = "";
+      LANGS.forEach((x) => {
+        const label = document.createElement("label");
+        label.htmlFor = "voice-" + x.code;
+        label.dataset.lang = x.code;
+        const sel = document.createElement("select");
+        sel.id = "voice-" + x.code;
+        sel.onchange = (ev) => {
+          store.set("voice." + x.code, ev.target.value || null);
+          stopSpeaking();
+          speak((STRINGS[x.code] || {}).voiceHello || STRINGS.en.voiceHello, null, x.code);
+        };
+        box.append(label, sel);
+      });
+      box.dataset.sig = LANGS.map((x) => x.code).join();
+    }
+    box.querySelectorAll("label").forEach((el) => {
+      const l = el.dataset.lang;
+      const own = t("voice" + l.charAt(0).toUpperCase() + l.slice(1));
+      el.textContent = !own.startsWith("voice") ? own : t("voiceFor").replace("{lang}", langLabel(l));
+    });
+    LANGS.map((x) => x.code).forEach((l) => {
       const sel = $("voice-" + l);
       if (!sel) return;
       const saved = store.get("voice." + l) || "";
@@ -747,7 +662,7 @@
       const auto = document.createElement("option");
       auto.value = ""; auto.textContent = t("auto");
       sel.appendChild(auto);
-      if (ttsOk) ONLINE_VOICES[l].forEach(([id, name]) => {
+      if (ttsOk) (ONLINE_VOICES[l] || []).forEach(([id, name]) => {
         const o = document.createElement("option");
         o.value = "@" + id; o.textContent = `🌐 ${name} (${t("onlineVoice")})`;
         sel.appendChild(o);
@@ -790,24 +705,32 @@
     if (saved.startsWith("@") && onlineUsable()) return { online: saved.slice(1) };
     const local = saved && !saved.startsWith("@") ? voicesFor(l).find((v) => v.name === saved) : null;
     if (local) return { local };
-    if (onlineUsable() && (l === "he" || !voicesFor(l).length)) return { online: ONLINE_VOICES[l][0][0] };
+    if (onlineUsable() && ONLINE_VOICES[l] && (l === "he" || !voicesFor(l).length))
+      return { online: ONLINE_VOICES[l][0][0] };
     const best = localVoice(l);
     return best ? { local: best } : null;
   }
-  const isHebrew = (s) => (s.match(/[֐-׿]/g) || []).length > (s.match(/[A-Za-z]/g) || []).length;
+  // Which language a sentence is in: the reader's, unless it is plainly in
+  // another writing system (a Hebrew name's sentence in English, say).
+  function chunkLang(s, hint) {
+    const d = dirFor(s);
+    if (hint) return hint;
+    if (isRtl(lang)) return d === "rtl" ? lang : "en";
+    if (d === "rtl") return (LANGS.find((x) => x.rtl) || { code: "he" }).code;
+    return lang;
+  }
+  // The game's shorthand, said as words (English and Hebrew; other languages just
+  // lose the symbols).
+  const SAID = {
+    en: [[/✓/g, " success "], [/✗/g, " fail "], [/\bvs\.?\b/gi, " versus "], [/\bDC\b/g, " D C "],
+         [/\bHP\b/g, " hit points "], [/\bXP\b/g, " experience "], [/(\d+)d(\d+)/gi, "$1 D $2"]],
+    he: [[/✓/g, " הצלחה "], [/✗/g, " כישלון "], [/\bvs\.?\b/gi, " מול "], [/\bDC\b/g, " דרגת קושי "],
+         [/\bHP\b/g, " נקודות חיים "], [/\bXP\b/g, " נקודות ניסיון "], [/(\d+)d(\d+)/gi, "$1 קוביות $2"]],
+  };
   function cleanForSpeech(s, l) {
-    const he = l === "he";
-    return s
-      .replace(/[*_`#>|]/g, " ")
-      .replace(/✓/g, he ? " הצלחה " : " success ")
-      .replace(/✗/g, he ? " כישלון " : " fail ")
-      .replace(/\bvs\.?\b/gi, he ? " מול " : " versus ")
-      .replace(/\bDC\b/g, he ? " דרגת קושי " : " D C ")
-      .replace(/\bHP\b/g, he ? " נקודות חיים " : " hit points ")
-      .replace(/\bXP\b/g, he ? " נקודות ניסיון " : " experience ")
-      .replace(/(\d+)d(\d+)/gi, he ? "$1 קוביות $2" : "$1 D $2")
-      .replace(/[▀-▟■-◿←-⇿☀-➿]|[\u{1F300}-\u{1FAFF}]/gu, " ")
-      .replace(/\s+/g, " ").trim();
+    let out = s.replace(/[*_`#>|]/g, " ");
+    (SAID[langBase(l)] || [[/[✓✗]/g, " "]]).forEach(([re, to]) => { out = out.replace(re, to); });
+    return out.replace(/[▀-▟■-◿←-⇿☀-➿]|[\u{1F300}-\u{1FAFF}]/gu, " ").replace(/\s+/g, " ").trim();
   }
   function speechChunks(text) {
     const out = [];
@@ -828,7 +751,7 @@
   // knows which share of the text it covers (f0..f1), so the words on screen
   // keep pace with the voice. Returns how many sentences were queued.
   let speechQ = [], speechGen = 0, speaking = false, curAudio = null, curUtter = null;
-  function speak(text, hooks) {
+  function speak(text, hooks, hint) {
     const rate = parseFloat($("rate").value) || 1;
     const chunks = speechChunks(text);
     const total = chunks.reduce((n, c) => n + c.length, 0) || 1;
@@ -837,7 +760,7 @@
     chunks.forEach((chunk) => {
       const f0 = cum / total;
       cum += chunk.length;
-      const l = isHebrew(chunk) ? "he" : "en";
+      const l = chunkLang(chunk, hint);
       const said = cleanForSpeech(chunk, l);
       if (said) items.push({ l, said, rate, hooks, f0, f1: cum / total });
     });
@@ -905,7 +828,7 @@
   function speakLocal(item, voice, done) {
     if (!synth) { setStatus(t("noTts"), true); return done(); }
     const u = new SpeechSynthesisUtterance(item.said);
-    u.lang = item.l === "he" ? "he-IL" : "en-US";
+    u.lang = speechTag(item.l);
     if (voice) u.voice = voice;
     else if (item.l === "he" && voices.length && !warnedNoHe) { warnedNoHe = true; setStatus(t("noHeVoice"), true); }
     u.rate = item.rate;
@@ -1320,7 +1243,7 @@
     if (!window.isSecureContext) { setStatus(t("needHttps"), true); return; }
     stopSpeaking();                      // don't let the narrator talk over the player
     rec = new SR();
-    rec.lang = lang === "he" ? "he-IL" : "en-US";
+    rec.lang = speechTag(lang);
     rec.interimResults = true;
     rec.continuous = false;
     rec.maxAlternatives = 1;
@@ -1351,6 +1274,7 @@
     const info = await api("/api/info");
     if (!info.ok) { $("code-error").textContent = info.error === "bad table code" ? t("badCode") : (info.error || t("badCode")); return; }
     store.set("code", code);
+    setLanguages(info.languages);
     if (info.me) { me = info.me; return openTable(info); }
     showSeats(info);
   }
@@ -1508,6 +1432,7 @@
 
   function renderInfo(info) {
     if (!info || !info.ok) return;
+    setLanguages(info.languages);
     if (!info.me && me) {           // our PC left the table or was replaced
       me = null; token = null; store.set("token", null);
       $("table").classList.add("hidden"); $("join").classList.remove("hidden");
@@ -2165,7 +2090,12 @@
   // tap away; until the translation arrives, the original shows, marked.
   const msgEls = new Map();            // message id -> its element, to update in place
   const showOriginal = new Set();      // ids this player flipped back to the original
-  function sourceLang(m) { return m.lang || (dirFor(m.text || "") === "rtl" ? "he" : "en"); }
+  function sourceLang(m) {
+    if (m.lang) return m.lang;
+    const rtl = dirFor(m.text || "") === "rtl";
+    const fits = LANGS.filter((x) => !!x.rtl === rtl).map((x) => x.code);
+    return fits.includes("en") ? "en" : fits[0] || (rtl ? "he" : "en");
+  }
   function readable(m) {
     if (m.kind === "system" || !m.text || (m.kind === "player" && m.pc === me)) return null;
     if (m.kind === "gm" && m.lang) return null;           // already one version per language
@@ -2206,11 +2136,11 @@
     // own isolate so Hebrew never pulls the numbers out of order.
     const line = document.createElement("div");
     line.className = "dice";
-    line.dir = lang === "he" ? "rtl" : "ltr";
+    line.dir = isRtl(lang) ? "rtl" : "ltr";
     const mod = r.modifier ? ` ${r.modifier > 0 ? "+" : "−"} ${Math.abs(r.modifier)}` : "";
     const math = document.createElement("bdi");
     math.dir = "ltr";
-    math.innerHTML = `🎲 <bdi dir="${lang === "he" ? "rtl" : "ltr"}">${esc(heDice(r.notation || ""))}</bdi>: [${esc((r.rolls || []).join("+"))}]`
+    math.innerHTML = `🎲 <bdi dir="${isRtl(lang) ? "rtl" : "ltr"}">${esc(heDice(r.notation || ""))}</bdi>: [${esc((r.rolls || []).join("+"))}]`
       + `${esc(mod)} = <span class="total">${esc(r.total)}</span>`;
     line.appendChild(math);
     const word = (text, cls) => {
@@ -2253,7 +2183,7 @@
     const box = document.createElement("textarea");
     box.className = "edit-box";
     box.value = m.text || "";
-    box.dir = dirFor(box.value) || (lang === "he" ? "rtl" : "ltr");
+    box.dir = dirFor(box.value) || (isRtl(lang) ? "rtl" : "ltr");
     box.oninput = () => { box.dir = dirFor(box.value); };
     const bar = document.createElement("div");
     bar.className = "edit-actions";
@@ -2495,7 +2425,7 @@
         const note = document.createElement("div");
         note.className = "tr-note";
         if (tr.text) {
-          note.append(t("trFrom").replace("{lang}", t("lang_" + tr.src)) + " · ");
+          note.append(t("trFrom").replace("{lang}", langLabel(tr.src)) + " · ");
           const flip = document.createElement("button");
           flip.type = "button";
           flip.textContent = useTr ? t("trShowOriginal") : t("trShowTranslation");
@@ -2593,7 +2523,7 @@
   // ------------------------------------------------------------- wiring ---
   $("say").onsubmit = (ev) => { ev.preventDefault(); sendAction(); };
   const fitTextDir = () => { $("text").dir = $("text").value.trim() ? dirFor($("text").value)
-                                                                   : (lang === "he" ? "rtl" : "ltr"); };
+                                                                   : (isRtl(lang) ? "rtl" : "ltr"); };
   $("text").addEventListener("input", fitTextDir);
   $("text").addEventListener("keydown", (ev) => {
     if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); sendAction(); }
@@ -2604,7 +2534,7 @@
     store.set("read", readAloud ? "1" : "0");
     updateReadToggle();
     if (!readAloud) stopSpeaking();
-    else speak(lang === "he" ? "ההקראה פועלת." : "Reading aloud is on.");
+    else speak(t("readOnSpoken"), null, lang);
   };
   $("music-toggle").onclick = () => {
     musicOn = !musicOn;
@@ -2623,28 +2553,29 @@
   };
   $("rate").value = store.get("rate") || "1";
   $("rate").onchange = () => store.set("rate", $("rate").value);
-  ["en", "he"].forEach((l) => {
-    $("voice-" + l).onchange = (ev) => {
-      store.set("voice." + l, ev.target.value || null);
-      stopSpeaking(); speak(l === "he" ? "שלום, אני אקריא לכם את ההרפתקה." : "Hello, I'll read the adventure to you.");
-    };
-  });
-  document.querySelectorAll(".lang-toggle").forEach((b) => {
-    b.onclick = () => {
-      lang = lang === "he" ? "en" : "he";
-      store.set("lang", lang);
-      sheetTr.clear();
-      loreCards.clear();
-      applyLang();
-      if (me) {
-        api("/api/lang", { lang }).then(() => { if (sheetFor && $("sheet").open) loadSheetTr(sheetFor); });
-        rerenderLog(); refreshInfo(); updateProgress(); fitTextDir();
-        if (sheetShown && $("sheet").open) renderSheet(sheetShown, true);   // its words, now in this language
-      }
-      if (!$("seat-cards").classList.contains("hidden")) refreshSeats();
-    };
-  });
-  async function refreshSeats() { const info = await api("/api/info"); if (info.ok) showSeats(info); }
+  // Switching language: everything is already there in every language the
+  // adventure is played in, so the page just shows it.
+  function setLang(next, chosen = true) {
+    if (!next || next === lang) return fillLangPickers();
+    lang = next;
+    if (chosen) { langChosen = true; store.set("lang", lang); }
+    sheetTr.clear();
+    loreCards.clear();
+    applyLang();
+    if (!STRINGS[lang] || !STRINGS[lang].__done) loadStrings(lang);
+    if (me) {
+      api("/api/lang", { lang });
+      if (sheetFor && $("sheet").open) loadSheetTr(sheetFor);
+      rerenderLog(); refreshInfo(); updateProgress(); fitTextDir();
+      if (sheetShown && $("sheet").open) renderSheet(sheetShown, true);   // its words, now in this language
+    }
+    if (!$("seat-cards").classList.contains("hidden")) refreshSeats();
+  }
+  document.querySelectorAll(".lang-pick").forEach((sel) => { sel.onchange = () => setLang(sel.value); });
+  async function refreshSeats() {
+    const info = await api("/api/info");
+    if (info.ok) { setLanguages(info.languages); showSeats(info); }
+  }
   // Keep the "who are you" list current while choosing (someone may join meanwhile).
   setInterval(() => {
     if (!me && code && !$("seat-cards").classList.contains("hidden")) refreshSeats();

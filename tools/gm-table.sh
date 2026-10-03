@@ -33,7 +33,7 @@ ACTION=$1
 shift
 
 case "$ACTION" in
-    "serve"|"start"|"status"|"wait"|"inbox"|"say"|"translate"|"music"|"free"|"stop"|"round"|"alias")
+    "serve"|"start"|"status"|"wait"|"inbox"|"say"|"translate"|"music"|"free"|"stop"|"round"|"alias"|"languages")
         $PYTHON_CMD "$LIB_DIR/table_server.py" "$ACTION" "$@"
         ;;
 
@@ -41,12 +41,15 @@ case "$ACTION" in
         echo "The online table — every player joins from their own computer's browser."
         echo ""
         echo "Usage: gm-table.sh <action> [args]"
+        echo "  languages [en he fr ...]      The adventure's languages (choose when it starts;"
+        echo "                                default: English only). Every beat, action, sheet and"
+        echo "                                hover card then exists in each: players switch any time"
         echo "  start [--port N] [--code C]   Open the table (runs in the background)"
         echo "  status                        Links, table code, seated players, unread actions"
         echo "  wait [--all] [--timeout S]    Wait for the round: every player acted, or 60 s after the first"
         echo "  inbox                         Unread player actions, without waiting"
         echo "  say \"<text>\" [--to PC] [--image FILE] | say --stdin"
-        echo "        [--lang en|he]          Post narration (or a whisper / an illustration /"
+        echo "        [--lang CODE]           Post narration (or a whisper / an illustration /"
         echo "                                one language's version of a beat)"
         echo "  music <track> [--volume V]    Shared background music: a file in music/, an https"
         echo "                                audio link, or ambient:wind|rain|storm|cave|fire|dungeon"
@@ -57,7 +60,7 @@ case "$ACTION" in
         echo "                                The enemy's own theme (boss: the exciting one), and portrait"
         echo "  say ... --heroic \"<pc>\"       A heroic moment: the PC's anthem, then the scene's music"
         echo "  say ... --loot \"<item>\" [--loot-look \"...\"] [--loot-for PC]  Important loot, painted"
-        echo "  translate --stdin             Players' actions in the other language (JSON by id)"
+        echo "  translate --stdin             Actions (and untagged beats) in the other languages (JSON by id)"
         echo "  round <seconds>|off           How long the GM waits for everyone once someone acts"
         echo "  alias \"<name>\" \"<spelling>\"   Another spelling of a name, for the hover cards"
         echo "  music theme \"<enemy>\" [file]  Play / assign an enemy's theme; music themes lists them"
