@@ -389,6 +389,7 @@
       <select id="voice-en"></select>
       <label for="voice-he" data-i18n="voiceHe"></label>
       <select id="voice-he"></select>
+      <p class="muted hidden" id="edge-hint" data-i18n="edgeHint"></p>
     </div>
   </aside>
   <section id="chat" aria-labelledby="chat-title">
@@ -506,6 +507,7 @@
       noTts: "This browser can't read aloud.",
       onlineVoice: "natural, online",
       onlineVoiceFailed: "The natural online voice isn't reachable right now — using this device's voice.",
+      edgeHint: "For the natural Hebrew voice, open this page in Microsoft Edge.",
       speed: "Reading speed", slower: "Slower", normal: "Normal", faster: "Faster",
       voiceEn: "English voice", voiceHe: "Hebrew voice", auto: "Automatic", other: "עברית",
       musicOn: "🎵 Music", musicOff: "🔇 Music", musicVol: "Music volume",
@@ -594,6 +596,7 @@
       noTts: "הדפדפן הזה לא יודע להקריא.",
       onlineVoice: "טבעי, מקוון",
       onlineVoiceFailed: "הקול הטבעי המקוון לא זמין כרגע — מקריא בקול של המכשיר.",
+      edgeHint: "לקול עברי טבעי, פתחו את הדף בדפדפן Microsoft Edge.",
       speed: "מהירות הקראה", slower: "לאט", normal: "רגיל", faster: "מהר",
       voiceEn: "קול באנגלית", voiceHe: "קול בעברית", auto: "אוטומטי", other: "English",
       musicOn: "🎵 מוזיקה", musicOff: "🔇 מוזיקה", musicVol: "עוצמת המוזיקה",
@@ -636,6 +639,7 @@
     document.documentElement.lang = lang;
     document.documentElement.dir = lang === "he" ? "rtl" : "ltr";
     document.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t(el.dataset.i18n); });
+    updateEdgeHint();
     document.querySelectorAll("[data-i18n-ph]").forEach((el) => { el.placeholder = t(el.dataset.i18nPh); });
     document.querySelectorAll(".lang-toggle").forEach((el) => { el.textContent = t("other"); });
     $("me").textContent = me ? `${t("playingAs")} ${me}` : "";
@@ -751,6 +755,20 @@
       });
       sel.value = [...sel.options].some((o) => o.value === saved) ? saved : "";
     });
+    updateEdgeHint();
+  }
+  // Without the host's natural voice (a table in the cloud, the host offline), a
+  // Hebrew reader on a computer can still hear Hila and Avri: Microsoft Edge has
+  // them built in and fetches them from Microsoft itself. Suggest it when this
+  // browser has no natural Hebrew voice of its own.
+  function updateEdgeHint() {
+    const el = $("edge-hint");
+    if (!el) return;
+    const ua = navigator.userAgent;
+    const desktop = !/Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+    const natural = voicesFor("he").some((v) => /natural|neural|online/i.test(v.name));
+    el.classList.toggle("hidden", !(lang === "he" && desktop && !/\bEdg\//.test(ua)
+                                    && !natural && !onlineUsable()));
   }
   if (synth) { loadVoices(); synth.addEventListener && synth.addEventListener("voiceschanged", loadVoices); }
   function localVoice(l) {
@@ -858,6 +876,7 @@
       if (gen !== speechGen || a.dataset.failed) return;
       a.dataset.failed = "1";
       ttsDownUntil = Date.now() + 120000;
+      updateEdgeHint();
       setStatus(t("onlineVoiceFailed"), true);
       speakLocal(item, localVoice(item.l), done);
     };

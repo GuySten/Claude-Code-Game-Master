@@ -699,7 +699,10 @@ natural voice made on the host's computer. That needs the host to be online and 
 pulled the update (`git pull`, then restart the table; `uv` installs `edge-tts` by itself).
 Check that "Hebrew voice" in the side panel offers 🌐 Hila / Avri. If the page says the
 online voice isn't reachable, it uses the device's own voice and tries again two minutes
-later. To give a device its own Hebrew voice as a backup:
+later. On a computer, the easiest backup is **Microsoft Edge**: it has the same natural Hila
+and Avri voices built in and fetches them from Microsoft itself, whatever the host can reach
+(the page suggests it to Hebrew players on other browsers when the host's voice is
+unavailable). To give a device its own Hebrew voice as a backup:
 - Windows: Settings → Time & language → Language & region → add Hebrew (with speech).
 - Mac / iPhone: Settings → Accessibility → Spoken Content → Voices → Hebrew.
 - Android: Settings → Text-to-speech → Google speech engine → install Hebrew voice data.
