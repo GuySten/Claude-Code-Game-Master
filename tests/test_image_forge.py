@@ -119,6 +119,11 @@ def test_the_session_brief_names_the_image_source(forge, dcc_world):
     assert "Scene images: DISABLED (Forge is running but has no model" in ctx
 
 
+def subject(prompt: str) -> str:
+    """A Forge prompt after the campaign style's headline, which leads it."""
+    return prompt.split("\n\n", 1)[1] if "\n\n" in prompt else prompt
+
+
 def test_portraits_are_drawn_and_kept_on_the_record(forge):
     camp = forge["camp"]
     (camp / "character.json").write_text(json.dumps({
@@ -130,9 +135,9 @@ def test_portraits_are_drawn_and_kept_on_the_record(forge):
     out = image_gen.generate_portrait("pip", camp)
     sent = forge["seen"]["requests"][-1]
     assert (sent["width"], sent["height"]) == (832, 1216)                 # a portrait shape
-    # Her sex leads the prompt (models weigh the start most), and Forge is told
-    # what NOT to draw.
-    assert sent["prompt"].startswith("Character portrait of a woman, a female Halfling Rogue.")
+    # On Forge the style's headline comes first, then the subject, sex first
+    # (the model weighs the start most), and Forge is told what NOT to draw.
+    assert subject(sent["prompt"]).startswith("Portrait of a woman, Halfling Rogue, red curls")
     assert "Pip" not in sent["prompt"]                                   # looks, never names
     assert sent["negative_prompt"].startswith("man, male, masculine face, beard")
     assert "red curls" in sent["prompt"] and "ink and watercolor" in sent["prompt"]
@@ -142,7 +147,7 @@ def test_portraits_are_drawn_and_kept_on_the_record(forge):
     npc = image_gen.generate_portrait("Grimnar", camp)
     sent = forge["seen"]["requests"][-1]
     assert "dwarf blacksmith" in sent["prompt"]
-    assert sent["prompt"].startswith("Character portrait of a person")     # sex unknown: no guess
+    assert subject(sent["prompt"]).startswith("Portrait of a person")      # sex unknown: no guess
     assert not sent["negative_prompt"].startswith(("man,", "woman,"))
     assert json.loads((camp / "npcs.json").read_text())["Grimnar"]["portrait"] == npc["portrait"]
     with pytest.raises(image_gen.ImageGenError, match="No character"):
@@ -260,10 +265,10 @@ def test_a_creature_is_painted_as_a_creature_whatever_its_name(forge):
         "Marta": {"description": "a woman who keeps a pet snake"}}))
     image_gen.generate_portrait("Old Mother Coil", camp)
     sent = forge["seen"]["requests"][-1]
-    assert sent["prompt"].startswith("Portrait of a snake, an animal, not a person")   # not a woman
+    assert subject(sent["prompt"]).startswith("Portrait of a snake, an animal, not a person")   # not a woman
     assert sent["negative_prompt"].startswith("human, person, woman, man")
     image_gen.generate_portrait("Ember", camp)
-    assert forge["seen"]["requests"][-1]["prompt"].startswith("Portrait of an owl")
+    assert subject(forge["seen"]["requests"][-1]["prompt"]).startswith("Portrait of an owl")
     image_gen.generate_portrait("Marta", camp)                       # a person with a pet snake
-    assert forge["seen"]["requests"][-1]["prompt"].startswith("Character portrait of a person")
+    assert subject(forge["seen"]["requests"][-1]["prompt"]).startswith("Portrait of a person")
     assert image_gen.creature_of({"description": "נחשה ענקית"}) == "snake"

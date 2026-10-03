@@ -604,7 +604,19 @@ def build_prompt(prompt: str, characters=None, campaign_dir=None, *,
             chronicler = load_chronicler(campaign_dir)
         style = (chronicler or {}).get("style", "").strip()
         if style and style.lower() not in final.lower():
-            final = f"{final.rstrip()}\n\nConsistent art style (campaign signature): {style}."
+            if sd_backend():
+                # Stable Diffusion reads ~75 tokens at a time and weighs the first
+                # chunk most: a style left at the end was ignored (photos, not ink),
+                # but a whole long style up front pushed the subject out of that
+                # chunk (everyone came out young). So: the style's headline first,
+                # its details at the end.
+                head, _, rest = style.partition(":")
+                head, rest = (head, rest) if rest and len(head.split()) <= 30 else (" ".join(style.split()[:24]), " ".join(style.split()[24:]))
+                final = f"{head.strip().rstrip('.')}.\n\n{final.strip()}"
+                if rest.strip():
+                    final += f"\n\nStyle details: {rest.strip().rstrip('.')}."
+            else:
+                final = f"{final.rstrip()}\n\nConsistent art style (campaign signature): {style}."
 
     return final
 
@@ -760,13 +772,45 @@ def creature_of(record: dict) -> str:
     return ""
 
 
-def portrait_avoid(record: dict) -> str:
+def sd_backend() -> bool:
+    """Pictures come from a Stable Diffusion model (Forge, ComfyUI, or the host's
+    GPU), which wants short, front-loaded prompts rather than long prose."""
+    return backend() in ("forge", "comfyui", "remote")
+
+
+_OLD = re.compile(r"\b(old|elder|elderly|aged|white-haired|wrinkl|"
+                  r"(?:sixt|sevent|eight|ninet)(?:y|ies))", re.I)
+_MIDDLE = re.compile(r"\b(middle|(?:fort|fift)(?:y|ies))", re.I)
+_YOUNG = re.compile(r"\b(young|youth|teen|child|boy|girl|(?:twel|thirteen|fourteen|"
+                    r"fifteen|sixteen|seventeen|eighteen|nineteen)|twent(?:y|ies)|"
+                    r"\b1\d\b|\b2\d\b)", re.I)
+
+
+def _age(record: dict) -> str:
+    va = record.get("visual_appearance") if isinstance(record.get("visual_appearance"), dict) else {}
+    return str(va.get("age") or "").strip()
+
+
+def portrait_avoid(record: dict, chronicler: Optional[dict] = None) -> str:
     """What a portrait must not show, for the negative prompt: a person, for a
-    creature; the other sex, for a person."""
+    creature; the other sex, for a person; for a Stable Diffusion model also the
+    wrong age (it draws everyone young and pretty) and, for a drawn style,
+    photographs."""
     if creature_of(record):
-        return "human, person, woman, man, girl, boy, humanoid, human face, human skin"
-    sex = sex_of(record)
-    return SEXES[sex][2] if sex else ""
+        avoid = ["human, person, woman, man, girl, boy, humanoid, human face, human skin"]
+    else:
+        sex = sex_of(record)
+        avoid = [SEXES[sex][2]] if sex else []
+        if sd_backend():
+            age = _age(record)
+            if _OLD.search(age) or _MIDDLE.search(age):
+                avoid.append("young, youthful, smooth skin, pretty, makeup")
+            elif _YOUNG.search(age):
+                avoid.append("old, elderly, wrinkles, grey hair")
+    style = str((chronicler or {}).get("style") or "")
+    if sd_backend() and style and not re.search(r"photo", style, re.I):
+        avoid.append("photograph, photorealistic, 3d render")
+    return ", ".join(a for a in avoid if a)
 
 
 def portrait_prompt(record: dict) -> str:
@@ -785,6 +829,26 @@ def portrait_prompt(record: dict) -> str:
                      "no text.")
         return " ".join(lines)
     sex = sex_of(record)
+    if sd_backend():
+        # Short and front-loaded: age and sex first, then their look (added by the
+        # appearance lock). A role line or a background sentence here pushed the
+        # look past what the model reads, and every portrait came out young.
+        noun = SEXES[sex][1] if sex else "person"
+        age = _age(record)
+        va = record.get("visual_appearance") if isinstance(record.get("visual_appearance"), dict) else {}
+        oldness = ("old, weathered " if _OLD.search(age) else
+                   "middle-aged, weathered " if _MIDDLE.search(age) else
+                   "young " if _YOUNG.search(age) else "")
+        article = "an" if oldness[:1] in ("o",) else "a"
+        bits = [f"Portrait of {article} {oldness}{noun}"]
+        hair = str(va.get("hair") or "").strip()
+        if hair and not re.search(r"\b(hair|bald|shaved|head|curls?|braids?|locks|bun|ponytail|mane)\b",
+                                  hair, re.I):
+            hair += " hair"
+        bits += [x for x in (age, who, hair, str(va.get("face") or "").strip()) if x]
+        if about and not any(str(v or "").strip() for v in va.values()):
+            bits.append(about)              # no recorded look: what they are is all there is
+        return ", ".join(bits) + ", head and shoulders, plain background."
     if sex:
         adj, noun, _ = SEXES[sex]
         lines = [f"Character portrait of a {noun}, a {adj} {who or noun}."]
@@ -821,7 +885,8 @@ def generate_portrait(name: str, campaign_dir=None, quality: str = DEFAULT_QUALI
     kind, path, record = found
     out = generate_image(portrait_prompt(record), title=f"portrait {record['name']}",
                          quality=quality, size="1024x1536", characters=[record["name"]],
-                         campaign_dir=campaign_dir, avoid=portrait_avoid(record))
+                         campaign_dir=campaign_dir,
+                         avoid=portrait_avoid(record, load_chronicler(campaign_dir)))
     filename = Path(out["path"]).name
     _record_portrait(kind, path, record["name"], filename)
     return {**out, "portrait": filename, "kind": kind, "name": record["name"]}
