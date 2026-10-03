@@ -55,6 +55,7 @@
   .pc-choice { display: flex; justify-content: space-between; align-items: center; gap: 12px;
                width: 100%; text-align: start; margin: 6px 0; }
   .row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  #seat-cards.busy button { opacity: .5; pointer-events: none; }
   label { display: block; margin: 10px 0 4px; font-size: .9rem; color: var(--muted); }
 
   /* table screen */
@@ -1302,9 +1303,16 @@
   }
 
   async function seat(path, body) {
+    // One request at a time: the buttons wait with the player (a hosted table may
+    // take a while to answer, and every click would be another character).
+    if ($("seat-cards").classList.contains("busy")) return;
+    $("seat-cards").classList.add("busy");
+    $("seat-error").textContent = t("sent");
+    let r;
+    try { r = await api(path, body); } finally { $("seat-cards").classList.remove("busy"); }
     $("seat-error").textContent = "";
-    const r = await api(path, body);
     if (!r.ok) { $("seat-error").textContent = r.error || "?"; refreshSeats(); return; }
+    if (me) return;                                  // (already seated meanwhile)
     token = r.token; me = r.pc; store.set("token", token);
     api("/api/lang", { lang });
     openTable(await api("/api/info"));
@@ -2574,7 +2582,10 @@
   document.querySelectorAll(".lang-pick").forEach((sel) => { sel.onchange = () => setLang(sel.value); });
   async function refreshSeats() {
     const info = await api("/api/info");
-    if (info.ok) { setLanguages(info.languages); showSeats(info); }
+    if (!info.ok) return;
+    setLanguages(info.languages);
+    if (info.me && !me) { me = info.me; return openTable(info); }   // our join was answered
+    showSeats(info);
   }
   // Keep the "who are you" list current while choosing (someone may join meanwhile).
   setInterval(() => {
