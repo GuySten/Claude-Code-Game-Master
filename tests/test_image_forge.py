@@ -165,7 +165,7 @@ def test_places_are_painted_and_kept_on_the_location(forge):
     out = image_gen.generate_location_image("the crooked lantern", camp)
     sent = forge["seen"]["requests"][-1]
     assert (sent["width"], sent["height"]) == (1216, 832)
-    assert "Establishing view of a place." in sent["prompt"] and "green lantern" in sent["prompt"]
+    assert subject(sent["prompt"]).startswith("Wide view: a leaning tavern") and "green lantern" in sent["prompt"]
     assert "Crooked Lantern" not in sent["prompt"]
     saved = json.loads((camp / "locations.json").read_text())
     assert saved["The Crooked Lantern"]["image"] == out["image"]
@@ -272,3 +272,24 @@ def test_a_creature_is_painted_as_a_creature_whatever_its_name(forge):
     image_gen.generate_portrait("Marta", camp)                       # a person with a pet snake
     assert subject(forge["seen"]["requests"][-1]["prompt"]).startswith("Portrait of a person")
     assert image_gen.creature_of({"description": "נחשה ענקית"}) == "snake"
+
+
+def test_a_place_inside_is_painted_from_inside(forge):
+    # "Establishing view ... landscape" first made a cavern inside a castle into the
+    # castle seen from outside under a blue sky.
+    camp = forge["camp"]
+    (camp / "locations.json").write_text(json.dumps({
+        "The Hip": {"description": "A cavern of iron chain-galleries inside the Keep.",
+                    "position": "opening stage"},
+        "The Moor": {"description": "Burnt hills under a low sky."},
+        "The Locker": {"position": "A cramped iron cage beside the shaft."}}))
+    image_gen.generate_location_image("The Hip", camp)
+    sent = forge["seen"]["requests"][-1]
+    assert subject(sent["prompt"]).startswith("Interior view, inside: A cavern of iron chain-galleries")
+    assert "opening stage" not in sent["prompt"]
+    assert "sky" in sent["negative_prompt"] and "people" in sent["negative_prompt"]
+    image_gen.generate_location_image("The Moor", camp)
+    sent = forge["seen"]["requests"][-1]
+    assert subject(sent["prompt"]).startswith("Wide view: Burnt hills") and "sky" not in sent["negative_prompt"]
+    image_gen.generate_location_image("The Locker", camp)            # described only in position
+    assert "cramped iron cage" in forge["seen"]["requests"][-1]["prompt"]

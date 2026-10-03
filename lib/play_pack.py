@@ -282,7 +282,7 @@ def apply_stage(campaign_dir, world_state_dir: Optional[str] = None) -> Dict[str
 
     _ensure_location(
         locations, pack["room"],
-        pack.get("whose_story") or "opening stage",
+        "opening stage",                # (whose_story is the premise, not where the place is)
         pack["primer"] or pack["hook"],
     )
     for exit_text in pack["exits"]:

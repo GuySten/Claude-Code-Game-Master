@@ -914,7 +914,37 @@ def location_is_important(rec: dict) -> bool:
                 or position not in ("", "unknown"))
 
 
+_INSIDE = re.compile(r"\b(inside|interior|indoors?|hall|room|chamber|cellar|vault|crypt|cave|cavern|"
+                     r"tunnel|corridor|passage|shaft|cage|cell|dungeon|ward|gallery|galleries|hold|"
+                     r"deck|below|beneath|underground|library|kitchen|barracks|"
+                     r"stair|stairs|attic|belly)\b", re.I)
+
+
+def place_is_inside(name: str, rec: dict) -> bool:
+    """An interior (a cavern, a cage, a vault...), from what the GM wrote about it."""
+    return bool(_INSIDE.search(f"{name} {rec.get('description') or ''}"))
+
+
+def location_avoid(name: str, rec: dict) -> str:
+    """The negative prompt for a place: no figures in the way; for an interior,
+    no sky or landscape (a cavern inside a castle came out as the castle outside)."""
+    avoid = ["people, crowd, close-up figures, portrait"]
+    if place_is_inside(name, rec):
+        avoid.append("sky, clouds, daylight, open landscape, mountains, exterior view, castle exterior")
+    return ", ".join(avoid)
+
+
 def location_prompt(name: str, rec: dict) -> str:
+    if sd_backend():
+        # What it looks like, first: Stable Diffusion weighs the start most, and
+        # "establishing view... landscape" up front made every place a castle seen
+        # from outside under a blue sky.
+        desc = str(rec.get("description") or "").strip().rstrip(".")
+        pos = str(rec.get("position") or "").strip().rstrip(".")
+        if not desc and pos.lower() not in ("", "unknown", "opening stage"):
+            desc = pos
+        view = "Interior view, inside" if place_is_inside(name, rec) else "Wide view"
+        return f"{view}: {desc or name}. Environment art, the place itself, no people, no text."
     seen = [str(rec.get(k) or "").strip() for k in ("description", "position")]
     seen = [v.rstrip(".") + "." for v in seen if v and v.lower() != "unknown"]
     # What it looks like, not what it's called ("The Crooked Lantern" isn't a lantern).
@@ -932,7 +962,8 @@ def generate_location_image(name: str, campaign_dir=None, quality: str = DEFAULT
         raise ImageGenError(f"No location named '{name}' (add it: gm-location.sh add).")
     path, key, rec = found
     out = generate_image(location_prompt(key, rec), title=f"place {key}", quality=quality,
-                         size="1536x1024", campaign_dir=campaign_dir)
+                         size="1536x1024", campaign_dir=campaign_dir,
+                         avoid=location_avoid(key, rec) if sd_backend() else "")
     filename = Path(out["path"]).name
     data = json.loads(path.read_text(encoding="utf-8"))          # re-read just before writing
     table = data["locations"] if isinstance(data.get("locations"), dict) else data
