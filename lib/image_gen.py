@@ -628,7 +628,7 @@ def generate_image(prompt: str, *, title: str = "", quality: str = DEFAULT_QUALI
     short = _short_link(out_path, campaign_dir)
     return {
         "path": str(out_path),
-        "rel_path": os.path.relpath(out_path, Path.cwd()),
+        "rel_path": _relpath(out_path),
         "short_path": str(short) if short else str(out_path),
         "cost": cost,
         "model": model,
@@ -636,6 +636,15 @@ def generate_image(prompt: str, *, title: str = "", quality: str = DEFAULT_QUALI
         "size": size,
         "title": title,
     }
+
+
+def _relpath(path: Path) -> str:
+    """``path`` relative to the working folder, or absolute when there's no relative
+    path (Windows: the campaign on another drive than the game)."""
+    try:
+        return os.path.relpath(path, Path.cwd())
+    except ValueError:
+        return str(path)
 
 
 # ------------------------------------------------------------ portraits ----
