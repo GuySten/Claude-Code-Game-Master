@@ -128,3 +128,10 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   "sounds less evil" than the grey-villain version it replaced. Slow and low reads as
   mournful, not evil; an evil mastermind keeps the momentum and the control. Push
   menace through power or coldness on a moving piece, not gloom.
+- **What evil sounds like to this host** (their references: Homelander's theme, Evil
+  Morty's theme, the Imperial March). Homelander's, in their words: "a lone fast violin
+  that is a bit jarring", with "very high notes" - "it presents him as lonely and
+  crazy". Evil here is a character portrait (madness, isolation, inevitability), not
+  gloom: one exposed voice, fast and obsessive, high and grating, over almost nothing.
+  (Don't describe a piece you can't hear as fact - the GM's guess at Homelander's theme
+  was wrong; ask the host to describe it.) The orchestra now has a solo violin.

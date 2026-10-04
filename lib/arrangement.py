@@ -68,7 +68,8 @@ except in "hits" and "rolls", where it is the velocity itself (1-127).
 Choir (and organ, strings) voices take over a second to bloom: give them notes of a
 beat or longer, held chords, not quick rhythms; let brass and drums carry those.
 
-Parts: violins, violins2, strings (sustained), tremolo, pizzicato, cellos, basses,
+Parts: violins, violins2, solo_violin (one player: exposed, quick), strings (sustained),
+tremolo, pizzicato, cellos, basses,
 flutes, piccolo, oboe, english_horn, clarinets, bassoons, horns, trumpets,
 trombones, tuba, brass, choir, harp, celesta, glockenspiel, bells, organ,
 timpani, taiko, toms, reverse_cymbal, kit (bd, snare, cymbals): as many as wanted.

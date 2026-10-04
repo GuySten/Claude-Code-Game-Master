@@ -61,6 +61,7 @@ PARTS = {
     "taiko": (0, 116, 64, 120),       # Taiko drums: war drums
     "toms": (0, 117, 58, 104),        # Melodic Tom
     "reverse_cymbal": (0, 119, 64, 96),
+    "solo_violin": (0, 40, 70, 110),  # one violin, alone: exposed, quick, edgy
 }
 DRUMS = {"kit"}
 LEAD_DB = 4.0          # the tune's notes, mixed this much over the rest
@@ -388,7 +389,7 @@ LOUDNESS = {
     "organ": -2.6, "toms": -2.6, "violins": -0.8, "bells": 0.0, "basses": 0.0, "kit": 0.2,
     "harp": 0.2, "oboe": 0.4, "bassoons": 1.9, "english_horn": 2.7, "reverse_cymbal": 5.4,
     "taiko": 5.5, "trumpets": 5.7, "brass": 6.6, "timpani": 6.9, "tuba": 8.2, "cellos": 8.6,
-    "trombones": 9.7, "horns": 11.8,
+    "trombones": 9.7, "horns": 11.8, "solo_violin": 2.9,
 }
 # How long each instrument's recording takes to speak (seconds to half its level), and
 # where it plays (MIDI, its practical range): for the score critic (arrangement.check).
@@ -401,7 +402,7 @@ RANGES = {
     "bassoons": (34, 72), "horns": (41, 77), "trumpets": (54, 82), "trombones": (40, 72),
     "tuba": (28, 58), "brass": (36, 84), "choir": (40, 81), "harp": (24, 103),
     "celesta": (60, 108), "glockenspiel": (79, 108), "bells": (60, 77), "organ": (24, 96),
-    "timpani": (38, 55),
+    "timpani": (38, 55), "solo_violin": (55, 100),
 }
 # How late each instrument's recording is heard after its note starts (seconds to come
 # within 9 dB of its full level, measured from MuseScore_General, less the ~20 ms a
@@ -412,7 +413,8 @@ RANGES = {
 # tune they knew (Ode to Joy): "clearly better". (Another sound set's instruments need
 # their own measurement.)
 ADVANCE = {"violins": 0.15, "violins2": 0.18, "cellos": 0.09, "tremolo": 0.115, "choir": 0.13,
-           "strings": 0.25, "trombones": 0.02, "organ": 0.015, "flutes": 0.012, "piccolo": 0.01}
+           "strings": 0.25, "trombones": 0.02, "organ": 0.015, "flutes": 0.012, "piccolo": 0.01,
+           "solo_violin": 0.032}
 # How much room each recording carries already (dB: its energy after a short note is
 # released, against the note's), measured from MuseScore_General for the instruments
 # whose sound stops when they do (bowed strings, the choir and ringing instruments
