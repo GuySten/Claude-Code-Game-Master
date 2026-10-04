@@ -34,3 +34,17 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   the surprise in the tune or in the setting, not both, and not neither.
 - The Audiobox rater put a Beethoven overture (Egmont, a professional recording)
   at 7.44 - level with our pieces: its scale is flat; don't read it as quality.
+- **The Margrave's finals (two villain waltz loops, the same setting on two tunes):**
+  "A is better overall" (the Velvet Waltz) - but "neither is very appropriate for a
+  villain song": the setting (English horn and clarinet, plucked waltz, harp, bells)
+  was elegant, not menacing. A villain's theme needs menace in its *colour* -
+  low register, dark instruments, weight - even when the tune is elegant.
+- **Uneven quality inside a piece** is heard: "the quality of the work changes a lot"
+  within each of them. Where: "the trumpets in B's climax are really weak" (it was the
+  horns and trombones carrying the tune - there were no trumpets) and "adding a choir
+  in A was a lot better". So: **never give the climax's tune to the brass** in this
+  sound set (its brass is its weakest-sounding section as a lead: horns, trombones and
+  trumpets alike); carry it on strings in octaves, with the choir in held chords over
+  it, and use brass only underneath, for weight and punctuation. Windowed ratings
+  (8-second windows) showed the same dip at both climaxes - use them to find a sagging
+  passage (a drop of 0.5 or more; their noise is about 0.2), never to rank fixes.
