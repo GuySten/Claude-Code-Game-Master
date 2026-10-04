@@ -536,7 +536,7 @@ def hall(dry, rate: int = RATE, rt60: float = 2.3, wet: float = 0.28, seed: int 
         for ms, g in ((11, .6), (19, .45), (27, .4), (37, .3), (53, .25)):     # early reflections
             i = int((ms + 3 * c) * rate / 1000)
             ir[i, c] += g * (1 if (ms + c) % 2 else -1)
-    pre = int(0.018 * rate)
+    pre = int(0.035 * rate)                                # (a gap before the echo: the attacks stay crisp)
     ir = np.vstack([np.zeros((pre, 2)), ir])
     ir /= np.sqrt((ir ** 2).sum(axis=0))
     tail = len(ir)
@@ -549,7 +549,7 @@ def hall(dry, rate: int = RATE, rt60: float = 2.3, wet: float = 0.28, seed: int 
         y = np.fft.irfft(np.fft.rfft(send[:, c], size) * np.fft.rfft(ir[:, c], size), size)
         out[:, c] = y[:len(dry) + tail]
     mix = out * wet
-    mix[:len(dry)] += dry * (1 - wet * 0.5)
+    mix[:len(dry)] += dry                                  # (the direct sound at full strength)
     if loop_at:                                            # a loop: what rings past its end
         n = loop_at                                        # sounds over its start
         for at in range(n, len(mix), n):

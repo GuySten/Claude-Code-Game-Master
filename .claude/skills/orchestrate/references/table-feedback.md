@@ -82,3 +82,9 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   to match VPO's stereo width:** the current one "feels smoothed", VPO's "crisper". The
   smoothing is likely the extra hall, not the instrument. "Crisp" keeps coming up as
   what the host notices and likes (the flutes too): the hall may be too much overall.
+- **"Crisp" is measurable** ("I am sure even you can detect that"): the rise in level in
+  the 30 ms after each note starts. It agreed with all three of the host's crispness
+  verdicts (the flutes, the trumpets, the brass alone), and showed our hall smoothing
+  the attacks (more hall, softer attacks). The hall now leaves a 35 ms gap before its
+  echo and keeps the direct sound at full strength: attacks +0.9 dB against +0.24 on
+  Ode to Joy, its width kept.
