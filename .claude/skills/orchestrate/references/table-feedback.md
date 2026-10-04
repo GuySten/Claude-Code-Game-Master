@@ -147,3 +147,5 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   And a complex villain is a portrait in layers - here the elegant waltz (his face), a
   mourning choir (the tithed, his guilt), the climax (his power), and the violin's
   cracks (the mind fraying), each heard at its moment.
+- **Timpani rolls at 9 strokes a second: "still too fast".** Now about 6 a second, each
+  stroke ringing into the next.

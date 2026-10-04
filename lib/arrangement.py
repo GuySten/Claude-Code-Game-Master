@@ -449,7 +449,7 @@ def render(spec: Dict[str, Any], rate: int = orchestra.RATE, sf2: Path = orchest
 PERCUSSIVE = {"timpani", "taiko", "toms", "kit", "reverse_cymbal", "bells", "harp", "glockenspiel",
               "celesta", "pizzicato"}                  # (struck: playing a note again is normal)
 DRUMS = {"timpani", "taiko", "toms", "kit", "reverse_cymbal"}
-ROLL_EVERY = 0.11          # seconds between a roll's strokes
+ROLL_EVERY = 0.16          # seconds between a roll's strokes (about 6 a second)
 
 
 def _where(ctx: Dict[str, Any], u: float) -> str:

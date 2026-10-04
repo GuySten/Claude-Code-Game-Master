@@ -317,10 +317,10 @@ def arrange(tune: dict, stage: int = 3, dark: int = 0) -> Tuple[Score, float]:
     tonic_timp = _in_range(key % 12, 40, 51)
 
     def roll(t0: float, t1: float, v0: float, v1: float) -> None:
-        n = max(1, int((t1 - t0) / 0.11))             # (a swelling rumble, not a rattle)
+        n = max(1, int((t1 - t0) / 0.16))             # (a swelling rumble, not a rattle)
         for i in range(n):
             f = i / n
-            sc.note("timpani", tonic_timp, t0 + i * 0.11, 0.28, v0 + (v1 - v0) * f ** 1.5)
+            sc.note("timpani", tonic_timp, t0 + i * 0.16, 0.4, v0 + (v1 - v0) * f ** 1.5)
 
     # The intro: the pulse and a timpani roll swelling into the theme.
     if intro:
