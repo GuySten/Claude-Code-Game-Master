@@ -189,3 +189,15 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   choir, tremolo, a slow roll; the hope chord under the held peak; the gang on the war
   cry; the horns' echo and a decided ending): "It is amazing." The library works: a
   character's description -> devices -> a portrait, the critic catching the craft.
+- **Too much story for a short theme** (the ablation's run 2 - four composers, each given
+  Izrin's description *and* four plot events, each scored every event in ~50 s: a rapier
+  drawn, a strike, a speech echoed, an uprising's march, an "other world" chord): "they
+  tried to fit too much story into only ~50 seconds - it feels too dense". A theme is a
+  portrait of who the character is, not a retelling of what they did. Kestrel's
+  "amazing" theme also carried several ideas, but as layers that run together (a stride
+  under it all, the tune over it), not as a chain of events one after another.
+- **An unclean experiment, caught by ear** (the ablation's run 1): one condition that
+  should have had none of the host's ideas used `unhinge` (a wavering intro chord, for
+  a tiefling "heat-haze") because the score-format guide every composer read listed it.
+  The tools built from the host's feedback (unhinge, slide, wobble) are the host's ideas
+  too: in an ablation they belong only to the conditions given the host's ideas.
