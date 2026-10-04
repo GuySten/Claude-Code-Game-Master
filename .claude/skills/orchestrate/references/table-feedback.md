@@ -137,3 +137,5 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   was wrong; ask the host to describe it.) The orchestra now has a solo violin.
   Evil Morty's theme, in their words: what stands out is "the human sad choir" - a
   villain's music can carry their sorrow, sung by human voices.
+  "They sound like they are mourning." (A villain's grief, sung - not gloom in the
+  orchestra.)
