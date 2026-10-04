@@ -615,6 +615,9 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
     # began: "the climax did not go with what was before"). A climax grows out of what
     # came before: a layer or two carries across, the bars before it build, the new
     # instruments arrive in waves.
+    # (The checks the host's verdicts taught - seams, the surprise budget - can be switched
+    # off, ARRANGEMENT_HOST_CHECKS=0, to test what they add.)
+    host_checks = __import__("os").environ.get("ARRANGEMENT_HOST_CHECKS", "1") != "0"
     sounding: Dict[str, List[Tuple[float, float]]] = {}
     held: Dict[Tuple[str, int], float] = {}
     for t, is_on, name, key, _ in sorted(sc.events, key=lambda e: (e[0], e[1])):
@@ -628,7 +631,7 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
         return any(x < b_s - 1e-6 and y > a_s + 1e-6 for x, y in sounding.get(part, []))
 
     parts_all = [p for p in sounding if p not in DRUMS]
-    for i in range(2, len(bounds) - 1):
+    for i in range(2, len(bounds) - 1 if host_checks else 2):
         u0, a_s, b_s = bounds[i]
         if ctx["loop"] and i >= len(bounds) - 2:
             continue
@@ -650,7 +653,7 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
                         "and bring the new parts in waves")
     # The surprise budget: a surprising tune wants a supportive setting, a simple tune
     # a rich one (the host's 2x2: those pairings beat both-plain and both-rich).
-    budget = surprise_budget(ctx, spec)
+    budget = surprise_budget(ctx, spec) if host_checks else None
     if budget:
         tune_pct, chromatic, changes, verdict = budget
         if verdict == "both":
