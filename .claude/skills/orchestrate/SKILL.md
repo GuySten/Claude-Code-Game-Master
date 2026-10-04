@@ -44,14 +44,17 @@ So the loop below is not optional ceremony; it's how you hear.
 5. **Play it** - `python lib/arrangement.py play <file> --out <file.ogg>` (laptop:
    `gm-music-compose.sh arrange <file>`).
 6. **Rate it** (when the rater is set up: `gm-music-compose.sh setup --rater`) -
-   `python lib/music_rate.py <file.ogg> music/<same-role>-*.mp3`: Meta's
-   Audiobox Aesthetics scores enjoyment (CE), usefulness (CU), complexity (PC)
-   and production quality (PQ), 1-10. Compare with the library tracks in the same
-   role (boss-*, sad-*, victory-*...: professional music) and with your previous
-   version. It hears the sound, not the composition, and a sampled orchestra
-   loses some PQ to real recordings whatever the notes - so use it to compare
-   versions of the same piece and to catch a piece that's clearly weaker (CE well
-   under its peers), not as a verdict. Report the numbers to the host.
+   `python lib/music_rate.py <file.ogg>`: Meta's Audiobox Aesthetics, 1-10, for
+   enjoyment, usefulness, complexity, production quality. Know what it hears: the
+   *sound*, not the music. It couldn't tell the host's favourite tune from the one
+   they found lacking (a tune alone on a clarinet scores 7.2-7.6 whatever the
+   notes), a lone clean instrument outscores a full orchestra, and an independent
+   review (Cyanite, 2026) found its scores cluster at 7-8 across genres and track
+   catchiness and familiarity rather than merit. So use it for coarse problems
+   *within* a piece - a wrong note in one part (it caught a trumpet tritone), a
+   squashed passage, a weak instrument - and to compare two mixes of the same
+   arrangement. Never to choose a tune, and never as a verdict on the music:
+   that's the host's ears (and, for tunes, `lib/tune_score.py` as a floor check).
 7. **Tell the host what to listen for** - timestamps and what happens there ("0:24
    - the climax lands on E major instead of home: the lift"), and ask what doesn't
    work. When they answer, record it in `references/table-feedback.md`: their
