@@ -223,6 +223,12 @@ def _pattern_hits(pattern: str, a: float, b: float, step: float):
 
 def build(spec: Dict[str, Any]) -> Tuple["orchestra.Score", float, Optional[float]]:
     """An arrangement -> (score, seconds, loop length in seconds or None)."""
+    ctx = _build(spec)
+    return ctx["score"], ctx["seconds"], ctx["loop"]
+
+
+def _build(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """build(), with what the score critic needs too: the tune, the chords, the clock."""
     t = dict(spec.get("tune") or {})
     if not t.get("seed"):
         raise ArrangementError('"tune": {"seed": ...} is needed (the character\'s name)')
@@ -287,7 +293,7 @@ def build(spec: Dict[str, Any]) -> Tuple["orchestra.Score", float, Optional[floa
     prog = []
     for item in spec.get("chords") or []:
         a, b, sym = item
-        prog.append((float(a), float(b), chord(sym, key)))
+        prog.append((float(a), float(b), {**chord(sym, key), "symbol": sym}))
     prog.sort(key=lambda c: c[0])
 
     def chord_at(x: float) -> Optional[Dict[str, Any]]:
@@ -326,7 +332,7 @@ def build(spec: Dict[str, Any]) -> Tuple["orchestra.Score", float, Optional[floa
                 keys = [place(c[play], lo, hi)]
             elif play == "root5":
                 r = place(c["root"], lo, hi)
-                keys = [r, r + 7] if r + 7 <= hi else [r - 12, r - 5] if r - 12 >= lo - 12 else [r]
+                keys = [r, r + 7] if r + 7 <= hi else [r - 5, r] if r - 5 >= lo else [r]
             elif play == "octaves":
                 r = place(c["bass"], lo, hi)
                 keys = [r, r + 12]
@@ -387,7 +393,9 @@ def build(spec: Dict[str, Any]) -> Tuple["orchestra.Score", float, Optional[floa
         sc.note(part, k, T(at), (T(at + float(h.get("len", 3))) - T(at)), float(h.get("vel", 110)))
 
     seconds = T(length)
-    return sc, seconds, (seconds if loop else None)
+    return {"score": sc, "seconds": seconds, "loop": seconds if loop else None, "tune": tune,
+            "played": played, "prog": prog, "T": T, "unit": unit, "beat": beat, "start": start,
+            "length": length, "dyn_pts": dyn_pts, "chord_at": chord_at}
 
 
 def render(spec: Dict[str, Any], rate: int = orchestra.RATE, sf2: Path = orchestra.SF2):
@@ -400,6 +408,162 @@ def render(spec: Dict[str, Any], rate: int = orchestra.RATE, sf2: Path = orchest
         return orchestra.master(wet, rate, loop=True), rate
     dry = orchestra.play(score, seconds, sf2, rate, mix)
     return orchestra.master(orchestra.hall(dry, rate), rate), rate
+
+
+# --- the score critic: what a listener would notice, measured (I can't hear) ---
+PERCUSSIVE = {"timpani", "taiko", "toms", "kit", "reverse_cymbal", "bells", "harp", "glockenspiel",
+              "celesta", "pizzicato"}
+
+
+def _where(ctx: Dict[str, Any], u: float) -> str:
+    bar = ctx["tune"]["bar"]
+    return "the intro" if u < 0 else f"bar {int(u // bar) + 1}"
+
+
+def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
+    """What's wrong with an arrangement, as [(level, finding)]: "error" (fix it),
+    "warn" (very likely heard), "note" (a choice to confirm). ``listen``: also
+    render it, to measure what's heard (the tune over the rest, the choir, a loop's
+    seam): a few seconds."""
+    ctx = _build(spec)
+    sc, tune, T, unit, beat = ctx["score"], ctx["tune"], ctx["T"], ctx["unit"], ctx["beat"]
+    bar = tune["bar"]
+    out: List[Tuple[str, str]] = []
+    add = lambda level, msg: out.append((level, msg))          # noqa: E731
+    # Every note in its instrument's range; and long enough to speak.
+    notes: Dict[str, list] = {}
+    on_at: Dict[Tuple[str, int], list] = {}
+    for t, is_on, name, key, vel in sorted(sc.events, key=lambda e: (e[0], e[1])):
+        if is_on:
+            on_at.setdefault((name, key), []).append(t)
+        elif on_at.get((name, key)):
+            notes.setdefault(name, []).append((on_at[(name, key)].pop(0), t, key))
+    by_part: Dict[str, list] = {}
+    for name, got in notes.items():
+        by_part.setdefault(name.partition(":")[0], []).extend(got)
+    quick = {(round(a, 3), k % 12) for part, got in by_part.items() if part not in orchestra.SPEAKS
+             or orchestra.SPEAKS[part] < 0.1 for a, _, k in got}           # (a quick attack doubling it)
+    for part, got in by_part.items():
+        lo, hi = orchestra.RANGES.get(part, (0, 127))
+        bad = [k for _, _, k in got if not lo <= k <= hi]
+        if bad:
+            add("error", f"{part}: {len(bad)} note(s) out of its range ({name_of(lo)}-{name_of(hi)}), "
+                         f"e.g. {name_of(bad[0])}")
+        speak = orchestra.SPEAKS.get(part)
+        if speak:
+            short = [(a, b) for a, b, k in got if b - a < 1.5 * speak and (round(a, 3), k % 12) not in quick]
+            if short and len(short) >= 0.25 * len(got):
+                add("warn", f"{part}: {len(short)} of {len(got)} notes are shorter than it takes to speak "
+                            f"({1.5 * speak:.2f}s): they sound at under half its level, smeared. Double "
+                            f"them with a quick instrument (horns, trumpets, flutes, clarinets, bassoons, "
+                            f"pizzicato), or give it held notes")
+    # The same note started again while it still sounds (the second cuts the first).
+    for name in notes:
+        if name.partition(":")[0] in PERCUSSIVE:
+            continue                                         # (a drum is struck again: that's fine)
+        active: Dict[int, int] = {}
+        clash = 0
+        for t, is_on, n, key, _ in sorted((e for e in sc.events if e[2] == name), key=lambda e: (e[0], e[1])):
+            if is_on:
+                clash += active.get(key, 0) > 0
+                active[key] = active.get(key, 0) + 1
+            else:
+                active[key] = max(0, active.get(key, 0) - 1)
+        if clash:
+            add("warn", f"{name.partition(':')[0]}: {clash} note(s) restart a note already sounding "
+                        "(the second cuts the first): move one to another part")
+    # The tune: all played, and against its chords.
+    melody = spec.get("melody") or []
+    silent = [u0 for u0, _, _ in ctx["played"]
+              if not any(float(m.get("from", ctx["start"])) - 1e-9 <= u0 < float(m.get("to", ctx["length"])) - 1e-9
+                         and m.get("parts") for m in melody)]
+    if silent:
+        add("warn", f"the tune isn't played at {_where(ctx, silent[0])} ({len(silent)} notes): "
+                    "no \"melody\" entry covers it")
+    rubs = []
+    for u0, d, k in ctx["played"]:
+        c = ctx["chord_at"](u0)
+        if c is None:
+            add("error", f"no chord at {_where(ctx, u0)}, under the tune")
+            break
+        if d * unit < 0.45 or k % 12 in c["pcs"]:
+            continue
+        above = [p for p in c["pcs"] if (k - p) % 12 == 1]
+        if above:
+            rubs.append(f"{name_of(k)} over {c['symbol']} at {_where(ctx, u0)}")
+    if rubs:
+        add("note", f"held tune notes a half step above a chord tone (a sigh if meant, a clash if not): "
+                    + "; ".join(rubs[:4]) + (f" (+{len(rubs) - 4})" if len(rubs) > 4 else ""))
+    # Shape: dynamics, and harmony that moves.
+    pts = ctx["dyn_pts"]
+    span = max(v for _, v in pts) - min(v for _, v in pts)
+    if span < 15:
+        add("note", f"the dynamics only move {span:.0f} velocity points: is there a build, a climax?")
+    run, longest, at, prev = 0.0, 0.0, 0.0, None
+    for a, b, c in ctx["prog"]:
+        if c["symbol"] == prev:
+            run += b - a
+        else:
+            run, prev = b - a, c["symbol"]
+        if run > longest:
+            longest, at = run, a
+    if longest > 4 * bar:
+        add("note", f"one chord holds {longest / bar:g} bars (up to {_where(ctx, at)}): static, if not meant")
+    if not listen:
+        return out
+    # Listening: render the layers apart and measure them.
+    import numpy as np
+    rate = 22050
+    mix = spec.get("mix") or {}
+
+    def layer(keep) -> "np.ndarray":
+        part = orchestra.Score()
+        part.events = [e for e in sc.events if keep(e[2])]
+        return orchestra.play(part, ctx["seconds"], rate=rate, mix=mix).mean(axis=1)
+
+    lead = layer(lambda n: ":" in n)
+    choir = layer(lambda n: n == "choir")
+    rest = layer(lambda n: ":" not in n and n != "choir")
+
+    def db(x) -> float:
+        return float(20 * np.log10(np.sqrt(np.mean(x ** 2)) + 1e-12)) if len(x) else -240.0
+
+    for m in melody:
+        a, b = float(m.get("from", ctx["start"])), float(m.get("to", ctx["length"]))
+        i, j = int(T(a) * rate), int(T(min(b, ctx["length"])) * rate)
+        if j - i < rate // 2 or db(lead[i:j]) < -200:
+            continue
+        gap = db(lead[i:j]) - db(rest[i:j])
+        if gap < -2:
+            add("error", f"the tune is buried at {_where(ctx, a)}-{_where(ctx, b - 1e-6)}: {gap:+.0f} dB "
+                         f"under the rest (give that melody entry \"gain\": {round(3 - gap)})")
+        elif gap < 1:
+            add("warn", f"the tune is barely over the rest at {_where(ctx, a)}-{_where(ctx, b - 1e-6)}: "
+                        f"{gap:+.0f} dB (\"gain\": {round(3 - gap)} would put it at +3)")
+    # The choir, where it sings.
+    w = rate // 2
+    sung = [i for i in range(0, len(choir) - w, w) if np.abs(choir[i:i + w]).max() > 1e-3]
+    if sung:
+        idx = np.concatenate([np.arange(i, i + w) for i in sung])
+        gap = db(choir[idx]) - db(rest[idx])
+        if gap < -8:
+            add("warn", f"the choir is {gap:+.0f} dB under the rest where it sings: it won't be heard "
+                        f"(\"mix\": {{\"choir\": {round(-4 - gap)}}}, or thin the orchestra there)")
+    # A loop's seam.
+    if ctx["loop"]:
+        full = (lead + choir + rest)
+        n = int(ctx["seconds"] * rate)
+        tail = full[n:]
+        body = full[:n].copy()
+        body[:len(tail)] += tail[:n]
+        q = rate // 2
+        step = db(body[:q]) - db(body[-q:])
+        if abs(step) > 3:
+            add("warn", f"the loop's seam steps {step:+.0f} dB (end -> start): bring the ends' dynamics together")
+    peak_level = db(lead + choir + rest)
+    if peak_level < -60:
+        add("error", "the piece is silent")
+    return out
 
 
 def describe(seed: str, mode: str = "major", cls: str = "", stage: int = 1, dark: int = 0) -> str:
@@ -431,10 +595,23 @@ def main() -> None:
     p = sub.add_parser("play", help="play an arrangement (a JSON file)")
     p.add_argument("file")
     p.add_argument("--out", required=True)
+    c = sub.add_parser("check", help="the score critic: what a listener would notice")
+    c.add_argument("file")
+    c.add_argument("--quick", action="store_true", help="read the score only (don't render it)")
     a = ap.parse_args()
     if a.cmd == "tune":
         print(describe(a.seed, "minor" if a.minor else "major", a.cls, a.stage, a.dark))
         return
+    if a.cmd == "check":
+        try:
+            found = check(json.loads(Path(a.file).read_text(encoding="utf-8")), listen=not a.quick)
+        except (ArrangementError, KeyError, TypeError, ValueError) as e:
+            sys.exit(f"[arrangement] {a.file}: {e}")
+        for level, msg in found:
+            print(f"{level.upper():5} {msg}")
+        print(f"{sum(lv == 'error' for lv, _ in found)} error(s), {sum(lv == 'warn' for lv, _ in found)} "
+              f"warning(s), {sum(lv == 'note' for lv, _ in found)} note(s)")
+        sys.exit(1 if any(lv == "error" for lv, _ in found) else 0)
     try:
         spec = json.loads(Path(a.file).read_text(encoding="utf-8"))
         samples, rate = render(spec)

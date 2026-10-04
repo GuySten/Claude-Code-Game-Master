@@ -116,3 +116,30 @@ def test_the_tune_is_mixed_over_the_rest_and_parts_are_evened_out():
     # the quiet choir recording is turned up, the loud horns down; a piece can adjust
     assert orchestra.level_db("choir") > orchestra.level_db("horns") + 10
     assert orchestra.level_db("choir", {"choir": -3}) == orchestra.level_db("choir") - 3
+
+
+def test_the_critic_reads_a_score_for_what_a_listener_would_notice():
+    found = A.check(spec(), listen=False)
+    assert not [m for lv, m in found if lv == "error"]
+    # out of range, quick notes on a slow instrument with no quick doubling, a buried tune
+    bad = spec(lines=[{"part": "horns", "notes": [[0, "C2", 2]]},
+                      {"part": "violins2", "notes": [[float(i) / 2, "C5", 0.25] for i in range(16)]}],
+               chords=[[0, 40, "I"]], dynamics=[[0, 90]])
+    found = A.check(bad, listen=False)
+    text = " | ".join(f"{lv}: {m}" for lv, m in found)
+    assert "error: horns: 1 note(s) out of its range" in text
+    assert "warn: violins2: 15 of 16 notes are shorter than it takes to speak" in text   # (the horn doubles one)
+    assert "only move 0 velocity points" in text and "one chord holds" in text
+    # a quick instrument doubling the same notes takes the warning away
+    doubled = dict(bad, lines=bad["lines"] + [{"part": "clarinets", "notes": [[float(i) / 2, "C4", 0.25] for i in range(16)]}])
+    assert not any("violins2" in m for _, m in A.check(doubled, listen=False))
+
+
+def test_the_critic_hears_a_buried_tune(tmp_path):
+    pytest.importorskip("numpy")
+    pytest.importorskip("tinysoundfont")
+    if not orchestra.SF2.is_file():
+        pytest.skip("the SoundFont isn't downloaded here")
+    buried = spec(lead=-12, melody=[{"from": 0, "to": 1000, "parts": {"violins": 0}}],
+                  harmony=[{"part": "brass", "play": "chord", "range": ["G3", "G4"], "vel": 20}])
+    assert any(lv == "error" and "buried" in m for lv, m in A.check(buried))

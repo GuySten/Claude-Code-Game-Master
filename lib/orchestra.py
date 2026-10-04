@@ -390,6 +390,19 @@ LOUDNESS = {
     "taiko": 5.5, "trumpets": 5.7, "brass": 6.6, "timpani": 6.9, "tuba": 8.2, "cellos": 8.6,
     "trombones": 9.7, "horns": 11.8,
 }
+# How long each instrument's recording takes to speak (seconds to half its level), and
+# where it plays (MIDI, its practical range): for the score critic (arrangement.check).
+SPEAKS = {"choir": 0.18, "strings": 0.48, "violins": 0.50, "violins2": 0.26, "english_horn": 0.42,
+          "cellos": 0.24, "tremolo": 0.16, "organ": 0.10, "oboe": 0.12, "brass": 0.08, "horns": 0.06}
+RANGES = {
+    "violins": (55, 100), "violins2": (55, 96), "strings": (36, 96), "tremolo": (36, 96),
+    "pizzicato": (28, 96), "cellos": (36, 76), "basses": (28, 60), "flutes": (60, 96),
+    "piccolo": (74, 108), "oboe": (58, 91), "english_horn": (52, 81), "clarinets": (50, 91),
+    "bassoons": (34, 72), "horns": (41, 77), "trumpets": (54, 82), "trombones": (40, 72),
+    "tuba": (28, 58), "brass": (36, 84), "choir": (40, 81), "harp": (24, 103),
+    "celesta": (60, 108), "glockenspiel": (79, 108), "bells": (60, 77), "organ": (24, 96),
+    "timpani": (38, 55),
+}
 BALANCE = {
     "horns": 2, "trumpets": 3, "trombones": 2, "brass": 3, "violins": 1, "strings": -3,
     "tremolo": -2, "choir": 3, "timpani": 2, "taiko": 3, "glockenspiel": -2, "piccolo": -2,
