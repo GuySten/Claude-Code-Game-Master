@@ -408,8 +408,9 @@ RANGES = {
 # listener forgives): play() starts its notes that much early, so instruments
 # playing together are heard together, on the beat (the violins doubling a quick
 # clarinet were ~150 ms behind it). The reverse cymbal is written to swell into the
-# beat; the string pad, which holds chords, is moved at most 250 ms. (Off by default
-# until the host has heard it: play(align=True).)
+# beat; the string pad, which holds chords, is moved at most 250 ms. The host, on a
+# tune they knew (Ode to Joy): "clearly better". (Another sound set's instruments need
+# their own measurement.)
 ADVANCE = {"violins": 0.15, "violins2": 0.18, "cellos": 0.09, "tremolo": 0.115, "choir": 0.13,
            "strings": 0.25, "trombones": 0.02, "organ": 0.015, "flutes": 0.012, "piccolo": 0.01}
 BALANCE = {
@@ -426,7 +427,7 @@ def level_db(part: str, mix: Optional[Dict[str, float]] = None) -> float:
 
 
 def play(score: Score, seconds: float, sf2: Path = SF2, rate: int = RATE,
-         mix: Optional[Dict[str, float]] = None, align: bool = False):
+         mix: Optional[Dict[str, float]] = None, align: bool = True):
     """The score through the SoundFont -> stereo float32 (n, 2), dry. Each part (and
     each layer of one: "horns:4", the tune's notes) is played on its own and mixed
     at its level (level_db, plus the layer's dB), so a piece can use any number."""

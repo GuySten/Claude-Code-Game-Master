@@ -56,3 +56,10 @@ whenever the host says how a piece sounded. Their ears are the final judge.
 - **Many instruments entering in the same bar** (piece A's climax: five at once, vs
   the same instruments brought in over a few bars): "I cannot tell". Not a rule
   worth enforcing for this music; the climax's weakness was its brass lead.
+- **Timing (slow instruments started early so they're heard on the beat):** on a new
+  tune the host couldn't judge it; they asked for **a tune they already know
+  independently** - Ode to Joy, the same notes with and without the early start:
+  "B is clearly better" (the early start). The orchestra now does it for every piece
+  (orchestra.ADVANCE). Lesson for every listening test of the *sound* (timing,
+  instruments, mix): play it on a tune the host knew before this campaign, so the
+  ear can tell what's off from what's new.
