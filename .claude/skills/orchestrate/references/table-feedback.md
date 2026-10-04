@@ -70,3 +70,11 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   they sounded like another room. Instruments from different sets must be placed in
   the same space (width, position, hall send) before they're compared or mixed;
   orchestra.ROOM sends each recording to the hall by the room it already carries.
+- **The same test with the acoustics matched** (each VPO recording narrowed and placed
+  like the current one, its hall reduced): the current flutes are "crisper and
+  better", and VPO's trumpets "horrible". The automatic instrument judge (Audiobox on
+  probe phrases) had picked VPO for both: it failed both checks, so it doesn't choose
+  instruments. It most likely rewarded the wide, roomy recordings rather than the
+  instruments. The earlier "VPO brass is better" was heard with VPO's own room left in,
+  so it may have been the room too. Narrowing a stereo recording (summing its two
+  microphones) can also make it hollow - another reason not to swap sample sets lightly.
