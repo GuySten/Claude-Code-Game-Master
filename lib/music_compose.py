@@ -598,7 +598,7 @@ def _grown(hero: dict, stage: int, dark: int) -> list:
             top, b = climb[i]
             low = min(_semitones(d, scale) for d, _ in hero["pickup"] + hero["motif"] + hero["again"] + hero["home"])
             up = 2 if _semitones(top + 2, scale) - low <= 21 else 1          # (or a step, kept singable)
-            first = BEATS[hero["meter"]] if b > BEATS[hero["meter"]] else b / 2   # (the lift lands on a beat)
+            first = BEATS[hero["meter"]] if b >= BEATS[hero["meter"]] - 1e-9 else b / 2   # (the lift on a beat)
             climb[i:i + 1] = [(top, first), (top + up, b - first + bar)]
         home = list(hero["home"])
         if stage >= 3:                                     # the legend's ending: held a bar longer
