@@ -179,6 +179,17 @@ end's dynamics and texture must meet the start's (the critic measures the seam).
 Start and end on a vamp or ostinato over the tonic so the wrap is invisible; put
 the intro's material at the end of the cycle too.
 
+## Characters: a portrait in devices
+
+A character's music is a portrait, not a mood: read who they are in the campaign
+(npcs.json, the world bible, their deeds) and build their piece from the **character
+devices** in `references/devices.md` - the façade, the madness, the lament, the power,
+the corruption... - each with how to write it, the convention and evidence behind it,
+and the host's verdicts; its trait table maps a description to devices. Some are code
+(`lib/devices.py`: `madness()`). Ask the host for a brief in their own words when you
+can (their reference pieces taught more than any measurement), and for one listen at
+the end: no model judges a piece's character for them (`table-feedback.md`).
+
 ## Pieces and versions
 
 What each kind of piece needs - a hero at each story stage, wounded, bonded,
