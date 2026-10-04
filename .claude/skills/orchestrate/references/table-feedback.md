@@ -135,3 +135,5 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   gloom: one exposed voice, fast and obsessive, high and grating, over almost nothing.
   (Don't describe a piece you can't hear as fact - the GM's guess at Homelander's theme
   was wrong; ask the host to describe it.) The orchestra now has a solo violin.
+  Evil Morty's theme, in their words: what stands out is "the human sad choir" - a
+  villain's music can carry their sorrow, sung by human voices.
