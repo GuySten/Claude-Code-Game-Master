@@ -21,8 +21,9 @@ So the loop below is not optional ceremony; it's how you hear.
 ## The loop
 
 0. **Main characters: write the tune yourself** (the host clearly preferred
-   hand-written tunes to the generator's): `references/tunes.md`. Everyone else
-   gets the generator's (gen 2).
+   hand-written tunes to the generator's): `references/tunes.md`. Write three
+   candidates, different in hook and rhythm, and let the **host judge** pick
+   (below). Everyone else gets the generator's (gen 2).
 1. **Read the tune.**
    `python lib/arrangement.py tune "<seed>" --class <Class> [--minor] [--stage N] [--dark N]`
    (on the host's laptop: `bash tools/gm-music-compose.sh tune "<name>" [--minor]`).
@@ -62,6 +63,30 @@ So the loop below is not optional ceremony; it's how you hear.
 
 Run the scripts with a Python that has numpy, soundfile and tinysoundfont (the
 host's `.compose-venv`, set up by `gm-music-compose.sh setup --orchestra`).
+
+## The host judge: the host's taste, so they only listen when it matters
+
+The host can't audition everything, and can't tell a 9 from a 10 - nobody can;
+people judge pairs, not scores. `lib/host_judge.py` approximates their taste with
+the judges that matched their verdicts (the audio models, Audiobox and SongEval,
+did no better than a coin flip on our music):
+
+- **Tunes:** `host_judge.py tunes prepare a.json b.json c.json --out DIR` drops
+  candidates with red flags (long notes off the beat, droning, no rhythmic
+  variety, broken tune rules) and writes the survivors as blind pairs. Spawn a
+  **fresh agent** (it must not know which is which, or that one is yours) to read
+  `DIR/README.txt` and write `DIR/verdicts.json`; then
+  `host_judge.py tunes decide DIR` ranks them.
+- **Arrangements:** the critic clean, and the surprise budget balanced.
+- **Close calls only go to the host:** when `decide` says `ask_host`, make two
+  short clips (`host_judge.py clips a.json b.json --out DIR`), send them, and ask
+  which they prefer - "can't tell" is a fine answer.
+- **Record every preference the host states** - an A/B answer, or "this one's
+  better" about anything - with `host_judge.py record WINNER.json LOSER.json
+  [--tie] [--note "their words"]`. Their verdicts live in the campaigns folder
+  (`taste/verdicts.json`); `host_judge.py validate` re-checks the automatic
+  judges against all of them - run it after changing a rule, and if agreement
+  drops, the rule is wrong, not the host.
 
 ## What makes it good
 

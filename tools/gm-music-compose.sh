@@ -11,6 +11,7 @@
 #   gm-music-compose.sh arrange <file.json>  Play an arrangement (lib/arrangement.py) into the campaign's music
 #   gm-music-compose.sh setup --rater        Meta's Audiobox Aesthetics, to rate music 1-10 (~1 GB model)
 #   gm-music-compose.sh rate <files...>      Rate pieces: enjoyment, usefulness, complexity, quality
+#   gm-music-compose.sh judge <args>          The host judge (lib/host_judge.py: tunes, clips, record, validate)
 #   gm-music-compose.sh check                Which GPU/CPU it would use
 #   gm-music-compose.sh test                 Time one 30-second piece (first run downloads the model)
 #   gm-music-compose.sh theme "<villain>" [--boss] [--look "..."]   Compose a theme now
@@ -163,6 +164,11 @@ print(f\"A villain theme (30 s) takes about {d['elapsed']/60:.1f} min; a hero's 
         [ -z "$PY" ] && { error "Not set up yet: bash tools/gm-music-compose.sh setup --rater"; exit 1; }
         [ -z "$1" ] && { error "What to rate? gm-music-compose.sh rate <files...>"; exit 1; }
         "$PY" "$LIB_DIR/music_rate.py" "$@"
+        ;;
+    judge)
+        PY="$(compose_py)"
+        [ -z "$PY" ] && { error "Not set up yet: bash tools/gm-music-compose.sh setup --orchestra"; exit 1; }
+        "$PY" "$LIB_DIR/host_judge.py" "$@"
         ;;
     theme|anthem|normalize|status)
         $PYTHON_CMD "$LIB_DIR/composer.py" "$ACTION" "$@"
