@@ -88,6 +88,9 @@
          display: flex; justify-content: space-between; gap: 8px; }
   .who button { border: 0; background: none; padding: 0 4px; font-size: .9rem; color: var(--muted); }
   .who .edited { font-style: italic; margin-inline-start: 4px; }
+  /* My action: sent (still mine to fix), then read by the GM. */
+  .msg .pend { font-size: .78rem; color: var(--muted); margin-top: 3px; }
+  .msg .pend.read { color: var(--accent); }
   /* An action the GM ruled can't work (its player chose again), and that ruling. */
   .msg.redone .body { text-decoration: line-through; opacity: .6; }
   .msg .redo-note { font-size: .85rem; color: var(--muted); margin-top: 2px; }
@@ -2600,7 +2603,14 @@
     allMessages.forEach((m) => {
       const el = msgEls.get(m.id);
       if (el && el.querySelector(".edit-btn") && !canEdit(m)) { editing.delete(m.id); updateMessage(m); }
+      else if (el && m.kind === "player" && m.pc === me && (el.dataset.pend || "") !== pendState(m)) updateMessage(m);
     });
+  }
+  // My action's state: "sent" (still mine to fix) → "read" (the GM has it) → answered.
+  function pendState(m) {
+    if (m.kind !== "player" || m.pc !== me || m.redo) return "";
+    if (!m.read) return "sent";
+    return allMessages.some((x) => x.id > m.id && x.kind === "gm" && (!x.to || x.to === me)) ? "" : "read";
   }
   function openEditor(m, d) {
     editing.add(m.id);
@@ -2858,6 +2868,14 @@
       body.innerHTML = md(heDice(useTr ? tr.text : (m.text || "")));
       if (m.kind === "gm") wrapLore(body);
       d.append(who, body);
+      const pend = pendState(m);
+      d.dataset.pend = pend;
+      if (pend) {
+        const note = document.createElement("div");
+        note.className = "pend " + pend;
+        note.textContent = t(pend === "sent" ? "pendSent" : "pendRead");
+        d.appendChild(note);
+      }
       if (m.kind === "player" && m.redo) {
         const note = document.createElement("div");
         note.className = "redo-note";
