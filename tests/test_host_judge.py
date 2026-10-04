@@ -87,3 +87,11 @@ def test_the_finals_judge_finished_pieces(tmp_path):
                                                               "confidence": 90}}))
     d = hj.decide_finals(out)
     assert d["ranking"][0][0] == str(files[1]) and d["ask_host"] is None
+
+
+def test_a_blind_score_carries_no_names():
+    spec = {"title": "Kestrel, legendary", "notes": "mine", "tune": {"seed": "K", "written": dict(GOOD, kind="war-cry")},
+            "chords": [[0, 4, "I"]]}
+    clean = hj._clean(spec)
+    assert "title" not in clean and "notes" not in clean and "kind" not in clean["tune"]["written"]
+    assert spec["tune"]["written"]["kind"] == "war-cry"                     # (the original is untouched)

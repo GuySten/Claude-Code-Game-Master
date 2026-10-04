@@ -261,9 +261,15 @@ these files and lib/. Write verdicts.json in this folder: {"pair00": {"prefer": 
 
 
 def _clean(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """A score without anything that names or describes it (titles, notes, a
+    written tune's "kind" - its nickname - or "name"): the reader judges the music."""
     spec = json.loads(json.dumps(spec))
     for k in [k for k in spec if k in ("title", "notes", "comment", "about") or k.startswith("_")]:
         spec.pop(k)
+    written = (spec.get("tune") or {}).get("written")
+    if isinstance(written, dict):
+        for k in ("kind", "name", "title", "notes"):
+            written.pop(k, None)
     return spec
 
 
