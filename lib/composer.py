@@ -604,7 +604,7 @@ def main() -> None:
         import party_roster
         from character_schema import to_flat
         from campaign_manager import CampaignManager
-        camp = CampaignManager().get_active_campaign_dir()
+        camp = CampaignManager(os.environ.get("GM_WORLD_STATE_BASE", "world-state")).get_active_campaign_dir()
         path = party_roster.find_pc(camp, args.name) if camp else None
         print(str(to_flat(json.loads(path.read_text(encoding="utf-8"))).get("class") or "") if path else "")
         return
@@ -639,7 +639,10 @@ def main() -> None:
             from character_schema import to_flat
             path = party_roster.find_pc(camp, args.name)
             if path is None:
-                sys.exit(f"[ERROR] No player character named {args.name}.")
+                names = ", ".join(party_roster.pc_names(camp)) or "none"
+                sys.exit(f"[ERROR] No player character named {args.name} in the active campaign "
+                         f"({camp.name}, in {camp.parent.parent}). Its player characters: {names}. "
+                         f"(Campaigns kept elsewhere? Set GM_WORLD_STATE_BASE in .env.)")
             rec = compose_anthem(camp, to_flat(json.loads(path.read_text(encoding="utf-8"))))
             print(f"[SUCCESS] {args.name}'s anthem: music/anthems/{rec['file']} ({rec['seconds']} s)")
     except ComposeError as e:
