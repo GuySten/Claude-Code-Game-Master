@@ -145,6 +145,11 @@ def main():
     elif args.action == 'add-enemy':
         out = m.add_combatant(args.name, args.hp, ac=args.ac, initiative=args.init)
     elif args.action == 'hp':
+        locked = m._find(m._load(), args.name)
+        if locked and locked.get('locked'):
+            # A foe with a stat block (lib/referee.py): its HP changes only through the
+            # referee, in public and in the log.
+            sys.exit(f"[ERROR] {locked['name']}'s HP is locked: use gm-referee.sh attack / damage / heal")
         out = m.modify_hp(args.name, args.delta)
     elif args.action == 'condition':
         out = m.set_condition(args.name, args.op, args.condition)

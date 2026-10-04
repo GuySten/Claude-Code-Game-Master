@@ -164,7 +164,7 @@ SWAP (make the chosen character the active PC):
 ## Action Router — load the matching Skill on demand
 | Player says | Workflow | Skill |
 |---|---|---|
-| "I attack..." | Combat (persist via `gm-combat.sh`) | `gm-combat` |
+| "I attack..." | Combat: `gm-referee.sh attack`; foes' turns by the `combat-referee` agent | `gm-combat` |
 | "I cast..." | Spellcasting | `gm-spellcasting` |
 | "I talk to..." / "I ask..." | Social/NPC | `gm-social` |
 | "I try to..." | Skill check (d20 vs DC) | `gm-skills` |
@@ -197,13 +197,13 @@ outcome is genuinely certain (trivial, or literally impossible).
   good outcome. The dice are why the world feels real.
 - Show the math in narration: `🎲 STR check: 14 + 3 = 17 vs DC 15 — ✓`.
 
-`uv run python lib/dice.py "[notation]" [--dc N | --ac N] --for "<who>" --why "<what>"`
-— `1d20+5`, `2d20kh1+3` (advantage), `2d20kl1` (disadvantage), `3d6`. One roll per
-command. Never inline dice, never invent a number.
-- **The DC (or the target's AC) goes IN the roll command** — decided before the dice
-  land, never after seeing them: `dice.py "1d20+5" --dc 15 --for Pip --why Stealth`;
-  attacks `--ac 14`; damage/initiative have no target: `--for Pip --why "dagger damage"`.
-  The command prints the verdict (✓/✗, natural 20/1); narrate exactly that.
+- **The referee rolls, from the records: you never choose a number or a modifier.** Checks, saves,
+  attacks, damage, heals: `gm-referee.sh check|save|attack|damage|heal …` (`gm-skills`, `gm-combat`).
+  Bonuses come from sheets / locked stat blocks; a DC is a ladder word or a record's number. Situations
+  are recorded state applied to BOTH sides (conditions, `cover`, earned `hide`, `help`); the environment
+  hits everyone (`field "Shaking floor" --effect dis:attack`). No "+2 because". Foes: lock each one
+  (`enemy '<json>'`) and spawn the `combat-referee` agent for EVERY foe turn. All logged (`log`/`report`);
+  `dice.py "<notation>" --for … --why …` only where no record applies (logged as a FREE ROLL).
 - **With the online table open, the TABLE rolls** and shows every roll to every player
   the moment you see it ("🎯 Pip — Stealth · DC 15 / 🎲 [12] + 5 = 17 ✓"). So: no silent
   re-rolls (a re-roll only when a rule grants one, and say which); at a multilingual table
@@ -255,7 +255,7 @@ grounded source passages.
 | Play pack / one name from the book | `gm-playpack.sh set` / `stage` / `from-book "<name>"` |
 | Location moved | `gm-session.sh move` |
 | Consequence (structured) | `gm-consequence.sh add "..." "<trigger>" --trigger-type ... --match ...` |
-| Combat | `gm-combat.sh` (optional; for fights worth tracking) |
+| Combat | `gm-referee.sh` (every roll, from the records; log/report) · `gm-combat.sh` (turn order, conditions) |
 | Fact / note | `gm-note.sh` |
 | New plot thread (seed a dormant thread; or async via `plot-weaver`) | `gm-plot.sh add "<name>" --type … --status dormant --description "…" [--npc …] [--location …]` |
 | End session | `gm-session.sh end "<summary>" --cliffhanger "..." --open-thread "..."` — then write the arc entry: `gm-recall.sh arc '{"summary": "...", "who_matters": [...], "open_debts": [...]}'` (this is what long-term recall surfaces) |

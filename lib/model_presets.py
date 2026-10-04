@@ -26,7 +26,7 @@ LOCAL_SETTINGS = PROJECT_ROOT / ".claude" / "settings.local.json"
 # Who does what (see the README's Specialist Agents table).
 GROUPS: Dict[str, List[str]] = {
     "story": ["plot-weaver", "npc-builder", "world-builder", "dungeon-architect",
-              "create-character", "rules-master"],
+              "create-character", "rules-master", "combat-referee"],
     "lookup": ["monster-manual", "spell-caster", "gear-master", "loot-dropper",
                "scene-illustrator"],
     "import": ["extractor-items", "extractor-locations", "extractor-npcs", "extractor-plots"],

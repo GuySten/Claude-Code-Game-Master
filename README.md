@@ -282,6 +282,7 @@ The harness is plumbing you can poke at: bash wrappers (`tools/`) → Python man
 | `gm-location.sh` | Locations and connections |
 | `gm-plot.sh` | Quest and storyline tracking |
 | `gm-combat.sh` | Persisted, resumable combat tracking |
+| `gm-referee.sh` | The fair referee: checks, saves, attacks, damage and death saves from the sheets and locked stat blocks, situations applied to both sides, every decision logged (`log`, `report`) |
 | `gm-condition.sh` | Player conditions (poisoned, stunned, etc.) |
 | `gm-consequence.sh` | Schedule future events and triggers |
 | `gm-recall.sh` | Campaign memory — semantic recall, arc entries, memoir |
