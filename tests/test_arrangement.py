@@ -48,9 +48,9 @@ def spec(**more):
 def test_the_tune_is_played_exactly_by_the_parts_named():
     tune = music_compose.leitmotif("Test Hero", "major", "Fighter")
     score, seconds, loop = A.build(spec())
-    horns = [k for t, on, p, k, _ in sorted(score.events) if on and p == "horns"]
+    horns = [k for t, on, p, k, _ in sorted(score.events) if on and p == "horns:4"]   # (the lead layer)
     assert horns == [tune["key"] + st for st, _ in tune["notes"]]
-    violins = [k for t, on, p, k, _ in sorted(score.events) if on and p == "violins"]
+    violins = [k for t, on, p, k, _ in sorted(score.events) if on and p == "violins:4"]
     assert violins == [k + 12 for k in horns]
     assert loop is None and seconds > 0
 
@@ -86,7 +86,7 @@ def test_a_loop_stops_at_its_length_and_slows_for_nothing():
     score, seconds, loop = A.build(spec(loop=True, length=8, start=-4, ritard={"from": 4, "amount": 0.5}))
     assert loop == seconds
     assert all(t < seconds for t, on, *_ in score.events if on)
-    first = min(t for t, on, p, *_ in score.events if on and p == "horns")
+    first = min(t for t, on, p, *_ in score.events if on and p.startswith("horns"))
     assert first == pytest.approx(4 * 60 / 80)                  # the tune, after a 4-beat intro
 
 
@@ -108,3 +108,11 @@ def test_a_loop_has_no_seam(tmp_path):
     assert float(np.abs(x[0] - x[-1]).max()) < 0.1
     out = music_compose.write(x, rate, tmp_path / "loop.ogg")
     assert out.stat().st_size > 1000
+
+
+def test_the_tune_is_mixed_over_the_rest_and_parts_are_evened_out():
+    score, _, _ = A.build(spec(lead=6, melody=[{"from": 0, "to": 1000, "parts": {"horns": 0}, "gain": 2}]))
+    assert {p for _, _, p, _, _ in score.events if p.startswith("horns")} == {"horns:8"}
+    # the quiet choir recording is turned up, the loud horns down; a piece can adjust
+    assert orchestra.level_db("choir") > orchestra.level_db("horns") + 10
+    assert orchestra.level_db("choir", {"choir": -3}) == orchestra.level_db("choir") - 3

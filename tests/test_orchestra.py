@@ -34,7 +34,7 @@ def test_the_harmony_fits_the_tune_moves_and_ends_home(name, cls):
 def test_the_orchestra_grows_with_the_story(stage):
     tune = music_compose.leitmotif("Kestrel", "major", "Barbarian", stage=stage)
     score, seconds = orchestra.arrange(tune, stage)
-    parts = {p for _, _, p, _, _ in score.events}
+    parts = {p.partition(":")[0] for _, _, p, _, _ in score.events}
     assert parts <= orchestra.LAYERS[stage]
     assert all(0 <= t <= seconds + 3.5 and 0 <= v <= 127 for t, _, _, _, v in score.events)
     assert sum(1 for e in score.events if e[1]) == sum(1 for e in score.events if not e[1])
@@ -47,7 +47,7 @@ def test_the_orchestra_grows_with_the_story(stage):
 def test_the_tune_is_the_characters_own():
     tune = music_compose.leitmotif("Kestrel", "major", "Barbarian", stage=3)
     score, _ = orchestra.arrange(tune, 3)
-    played = [k for _, on, p, k, _ in sorted(score.events) if on and p == "violins"]
+    played = [k for _, on, p, k, _ in sorted(score.events) if on and p == "violins:4"]
     assert played == [tune["key"] + st for st, _ in tune["notes"]]
 
 

@@ -52,14 +52,19 @@ except in "hits" and "rolls", where it is the velocity itself (1-127).
   ],                     # note: a pitch, "root"/"fifth" (of the chord, timpani range), or
                          # snare, bd, crash, cymbal, china, splash, ride, triangle, gong
   "rolls": [{"part": "timpani", "note": "G#2", "from": 57, "to": 60, "vel": [70, 120]}],
-  "hits": [{"part": "kit", "note": "crash", "at": 60, "len": 6, "vel": 124}]
-}
+  "hits": [{"part": "kit", "note": "crash", "at": 60, "len": 6, "vel": 124}],
+  "mix": {"choir": 3},   # dB up or down for a part in this piece (all parts are already
+                         # evened out: the same velocity is the same loudness)
+  "lead": 4              # the tune's notes are mixed this many dB over the rest (default 4);
+}                        # a "melody" entry's "gain" adds to it, a "lines" entry's sets its own
+
+Choir (and organ, strings) voices take over a second to bloom: give them notes of a
+beat or longer, held chords, not quick rhythms; let brass and drums carry those.
 
 Parts: violins, violins2, strings (sustained), tremolo, pizzicato, cellos, basses,
 flutes, piccolo, oboe, english_horn, clarinets, bassoons, horns, trumpets,
 trombones, tuba, brass, choir, harp, celesta, glockenspiel, bells, organ,
-timpani, taiko, toms, reverse_cymbal, kit (bd, snare, cymbals). At most 15 of them
-in one piece, besides the kit.
+timpani, taiko, toms, reverse_cymbal, kit (bd, snare, cymbals): as many as wanted.
 """
 
 import argparse
@@ -272,10 +277,11 @@ def build(spec: Dict[str, Any]) -> Tuple["orchestra.Score", float, Optional[floa
         used.add(part)
         return part
 
-    def note(part: str, k: int, u0: float, dur: float, vel: float, legato: float = 0.97) -> None:
+    def note(part: str, k: int, u0: float, dur: float, vel: float, legato: float = 0.97,
+             gain: float = 0.0) -> None:
         if u0 >= length - 1e-9 and loop:
             return
-        sc.note(part_ok(part), int(k), T(u0), max(0.02, (T(u0 + dur) - T(u0)) * legato), vel)
+        sc.note(part_ok(part), int(k), T(u0), max(0.02, (T(u0 + dur) - T(u0)) * legato), vel, gain)
 
     # the chords
     prog = []
@@ -290,13 +296,15 @@ def build(spec: Dict[str, Any]) -> Tuple["orchestra.Score", float, Optional[floa
                 return c
         return None
 
-    # the tune
+    # the tune (its notes a layer of their own, mixed over the rest: "lead" dB)
+    lead = float(spec.get("lead", orchestra.LEAD_DB))
     for m in spec.get("melody") or []:
         a, b = _span(m, start, length)
         for u0, d, k in played:
             if a - 1e-9 <= u0 < b - 1e-9:
                 for part, shift in (m.get("parts") or {}).items():
-                    note(part, k + int(shift), u0, d, dyn(u0) + float(m.get("vel", 0)), float(m.get("legato", 0.97)))
+                    note(part, k + int(shift), u0, d, dyn(u0) + float(m.get("vel", 0)), float(m.get("legato", 0.97)),
+                         lead + float(m.get("gain", 0)))
 
     # the harmony
     for h in spec.get("harmony") or []:
@@ -340,7 +348,8 @@ def build(spec: Dict[str, Any]) -> Tuple["orchestra.Score", float, Optional[floa
         for n in line.get("notes") or []:
             at, p, d = float(n[0]), pitch(n[1]), float(n[2])
             extra = float(n[3]) if len(n) > 3 else 0.0
-            note(part, p, at, d, dyn(at) + float(line.get("vel", 0)) + extra, float(line.get("legato", 0.97)))
+            note(part, p, at, d, dyn(at) + float(line.get("vel", 0)) + extra, float(line.get("legato", 0.97)),
+                 float(line.get("gain", 0)))
 
     def perc_key(part: str, what: Any, x: float) -> int:
         if isinstance(what, str) and what in KIT:
@@ -377,8 +386,6 @@ def build(spec: Dict[str, Any]) -> Tuple["orchestra.Score", float, Optional[floa
         k = perc_key(part, h.get("note", "root"), at)
         sc.note(part, k, T(at), (T(at + float(h.get("len", 3))) - T(at)), float(h.get("vel", 110)))
 
-    if len([p for p in used if p not in orchestra.DRUMS]) > 15:
-        raise ArrangementError("at most 15 parts in one piece, besides the kit")
     seconds = T(length)
     return sc, seconds, (seconds if loop else None)
 
@@ -386,11 +393,12 @@ def build(spec: Dict[str, Any]) -> Tuple["orchestra.Score", float, Optional[floa
 def render(spec: Dict[str, Any], rate: int = orchestra.RATE, sf2: Path = orchestra.SF2):
     """An arrangement played by the orchestra -> (stereo float32 samples, rate)."""
     score, seconds, loop = build(spec)
+    mix = spec.get("mix") or {}
     if loop:
-        dry = orchestra.play(score, seconds + 3.0, sf2, rate)        # (what rings past the end)
+        dry = orchestra.play(score, seconds + 3.0, sf2, rate, mix)  # (what rings past the end)
         wet = orchestra.hall(dry, rate, loop_at=int(round(seconds * rate)))
         return orchestra.master(wet, rate, loop=True), rate
-    dry = orchestra.play(score, seconds, sf2, rate)
+    dry = orchestra.play(score, seconds, sf2, rate, mix)
     return orchestra.master(orchestra.hall(dry, rate), rate), rate
 
 

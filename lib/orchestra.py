@@ -63,20 +63,7 @@ PARTS = {
     "reverse_cymbal": (0, 119, 64, 96),
 }
 DRUMS = {"kit"}
-
-
-def channels(parts) -> Dict[str, int]:
-    """MIDI channels for the parts a piece uses (15, plus the drum channel)."""
-    free = [c for c in range(16) if c != 9]
-    out, i = {}, 0
-    for part in sorted(set(parts), key=list(PARTS).index):
-        if part in DRUMS:
-            out[part] = 9
-            continue
-        if i >= len(free):
-            raise ValueError(f"too many instruments in one piece (at most {len(free)} besides the drums)")
-        out[part], i = free[i], i + 1
-    return out
+LEAD_DB = 4.0          # the tune's notes, mixed this much over the rest
 BASS_DRUM, CRASH = 35, 49
 STAGES = ("seed", "theme", "heroic", "legendary")
 
@@ -219,10 +206,15 @@ class Score:
     def __init__(self):
         self.events: List[Tuple[float, int, str, int, int]] = []   # (seconds, on?, part, key, vel)
 
-    def note(self, part: str, key: int, start: float, length: float, vel: float) -> None:
+    def note(self, part: str, key: int, start: float, length: float, vel: float,
+             gain_db: float = 0.0) -> None:
+        """``gain_db``: this note's layer is mixed that much louder (the tune's notes:
+        LEAD_DB), as "part:dB"."""
         if length <= 0:
             return
         vel = int(max(1, min(127, vel)))
+        if gain_db:
+            part = f"{part}:{gain_db:g}"
         self.events.append((start, 1, part, key, vel))
         self.events.append((start + length, 0, part, key, 0))
 
@@ -265,13 +257,13 @@ def arrange(tune: dict, stage: int = 3, dark: int = 0) -> Tuple[Score, float]:
         v = 70 + 50 * level(u)
         held = d >= 2 * beat_units
         if on("violins", u):
-            sc.note("violins", k, start, length, v)
+            sc.note("violins", k, start, length, v, LEAD_DB)
         if on("horns", u):
-            sc.note("horns", k - 12, start, length, v + (8 if stage == 0 else 0))
+            sc.note("horns", k - 12, start, length, v + (8 if stage == 0 else 0), LEAD_DB)
         if on("trumpets", u):
-            sc.note("trumpets", k, start, length, v - 6 + (10 if held else 0))
+            sc.note("trumpets", k, start, length, v - 6 + (10 if held else 0), LEAD_DB)
         if on("flutes", u) and k + 12 <= 96:
-            sc.note("flutes", k + 12, start, length, v - 10)
+            sc.note("flutes", k + 12, start, length, v - 10, LEAD_DB)
 
     # The chords, the bass, the low brass.
     prog = harmonize(tune)
@@ -385,32 +377,70 @@ def available() -> bool:
     return SF2.is_file()
 
 
-def play(score: Score, seconds: float, sf2: Path = SF2, rate: int = RATE):
-    """The score through the SoundFont -> stereo float32 (n, 2), dry."""
+# How loud each instrument's recording is (dB, a note at velocity 100, at its channel
+# volume, against the median): measured from MuseScore_General. The sound set's
+# instruments differ by 23 dB (the horns are loud recordings, the choir and the
+# tremolo strings quiet ones), so each part is mixed at -LOUDNESS + BALANCE: the
+# same velocity is the same loudness, then the orchestra's own balance.
+LOUDNESS = {
+    "tremolo": -11.3, "glockenspiel": -11.1, "celesta": -10.3, "piccolo": -8.0, "choir": -6.9,
+    "clarinets": -5.4, "violins2": -4.5, "strings": -4.4, "flutes": -4.0, "pizzicato": -3.5,
+    "organ": -2.6, "toms": -2.6, "violins": -0.8, "bells": 0.0, "basses": 0.0, "kit": 0.2,
+    "harp": 0.2, "oboe": 0.4, "bassoons": 1.9, "english_horn": 2.7, "reverse_cymbal": 5.4,
+    "taiko": 5.5, "trumpets": 5.7, "brass": 6.6, "timpani": 6.9, "tuba": 8.2, "cellos": 8.6,
+    "trombones": 9.7, "horns": 11.8,
+}
+BALANCE = {
+    "horns": 2, "trumpets": 3, "trombones": 2, "brass": 3, "violins": 1, "strings": -3,
+    "tremolo": -2, "choir": 3, "timpani": 2, "taiko": 3, "glockenspiel": -2, "piccolo": -2,
+    "reverse_cymbal": -2,
+}
+
+
+def level_db(part: str, mix: Optional[Dict[str, float]] = None) -> float:
+    """The gain a part is mixed at (dB): measured loudness evened out, the
+    orchestra's balance, and the piece's own "mix" adjustments."""
+    return -LOUDNESS.get(part, 0.0) + BALANCE.get(part, 0) + float((mix or {}).get(part, 0))
+
+
+def play(score: Score, seconds: float, sf2: Path = SF2, rate: int = RATE,
+         mix: Optional[Dict[str, float]] = None):
+    """The score through the SoundFont -> stereo float32 (n, 2), dry. Each part (and
+    each layer of one: "horns:4", the tune's notes) is played on its own and mixed
+    at its level (level_db, plus the layer's dB), so a piece can use any number."""
     import numpy as np
     import tinysoundfont
     syn = tinysoundfont.Synth(gain=-12, samplerate=rate)
     sfid = syn.sfload(str(sf2))
-    chans = channels({e[2] for e in score.events})
-    for part, ch in chans.items():
+    total = int((seconds + 0.5) * rate)
+    out = np.zeros((total, 2), dtype="float32")
+    groups: Dict[str, list] = {}
+    for e in score.events:
+        groups.setdefault(e[2], []).append(e)
+    for name, events in groups.items():
+        part, _, layer = name.partition(":")
         bank, preset, pan, vol = PARTS[part]
+        ch = 9 if part in DRUMS else 0
         syn.program_select(ch, sfid, bank, preset, part in DRUMS)
         syn.control_change(ch, 7, vol)
         syn.control_change(ch, 10, pan)
-    total = int((seconds + 0.5) * rate)
-    out = np.zeros((total, 2), dtype="float32")
-    pos = 0
-    for t, is_on, part, key, vel in sorted(score.events, key=lambda e: (e[0], e[1])):
-        at = min(total, int(t * rate))
-        if at > pos:
-            out[pos:at] = np.frombuffer(syn.generate(at - pos), dtype="float32").reshape(-1, 2)
-            pos = at
-        if is_on:
-            syn.noteon(chans[part], key, vel)
-        else:
-            syn.noteoff(chans[part], key)
-    if pos < total:
-        out[pos:] = np.frombuffer(syn.generate(total - pos), dtype="float32").reshape(-1, 2)
+        stem = np.zeros((total, 2), dtype="float32")
+        pos = 0
+        for t, is_on, _, key, vel in sorted(events, key=lambda e: (e[0], e[1])):
+            at = min(total, int(t * rate))
+            if at > pos:
+                stem[pos:at] = np.frombuffer(syn.generate(at - pos), dtype="float32").reshape(-1, 2)
+                pos = at
+            if is_on:
+                syn.noteon(ch, key, vel)
+            else:
+                syn.noteoff(ch, key)
+        if pos < total:
+            stem[pos:] = np.frombuffer(syn.generate(total - pos), dtype="float32").reshape(-1, 2)
+        syn.sounds_off(ch)
+        syn.generate(256)                                   # (let the cut voices go)
+        gain = level_db(part, mix) + (float(layer) if layer else 0.0)
+        out += stem * np.float32(10 ** (gain / 20))
     return out
 
 
