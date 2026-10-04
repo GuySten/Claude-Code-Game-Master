@@ -123,3 +123,8 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   his theme - the one instrument far faster than everything else. Rolls are now about
   9 strokes a second, each ringing into the next, swelling smoothly (and a battle's
   roll stays under velocity ~104).
+- **Darker is not slower:** the Margrave's "dark" rewrite (72 bpm, organ pedal, low
+  cellos/bassoons/trombones on the tune, diminished chords, low choir clusters)
+  "sounds less evil" than the grey-villain version it replaced. Slow and low reads as
+  mournful, not evil; an evil mastermind keeps the momentum and the control. Push
+  menace through power or coldness on a moving piece, not gloom.
