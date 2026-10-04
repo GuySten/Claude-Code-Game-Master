@@ -106,6 +106,14 @@
   .msg h3 { margin: .2em 0 .4em; font-size: 1.05rem; }
   .msg code { font-family: ui-monospace, Menlo, monospace; font-size: .9em; }
   #status { padding: 4px 16px; font-size: .85rem; color: var(--muted); min-height: 1.6em; }
+  /* Whose move it is, in one glance. */
+  #turn { margin: 0 16px; padding: 8px 14px; border-radius: 10px; font-weight: bold; font-size: 1.02rem;
+          border: 2px solid var(--line); background: var(--panel); text-align: center; }
+  #turn.yours { border-color: var(--accent); color: var(--accent); }
+  #turn.redo { border-color: var(--hp-low); color: var(--hp-low); animation: pulse 1.2s ease-in-out infinite; }
+  #turn.sent, #turn.gm, #turn.out { color: var(--muted); font-weight: normal; }
+  .pc .turn-tick { float: inline-end; margin-inline-end: 8px; font-size: .85rem; }
+  @media (max-width: 760px) { #turn { margin: 0 8px; padding: 6px 10px; font-size: .95rem; } }
   /* The GM's turn: what it's doing and roughly how long is left. */
   #progress { padding: 8px 16px 2px; }
   #progress .label { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
@@ -419,6 +427,7 @@
       </div>
     </header>
     <div id="log" aria-live="polite"></div>
+    <div id="turn" class="hidden" aria-live="polite"></div>
     <div id="progress" class="hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100"
          aria-live="polite">
       <div class="label"><span id="progress-what"></span><span class="eta" id="progress-eta"></span><button
@@ -1553,7 +1562,7 @@
     syncParty();
     refreshExtras();
     const waiting = info.waiting_on || [];
-    if (!listening && !noticeShowing()) setStatus(waiting.length ? t("waiting") + waiting.join(", ") : "");
+    if (!listening && !noticeShowing()) setStatus(waiting.length && !me ? t("waiting") + waiting.join(", ") : "");
   }
   async function refreshInfo() { renderInfo(await api("/api/info")); }
 
@@ -1607,7 +1616,10 @@
     }));
   }
   function renderParty(list) {
-    const sig = lang + "|" + me + "|" + list.map((p) => [p.name, p.sheet_rev, p.claimed, p.lead, p.hp, p.level_up].join("/")).join("|");
+    const rnd = roundState || {};
+    const ticking = rnd.open && rnd.deadline > serverNow();
+    const sig = lang + "|" + me + "|" + (ticking ? (rnd.waiting_on || []).join(",") : "-") + "|"
+      + list.map((p) => [p.name, p.sheet_rev, p.claimed, p.lead, p.hp, p.level_up].join("/")).join("|");
     if (sig === partySig) return;
     partySig = sig;
     const box = $("party-list");
@@ -1625,7 +1637,10 @@
       const status = pc.status && pc.status !== "alive" ? pc.status.toUpperCase() : "";
       const conds = (pc.conditions || []).map((c) => tx(String(c))).join(", ");
       const from = before ? hpPct(before) : pct;
-      d.innerHTML = `<div><span class="open-sheet">${esc(t("openSheet"))}</span>` +
+      const tick = !ticking || !pc.claimed || (rnd.out_of_action || {})[pc.name] ? ""
+        : (rnd.waiting_on || []).includes(pc.name) ? `<span class="turn-tick" title="${esc(t("stillChoosing"))}">⏳</span>`
+        : `<span class="turn-tick" title="${esc(t("acted"))}">✅</span>`;
+      d.innerHTML = tick + `<div><span class="open-sheet">${esc(t("openSheet"))}</span>` +
         (pc.portrait ? `<img class="avatar" alt="" src="${esc(imageUrl(pc.portrait, 96))}">` : "") +
         `<span class="name lore" dir="auto" data-term="${esc(pc.name)}">${esc(pc.name)}</span>` +
         (pc.level_up && pc.name === me ? `<span class="lvl-ready">${esc(t("lvlBadge"))}</span>` : "") +
@@ -2211,6 +2226,32 @@
     $("progress").classList.add("hidden");
   }
   setInterval(updateProgress, 250);
+  // Whose move it is: a banner above the action box.
+  function turnState() {
+    if (!me) return null;
+    const r = roundState || {}, p = progressState || {};
+    const left = r.open ? r.deadline - serverNow() : 0;
+    const waiting = r.open ? (r.waiting_on || []) : waitingOn;
+    const out = (r.out_of_action || {})[me];
+    if (out) return ["out", t("turnOut").replace("{why}", tx(String(out)))];
+    if (left > 0 && waiting.includes(me) && (r.redo || {})[me] != null) return ["redo", t("turnRedo")];
+    if (p.state === "working" && lastGmId <= p.start_id) return ["gm", t("turnGm")];
+    if (left > 0 && waiting.includes(me))
+      return ["yours", t("turnYoursClock").replace("{t}", fmtClock(Math.ceil(left)))];
+    if (left > 0 || (mySentId && lastGmId < mySentId)) {
+      const others = waiting.filter((n) => n !== me);
+      return ["sent", others.length ? t("turnSent").replace("{names}", others.join(", ")) : t("turnSentAll")];
+    }
+    return ["yours", t("turnFree")];
+  }
+  function updateTurn() {
+    const el = $("turn"), st = turnState();
+    if (!st) { el.classList.add("hidden"); return; }
+    el.classList.remove("hidden");
+    if (el.dataset.k !== st[0]) { el.className = st[0]; el.dataset.k = st[0]; }
+    if (el.textContent !== st[1]) el.textContent = st[1];
+  }
+  tickHooks.push(updateTurn);
   $("extend").onclick = async () => {
     $("extend").disabled = true;
     const r = await api("/api/extend", {});
