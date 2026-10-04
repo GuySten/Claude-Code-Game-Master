@@ -65,3 +65,10 @@ def test_surprise_is_lower_for_a_repeated_hook():
     assert sum(plain) < sum(odd)
     # the short-term model: a pattern repeated within the tune becomes expected
     assert ts.information([7, -5, 9, -11] * 4, m, 25)[-1] < ts.information([7, -5, 9, -11] * 4, m, 25)[2]
+
+
+def test_the_heroic_and_legendary_lift_lands_on_the_beat():
+    for seed, cls in PEOPLE:
+        for stage in (2, 3):
+            tune = mc.leitmotif(seed, "major", cls, gen=2, stage=stage)
+            assert ts.features(ts.from_leitmotif(tune))["long_on_beat"] == 1.0, (seed, stage)
