@@ -88,3 +88,8 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   the attacks (more hall, softer attacks). The hall now leaves a 35 ms gap before its
   echo and keeps the direct sound at full strength: attacks +0.9 dB against +0.24 on
   Ode to Joy, its width kept.
+- **The crisper hall, heard on Ode to Joy:** "hall B [the old one] is a bit better", but
+  "for fast or changing tunes the difference will be a lot more" - and the host isn't
+  sure Ode to Joy was a good test of it. The old hall is back until a fast, changing
+  tune (In the Hall of the Mountain King, accelerating) settles it. Measured there, the
+  new hall's attacks are sharper only in the slow opening (+0.7 dB), not in the fast end.
