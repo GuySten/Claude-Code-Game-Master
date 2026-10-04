@@ -170,3 +170,11 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   plays along and then breaks, the facade that cracks), which no clip-based judge can
   hear; scored by each piece's strongest clip instead, still a coin flip (evil 3/6,
   madness 1/2).
+- **The Margrave's violin "disappeared"** after the opening: it was mixed 13-17 dB under
+  the orchestra (and left a 3.5-second gap) - "I thought we agreed it should accompany
+  the whole piece". A voice that carries a character must be measured audible all
+  through (here about 3 dB under the orchestra, louder when it breaks; no silence over
+  a moment). And "it is a mistake to make only the violin crazy - the string
+  instruments should represent madness, following the violin when they accompany it":
+  scores now take "unhinge" stretches (the named parts waver and drift off pitch, each
+  its own way); the other sections stay true.

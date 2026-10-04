@@ -61,6 +61,9 @@ except in "hits" and "rolls", where it is the velocity itself (1-127).
   ],                     # note: a pitch, "root"/"fifth" (of the chord, timpani range), or
                          # snare, bd, crash, cymbal, china, splash, ride, triangle, gong
   "rolls": [{"part": "timpani", "note": "G#2", "from": 57, "to": 60, "vel": [70, 120]}],
+  "unhinge": [{"parts": ["strings", "tremolo", "violins"], "from": 36, "to": 40, "drift": 0.6,
+               "wobble": 0.3}],    # those parts waver and drift off pitch, each its own way,
+                         # and come back true by the end (madness in a section)
   "hits": [{"part": "kit", "note": "crash", "at": 60, "len": 6, "vel": 124}],
   "mix": {"choir": 3},   # dB up or down for a part in this piece (all parts are already
                          # evened out: the same velocity is the same loudness)
@@ -405,6 +408,27 @@ def _build(spec: Dict[str, Any]) -> Dict[str, Any]:
         for t0, hold, acc in _pattern_hits(p["pattern"], a, b, step):
             note(part, perc_key(part, p.get("note", "root"), t0), t0, max(hold * step, float(p.get("len", 0))),
                  dyn(t0) + float(p.get("vel", 0)) + (ACCENT if acc else 0), float(p.get("legato", 0.9)))
+
+    # Unhinged stretches: the parts named waver and drift off pitch, each its own way (a
+    # section going out of tune with itself), and come back by the end - madness spreading
+    # through the strings while the rest of the orchestra stays sane (the host's idea).
+    for w in spec.get("unhinge") or []:
+        import random
+        a, b = float(w["from"]), float(w["to"])
+        t0, t1 = T(a), T(b)
+        for part in w.get("parts") or []:
+            part = part_ok(part)
+            rnd = random.Random(f"{w.get('seed', 0)}:{part}:{a}")
+            drift = rnd.uniform(-1, 1) * float(w.get("drift", 0.6))       # where it sags or rises to
+            depth = float(w.get("wobble", 0.3)) * rnd.uniform(0.6, 1.2)
+            rate, phase = rnd.uniform(3.0, 7.5), rnd.uniform(0, 6.28)
+            steps = max(2, int((t1 - t0) / 0.02))
+            for i in range(steps + 1):
+                f = i / steps
+                env = math.sin(math.pi * f) ** 0.7                          # in, and back to true
+                wob = depth * math.sin(phase + 6.2832 * rate * f * (t1 - t0) * (1 + 0.4 * math.sin(2.3 * f + phase)))
+                sc.bend(part, t0 + f * (t1 - t0), env * (drift + wob))
+            sc.bend(part, t1 + 0.01, 0.0)
 
     for r in spec.get("rolls") or []:
         part = part_ok(r["part"])
