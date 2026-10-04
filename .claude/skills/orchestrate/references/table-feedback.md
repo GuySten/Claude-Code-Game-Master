@@ -110,3 +110,11 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   bass and pad; the cellos carried across as a creeping line; horns, then tremolo,
   trombones and a timpani roll, then the choir, in waves; brass on the climax tune):**
   "the climax fits much better now". The seam was the problem, and the fix works.
+- **The Margrave v2:** "good music but not dark enough - good for a grey villain, not a
+  really evil mastermind", and "it does not fit as a piece during battle". An evil
+  mastermind's theme: slower and heavier, low and dark colours (no harp, no plucked
+  lightness), tense diminished chords for the bright dominants, a pedal under it all,
+  dissonant low choir and organ at the climax, an ending that never resolves. And a
+  villain needs **two pieces on the tune**: the theme for their scenes, and a battle
+  piece (fast, an ostinato engine, drums) - the table plays the battle piece in any
+  fight they're in.

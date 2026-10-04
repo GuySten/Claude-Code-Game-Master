@@ -214,3 +214,21 @@ def test_iconic_places_play_their_own_music(table):  # noqa: F811
     # Ten minutes of play there and the road would earn music - but it's passed through... unless
     # the GM marks it.
     assert "The Road North" not in state.place_music
+
+
+def test_a_villains_battle_music_plays_in_any_fight_with_them(table):  # noqa: F811
+    call, state, camp = table["call"], table["state"], table["camp"]
+    state.orchestra_maker = _orchestra(camp, [])
+    _score(camp, "grim-theme", {"as": "theme", "who": "Grimaldi"})
+    _score(camp, "grim-battle", {"as": "boss", "who": "Grimaldi"})
+    state.music_pass()
+    call("/api/gm/say", {"text": "Grimaldi smiles.", "theme": "Grimaldi", "mood": "dread"}, host=True)
+    assert state.music["track"] == "grimaldi-theme-score.ogg"        # his scenes: his theme
+    call("/api/gm/say", {"text": "Steel is drawn!", "mood": "combat"}, host=True)
+    assert state.music["track"] == "grimaldi-boss-score.ogg" and not state.music.get("boss")
+    call("/api/gm/say", {"text": "He grows!", "mood": "boss"}, host=True)
+    assert state.music["track"] == "grimaldi-boss-score.ogg" and state.music["boss"] is True
+    # A fight that starts with him: straight to the battle music.
+    call("/api/gm/say", {"text": "Peace.", "mood": "calm"}, host=True)
+    call("/api/gm/say", {"text": "Ambush!", "theme": "Grimaldi", "mood": "combat"}, host=True)
+    assert state.music["track"] == "grimaldi-boss-score.ogg"

@@ -1314,11 +1314,24 @@ class TableState:
                 return (bossy or calm)[0] if boss else (calm or bossy)[0]
         return "theme:" + name
 
-    def apply_theme(self, name: str, boss: bool = False) -> Optional[Dict[str, Any]]:
+    def battle_track(self, name: str) -> Optional[str]:
+        """This foe's battle music (their boss version), if they have one: it plays
+        in any fight they're in - their theme is for their scenes, not a battle."""
+        f = composer.theme_file(self.campaign_dir, name, True)
+        return f if f and f != composer.theme_file(self.campaign_dir, name, False) else None
+
+    def apply_theme(self, name: str, boss: bool = False, battle: bool = False) -> Optional[Dict[str, Any]]:
         name = " ".join(str(name).split())
         if boss:
             self.queue_theme(name, True)   # a boss earns a composed battle theme
         same = party_roster._same_name(self.music.get("theme"), name) and self.music.get("track")
+        fight = self.battle_track(name) if battle and not boss else None
+        if fight:                          # a fight with them on stage: their battle music
+            if same and self.music.get("track") == fight:
+                return None
+            music = self.set_music(fight, 0.65, True, f"{name}'s theme", mood="combat", theme=name)
+            self.show_foe(name, False)
+            return music
         if same and (bool(self.music.get("boss")) == boss or not boss):
             return None       # already playing (a plain re-mention never calms a boss down)
         track = self.theme_track(name, boss)
@@ -1552,6 +1565,8 @@ class TableState:
             if mood == "boss" and not current.get("boss"):
                 # The fight escalates: same enemy, their theme's boss version.
                 return self.apply_theme(current["theme"], boss=True)
+            if mood == "combat" and not current.get("boss"):
+                return self.apply_theme(current["theme"], battle=True)   # (their battle music, if any)
             return None    # the enemy's theme carries the rest of the encounter
         here = self.overview().get("location") if mood in PLACE_MOODS and self.place_music_on else None
         place = self.place_track(here) if here and not leaving else None
@@ -3347,7 +3362,8 @@ def make_handler(state: TableState, code: str, host_key: str):
                 # An enemy's theme (an always-explicit choice) wins over the mood.
                 music = None
                 if not to and theme:
-                    music = state.apply_theme(theme, boss=bool(data.get("boss")) or mood == "boss")
+                    music = state.apply_theme(theme, boss=bool(data.get("boss")) or mood == "boss",
+                                              battle=mood == "combat")
                 elif not to and mood:
                     music = state.apply_mood(mood)
                 if not to and theme and data.get("villain"):
