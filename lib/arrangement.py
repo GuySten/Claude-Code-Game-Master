@@ -52,7 +52,9 @@ except in "hits" and "rolls", where it is the velocity itself (1-127).
                          # x accent, o a note, - holds the previous one on, space or . a rest
   "lines": [             # anything written out: countermelodies, ostinati, fanfares
     {"part": "horns", "vel": 0, "notes": [[18, "E#4", 3], [21, "G#4", 3], [24, "A#4", 6, 10]]}
-  ],                     # [at, pitch, units, (vel offset)]
+  ],                     # [at, pitch, units, (vel offset), ({"slide": semitones over the
+                         # note, "wobble": an uneven vibrato's depth in semitones})] - for
+                         # one voice at a time (a solo line): a bend moves the whole part
   "patterns": [          # percussion (or any part) on one note, in a rhythm
     {"part": "kit", "note": "snare", "from": 36, "to": 60, "pattern": "xoooox", "vel": -30},
     {"part": "timpani", "note": "root", "from": 0, "to": 84, "pattern": "x     ", "vel": -6}
@@ -77,6 +79,7 @@ timpani, taiko, toms, reverse_cymbal, kit (bd, snare, cymbals): as many as wante
 
 import argparse
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -368,9 +371,22 @@ def _build(spec: Dict[str, Any]) -> Dict[str, Any]:
         part = part_ok(line["part"])
         for n in line.get("notes") or []:
             at, p, d = float(n[0]), pitch(n[1]), float(n[2])
-            extra = float(n[3]) if len(n) > 3 else 0.0
+            extra = float(n[3]) if len(n) > 3 and not isinstance(n[3], dict) else 0.0
+            how = next((x for x in n[3:] if isinstance(x, dict)), {})
             note(part, p, at, d, dyn(at) + float(line.get("vel", 0)) + extra, float(line.get("legato", 0.97)),
                  float(line.get("gain", 0)))
+            if how.get("slide") or how.get("wobble"):              # a slide and/or an uneven vibrato
+                import random
+                rnd = random.Random(f"{part}:{at}:{p}")
+                t0, t1 = T(at), T(at + d)
+                slide, depth = float(how.get("slide", 0)), float(how.get("wobble", 0))
+                rate, phase = rnd.uniform(4.5, 8.0), rnd.uniform(0, 6.28)
+                steps = max(2, int((t1 - t0) / 0.01))
+                for i in range(steps + 1):
+                    f = i / steps
+                    wob = depth * math.sin(phase + 6.2832 * rate * f * (t1 - t0) * (1 + 0.3 * math.sin(3.1 * f)))
+                    sc.bend(part, t0 + f * (t1 - t0), slide * f ** 1.5 + wob)
+                sc.bend(part, t1 + 0.005, 0.0)
 
     def perc_key(part: str, what: Any, x: float) -> int:
         if isinstance(what, str) and what in KIT:

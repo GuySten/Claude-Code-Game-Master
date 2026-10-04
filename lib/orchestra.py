@@ -206,6 +206,11 @@ def _voicing(pcs: frozenset, root: int, prev: Optional[List[int]], lo: int, hi: 
 class Score:
     def __init__(self):
         self.events: List[Tuple[float, int, str, int, int]] = []   # (seconds, on?, part, key, vel)
+        self.bends: List[Tuple[float, str, float]] = []             # (seconds, part, semitones)
+
+    def bend(self, part: str, at: float, semitones: float) -> None:
+        """The part's pitch, bent from here on (a slide, a wavering): -12 .. 12."""
+        self.bends.append((at, part, max(-12.0, min(12.0, semitones))))
 
     def note(self, part: str, key: int, start: float, length: float, vel: float,
              gain_db: float = 0.0) -> None:
@@ -481,6 +486,8 @@ def play(score: Score, seconds: float, sf2: Path = SF2, rate: int = RATE,
         groups.setdefault(e[2], []).append(e)
     for name, events in groups.items():
         part, _, layer = name.partition(":")
+        bends = [(t, 2, name, 0, sem) for t, p, sem in getattr(score, "bends", []) if p == part]
+        events = list(events) + bends                        # (2: a bend, its semitones as "vel")
         early = ADVANCE.get(part, 0.0) if align else 0.0
         if early:                                           # (heard on the beat: see ADVANCE)
             events = [(max(0.0, t - early), *rest) for t, *rest in events]
@@ -489,6 +496,9 @@ def play(score: Score, seconds: float, sf2: Path = SF2, rate: int = RATE,
         syn.program_select(ch, sfid, bank, preset, part in DRUMS)
         syn.control_change(ch, 7, vol)
         syn.control_change(ch, 10, pan)
+        if bends:
+            syn.pitchbend_range(ch, 12)
+            syn.pitchbend(ch, 8192)
         stem = np.zeros((total, 2), dtype="float32")
         pos = 0
         for t, is_on, _, key, vel in sorted(events, key=lambda e: (e[0], e[1])):
@@ -496,13 +506,17 @@ def play(score: Score, seconds: float, sf2: Path = SF2, rate: int = RATE,
             if at > pos:
                 stem[pos:at] = np.frombuffer(syn.generate(at - pos), dtype="float32").reshape(-1, 2)
                 pos = at
-            if is_on:
+            if is_on == 2:
+                syn.pitchbend(ch, int(max(0, min(16383, 8192 + vel / 12 * 8191))))
+            elif is_on:
                 syn.noteon(ch, key, vel)
             else:
                 syn.noteoff(ch, key)
         if pos < total:
             stem[pos:] = np.frombuffer(syn.generate(total - pos), dtype="float32").reshape(-1, 2)
         syn.sounds_off(ch)
+        if bends:
+            syn.pitchbend(ch, 8192)
         syn.generate(256)                                   # (let the cut voices go)
         gain = level_db(part, mix) + (float(layer) if layer else 0.0)
         out += stem * np.float32(10 ** (gain / 20))

@@ -139,3 +139,11 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   villain's music can carry their sorrow, sung by human voices.
   "They sound like they are mourning." (A villain's grief, sung - not gloom in the
   orchestra.)
+- **The lone-violin sketch:** "not jarring, it is too crisp - it signals structured evil,
+  not crazy and unstable evil. But you are in a good direction. Also the violin should
+  not take the whole piece. The Margrave is a complex character." Madness is
+  instability: uneven rhythm (rushing, stalling), sudden bursts and dynamic swings,
+  wild leaps, notes sliding off pitch and wavering (lines now take {"slide", "wobble"}).
+  And a complex villain is a portrait in layers - here the elegant waltz (his face), a
+  mourning choir (the tithed, his guilt), the climax (his power), and the violin's
+  cracks (the mind fraying), each heard at its moment.
