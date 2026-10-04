@@ -366,6 +366,9 @@ class TableState:
         self.chat: List[Dict[str, Any]] = []           # players only; never written to disk
         # The Narrator (lib/narrator.py): each player's private questions and answers.
         self.narrator_log: Dict[str, List[Dict[str, Any]]] = {}
+        # "Previously on...": (viewer, lang) -> {n (story lines then), text, source}.
+        self.recaps: Dict[tuple, Dict[str, Any]] = {}
+        self.recap_busy: set = set()
         self.narrator_busy: set = set()
         self.narrator_slots = threading.Semaphore(2)
         self.narrator_ask = None                        # tests plug in a fake model
@@ -653,6 +656,39 @@ class TableState:
                 self.chat_changed.wait(left)
 
     # --- the Narrator: reminds a player of the story so far (private, read-only) ---
+    def recap(self, viewer: str, lang: str) -> Dict[str, Any]:
+        """"Previously on...": the story so far for this player, in their language.
+        Told by the Narrator's model in the background (kept until the story moves
+        on); until then, and without a model, the last beats as they were told."""
+        import narrator
+        lines = narrator.story_lines(self.since(0, viewer), viewer, lang)
+        if not any(l.startswith("[GM] ") for l in lines):
+            return {"ok": True, "text": None, "pending": False}
+        key = (viewer, lang)
+        with self.lock:
+            have = self.recaps.get(key)
+            fresh = have is not None and have["n"] == len(lines)
+            pending = not fresh and (self.narrator_ask is not None or narrator.backend() != "off")
+            if pending and key not in self.recap_busy:
+                self.recap_busy.add(key)
+                threading.Thread(target=self._make_recap, args=(key, lines), daemon=True).start()
+        if fresh:
+            return {"ok": True, "text": have["text"], "pending": False, "source": have["source"]}
+        return {"ok": True, "text": narrator.recap_fallback(lines), "pending": pending, "source": "story"}
+
+    def _make_recap(self, key: tuple, lines: List[str]) -> None:
+        import narrator
+        viewer, lang = key
+        try:
+            got = narrator.answer("What happened so far?", lines[-60:],
+                                  narrator.recap_prompt(lines[-60:], viewer), lang, ask=self.narrator_ask)
+            text = got["answer"] if got["source"] != "recall" else narrator.recap_fallback(lines)
+            with self.lock:
+                self.recaps[key] = {"n": len(lines), "text": text, "source": got["source"]}
+        finally:
+            with self.lock:
+                self.recap_busy.discard(key)
+
     def narrator_question(self, pc: str, question: str) -> Dict[str, Any]:
         import narrator
         with self.lock:
@@ -2641,6 +2677,11 @@ def make_handler(state: TableState, code: str, host_key: str):
                                    "lang": state.lang_for(me),
                                    "narration_id": state.last_narration(me),
                                    **state.overview()})
+            if url.path == "/api/recap":
+                if not me:
+                    return self._err("Take a seat first.", 403)
+                lang = q.get("lang") if q.get("lang") in state.table_langs() else state.lang_for(me)
+                return self._json(state.recap(me, lang))
             if url.path == "/api/messages":
                 try:
                     after = int(q.get("after", 0))

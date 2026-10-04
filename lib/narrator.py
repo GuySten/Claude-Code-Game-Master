@@ -165,6 +165,24 @@ def lore_prompt(name: str, kind: str, lines: List[str], viewer: str,
             f"No preamble; start with the facts.")
 
 
+def recap_prompt(lines: List[str], viewer: str) -> str:
+    """"Previously on...": the story so far, for a player sitting (back) down."""
+    log = "\n".join(lines)
+    if len(log) > LOG_CHARS:
+        log = "…" + log[-LOG_CHARS:]
+    return (f"STORY LOG (oldest first):\n{log}\n\n"
+            f"{viewer} is sitting down at the table. In three to five short sentences, tell them "
+            f"what has happened so far, most of all the latest scene: where the party is, what "
+            f"they face, and what was just going on. Name the people and places. Address {viewer} "
+            f"as \"you\". Only what the log says; no preamble, no advice.")
+
+
+def recap_fallback(lines: List[str]) -> str:
+    """No model: the last beats of narration, as they were told."""
+    told = [l.split("] ", 1)[1] for l in lines if l.startswith("[GM] ")][-3:]
+    return "\n\n".join(t if len(t) <= 360 else t[:360].rsplit(" ", 1)[0] + "…" for t in told)
+
+
 # --------------------------------------------------------------- answers ----
 def _claude(system: str, prompt: str) -> str:
     exe = shutil.which("claude")

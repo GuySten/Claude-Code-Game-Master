@@ -1375,6 +1375,29 @@ def test_the_round_never_waits_for_a_pc_who_cannot_act(table):
     assert table_server.cant_act({"conditions": ["poisoned", "prone"]}) is None
 
 
+def test_previously_on_tells_the_story_so_far_in_the_players_language(table):
+    call, state = table["call"], table["state"]
+    state.set_round_seconds(0)
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    assert call(f"/api/recap?code={CODE}&token={pip}&lang=en")[1]["text"] is None   # no story yet
+    assert call(f"/api/recap?code={CODE}&lang=en")[0] == 403                         # seated only
+    call("/api/gm/say", {"text": "Rain lashes the Rusty Tankard.", "lang": "en"}, host=True)
+    call("/api/gm/say", {"text": "גשם מכה בפונדק.", "lang": "he"}, host=True)
+    call("/api/gm/say", {"text": "Marta slides a key across the bar.", "lang": "en"}, host=True)
+    # No model: the last beats, as they were told, in the reader's language.
+    got = call(f"/api/recap?code={CODE}&token={pip}&lang=en")[1]
+    assert got["text"].startswith("Rain lashes") and "Marta" in got["text"] and "גשם" not in got["text"]
+    assert not got["pending"]
+    # With the Narrator's model: told once, kept until the story moves on.
+    asked = []
+    state.narrator_ask = lambda system, prompt: asked.append((system, prompt)) or "You sheltered from the rain."
+    first = call(f"/api/recap?code={CODE}&token={pip}&lang=he")[1]
+    assert first["pending"] and "גשם" in first["text"]
+    assert wait_for(lambda: not call(f"/api/recap?code={CODE}&token={pip}&lang=he")[1]["pending"])
+    assert call(f"/api/recap?code={CODE}&token={pip}&lang=he")[1]["text"] == "You sheltered from the rain."
+    assert "Hebrew" in asked[0][0] and "Pip is sitting down" in asked[0][1] and len(asked) == 1
+
+
 def test_a_waiting_chat_request_gets_the_line_at_once(table):
     call, state = table["call"], table["state"]
     pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]

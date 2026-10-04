@@ -242,6 +242,13 @@
   @keyframes healed { from { background: color-mix(in srgb, var(--hp) 35%, transparent); } }
   /* Narration being told: tap it to show the rest at once. */
   .msg.revealing { cursor: pointer; }
+  /* "Previously…": the story so far, for a player sitting (back) down. */
+  #recap { max-width: 760px; margin: 12px auto; padding: 12px 16px; border: 1px solid var(--accent);
+           border-radius: 12px; background: var(--gm); }
+  #recap h3 { margin: 0 0 6px; font-size: 1rem; color: var(--accent); }
+  #recap .text { white-space: pre-line; }
+  #recap .text.pending { opacity: .75; }
+  #recap .row { justify-content: flex-end; margin-top: 8px; }
   .msg.queued { display: none; }
 
   /* The character sheet */
@@ -2889,6 +2896,35 @@
     return d;
   }
 
+  // "Previously on...": for a player sitting down (new, or back after a break
+  // of 10 minutes or more), the story so far, at the top of the log.
+  const seenKey = () => "seen." + code;
+  let recapShown = false;
+  async function maybeRecap() {
+    if (recapShown || !me) return;
+    if (Date.now() - Number(store.get(seenKey()) || 0) < 10 * 60 * 1000) return;
+    if (!allMessages.some((m) => m.kind === "gm" && shownToMe(m))) return;
+    recapShown = true;
+    const card = document.createElement("div");
+    card.id = "recap";
+    card.innerHTML = `<h3>${esc(t("recapTitle"))}</h3><div class="text pending" dir="auto">${esc(t("recapLoading"))}</div>` +
+      `<div class="row"><button type="button" class="primary">${esc(t("recapClose"))}</button></div>`;
+    card.querySelector("button").onclick = () => { card.remove(); $("log").scrollTop = $("log").scrollHeight; };
+    $("log").prepend(card);
+    $("log").scrollTop = 0;
+    for (let i = 0; i < 40 && card.isConnected; i++) {
+      const r = await api("/api/recap?lang=" + encodeURIComponent(lang));
+      if (!r.ok || !r.text) { card.remove(); return; }
+      const box = card.querySelector(".text");
+      box.textContent = r.text; box.dir = dirFor(r.text);
+      box.classList.toggle("pending", !!r.pending);
+      if (!r.pending) return;
+      await new Promise((ok) => setTimeout(ok, 3000));
+    }
+  }
+  setInterval(() => { if (me) store.set(seenKey(), String(Date.now())); }, 30000);
+  window.addEventListener("pagehide", () => { if (me) store.set(seenKey(), String(Date.now())); });
+
   function rerenderLog() {
     finishAllReveals();
     partySig = "";
@@ -2940,6 +2976,7 @@
                                                    || (m.kind === "gm" && !m.to)
                                                    || m.kind === "player")) refreshInfo();
       }
+      if (!historyLoaded && r.ok) { historyLoaded = true; maybeRecap(); }
       historyLoaded = true;
     } catch (e) { setStatus(t("reconnecting")); }
     setTimeout(pollMessages, 1500);
