@@ -18,7 +18,9 @@ except in "hits" and "rolls", where it is the velocity itself (1-127).
 
 {
   "tune": {"seed": "Kestrel", "mode": "major", "cls": "Barbarian", "stage": 3, "dark": 0},
-                         # mode "minor": the villain's version of the seed's tune
+                         # mode "minor": the villain's version of the seed's tune; "gen": 2
+                         # the generator's second version; "written": a hand-written tune
+                         # (music_compose.written_tune: its sections in scale degrees)
   "tempo": 60,           # beats a minute (6/8: dotted quarters)
   "start": -12,          # where the piece starts (an intro before the tune): default 0
   "length": 96,          # where it ends (default: the end of the last statement)
@@ -238,7 +240,8 @@ def _build(spec: Dict[str, Any]) -> Dict[str, Any]:
     if not t.get("seed"):
         raise ArrangementError('"tune": {"seed": ...} is needed (the character\'s name)')
     tune = music_compose.leitmotif(t["seed"], t.get("mode", "major"), t.get("cls", ""),
-                                   stage=int(t.get("stage", 1)), dark=int(t.get("dark", 0)))
+                                   stage=int(t.get("stage", 1)), dark=int(t.get("dark", 0)),
+                                   gen=int(t.get("gen", 1)), written=t.get("written"))
     key = tune["key"]
     notes, u = [], 0.0
     for st, b in tune["notes"]:
@@ -438,7 +441,7 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
     render it, to measure what's heard (the tune over the rest, the choir, a loop's
     seam): a few seconds."""
     ctx = _build(spec)
-    sc, tune, T, unit, beat = ctx["score"], ctx["tune"], ctx["T"], ctx["unit"], ctx["beat"]
+    sc, tune, T, unit = ctx["score"], ctx["tune"], ctx["T"], ctx["unit"]
     bar = tune["bar"]
     out: List[Tuple[str, str]] = []
     add = lambda level, msg: out.append((level, msg))          # noqa: E731
@@ -504,7 +507,7 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
         if above:
             rubs.append(f"{name_of(k)} over {c['symbol']} at {_where(ctx, u0)}")
     if rubs:
-        add("note", f"held tune notes a half step above a chord tone (a sigh if meant, a clash if not): "
+        add("note", "held tune notes a half step above a chord tone (a sigh if meant, a clash if not): "
                     + "; ".join(rubs[:4]) + (f" (+{len(rubs) - 4})" if len(rubs) > 4 else ""))
     # Shape: dynamics, and harmony that moves.
     pts = ctx["dyn_pts"]
@@ -617,9 +620,10 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
     return out
 
 
-def describe(seed: str, mode: str = "major", cls: str = "", stage: int = 1, dark: int = 0) -> str:
+def describe(seed: str, mode: str = "major", cls: str = "", stage: int = 1, dark: int = 0,
+             gen: int = 1) -> str:
     """The tune, for writing an arrangement: its key, meter, and every note with its time."""
-    tune = music_compose.leitmotif(seed, mode, cls, stage=stage, dark=dark)
+    tune = music_compose.leitmotif(seed, mode, cls, stage=stage, dark=dark, gen=gen)
     bar = tune["bar"]
     lines = [f"{seed} ({mode}{', ' + cls if cls else ''}, stage {stage}, dark {dark}): "
              f"tonic {name_of(tune['key'])}, {tune['meter']} ({'eighths' if tune['meter'] == '6/8' else 'beats'}), "
@@ -643,6 +647,7 @@ def main() -> None:
     t.add_argument("--minor", action="store_true", help="the villain's version")
     t.add_argument("--stage", type=int, default=1)
     t.add_argument("--dark", type=int, default=0)
+    t.add_argument("--gen", type=int, default=1, help="the tune generator's version")
     p = sub.add_parser("play", help="play an arrangement (a JSON file)")
     p.add_argument("file")
     p.add_argument("--out", required=True)
@@ -651,7 +656,7 @@ def main() -> None:
     c.add_argument("--quick", action="store_true", help="read the score only (don't render it)")
     a = ap.parse_args()
     if a.cmd == "tune":
-        print(describe(a.seed, "minor" if a.minor else "major", a.cls, a.stage, a.dark))
+        print(describe(a.seed, "minor" if a.minor else "major", a.cls, a.stage, a.dark, a.gen))
         return
     if a.cmd == "check":
         try:

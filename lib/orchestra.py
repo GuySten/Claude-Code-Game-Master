@@ -120,7 +120,7 @@ def harmonize(tune: dict) -> List[Tuple[float, float, int, frozenset]]:
     """A chord for each span: the progression that best fits the tune (its strong
     notes in the chord), moves well (V-I, bVII-I) and ends home. [(start, end,
     degree, pitch classes)] in units."""
-    scale = tune["scale"] if isinstance(tune["scale"], list) else music_compose.MODES[tune["scale"]]
+    scale = tune["scale"] if isinstance(tune["scale"], list) else music_compose._scale(tune["scale"])
     chords = _triads(scale)
     notes, spans = _onsets(tune), _spans(tune)
     fit = []
@@ -226,7 +226,7 @@ def arrange(tune: dict, stage: int = 3, dark: int = 0) -> Tuple[Score, float]:
     bpm = TEMPO.get(kind, 66) * (0.92 if stage >= 3 else 1.0) * (0.9 if dark else 1.0)
     unit = 60.0 / bpm / beat_units                             # seconds per unit
     layers = LAYERS[max(0, min(3, stage))]
-    scale = tune["scale"] if isinstance(tune["scale"], list) else music_compose.MODES[tune["scale"]]
+    scale = tune["scale"] if isinstance(tune["scale"], list) else music_compose._scale(tune["scale"])
     key = tune["key"]
     notes = _onsets(tune)
     total = sum(b for _, b in tune["notes"])

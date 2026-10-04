@@ -357,7 +357,7 @@ def _twist(rng, motif: list, n_head: int) -> tuple:
     return motif, n_head
 
 
-def _sentence(rng, kind: str, meter: str, mode: str):
+def _sentence(rng, kind: str, meter: str, mode: str, gen: int = 1):
     """A memorable theme, in the form most film themes use (A A B A): the hook (a
     short motif, its signature leap and rhythm); the hook again (the same, landing
     somewhere new, or a step higher): repetition is what makes it stick;
@@ -376,7 +376,12 @@ def _sentence(rng, kind: str, meter: str, mode: str):
     if shift == 0:                                                         # the same hook, a new landing
         again = again[:-1] + [(4 if motif[-1][0] != 4 else 2, again[-1][1])]
     rise = rng.choice([1, 1, 2])
-    climb = [(d + k * rise, b) for k in (1, 2) for d, b in hook]
+    if gen >= 2:                                    # development: the hook, then its head
+        frag = hook[:max(2, min(3, len(hook) - 1))]  # in quicker notes, climbing: a new rhythm
+        climb = ([(d + rise, b) for d, b in hook] + [(d + 2 * rise, b / 2) for d, b in frag]
+                 + [(d + 3 * rise, b / 2) for d, b in frag])
+    else:
+        climb = [(d + k * rise, b) for k in (1, 2) for d, b in hook]
     peak = max(d for d, _ in pickup + motif + again + climb)
     top = next(c for c in (7, 9, 11, 12, 14) if c > peak)
     climb.append((top, 2.5 * one))                                         # the climax
@@ -397,12 +402,50 @@ def _sentence(rng, kind: str, meter: str, mode: str):
     every = pickup + motif + again + climb + home
     if st(top) - min(st(d) for d, _ in every) > 19:
         return None
+    if gen >= 2:                                    # long notes on the beat
+        parts = [pickup, motif, again, climb, home]
+        flat, start = list(every), -sum(b for _, b in pickup)
+        grid, medium = (1, 2) if meter == "6/8" else (.5, 1)
+        for _ in range(6):                          # (moving one note can unsettle the one before)
+            new = _align(_align(flat, BEATS[meter], start), grid, start, medium)
+            if new == flat:
+                break
+            flat = new
+        out, i = [], 0
+        for part in parts:
+            out.append(flat[i:i + len(part)])
+            i += len(part)
+        pickup, motif, again, climb, home = out
     return {"kind": kind, "meter": meter, "mode": mode, "pickup": pickup, "motif": motif,
-            "again": again, "climb": climb, "home": home, "hook": len(hook)}
+            "again": again, "climb": climb, "home": home, "hook": len(hook), "gen": gen}
+
+
+BEATS = {"4/4": 1, "3/4": 1, "6/8": 3}                       # a beat, in units
+
+
+def _align(notes: list, beat: float, start: float, longer: float = None) -> list:
+    """Long notes (a beat or more: ``longer``) start on a beat: the note before one
+    that would start off the beat is lengthened, and the long note shortened by as
+    much (its end, and everything after, stay where they were)."""
+    out = list(notes)
+    t = start
+    longer = beat if longer is None else longer
+    for i, (d, b) in enumerate(out):
+        off = (t / beat) % 1
+        if i and b >= longer - 1e-9 and 1e-6 < off < 1 - 1e-6:
+            delta = round((1 - off) * beat, 6)
+            if b - delta >= .5:
+                pd, pb = out[i - 1]
+                out[i - 1] = (pd, round(pb + delta, 6))
+                b = round(b - delta, 6)
+                out[i] = (d, b)
+                t += delta
+        t += b
+    return out
 
 
 def _hero_notes(hero: dict) -> list:
-    return [(_semitones(d, MODES[hero["mode"]]), b)
+    return [(_semitones(d, _scale(hero["mode"])), b)
             for sec in ("pickup", "motif", "again", "climb", "home") for d, b in hero[sec]]
 
 
@@ -428,33 +471,52 @@ def memorability(tune: dict) -> float:
 CANDIDATES = 12                                             # tunes tried per character
 
 
-def _candidates(seed_hex: str, kind: str, meter: str, mode: str) -> list:
+def _candidates(seed_hex: str, kind: str, meter: str, mode: str, gen: int = 1) -> list:
     """[(score, i, hero)]: the candidate tunes and their memorability (a tune that
     breaks a hard rule - range, leaps, climax, the bar line - drops to the bottom)."""
     import random
     found = []
     for i in range(60):
-        hero = _sentence(random.Random(f"{seed_hex}:{i}"), kind, meter, mode)
+        hero = _sentence(random.Random(f"{seed_hex}:{i}" if gen < 2 else f"{seed_hex}:v{gen}:{i}"),
+                         kind, meter, mode, gen)
         if hero is None:
             continue
-        tune = {"notes": _hero_notes(hero), "bar": METERS[meter],
+        tune = {"notes": _hero_notes(hero), "bar": METERS[meter], "meter": meter, "key": 60,
                 "pickup": sum(b for _, b in hero["pickup"]), "hook": (len(hero["pickup"]), hero["hook"])}
         t = theme_traits(tune)
         fits = (.45 <= t["climax_at"] <= .72 and t["biggest_jump"] <= 12 and t["range"] <= 19
                 and t["whole_bars"] and t["ends_home"] and t["gap_fill"] and t["rise"] >= 5)
-        found.append((memorability(tune) - (0 if fits else 20), i, hero))
+        value = memorability(tune) - (0 if fits else 20)
+        if gen >= 2:
+            value += _research_score(tune)
+        found.append((value, i, hero))
         if len(found) >= CANDIDATES:
             break
     return found
 
 
-def _hero(seed_hex: str, rng, cls) -> dict:
+def _research_score(tune: dict) -> float:
+    """Generator v2: the tune scored as music research measures melodies (surprise
+    against thousands of folk tunes, rhythmic variety, held notes, long notes on the
+    beat: lib/tune_score.py), when its corpus is built; else the plain rhythm checks."""
+    try:
+        import tune_score
+        mel = tune_score.from_leitmotif(tune)
+        if tune_score.CACHE.is_file():
+            return 1.2 * tune_score.score(mel)["composite"]
+        f = tune_score.features(mel)
+        return 4 * f["long_on_beat"] + 3 * min(1.0, f["rhythm_entropy"] / 2) - 6 * max(0.0, f["held_share"] - .45)
+    except Exception:
+        return 0.0
+
+
+def _hero(seed_hex: str, rng, cls, gen: int = 1) -> dict:
     """The character's theme: its kind, meter and mode from their class (and name);
     of twelve candidate tunes, one of the most memorable."""
     import random
     kinds, meters, modes = _style(cls)
     kind, meter, mode = rng.choice(kinds), rng.choice(meters), rng.choice(modes)
-    found = _candidates(seed_hex, kind, meter, mode)
+    found = _candidates(seed_hex, kind, meter, mode, gen)
     # Among the near-best (within half a point), the name chooses: memorable, and
     # not the same "best" tune for every character of a kind.
     top = max(sc for sc, _, _ in found)
@@ -462,6 +524,11 @@ def _hero(seed_hex: str, rng, cls) -> dict:
     score, _, best = near[random.Random(seed_hex + ":pick").randrange(len(near))]
     best["memorability"] = round(score, 2)
     return best
+
+
+def _scale(name: str) -> list:
+    """A mode's scale: the heroes' modes, or (a hand-written tune's) a dark one."""
+    return MODES.get(name) or DARK[name]
 
 
 def _semitones(degree: int, scale) -> int:
@@ -516,7 +583,7 @@ def _darkened(scale: list, dark: int) -> list:
 
 def _grown(hero: dict, stage: int, dark: int) -> list:
     """The hero's tune at a stage of their story, in semitones."""
-    scale = _darkened(MODES[hero["mode"]], dark)
+    scale = _darkened(_scale(hero["mode"]), dark)
     bar = METERS[hero["meter"]]
     one = 1 if hero["meter"] != "6/8" else 2
     if stage <= 0:                                         # a lone voice: the hook, its answer, home
@@ -539,8 +606,17 @@ def _grown(hero: dict, stage: int, dark: int) -> list:
     return [(_semitones(d, scale), b) for d, b in secs]
 
 
+def written_tune(spec: dict, mode: str = "major", stage: int = 1, dark: int = 0) -> dict:
+    """A hand-written tune (the GM's), in the generator's own shape so that every
+    version of it works - the villain's, the story stages, the darkening:
+    {"seed", "meter": "6/8", "mode": "mixolydian", "key": "C#4" (default: from the
+    seed), "kind", "pickup"/"motif"/"again"/"climb"/"home": [[scale degree, units]],
+    "hook": notes in the hook}. Degrees: 0 the tonic, 7 the octave, -1 below."""
+    return leitmotif(spec.get("seed", "written"), mode, "", stage=stage, dark=dark, written=spec)
+
+
 def leitmotif(seed: str, mode: str = "major", cls: str = "", stage: int = 1, dark: int = 0,
-              **_arc) -> dict:
+              gen: int = 1, written: dict = None, **_arc) -> dict:
     """The tune: {key (MIDI tonic), notes [(semitones from the tonic, units)], motif
     (its first statement), hook (where it starts, how many notes), kind, meter,
     scale, memorability}. Same seed and class, same tune; "minor" is the villain;
@@ -550,7 +626,18 @@ def leitmotif(seed: str, mode: str = "major", cls: str = "", stage: int = 1, dar
     seed_hex = hashlib.sha256(seed.strip().lower().encode("utf-8")).hexdigest()
     rng = random.Random(seed_hex)
     key = 57 + rng.randrange(10)                                           # A3 .. F#4
-    hero = _hero(seed_hex, rng, cls)
+    if written:
+        hero = {k: [tuple(n) for n in written.get(k) or []] for k in ("pickup", "motif", "again", "climb", "home")}
+        hero.update(kind=written.get("kind", "written"), meter=written["meter"], mode=written["mode"],
+                    hook=int(written.get("hook", len(hero["motif"]))), memorability=0.0)
+        if written.get("key"):
+            import arrangement
+            key = arrangement.pitch(written["key"])
+        hero["memorability"] = round(memorability({"notes": _hero_notes(hero), "bar": METERS[hero["meter"]],
+                                                   "pickup": sum(b for _, b in hero["pickup"]),
+                                                   "hook": (len(hero["pickup"]), hero["hook"])}), 2)
+    else:
+        hero = _hero(seed_hex, rng, cls, gen)
     if mode == "minor":
         notes, scale = _villain(random.Random(seed_hex + ":villain"), hero)
         start = 4                                                          # (after the march)
@@ -563,7 +650,7 @@ def leitmotif(seed: str, mode: str = "major", cls: str = "", stage: int = 1, dar
             "kind": hero["kind"], "meter": hero["meter"], "scale": scale,
             "shape": [d for d, _ in hero["motif"]], "bar": METERS[hero["meter"]],
             "pickup": sum(b for _, b in hero["pickup"]) if mode != "minor" else 0,
-            "memorability": hero["memorability"]}
+            "memorability": hero["memorability"], "gen": gen if not written else "written"}
 
 
 def theme_traits(tune: dict) -> dict:
