@@ -5,6 +5,8 @@
 #   gm-music-compose.sh setup [--cpu]        Install the composer (its own .compose-venv, ~3 GB)
 #   gm-music-compose.sh setup --melody       Also the melody model (~3.3 GB): dark twins keep the anthem's tune
 #                                            (COMPOSE_MODEL=facebook/musicgen-melody: it composes everything)
+#   gm-music-compose.sh setup --orchestra    The sampled orchestra (~215 MB of real instrument recordings, no GPU)
+#   gm-music-compose.sh orchestra "<PC>" [--stage 0-3]   Their theme played by the orchestra (default: legendary)
 #   gm-music-compose.sh check                Which GPU/CPU it would use
 #   gm-music-compose.sh test                 Time one 30-second piece (first run downloads the model)
 #   gm-music-compose.sh theme "<villain>" [--boss] [--look "..."]   Compose a theme now
@@ -33,6 +35,21 @@ shift || true
 
 case "$ACTION" in
     setup)
+        if [ "$1" = "--orchestra" ]; then
+            # No AI and no GPU: the notes of the character's tune, played by recorded
+            # instruments (the MuseScore_General SoundFont, MIT licensed).
+            PY="$(compose_py)"
+            if [ -z "$PY" ]; then
+                command -v uv >/dev/null 2>&1 || { error "uv is needed (the installer sets it up): https://docs.astral.sh/uv/"; exit 1; }
+                uv venv "$VENV" --python 3.11 || exit 1
+                PY="$(compose_py)"
+            fi
+            uv pip install --python "$PY" soundfile numpy || exit 1
+            uv pip install --python "$PY" --no-deps tinysoundfont || exit 1   # (its audio-device extra isn't needed)
+            "$PY" "$LIB_DIR/orchestra.py" --fetch-only || exit 1
+            success "The orchestra is ready. Try: bash tools/gm-music-compose.sh orchestra \"<PC>\""
+            exit 0
+        fi
         if [ "$1" = "--melody" ]; then
             PY="$(compose_py)"
             [ -z "$PY" ] && { error "Set up the composer first: bash tools/gm-music-compose.sh setup"; exit 1; }
@@ -93,6 +110,15 @@ print(f\"A villain theme (30 s) takes about {d['elapsed']/60:.1f} min; a hero's 
         [ -z "$PY" ] && { error "Not set up yet: bash tools/gm-music-compose.sh setup"; exit 1; }
         CLS="$($PYTHON_CMD "$LIB_DIR/composer.py" class-of "$1" 2>/dev/null)"
         "$PY" "$LIB_DIR/music_compose.py" --leitmotif "$1" --class "$CLS" --out "$(get_campaign_dir 2>/dev/null || echo .)/music/anthems"
+        ;;
+    orchestra)
+        PY="$(compose_py)"
+        [ -z "$PY" ] && { error "Not set up yet: bash tools/gm-music-compose.sh setup --orchestra"; exit 1; }
+        [ -z "$1" ] && { error "Whose theme? gm-music-compose.sh orchestra \"<PC>\" [--stage 0-3]"; exit 1; }
+        CLS="$($PYTHON_CMD "$LIB_DIR/composer.py" class-of "$1" 2>/dev/null)"
+        DIR="$(get_campaign_dir 2>/dev/null || echo .)/music/anthems"
+        mkdir -p "$DIR"
+        "$PY" "$LIB_DIR/orchestra.py" "$@" --class "$CLS" --out "$DIR"
         ;;
     theme|anthem|normalize|status)
         $PYTHON_CMD "$LIB_DIR/composer.py" "$ACTION" "$@"
