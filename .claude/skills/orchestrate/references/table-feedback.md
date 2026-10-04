@@ -158,3 +158,10 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   misbehaves - turns too high, breaks pitch and stride". And "the piece should end with
   the violin alone (and briefly start with it)": the loop's end and start are the
   violin alone - unravelled, then composed again.
+- **A character judge (MuQ-MuLan, music-text similarity to "an evil villain's theme" /
+  "an unhinged, unstable violin") failed against the host's verdicts:** evil 3 of 6
+  pairs (a coin flip: it rated the slow dark rewrite more evil than the version the host
+  found more evil), madness 0 of 2 (it rated the crisp, "structured" violin sketch the
+  maddest). It does recognise style ("an elegant waltz" tracked the waltz versions). So
+  no model judges a piece's character for this host: ask them for a brief in their own
+  words before writing, and for one listen at the end.
