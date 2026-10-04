@@ -106,3 +106,7 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   stopping as others start) and at a sudden doubling of the orchestra. (Heard as
   20-second excerpts, the old render of that climax also beat both timing-fixed
   renders - unexplained; the timing fix stays on, from Ode to Joy.)
+- **The Margrave v2 (the Velvet Waltz as one piece that grows: a running plucked waltz,
+  bass and pad; the cellos carried across as a creeping line; horns, then tremolo,
+  trombones and a timpani roll, then the choir, in waves; brass on the climax tune):**
+  "the climax fits much better now". The seam was the problem, and the fix works.
