@@ -323,8 +323,10 @@ def _opening(rng, kind: str, meter: str) -> tuple:
         leap = arp[-1]
         fill = [(leap - 1, one), (leap - 3, one)]
     else:                                                                  # hymn: a noble stepwise rise
-        line = rng.choice([[0, 1, 2, 3, 4], [0, 2, 1, 3, 4], [0, 0, 1, 2, 4], [0, 1, 2, 4, 5], [0, 2, 3, 4, 5]])
-        durs = rng.choice([[1, 1, 2, 1], [2, 1, 1, 1], [1.5, .5, 1, 1], [1, .5, .5, 2]])
+        line = rng.choice([[0, 1, 2, 3, 4], [0, 2, 1, 3, 4], [0, 0, 1, 2, 4], [0, 1, 2, 4, 5], [0, 2, 3, 4, 5],
+                           [0, 1, 0, 2, 4], [0, 2, 4, 3, 5], [0, 4, 3, 2, 4], [0, 1, 3, 2, 5], [0, 2, 2, 3, 4]])
+        durs = rng.choice([[1, 1, 2, 1], [2, 1, 1, 1], [1.5, .5, 1, 1], [1, .5, .5, 2], [1, 1, 1, 1],
+                           [.5, .5, 1, 2], [2, .5, .5, 1], [1, 2, 1, .5]])
         head = [(d, b * one) for d, b in zip(line[:-1], durs)] + [(line[-1], long_)]
         leap = line[-1]
         fill = rng.choice([[(leap - 1, one), (leap - 2, one)], [(leap + 1, one), (leap - 1, one)]])
@@ -333,49 +335,133 @@ def _opening(rng, kind: str, meter: str) -> tuple:
     return pickup, _close(motif, landing, bar, one), len(head)
 
 
-def _hero(rng, cls) -> dict:
-    kinds, meters, modes = _style(cls)
-    kind, meter, mode = rng.choice(kinds), rng.choice(meters), rng.choice(modes)
+def _twist(rng, motif: list, n_head: int) -> tuple:
+    """A character's own touch on the hook: a long note split in two, an even pair
+    made dotted, or a neighbour note before the leap (or nothing). (motif, n_head)"""
+    how = rng.choice(["none", "split", "dot", "neighbour", "neighbour"])
+    head = motif[:n_head]
+    if how == "split":
+        i = max(range(n_head), key=lambda k: head[k][1])
+        if head[i][1] >= 1:
+            d, b = head[i]
+            return motif[:i] + [(d, b / 2), (d, b / 2)] + motif[i + 1:], n_head + 1
+    if how == "dot":
+        for i in range(n_head - 1):
+            if head[i][1] == head[i + 1][1] and head[i][1] >= .5 and head[i][0] != head[i + 1][0]:
+                b = head[i][1]
+                return motif[:i] + [(head[i][0], 1.5 * b), (head[i + 1][0], .5 * b)] + motif[i + 2:], n_head
+    if how == "neighbour" and n_head >= 2:
+        d, b = head[n_head - 2]                                            # (the note before the leap)
+        if b >= 1:
+            return (motif[:n_head - 2] + [(d, b / 2), (d + 1, b / 2)] + motif[n_head - 1:], n_head + 1)
+    return motif, n_head
+
+
+def _sentence(rng, kind: str, meter: str, mode: str):
+    """A memorable theme, in the form most film themes use (A A B A): the hook (a
+    short motif, its signature leap and rhythm); the hook again (the same, landing
+    somewhere new, or a step higher): repetition is what makes it stick;
+    development (the hook's head twice more, climbing, to the climax: the highest
+    note, heard once, about two-thirds in); and the hook once more, at home, going
+    down by step to the tonic, held: what the listener walks away humming.
+    In scale degrees; None if it doesn't fit a singable range."""
     bar = METERS[meter]
     one = 1 if meter != "6/8" else 2
+    st = lambda d: _semitones(d, MODES[mode])                              # noqa: E731
     pickup, motif, n_head = _opening(rng, kind, meter)
-    low = min(d for d, _ in pickup + motif)
-    scale = MODES[mode]
-    st = lambda d: _semitones(d, scale)                                    # noqa: E731
-    # The motif again: a step or a third higher, or the same head answered lower.
-    for dev in rng.sample(["step", "third", "answer"], 3):
-        if dev == "answer":
-            again = motif[:-2] + [(motif[-2][0] - 1, motif[-2][1])]
-            again = _close(again, rng.choice([0, 2]) if motif[-1][0] != 0 else 2, bar, one)
-        else:
-            up = 1 if dev == "step" else 2
-            again = [(d + up, b) for d, b in motif]
-        peak = max(d for d, _ in motif + again)
-        top = next((c for c in (7, 9, 11) if c > peak), None)
-        if top is not None and st(top) - st(low) <= 19:
-            break
-    else:                                                                  # (always found in practice)
-        again, top = motif, max(d for d, _ in motif) + 1
-    # The climb to the climax: a run, an arpeggio, or a leap from the 5th.
-    fig = rng.choice(FIGS[meter])
-    approach = rng.choice(["run", "arpeggio", "leap"])
-    if approach == "run":
-        steps = [top - 3, top - 2, top - 1]
-    elif approach == "arpeggio":
-        steps = [d for d in (0, 2, 4, 7, 9) if d < top][-3:]
-    else:
-        steps = [4, 4]
-    durs = (fig * 3)[:len(steps)]
-    climb = list(zip(steps, durs)) + [(top, 2.5 * one), (top - 1, one), (top - 3, one)]
-    climb = _close(climb, 4, bar, one)
-    # Home: the motif's head, then stepping to the tonic (the high one if it rose to it).
-    head = motif[:n_head]
-    last = head[-1][0]
-    tonic = 7 if last >= 5 else 0
-    path = range(last + 1, tonic) if tonic > last else range(last - 1, tonic, -1)
-    home = _close(head + [(d, one) for d in path], tonic, bar, 2 * one if meter != "6/8" else 3)
+    motif, n_head = _twist(rng, motif, n_head)
+    hook = motif[:min(len(motif) - 1, n_head + rng.choice([1, 1, 2]))]     # the head and its first step(s) back
+    shift = rng.choice([0, 0, 1])
+    again = [(d + shift, b) for d, b in motif]
+    if shift == 0:                                                         # the same hook, a new landing
+        again = again[:-1] + [(4 if motif[-1][0] != 4 else 2, again[-1][1])]
+    rise = rng.choice([1, 1, 2])
+    climb = [(d + k * rise, b) for k in (1, 2) for d, b in hook]
+    peak = max(d for d, _ in pickup + motif + again + climb)
+    top = next(c for c in (7, 9, 11, 12, 14) if c > peak)
+    climb.append((top, 2.5 * one))                                         # the climax
+    fall, cur = [], top                                                    # and a fall from it, by
+    while st(cur) - st(4) > 9:                                             # thirds, to the 5th: the hook
+        cur -= 2                                                           # comes back smoothly
+        fall.append((cur, .5 * one))
+    climb += fall + [(4, one)]
+    last = hook[-1][0]                                                     # home: the hook, then by step
+    if last >= 6 and rng.random() < .5:                                    # up to the high tonic
+        path, tonic = list(range(last + 1, 7)), 7
+    else:                                                                  # or down to the tonic
+        path, tonic = list(range(last - 1, 0, -1)), 0
+    home = list(hook) + [(d, one) for d in path]
+    before = sum(b for _, b in motif + again + climb + home)
+    at_least = 2 * one if meter != "6/8" else 3
+    home.append((tonic, round(math.ceil((before + at_least) / bar - 1e-9) * bar - before, 6)))
+    every = pickup + motif + again + climb + home
+    if st(top) - min(st(d) for d, _ in every) > 19:
+        return None
     return {"kind": kind, "meter": meter, "mode": mode, "pickup": pickup, "motif": motif,
-            "again": again, "climb": climb, "home": home}
+            "again": again, "climb": climb, "home": home, "hook": len(hook)}
+
+
+def _hero_notes(hero: dict) -> list:
+    return [(_semitones(d, MODES[hero["mode"]]), b)
+            for sec in ("pickup", "motif", "again", "climb", "home") for d, b in hero[sec]]
+
+
+def memorability(tune: dict) -> float:
+    """How memorable a tune is likely to be, from what memorable themes share: its
+    hook heard again and again, a strong opening rise, an arch to a single climax
+    about two-thirds in, mostly steps with a few leaps, a comfortable range, and
+    no drone of one note."""
+    t = theme_traits(tune)
+    pitch = [p for p, _ in tune["notes"]]
+    moves = [b - a for a, b in zip(pitch, pitch[1:]) if b != a]
+    stepwise = sum(1 for m in moves if abs(m) <= 2) / max(1, len(moves))
+    same = longest = 1
+    for a, b in zip(pitch, pitch[1:]):
+        same = same + 1 if a == b else 1
+        longest = max(longest, same)
+    return (2 * min(t["rise"], 12) / 12 + .75 * min(t["hook_repeats"], 4)
+            + 2 - 8 * abs(t["climax_at"] - .65) + (1.5 if t["single_climax"] else 0)
+            + 1.5 - 5 * abs(stepwise - .7) + (1 if 10 <= t["range"] <= 16 else 0)
+            - .4 * max(0, longest - 4))
+
+
+CANDIDATES = 12                                             # tunes tried per character
+
+
+def _candidates(seed_hex: str, kind: str, meter: str, mode: str) -> list:
+    """[(score, i, hero)]: the candidate tunes and their memorability (a tune that
+    breaks a hard rule - range, leaps, climax, the bar line - drops to the bottom)."""
+    import random
+    found = []
+    for i in range(60):
+        hero = _sentence(random.Random(f"{seed_hex}:{i}"), kind, meter, mode)
+        if hero is None:
+            continue
+        tune = {"notes": _hero_notes(hero), "bar": METERS[meter],
+                "pickup": sum(b for _, b in hero["pickup"]), "hook": (len(hero["pickup"]), hero["hook"])}
+        t = theme_traits(tune)
+        fits = (.45 <= t["climax_at"] <= .72 and t["biggest_jump"] <= 12 and t["range"] <= 19
+                and t["whole_bars"] and t["ends_home"] and t["gap_fill"] and t["rise"] >= 5)
+        found.append((memorability(tune) - (0 if fits else 20), i, hero))
+        if len(found) >= CANDIDATES:
+            break
+    return found
+
+
+def _hero(seed_hex: str, rng, cls) -> dict:
+    """The character's theme: its kind, meter and mode from their class (and name);
+    of twelve candidate tunes, one of the most memorable."""
+    import random
+    kinds, meters, modes = _style(cls)
+    kind, meter, mode = rng.choice(kinds), rng.choice(meters), rng.choice(modes)
+    found = _candidates(seed_hex, kind, meter, mode)
+    # Among the near-best (within half a point), the name chooses: memorable, and
+    # not the same "best" tune for every character of a kind.
+    top = max(sc for sc, _, _ in found)
+    near = sorted((c for c in found if c[0] >= top - .5), key=lambda c: c[1])
+    score, _, best = near[random.Random(seed_hex + ":pick").randrange(len(near))]
+    best["memorability"] = round(score, 2)
+    return best
 
 
 def _semitones(degree: int, scale) -> int:
@@ -392,16 +478,15 @@ def _villain(rng, hero: dict) -> tuple:
     bar, one = METERS[meter], (1 if meter != "6/8" else 2)
     march = [(0, 2), (0, 1), (0, 2), (0, 1)] if meter == "6/8" else [(0, .75), (0, .25), (0, .75), (0, .25)]
     out = list(march)
-    for sec in ("motif", "again"):
-        s = hero[sec]
-        out += [(st(d), b) for d, b in s[:-1]] + sigh(s[-1][1])
+    for sec in ("motif", "again"):                                         # each ends on a sigh
+        sec_notes = hero[sec]
+        out += [(st(d), b) for d, b in sec_notes[:-1]] + sigh(sec_notes[-1][1])
     climb = [(st(d), b) for d, b in hero["climb"]]
-    peak = max(range(len(climb)), key=lambda i: climb[i][0])
+    peak = max(range(len(climb)), key=lambda i: climb[i][0])               # the climax: kept
     tritone = 18 if climb[peak][0] - 6 > 12 else 6                         # (in the climax's octave)
-    climb[peak - 1] = (tritone, climb[peak - 1][1])                        # the tritone, before the peak
-    out += climb[:-1] + sigh(climb[-1][1])
-    n_head = len(hero["home"]) - 1
-    head = [(st(d), b) for d, b in hero["home"][:n_head]]
+    climb[peak - 1] = (tritone, climb[peak - 1][1])                        # the tritone, before it
+    out += climb
+    head = [(st(d), b) for d, b in hero["home"][:hero["hook"]]]           # the hook, at home
     while len(head) > 2 and head[-1][0] < 3:                               # (the fall starts above)
         head.pop()
     tail = head + [(3, one), (1, one)]                                     # falling home through the minor 2nd
@@ -412,25 +497,27 @@ def _villain(rng, hero: dict) -> tuple:
 
 def leitmotif(seed: str, mode: str = "major", cls: str = "") -> dict:
     """The tune: {key (MIDI tonic), notes [(semitones from the tonic, units)], motif
-    (its first statement), kind, meter, scale}. Same seed and class, same tune;
-    "minor" is the villain."""
+    (its first statement), hook (where it starts, how many notes), kind, meter,
+    scale, memorability}. Same seed and class, same tune; "minor" is the villain."""
     import hashlib
     import random
-    rng = random.Random(hashlib.sha256(seed.strip().lower().encode("utf-8")).hexdigest())
+    seed_hex = hashlib.sha256(seed.strip().lower().encode("utf-8")).hexdigest()
+    rng = random.Random(seed_hex)
     key = 57 + rng.randrange(10)                                           # A3 .. F#4
-    hero = _hero(rng, cls)
+    hero = _hero(seed_hex, rng, cls)
     if mode == "minor":
-        notes, scale = _villain(rng, hero)
-        motif = notes[4:4 + len(hero["motif"])]
+        notes, scale = _villain(random.Random(seed_hex + ":villain"), hero)
+        start = 4                                                          # (after the march)
     else:
         scale = hero["mode"]
-        notes = [(_semitones(d, MODES[scale]), b)
-                 for sec in ("pickup", "motif", "again", "climb", "home") for d, b in hero[sec]]
-        motif = notes[:len(hero["pickup"]) + len(hero["motif"])]
-    return {"seed": seed, "mode": mode, "key": key, "motif": motif, "notes": notes,
+        notes = _hero_notes(hero)
+        start = len(hero["pickup"])
+    return {"seed": seed, "mode": mode, "key": key, "notes": notes,
+            "motif": notes[start:start + len(hero["motif"])], "hook": (start, hero["hook"]),
             "kind": hero["kind"], "meter": hero["meter"], "scale": scale,
             "shape": [d for d, _ in hero["motif"]], "bar": METERS[hero["meter"]],
-            "pickup": sum(b for _, b in hero["pickup"]) if mode != "minor" else 0}
+            "pickup": sum(b for _, b in hero["pickup"]) if mode != "minor" else 0,
+            "memorability": hero["memorability"]}
 
 
 def theme_traits(tune: dict) -> dict:
@@ -460,7 +547,20 @@ def theme_traits(tune: dict) -> dict:
         "repeated": any(s == 0 for s in steps),
         "tritone": 6 in pcs,
         "falls_home": steps[-1] < 0,
+        "hook_repeats": _recurrences(pitch, beats, *tune["hook"]) if tune.get("hook") else 0,
+        "single_climax": pitch.count(max(pitch)) == 1,
     }
+
+
+def _recurrences(pitch: list, beats: list, start: int, length: int) -> int:
+    """How many times the hook (its contour and rhythm) is heard in the tune."""
+    sign = lambda x: (x > 0) - (x < 0)                                     # noqa: E731
+    shape = lambda i: tuple((sign(pitch[i + k + 1] - pitch[i + k]), round(beats[i + k], 3))  # noqa: E731
+                            for k in range(length - 1))
+    if start + length > len(pitch):
+        return 0
+    hook = shape(start)
+    return sum(1 for i in range(len(pitch) - length + 1) if shape(i) == hook)
 
 
 def render_leitmotif(seed: str, mode: str = "major", seconds: float = 20, rate: int = 32000,

@@ -339,6 +339,7 @@ def test_every_heroes_tune_is_built_like_a_film_heroes_theme():
         assert 0.4 <= t["climax_at"] <= 0.75 and t["climax_held"], (name, cls, t)
         assert t["range"] <= 19 and t["biggest_jump"] <= 12, (name, cls, t)
         assert t["ends_home"] and t["whole_bars"], (name, cls, t)
+        assert t["hook_repeats"] >= 5 and t["single_climax"], (name, cls, t)   # memorable: A A B A
     assert mc.leitmotif("Pip", "major", "Rogue")["notes"] == mc.leitmotif(" pip ", "major", "Rogue")["notes"]
 
 
@@ -352,7 +353,7 @@ def test_every_villains_tune_is_the_same_tune_turned_menacing():
         assert t["minor"] and t["repeated"] and t["tritone"] and t["sighs"] >= 3, (name, cls, t)
         assert t["falls_home"] and t["ends_home"] and dark["notes"][-2][0] == 1, (name, cls, t)
         assert t["range"] <= 19 and t["biggest_jump"] <= 12 and t["whole_bars"], (name, cls, t)
-        assert 0.4 <= t["climax_at"] <= 0.75, (name, cls, t)
+        assert 0.4 <= t["climax_at"] <= 0.75 and t["hook_repeats"] >= 3, (name, cls, t)
         assert dark["shape"] == hero["shape"] and (dark["key"], dark["meter"]) == (hero["key"], hero["meter"])
 
 
@@ -368,10 +369,11 @@ def test_no_two_characters_share_a_tune():
         p = [x for x, _ in notes]
         contour = tuple("U" if b - a > 2 else "u" if b > a else "=" if b == a else "d" if a - b <= 2 else "D"
                         for a, b in zip(p, p[1:]))
-        return contour, tuple(round(b, 2) for _, b in notes)
+        return contour, tuple(round(b, 2) for _, b in notes), tuple(b - a for a, b in zip(p, p[1:]))
     people = PEOPLE[:60]
     shapes = [shape(*p) for p in people]
-    assert len(set(shapes)) == len(people)                                    # no two the same tune
+    assert len({(i, r) for _, r, i in shapes}) == len(people)                 # no two the same tune (any key)
+    shapes = [(c, r) for c, r, _ in shapes]
     assert len({c for c, _ in shapes}) >= 50                                  # nor mostly the same shape
     alike = [(difflib.SequenceMatcher(None, a[0], b[0]).ratio(), difflib.SequenceMatcher(None, a[1], b[1]).ratio())
              for a, b in itertools.combinations(shapes, 2)]
@@ -505,3 +507,22 @@ def test_a_dark_anthem_made_later_asks_for_its_weight_too(tmp_path, fake):
     finally:
         composer.compose_many = real
     assert seen[0]["heavy"] is True and not seen[1].get("heavy")
+
+
+def test_one_of_the_most_memorable_candidate_tunes_is_kept():
+    """Each character's tune is one of the best of twelve on memorability (its hook
+    heard again and again, a strong opening rise, an arch to one climax, mostly
+    steps), and keeps every hard rule."""
+    import hashlib
+    import random
+    from lib import music_compose as mc
+    for name, cls in PEOPLE[:40]:
+        tune = mc.leitmotif(name, "major", cls)
+        seed_hex = hashlib.sha256(name.strip().lower().encode("utf-8")).hexdigest()
+        rng = random.Random(seed_hex)
+        rng.randrange(10)
+        kinds, meters, modes = mc._style(cls)
+        found = mc._candidates(seed_hex, rng.choice(kinds), rng.choice(meters), rng.choice(modes))
+        best = max(sc for sc, _, _ in found)
+        assert len(found) == mc.CANDIDATES and tune["memorability"] >= best - .5 - 1e-9, (name, tune["memorability"], best)
+        assert tune["memorability"] >= 7, (name, cls, tune["memorability"])
