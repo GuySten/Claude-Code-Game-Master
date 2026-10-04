@@ -28,7 +28,7 @@ Sources, in brief (details and citations: `research.md`):
 - **This table's ears** - `table-feedback.md` (the host's verdicts win over all of these).
 
 
-Entries marked **(from knowledge)** are general film and game scoring practice written from memory (the TV Tropes pages for heroic, mood, genre and regional music could not be fetched); names marked † were not checked against the site. The orchestra has no piano, harpsichord, guitar, accordion, saxophone, bagpipes, harmonica, xylophone or steel drums: where a device names one, it says what to write instead.
+Entries marked **(from knowledge)** are general film and game scoring practice written from memory (the TV Tropes pages for mood, genre and regional music could not be fetched; the Heroic Music Index was reviewed from the host's paste); names marked † were not checked against the site. The orchestra has no piano, harpsichord, guitar, accordion, saxophone, bagpipes, harmonica, xylophone or steel drums: where a device names one, it says what to write instead.
 
 ---
 
@@ -134,6 +134,8 @@ Entries marked **(from knowledge)** are general film and game scoring practice w
   the next by a `slide`, with a wide `wobble`; over held tremolo on an unrelated chord
   (two chords a tritone apart), celesta or glockenspiel ticking irregularly.
 - **Not**: a steady beat or functional harmony - the alien does not resolve.
+- **Also heroic**: the same glide, warm and in major over a steady pulse, reads as retro
+  science-fiction wonder - the strange made friendly.
 
 ### The villain conducts ("Conducting the Carnage")
 - **Signals**: a villain in total command: the music obeys them, each gesture lands.
@@ -238,6 +240,51 @@ Entries marked **(from knowledge)** are general film and game scoring practice w
   fight turning.
 
 ---
+
+### Rallying ("Music for Courage", "Song of Courage", "Pep-Talk Song", "\"Gaining Confidence\" Song")
+- **Signals**: fear turning into courage: the speech before the charge, a frightened
+  hero finding their nerve, allies taking heart.
+- **Write it**: the hero's tune heard first unsure - one soft voice (a clarinet or solo
+  violin), broken phrases with rests, minor or over an unstable chord, no pulse - then
+  steadied: a pulse enters (low strings, then timpani on the beats), the tune doubled in
+  octaves, the harmony moving to major (the borrowed chords resolving home), horns
+  joining, the dynamics climbing in steps. Confidence is steadiness first, loudness
+  second.
+- **Not**: starting loud - the change is the device.
+
+### Themes in conflict ("Hero vs. Villain Duet")
+- **Signals**: a showdown, a parley, a debate of wills; two characters whose themes the
+  table knows.
+- **Write it**: the two motifs in alternation, each in its own colour (the hero's on
+  horns or violins, the villain's on low brass or cellos), cutting each other off sooner
+  each time; then together in counterpoint, one high and one low, over a shared pulse,
+  their harmonies clashing (the villain's motif in a key a semitone or tritone away);
+  whichever wins the last statement wins the scene.
+- **Not**: blending them into one comfortable harmony before the story decides.
+
+### The hero's breakdown ("BSoD Song")
+- **Signals**: a hero shattered - a death, a failure, a betrayal; numbness, not darkness.
+- **Write it**: the theme in fragments: its first notes only, on one quiet instrument
+  (a solo oboe, a cello, celesta), each fragment stopping before it resolves, long rests,
+  a slow bare accompaniment (one held note or none); the tempo slower, the key the same.
+- **Not**: Corruption (the theme turned dark) - here it is broken, not changed.
+
+### The sidekick's answer ("Sidekick Song")
+- **Signals**: the companion, the comic friend, the loyal squire: lighter than the hero,
+  tied to them.
+- **Write it**: their own short motif, quicker and higher (piccolo, clarinet, pizzicato,
+  bassoon for the comic one), that answers the hero's phrases in the gaps - often built
+  from the hero's motif's rhythm; it can play alone in their scenes.
+- **Not**: a second grand theme - the sidekick's music stays smaller than the hero's.
+
+### Voice and register ("Innocent Soprano", "Tenor Boy")
+- **Signals**: youth, innocence, idealism in a high, bright voice; age, weight and
+  authority in a low one.
+- **Write it**: put a young idealist's or innocent's tune high (flutes, violins, oboe,
+  high clarinet, a high choir line), a veteran's, a ruler's or a mentor's low and warm
+  (cellos, horns, bassoons, a low choir); a character who grows up can move down an
+  octave over their arc, and a fallen innocent can lose the top of their range.
+- **Not**: a young hero carried by tuba and basses (unless the joke is the point).
 
 ## Themes across a campaign
 
@@ -1181,3 +1228,5 @@ Tango Music, Tense Tremolo, Theme Music Power-Up, Tick Tock Tune, Triumphant Rep
 Victorious Chorus, Villain Song (the villain portraits; its lyrics are not used).
 
 The *Evil Music Index*'s members were reviewed separately: the ones not already above or in the villain sections are Ghost Song, Theremin / Freaky Electronic Music and Conducting the Carnage (added under Villains); the rest are songs with lyrics (villain songs, duets, rock, Halloween songs), not orchestral devices.
+
+From the *Heroic Music Index*: the songs that are lyrics rather than devices ("Bragging Theme Tune", "Bravado Song", "Christmas Songs", "'I Am Great!' Song", "'I Am' Song", "'The Villain Sucks' Song") are not used; its other members are covered above.
