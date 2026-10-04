@@ -202,6 +202,8 @@
   .pc { cursor: pointer; border-radius: 6px; }
   .pc:hover, .pc:focus-visible { background: var(--me); outline: none; }
   .pc .open-sheet { float: inline-end; font-size: .75rem; color: var(--muted); }
+  .pc .kick { float: inline-end; border: 0; background: none; padding: 0 4px; margin-inline-start: 6px;
+              font-size: .85rem; color: var(--hp-low); }
   .pc .avatar { width: 30px; height: 30px; border-radius: 50%; object-fit: cover;
                 vertical-align: middle; margin-inline-end: 6px; border: 1px solid var(--line); }
   #sheet-body .portrait { float: inline-end; width: min(180px, 42%); border-radius: 10px;
@@ -1745,6 +1747,19 @@
       }));
       if (before && before.hp !== pc.hp) d.classList.add(pc.hp < before.hp ? "hurt" : "healed");
       d.onclick = () => openSheet(pc.name);
+      const iLead = list.some((p) => p.name === me && p.lead);
+      if (iLead && !pc.claimed && !pc.lead && pc.name !== me) {
+        const k = document.createElement("button");
+        k.type = "button"; k.className = "kick"; k.textContent = "✕"; k.title = t("kickPc");
+        k.onclick = async (ev) => {
+          ev.stopPropagation();
+          if (!confirm(t("kickConfirm").replace("{pc}", pc.name))) return;
+          const r = await api("/api/kick", { pc: pc.name });
+          if (!r.ok) setStatus(r.error || "?", true);
+          refreshInfo();
+        };
+        d.prepend(k);
+      }
       d.onkeydown = (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); openSheet(pc.name); } };
       box.appendChild(d);
       partyShown.set(pc.name, pc);

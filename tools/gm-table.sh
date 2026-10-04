@@ -23,6 +23,7 @@
 #   gm-table.sh round 90 | round off      How long the GM waits for everyone (default 60 s)
 #   gm-table.sh alias "Marta" "מרתה"      Another spelling of a name (hover cards)
 #   gm-table.sh free "<pc>"               Free a seat (player switching devices)
+#   gm-table.sh kick "<pc>"               Remove a character nobody is playing (to departed/)
 #   gm-table.sh stop                      Close the table
 #   gm-table.sh serve [...]               Run the server in the foreground instead
 
@@ -35,6 +36,10 @@ shift
 
 case "$ACTION" in
     "serve"|"start"|"status"|"wait"|"inbox"|"say"|"redo"|"translate"|"music"|"free"|"stop"|"round"|"alias"|"languages")
+        $PYTHON_CMD "$LIB_DIR/table_server.py" "$ACTION" "$@"
+        ;;
+
+    "kick")         # (its own clause: remove a character nobody plays)
         $PYTHON_CMD "$LIB_DIR/table_server.py" "$ACTION" "$@"
         ;;
 

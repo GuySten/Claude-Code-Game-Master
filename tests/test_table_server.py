@@ -1183,6 +1183,28 @@ def test_heroic_moments_and_bosses_without_a_composer(table, monkeypatch):
     assert state.music["track"] == "theme:Lich" and state.music["boss"] is True
 
 
+def test_the_host_removes_a_character_nobody_plays(table):
+    call, camp, state = table["call"], table["camp"], table["state"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    bram = call("/api/create", {"code": CODE, "name": "Bram", "concept": "a dwarf"})[1]["token"]
+    izrin = call("/api/create", {"code": CODE, "name": "Izrin", "concept": "an elf"})[1]["token"]
+    call("/api/leave", {"code": CODE, "token": izrin})                   # their player is gone
+    names = lambda: [p["name"] for p in call(f"/api/info?code={CODE}&token={pip}")[1]["party"]]
+    assert "Izrin" in names()
+    # Seated, or the lead: never.
+    status, body = call("/api/gm/kick", {"pc": "Bram"}, host=True)
+    assert status == 409 and "seated" in body["error"]
+    assert "lead" in call("/api/gm/kick", {"pc": "Pip"}, host=True)[1]["error"]
+    # Only the lead player may, from the page.
+    assert call("/api/kick", {"code": CODE, "token": bram, "pc": "Izrin"})[0] == 403
+    status, body = call("/api/kick", {"code": CODE, "token": pip, "pc": "izrin"})
+    assert status == 200 and body["removed"] == "Izrin" and "Izrin" not in names()
+    assert json.loads((camp / "departed" / next(p.name for p in (camp / "departed").iterdir())).read_text())["name"] == "Izrin"
+    seen = call(f"/api/messages?code={CODE}&token={bram}&after=0")[1]["messages"]
+    assert any((m.get("event") or {}).get("type") == "departed" and m.get("pc") == "Izrin" for m in seen)
+    assert call("/api/gm/kick", {"pc": "Nobody"}, host=True)[0] == 409
+
+
 def test_the_gm_waits_for_everyone_or_a_minute_after_the_first_action(table):
     import table_server
     call, state = table["call"], table["state"]

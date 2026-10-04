@@ -406,6 +406,9 @@ story to every screen. Talk to Claude in the terminal only for out-of-game thing
 "take it slower", "let's end at the next rest"). Want longer rounds tonight?
 `bash tools/gm-table.sh round 120` (or `round off`). A player who's away for a while holds up
 nobody for more than a minute, but you can free their seat: `bash tools/gm-table.sh free "Name"`.
+A character nobody plays any more can leave the party: `bash tools/gm-table.sh kick "Name"`
+(its sheet is kept in the campaign's `departed/`), or, from the lead player's page, the ✕ on
+that character's card. A seated character can't be removed: free the seat first.
 
 > **Tip:** Claude Code asks permission before running commands. When it asks to run
 > `bash tools/...` during the game, choose the option to allow it without asking again, or

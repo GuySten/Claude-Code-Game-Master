@@ -1657,6 +1657,26 @@ class TableState:
             return None  # the PC left the table (or died and was replaced)
         return name
 
+    def remove_pc(self, name: str) -> Dict[str, Any]:
+        """Take a character nobody is playing out of the party: its sheet is archived
+        to the campaign's departed/ (as gm-player.sh leave does) and the table is
+        told. Never a seated character (free the seat first), never the lead."""
+        path = party_roster.find_pc(self.campaign_dir, name)
+        if path is None:
+            return {"ok": False, "error": f"no player character named {name}"}
+        sheet = party_roster._read(path) or {}
+        real = sheet.get("name") or name
+        if path.name == party_roster.LEAD_FILE:
+            return {"ok": False, "error": f"{real} is the lead character and can't be removed"}
+        if self.claimed_by_anyone(real):
+            return {"ok": False, "error": f"{real} is seated: free the seat first (gm-table.sh free)"}
+        departed = self.campaign_dir / "departed"
+        departed.mkdir(parents=True, exist_ok=True)
+        (departed / path.name).write_text(json.dumps(sheet, indent=2, ensure_ascii=False), encoding="utf-8")
+        path.unlink()
+        self.append("system", f"{real} has left the party.", pc=real, event={"type": "departed"})
+        return {"ok": True, "removed": real}
+
     def claimed_by_anyone(self, name: str) -> bool:
         return any(party_roster._same_name(n, name) for n in self.seats.values())
 
@@ -2864,6 +2884,13 @@ def make_handler(state: TableState, code: str, host_key: str):
                 state.set_lang(me, data.get("lang"))
                 return self._json({"ok": True})
 
+            if url.path == "/api/kick":
+                # The lead player (the host's own seat) may clear out characters nobody plays.
+                lead = me and party_roster.find_pc(state.campaign_dir, me)
+                if not lead or lead.name != party_roster.LEAD_FILE:
+                    return self._err("Only the lead player can remove a character.", 403)
+                r = state.remove_pc(str(data.get("pc", "")))
+                return self._json(r, 200 if r["ok"] else 409)
             if url.path == "/api/leave":
                 name = state.release(str(data.get("token", "")))
                 if name:
@@ -3082,6 +3109,9 @@ def make_handler(state: TableState, code: str, host_key: str):
                     return self._err("give a name and its other spelling")
                 state.set_alias(name, alias)
                 return self._json({"ok": True, "aliases": state.aliases()})
+            if path == "/api/gm/kick":
+                r = state.remove_pc(str(data.get("pc", "")))
+                return self._json(r, 200 if r["ok"] else 409)
             if path == "/api/gm/free":
                 freed = state.free(str(data.get("pc", "")))
                 return self._json({"ok": True, "freed": freed})
@@ -3590,6 +3620,9 @@ def main() -> None:
     f = sub.add_parser("free", help="Free a player's seat so they can rejoin from another device")
     f.add_argument("pc")
 
+    kk = sub.add_parser("kick", help="Remove a character nobody is playing (archived to departed/)")
+    kk.add_argument("pc")
+
     rd = sub.add_parser("redo", help="An action can't work: tell its player why; they choose "
                                      "another on a fresh round clock")
     rd.add_argument("pc")
@@ -3870,6 +3903,13 @@ def main() -> None:
               f"Resolve and narrate nothing of this round yet: run wait.")
         if r.get("reminder"):
             print(r["reminder"])
+        return
+
+    if args.action == "kick":
+        r = _call(campaign_dir, "POST", "/api/gm/kick", {"pc": args.pc})
+        if not r.get("ok"):
+            sys.exit(f"[ERROR] {r.get('error')}")
+        print(f"{r['removed']} has left the party (their sheet is in departed/).")
         return
 
     if args.action == "free":
