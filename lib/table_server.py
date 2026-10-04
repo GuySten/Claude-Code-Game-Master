@@ -1556,7 +1556,7 @@ class TableState:
                      # The sheets as the players last saw them. The GM records
                      # every change BEFORE narrating it, so without this the HP
                      # bars would give the outcome away before the story does.
-                     "party": self.party(sheets=True)}
+                     "party": self.party(sheets=True), "fight": self.fight()}
 
     def set_stage(self, stage: str) -> bool:
         with self.lock:
@@ -1676,6 +1676,56 @@ class TableState:
                 out.append({**{k: v for k, v in before.items() if k != "sheet"},
                             "claimed": pc["claimed"], "lead": pc["lead"]})
         return out
+
+    def fight(self) -> Optional[Dict[str, Any]]:
+        """The fight as the players may see it: the order, whose turn it is, how
+        hurt each foe looks (in words, never its numbers), recorded conditions and
+        states, and the battlefield effects (which hit everyone). A hidden foe isn't
+        listed. None when there is no fight."""
+        data = self._read_json(self.campaign_dir / "combat_state.json", {})
+        combatants = data.get("combatants") if isinstance(data, dict) else None
+        if not combatants or data.get("active") is False:
+            return None
+        order, turn = [], None
+        for i, c in enumerate(combatants):
+            if not isinstance(c, dict) or not c.get("name"):
+                continue
+            states = c.get("states") or {}
+            foe = c.get("kind") == "enemy" or "block" in c or str(c.get("side", "")).lower() in (
+                "enemy", "enemies", "foe", "foes", "hostile", "monster")
+            if foe and states.get("hidden"):
+                continue                        # (the players don't know where it is)
+            entry = {"name": c["name"], "foe": foe,
+                     "states": {k: v for k, v in states.items() if k in ("hidden", "cover") and v},
+                     "conditions": [str(x.get("name") if isinstance(x, dict) else x)
+                                    for x in c.get("conditions") or []]}
+            if foe:
+                try:
+                    ratio = max(0.0, float(c.get("hp_current"))) / float(c.get("hp_max"))
+                except (TypeError, ValueError, ZeroDivisionError):
+                    ratio = None
+                entry["health"] = (None if ratio is None else "down" if ratio <= 0
+                                   else "critical" if ratio <= .25 else "bloodied" if ratio <= .5
+                                   else "wounded" if ratio < 1 else "unhurt")
+            order.append(entry)
+            if i == data.get("turn_index", 0):
+                turn = c["name"]
+        if not order:
+            return None
+        fields = [{"name": f.get("name"), "effects": f.get("effects") or [], "unless": f.get("unless")}
+                  for f in data.get("fields") or [] if isinstance(f, dict) and f.get("name")]
+        return {"round": data.get("round", 1), "turn": turn if any(e["name"] == turn for e in order)
+                else None, "order": order, "fields": fields}
+
+    def fight_for(self, viewer: Optional[str]) -> Optional[Dict[str, Any]]:
+        """The fight, held back like the party's sheets during the GM's turn: a foe
+        falls when the story says so, not when the GM records it."""
+        with self.lock:
+            turn = self.turn
+            if (turn and time.time() - turn["started_at"] < STALE_TURN_SECONDS and "fight" in turn
+                    and not (viewer and self.langs.get(viewer, "en") in turn["langs_done"])):
+                return turn["fight"]
+        return self.fight()
 
     def last_narration(self, viewer: Optional[str]) -> int:
         """Id of the newest GM message this viewer can see. The page holds sheet
@@ -2585,6 +2635,7 @@ def make_handler(state: TableState, code: str, host_key: str):
                                    "places": state.places(), **state.gallery(),
                                    "round": state.round_state(),
                                    "lore_terms": state.lore_terms(me, q.get("lang")),
+                                   "fight": state.fight_for(me),
                                    "languages": languages.describe(state.languages),
                                    "lang": state.lang_for(me),
                                    "narration_id": state.last_narration(me),

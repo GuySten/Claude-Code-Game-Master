@@ -252,6 +252,20 @@
   .voice-settings input[type=range] { width: 100%; padding: 0; }
   #now-playing { margin-bottom: 6px; }
   #party-toggle { display: none; }
+  /* The fight: order, whose turn, how the foes look, what's on the battlefield. */
+  #fight { margin: 6px 16px 0; padding: 6px 10px; border: 1px solid var(--hp-low); border-radius: 10px;
+           background: color-mix(in srgb, var(--hp-low) 5%, var(--panel)); font-size: .88rem; }
+  #fight .fhead { display: flex; justify-content: space-between; gap: 8px; color: var(--hp-low); font-weight: bold; }
+  #fight .order { display: flex; gap: 6px; overflow-x: auto; padding: 6px 0 2px; scrollbar-width: thin; }
+  #fight .fc { flex: 0 0 auto; display: block; border: 1px solid var(--line); border-radius: 8px;
+               padding: 3px 9px; background: var(--panel); color: var(--ink); text-align: start; font-size: .85rem; }
+  #fight .fc .h { display: block; font-size: .74rem; color: var(--muted); }
+  #fight .fc.foe { border-color: color-mix(in srgb, var(--hp-low) 55%, var(--line)); }
+  #fight .fc.now { box-shadow: 0 0 0 2px var(--accent); }
+  #fight .fc.target { outline: 2px dashed var(--hp-low); outline-offset: 1px; }
+  #fight .fc.down { opacity: .5; text-decoration: line-through; }
+  #fight .fields { margin-top: 4px; }
+  @media (max-width: 760px) { #fight { margin: 4px 8px 0; } }
 
   /* The players' side chat (the GM never sees it): a third column on wide screens,
      a drawer from the side on narrower ones. */
@@ -431,6 +445,7 @@
                 data-i18n-label="menu">⋯</button>
       </div>
     </header>
+    <div id="fight" class="hidden" aria-live="polite"></div>
     <div id="log" aria-live="polite"></div>
     <div id="turn" class="hidden" aria-live="polite"></div>
     <div id="progress" class="hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100"
@@ -1668,6 +1683,63 @@
     loadMySheet();
     refreshExtras();
   }
+
+  // ------------------------------------------------------------ the fight ---
+  // Who's in it and in what order, whose turn it is, how hurt each foe looks (in
+  // words), and the battlefield effects, which hit everyone. Tap a foe to aim at it.
+  const fxWords = (f) => (f.effects || []).map((e) =>
+    t(e.kind === "adv" ? "fxAdv" : "fxDis").replace("{what}",
+      (e.ability ? tx(e.ability.toUpperCase()) + " " : "") + t("fx_" + e.roll))).join(", ");
+  function renderFight() {
+    const box = $("fight"), f = fightState;
+    if (!f) { box.classList.add("hidden"); box.textContent = ""; box.dataset.sig = ""; return; }
+    const foes = f.order.filter((c) => c.foe && c.health !== "down");
+    const aim = aimAt && foes.some((c) => c.name === aimAt) ? aimAt : (foes[0] || {}).name;
+    const party = f.order.filter((c) => !c.foe).map((c) => partyLive.find((p) => p.name === c.name) || {});
+    const sig = lang + "|" + aim + "|" + JSON.stringify(f) + JSON.stringify(party.map((p) => [p.hp, p.conditions]));
+    if (box.dataset.sig === sig) return;
+    box.dataset.sig = sig;
+    box.classList.remove("hidden");
+    box.textContent = "";
+    const head = document.createElement("div");
+    head.className = "fhead";
+    head.innerHTML = `<span>${esc(t("fightTitle").replace("{n}", f.round || 1))}</span>` +
+      (f.turn ? `<span dir="auto">${esc(t("fightTurn").replace("{name}", f.turn))}</span>` : "");
+    box.appendChild(head);
+    const order = document.createElement("div");
+    order.className = "order";
+    f.order.forEach((c) => {
+      const pc = !c.foe && partyLive.find((p) => p.name === c.name);
+      const b = document.createElement(c.foe ? "button" : "div");
+      if (c.foe) b.type = "button";
+      b.className = "fc" + (c.foe ? " foe" : "") + (c.name === f.turn ? " now" : "")
+        + (c.foe && c.name === aim ? " target" : "") + (c.health === "down" ? " down" : "");
+      const bits = [];
+      if (c.foe && c.health) bits.push(t("hpw_" + c.health));
+      if (pc) bits.push(`${pc.hp}/${pc.hp_max}`);
+      const conds = (c.conditions || []).concat(pc ? (pc.conditions || []).map((x) => String(x && x.name ? x.name : x)) : []);
+      [...new Set(conds)].forEach((x) => bits.push(tx(x)));
+      if ((c.states || {}).cover) bits.push(t("cover_" + c.states.cover));
+      if ((c.states || {}).hidden) bits.push(t("hiddenState"));
+      b.innerHTML = `${c.foe ? "👹 " : ""}${esc(c.name)}<span class="h">${esc(bits.join(" · "))}</span>`;
+      b.dir = "auto";
+      if (c.foe && c.health !== "down") {
+        b.title = t("fightTarget");
+        b.onclick = () => { aimAt = c.name; refreshExtras(); };
+      }
+      order.appendChild(b);
+      if (c.name === f.turn) setTimeout(() => b.scrollIntoView({ block: "nearest", inline: "nearest" }), 0);
+    });
+    box.appendChild(order);
+    (f.fields || []).forEach((fl) => {
+      const d = document.createElement("div");
+      d.className = "fields"; d.dir = "auto";
+      d.textContent = `🌋 ${fl.name}: ${fxWords(fl)} — ${t("fxEveryone")}`
+        + (fl.unless ? " " + t("fxUnless").replace("{trait}", fl.unless) : "");
+      box.appendChild(d);
+    });
+  }
+  uiHooks.push(renderFight);
 
   // ------------------------------------------------- the character sheet ---
   let sheetFor = null, sheetShownRev = null, sheetLevelUp = null, sheetPublic = false;

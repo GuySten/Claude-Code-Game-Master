@@ -1310,6 +1310,42 @@ def test_an_action_that_cannot_work_is_chosen_again_on_a_fresh_clock(table):
     assert call("/api/gm/redo", {"pc": "Nobody", "text": "x"}, host=True)[0] == 400
 
 
+def test_the_fight_shows_order_turn_foes_in_words_and_effects_for_everyone(table):
+    call, camp, state = table["call"], table["camp"], table["state"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    assert call(f"/api/info?code={CODE}&token={pip}")[1]["fight"] is None          # no fight
+    fight = {"active": True, "round": 2, "turn_index": 1, "fields": [
+                 {"name": "Shaking floor", "effects": [{"kind": "dis", "roll": "attack", "ability": None}],
+                  "unless": "tremorsense"}],
+             "combatants": [
+                 {"name": "Pip", "side": "party", "kind": "pc", "states": {"cover": "half"}},
+                 {"name": "Grak", "side": "enemy", "kind": "enemy", "hp_current": 3, "hp_max": 7,
+                  "conditions": ["prone"], "states": {}, "block": {"secret": "its numbers"}},
+                 {"name": "Lurker", "side": "enemy", "kind": "enemy", "hp_current": 9, "hp_max": 9,
+                  "states": {"hidden": True}},
+                 {"name": "Rat", "side": "enemy", "hp_current": 0, "hp_max": 2}]}
+    (camp / "combat_state.json").write_text(json.dumps(fight))
+    got = call(f"/api/info?code={CODE}&token={pip}")[1]["fight"]
+    assert got["round"] == 2 and got["turn"] == "Grak"
+    assert [c["name"] for c in got["order"]] == ["Pip", "Grak", "Rat"]             # the hidden one isn't
+    grak = got["order"][1]
+    assert grak == {"name": "Grak", "foe": True, "states": {}, "conditions": ["prone"], "health": "bloodied"}
+    assert got["order"][2]["health"] == "down" and got["order"][0]["states"] == {"cover": "half"}
+    assert "block" not in json.dumps(got) and "hp_current" not in json.dumps(got)  # never its numbers
+    assert got["fields"][0]["name"] == "Shaking floor" and got["fields"][0]["unless"] == "tremorsense"
+    # During the GM's turn the fight waits for the story, like the sheets do.
+    call("/api/say", {"code": CODE, "token": pip, "text": "I stab Grak."})
+    call("/api/gm/inbox", {}, host=True)
+    fight["combatants"][1]["hp_current"] = 0
+    (camp / "combat_state.json").write_text(json.dumps(fight))
+    assert call(f"/api/info?code={CODE}&token={pip}")[1]["fight"]["order"][1]["health"] == "bloodied"
+    call("/api/gm/say", {"text": "Grak falls.", "lang": "en"}, host=True)
+    call("/api/gm/say", {"text": "גראק נופל.", "lang": "he"}, host=True)
+    assert call(f"/api/info?code={CODE}&token={pip}")[1]["fight"]["order"][1]["health"] == "down"
+    (camp / "combat_state.json").write_text(json.dumps({"active": False, "combatants": []}))
+    assert state.fight() is None
+
+
 def test_the_round_never_waits_for_a_pc_who_cannot_act(table):
     import table_server
     call, state, camp = table["call"], table["state"], table["camp"]
