@@ -93,3 +93,8 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   sure Ode to Joy was a good test of it. The old hall is back until a fast, changing
   tune (In the Hall of the Mountain King, accelerating) settles it. Measured there, the
   new hall's attacks are sharper only in the slow opening (+0.7 dB), not in the fast end.
+- **The crisper hall on fast music:** Mountain King (accelerating) for the full orchestra
+  "too close"; brass only, the old hall "slightly crisper, but not sure"; Flight of the
+  Bumblebee (brass) "almost the same". The hall tweak isn't heard - the old hall stays.
+  The attack measure tracks big differences (an instrument, 9 dB more hall), not
+  this small one (it leaned the other way on the brass Mountain King).
