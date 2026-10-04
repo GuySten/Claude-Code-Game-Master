@@ -302,7 +302,9 @@ every other occasion comes from the library and the built-in sounds as before.
 - **Main villains** get their own composed theme (the GM marks them).
 - **Bosses** get a composed battle theme: thundering drums, brass, choir.
 - **Every player character** gets a heroic anthem. When they do something truly heroic,
-  it plays for everyone, and then the scene's music comes back.
+  it plays for everyone, and then the scene's music comes back. Each anthem is composed with
+  its **dark twin**, the same music made ominous: if that character ever falls (lost to
+  madness, see the GM's judgment), it becomes their villain theme.
 
 Everything is composed in the background while you play: a theme takes a minute or two on
 a GPU. Until it's ready, the built-in theme plays, and then the composed one takes over.
@@ -320,6 +322,11 @@ computer took and a link to listen. That tells you what to expect: if a 30-secon
 
 - **No NVIDIA card?** `setup --cpu` works on any computer, but each piece takes several
   minutes. The music still arrives, just later.
+- **Dark twins that keep the tune:** by default a twin is the anthem's own recording made
+  dark (slower, lower, muffled, echoing). `bash tools/gm-music-compose.sh setup --melody`
+  adds MusicGen-Melody (about 3.3 GB more): it re-composes each twin on the anthem's melody,
+  in a minor, menacing arrangement. It's heavier on the GPU; if it ever fails, the darkened
+  recording is used instead.
 - **Pictures and music take turns on the GPU; both models stay in RAM.** When the table
   starts, it loads both into RAM in the background, one after the other: first Forge's
   picture model (Forge paints one tiny throwaway picture), then the music model. After

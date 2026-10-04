@@ -3,6 +3,7 @@
 # (local AI: MusicGen, on this computer's GPU — optional)
 #
 #   gm-music-compose.sh setup [--cpu]        Install the composer (its own .compose-venv, ~3 GB)
+#   gm-music-compose.sh setup --melody       Also the melody model (~3.3 GB): dark twins keep the anthem's tune
 #   gm-music-compose.sh check                Which GPU/CPU it would use
 #   gm-music-compose.sh test                 Time one 30-second piece (first run downloads the model)
 #   gm-music-compose.sh theme "<villain>" [--boss] [--look "..."]   Compose a theme now
@@ -30,6 +31,22 @@ shift || true
 
 case "$ACTION" in
     setup)
+        if [ "$1" = "--melody" ]; then
+            PY="$(compose_py)"
+            [ -z "$PY" ] && { error "Set up the composer first: bash tools/gm-music-compose.sh setup"; exit 1; }
+            info "Downloading the melody model (about 3.3 GB, once)..."
+            "$PY" "$LIB_DIR/music_compose.py" --fetch-melody || exit 1
+            # COMPOSE_TWIN=melody in .env (other lines untouched, never printed)
+            $PYTHON_CMD - "$PROJECT_ROOT/.env" <<'PY'
+import pathlib, sys
+p = pathlib.Path(sys.argv[1])
+lines = p.read_text(encoding="utf-8").splitlines() if p.exists() else []
+lines = [l for l in lines if not l.startswith("COMPOSE_TWIN=")] + ["COMPOSE_TWIN=melody"]
+p.write_text("\n".join(lines) + "\n", encoding="utf-8")
+PY
+            success "Dark twins now keep each anthem's tune (COMPOSE_TWIN=melody in .env)."
+            exit 0
+        fi
         if ! command -v uv >/dev/null 2>&1; then
             error "uv is needed (the installer sets it up): https://docs.astral.sh/uv/"
             exit 1

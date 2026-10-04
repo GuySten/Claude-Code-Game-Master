@@ -699,6 +699,8 @@ class TableState:
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
         tmp.replace(path)
+        if composer.villain_theme_from_anthem(self.campaign_dir, name):
+            return                          # the anthem's dark twin was ready: their theme now
         if self.music_maker is not None or composer.available():
             self.music_jobs.append({"kind": "dark_anthem", "name": name, "boss": False, "look": "",
                                     "sheet": sheet})

@@ -15,6 +15,13 @@ this; it starts this script and reads the JSON lines it prints.
 The model (facebook/musicgen-small by default; COMPOSE_MODEL to change) is
 downloaded from Hugging Face on first use. Its weights are licensed CC-BY-NC
 4.0: fine for a home game, not for selling the music.
+
+A piece can have a dark TWIN: the same music, made ominous (a hero's anthem and
+the villain theme they'd become). COMPOSE_TWIN=melody re-composes it with
+MusicGen-Melody, which keeps the melody of the original and changes everything
+else (an extra ~3.3 GB model: `gm-music-compose.sh setup --melody`); otherwise,
+or if that fails, the original recording itself is darkened: slower and lower,
+muffled, with a cavernous echo.
 """
 
 import argparse
@@ -27,6 +34,8 @@ import time
 from pathlib import Path
 
 MODEL = os.environ.get("COMPOSE_MODEL", "facebook/musicgen-small")
+MELODY_MODEL = os.environ.get("COMPOSE_MELODY_MODEL", "facebook/musicgen-melody")
+TWIN = os.environ.get("COMPOSE_TWIN", "darken").strip().lower()      # melody | darken
 TOKENS_PER_SECOND = 50          # MusicGen's audio frame rate
 MAX_SECONDS = 30                # the model's context: ~1500 tokens
 # How loud a finished piece is (gated RMS, dBFS: close to LUFS for music). MusicGen's
@@ -172,15 +181,101 @@ def generate(prompt: str, seconds: float, device: str):
     return samples, model.config.audio_encoder.sampling_rate, device
 
 
+# --- the dark twin of a piece ---
+def darken(samples, rate: int, slow: float = 0.84):
+    """The same recording, made ominous: slower and lower (0.84 ≈ three semitones
+    down, like a tape slowing), its brightness muffled, in a cavernous echo."""
+    import numpy as np
+    x = np.asarray(samples, dtype="float64")
+    if len(x) < 2:
+        return x.astype("float32")
+    y = np.interp(np.arange(int(len(x) / slow)) * slow, np.arange(len(x)), x)
+    size = 1 << (len(y) + int(rate * 2.2)).bit_length()
+    spec = np.fft.rfft(y, size)
+    freqs = np.fft.rfftfreq(size, 1 / rate)
+    spec *= 1 / (1 + (freqs / 2200.0) ** 4)                    # muffled: the highs roll off
+    rng = np.random.default_rng(7)
+    n_ir = int(rate * 2.0)
+    ir = rng.standard_normal(n_ir) * np.exp(-np.arange(n_ir) / (rate * 0.5))
+    ir[0] = 0
+    ir /= np.sqrt(np.sum(ir ** 2))
+    dry = np.fft.irfft(spec, size)[:len(y)]
+    wet = np.fft.irfft(spec * np.fft.rfft(ir, size), size)[:len(y)]
+    return (0.8 * dry + 0.45 * wet).astype("float32")
+
+
+def _load_melody():
+    from transformers import AutoProcessor, MusicgenMelodyForConditionalGeneration
+    if "melody" not in _cache:
+        _cache["melody_processor"] = AutoProcessor.from_pretrained(MELODY_MODEL)
+        _cache["melody"] = MusicgenMelodyForConditionalGeneration.from_pretrained(MELODY_MODEL).eval()
+    return _cache["melody_processor"], _cache["melody"]
+
+
+def melody_generate(base, rate: int, prompt: str, seconds: float, device: str):
+    """MusicGen-Melody: the description's music, on the melody of ``base``."""
+    import numpy as np
+    import torch
+    processor, model = _load_melody()
+    want = processor.feature_extractor.sampling_rate
+    audio = np.asarray(base, dtype="float32")
+    if rate != want:
+        audio = np.interp(np.arange(int(len(audio) * want / rate)) * rate / want,
+                          np.arange(len(audio)), audio).astype("float32")
+    seconds = max(1.0, min(float(seconds), MAX_SECONDS))
+    half = device != "cpu"                  # (1.5 B parameters: half precision on the card)
+    try:
+        model.to(device, torch.float16 if half else torch.float32)
+        inputs = processor(audio=audio, sampling_rate=want, text=[prompt], padding=True,
+                           return_tensors="pt").to(device)
+        if half:
+            inputs = {k: (v.half() if v.is_floating_point() else v) for k, v in inputs.items()}
+        with torch.no_grad():
+            out = model.generate(**inputs, do_sample=True, guidance_scale=3.0,
+                                 max_new_tokens=int(seconds * TOKENS_PER_SECOND) + 3)
+        return out[0, 0].float().cpu().numpy(), model.config.audio_encoder.sampling_rate
+    finally:
+        if device != "cpu":
+            _park(model)
+
+
+def twin_from(base, rate: int, prompt: str, seconds: float, device: str):
+    """(samples, rate, how): the dark twin of ``base``."""
+    if TWIN == "melody":
+        try:
+            samples, out_rate = melody_generate(base, rate, prompt, seconds, device)
+            return samples, out_rate, "melody"
+        except Exception as e:             # not downloaded, offline, out of memory...
+            print(f"[compose] the melody model failed ({type(e).__name__}: {e}); "
+                  "darkening the recording instead", file=sys.stderr, flush=True)
+    return darken(base, rate), rate, "darkened"
+
+
 def run_job(job: dict, device: str) -> dict:
     """Compose one {prompt, seconds, out, loop} job -> its JSON answer."""
     started = time.time()
     try:
-        samples, rate, used = generate(job["prompt"], job.get("seconds", 30), device)
+        extra = {}
+        if job.get("melody_from"):          # this piece IS a twin: of a piece already made
+            import soundfile as sf
+            base, base_rate = sf.read(job["melody_from"], dtype="float32", always_2d=False)
+            if getattr(base, "ndim", 1) > 1:
+                base = base.mean(axis=1)
+            samples, rate, how = twin_from(base, base_rate, job["prompt"], job.get("seconds", 30), device)
+            used, extra = device, {"how": how}
+        else:
+            samples, rate, used = generate(job["prompt"], job.get("seconds", 30), device)
+        raw = samples
         samples = finish(samples, rate, bool(job.get("loop")))
         path = write(samples, rate, Path(job["out"]))
+        twin = job.get("twin")
+        if twin:                            # and its dark twin, from the same music
+            t_samples, t_rate, how = twin_from(raw, rate, twin["prompt"], job.get("seconds", 30), device)
+            t_samples = finish(t_samples, t_rate, bool(twin.get("loop")))
+            t_path = write(t_samples, t_rate, Path(twin["out"]))
+            extra["twin"] = {"path": str(t_path), "seconds": round(len(t_samples) / t_rate, 1), "how": how}
         return {"ok": True, "path": str(path), "seconds": round(len(samples) / rate, 1),
-                "device": used, "elapsed": round(time.time() - started, 1)}
+                "device": used, "elapsed": round(time.time() - started, 1), **extra}
     except Exception as e:                # one bad piece doesn't sink the rest
         return {"ok": False, "error": f"{type(e).__name__}: {e}"}
 
@@ -212,6 +307,8 @@ def main() -> None:
                     help="Bring already-composed pieces to the standard loudness, in place")
     ap.add_argument("--check", action="store_true", help="Print the hardware that would be used")
     ap.add_argument("--benchmark", action="store_true", help="Time one 30-second piece")
+    ap.add_argument("--fetch-melody", action="store_true",
+                    help="Download the melody model (for COMPOSE_TWIN=melody) and exit")
     args = ap.parse_args()
 
     if args.normalize:
@@ -226,6 +323,11 @@ def main() -> None:
                       flush=True)
             except Exception as e:
                 print(json.dumps({"ok": False, "path": f, "error": f"{type(e).__name__}: {e}"}), flush=True)
+        return
+
+    if args.fetch_melody:
+        _load_melody()
+        print(json.dumps({"ok": True, "model": MELODY_MODEL}))
         return
 
     import torch
