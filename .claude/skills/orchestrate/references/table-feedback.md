@@ -183,3 +183,9 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   "more incremental". A strong effect is a flash: about a beat at first, growing a
   little each time through the piece (here 1 -> 2 beats), and longer and more often
   one level down.
+- **The blind test - Kestrel's theme, written from the device library and the campaign
+  notes with no guidance** (the chain-gang stride under it all; the outsider's tune high
+  on flutes and clarinets; the rebel rising in waves - horns and violins, the Legmen's
+  choir, tremolo, a slow roll; the hope chord under the held peak; the gang on the war
+  cry; the horns' echo and a decided ending): "It is amazing." The library works: a
+  character's description -> devices -> a portrait, the critic catching the craft.
