@@ -63,7 +63,7 @@ except in "hits" and "rolls", where it is the velocity itself (1-127).
   "rolls": [{"part": "timpani", "note": "G#2", "from": 57, "to": 60, "vel": [70, 120]}],
   "unhinge": [{"parts": ["strings", "tremolo", "violins"], "from": 36, "to": 40, "drift": 0.6,
                "wobble": 0.3}],    # those parts waver and drift off pitch, each its own way,
-                         # and come back true by the end (madness in a section)
+                         # and come back true by the end
   "hits": [{"part": "kit", "note": "crash", "at": 60, "len": 6, "vel": 124}],
   "mix": {"choir": 3},   # dB up or down for a part in this piece (all parts are already
                          # evened out: the same velocity is the same loudness)
@@ -72,6 +72,27 @@ except in "hits" and "rolls", where it is the velocity itself (1-127).
 
 Choir (and organ, strings) voices take over a second to bloom: give them notes of a
 beat or longer, held chords, not quick rhythms; let brass and drums carry those.
+
+What the tools can make - each sound serves many characters and moods, none is a default:
+- a pulse that never stops: a dance (a waltz "xoo", a habanera), a march, an ostinato,
+  a ticking clock (pizzicato, high short strokes), a heartbeat (timpani) - "harmony"
+  with a "pattern", or "patterns";
+- a drone or pedal under moving music: "bass" held with "-", tremolo, organ, basses;
+- held chords that swell: strings; choir (a lament, a sacred or ominous chant, a
+  victorious chorus); organ; low brass for weight;
+- a written voice: a countermelody, a fanfare (trumpets, horns), an answering second
+  voice, a lone solo (solo_violin, oboe, english_horn, flute), a run - "lines";
+- bells tolling, a music box (celesta, glockenspiel), a birdlike flute figure;
+- drums of war or urgency (taiko, toms, snare, timpani), a roll into a moment, a sudden
+  loud hit or dissonant chord after quiet ("hits", a loud chord in "lines"), a reverse
+  cymbal into a downbeat;
+- a new colour for a return: a key change ("keys" and a statement's "shift"), borrowed,
+  diminished or unexpected chords, the tune moved to another register or instrument;
+- pitch that is not steady: a note that slides (a sigh, a slash, a siren, a lurch), an
+  uneven vibrato (a warped music box, a ghostly or frail voice, a heat shimmer), parts
+  drifting apart and back (unease, illusion, a dream, sickness, a curse, a mind
+  breaking) - "slide"/"wobble" on "lines" notes, "unhinge" for parts;
+- growth and shape: "dynamics", parts entering in waves, a "ritard", a "loop".
 
 Parts: violins, violins2, solo_violin (one player: exposed, quick), strings (sustained),
 tremolo, pizzicato, cellos, basses,
