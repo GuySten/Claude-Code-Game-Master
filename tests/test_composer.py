@@ -93,7 +93,7 @@ def test_compose_runs_the_composer_and_reads_its_answer(tmp_path, fake):
 
     prompt = composer.theme_prompt("Grimaldi", "rotting ringmaster", composer.flavor(camp), True)
     assert "boss battle" in prompt and "dark fantasy, grim" in prompt and "rotting ringmaster" in prompt
-    assert "heroic triumphant anthem for Pip, a Halfling Rogue" in composer.anthem_prompt(
+    assert "heroic character theme for Pip, a Halfling Rogue" in composer.anthem_prompt(
         {"name": "Pip", "race": "Halfling", "class": "Rogue"}, "")
 
 
@@ -321,3 +321,53 @@ def test_twins_use_the_melody_model_only_when_its_there_and_on_a_gpu(monkeypatch
     assert mc.twin_mode("cuda") == "darken"
     monkeypatch.setattr(mc, "TWIN", "melody")
     assert mc.twin_mode("cpu") == "melody"                              # asked for: always tried
+
+
+def test_each_character_has_a_tune_of_their_own_and_its_dark_twin_is_the_same_tune():
+    pytest.importorskip("numpy")
+    from lib import music_compose as mc
+    pip, also_pip, bram = mc.leitmotif("Pip"), mc.leitmotif(" pip "), mc.leitmotif("Bram")
+    assert pip == {**also_pip, "seed": "Pip"} and pip["motif"] != bram["motif"]   # stable, personal
+    first, second = pip["motif"][0][0], pip["motif"][1][0]
+    assert second - first in (3, 4)                                      # opens with a heroic leap
+    assert len(pip["notes"]) >= 4 * len(pip["motif"]) - 1                # a phrase, not one bar looped
+    dark = mc.leitmotif("Pip", "minor")
+    assert dark["notes"] == pip["notes"] and dark["key"] == pip["key"]   # the same tune...
+    k = pip["key"]
+    assert [mc._midi(k, d, "minor") for d, _ in dark["notes"]] != [mc._midi(k, d, "major") for d, _ in pip["notes"]]
+    score = mc.render_leitmotif("Pip", "major", 20)
+    assert abs(len(score) / 32000 - 20) < 0.01 and float(abs(score).max()) > 0.1
+
+
+def test_anthems_are_composed_on_the_leitmotif_with_the_melody_model(tmp_path, fake):
+    camp = tmp_path / "camp"
+    camp.mkdir()
+    seen = []
+    real = composer.compose_many
+    composer.compose_many = lambda jobs, *a, **k: seen.extend(jobs) or real(jobs, *a, **k)
+    try:
+        composer.compose_pieces(camp, [{"kind": "anthem", "sheet": {"name": "Pip"}}])
+    finally:
+        composer.compose_many = real
+    assert seen[0]["leitmotif"] == {"seed": "Pip", "mode": "major"}
+    assert seen[0]["twin"]["leitmotif"] == {"seed": "Pip", "mode": "minor"}
+    assert "memorable melody" in seen[0]["prompt"]
+
+
+def test_a_composer_job_follows_the_leitmotif_or_composes_freely(tmp_path, monkeypatch):
+    np = pytest.importorskip("numpy")
+    pytest.importorskip("soundfile")
+    from lib import music_compose as mc
+    tone = np.zeros(32000 * 2, "float32") + 0.1
+    monkeypatch.setattr(mc, "generate", lambda prompt, seconds, device: (tone, 32000, device))
+    heard = []
+    monkeypatch.setattr(mc, "melody_generate",
+                        lambda base, rate, prompt, seconds, device: heard.append((prompt, len(base))) or (tone, 32000))
+    job = {"prompt": "hero", "seconds": 2, "out": str(tmp_path / "h.wav"), "leitmotif": {"seed": "Pip"},
+           "twin": {"prompt": "dark", "out": str(tmp_path / "d.wav"), "leitmotif": {"seed": "Pip", "mode": "minor"}}}
+    monkeypatch.setattr(mc, "twin_mode", lambda device: "melody")
+    r = mc.run_job(job, "cuda")
+    assert r["how"] == "leitmotif" and r["twin"]["how"] == "leitmotif" and [p for p, _ in heard] == ["hero", "dark"]
+    monkeypatch.setattr(mc, "twin_mode", lambda device: "darken")         # no melody model: as before
+    r = mc.run_job(job, "cpu")
+    assert "how" not in r and r["twin"]["how"] == "darkened"

@@ -205,6 +205,67 @@ def generate(prompt: str, seconds: float, device: str):
     return samples, model.config.audio_encoder.sampling_rate, device
 
 
+# --- a character's leitmotif: a tune of their own, for the melody model to follow ---
+# MusicGen left to itself tends to loop one short phrase. Given a melody line, the
+# melody model arranges THAT: so each character gets a short motif (from their
+# name: always the same), laid out as a phrase that goes somewhere, and their dark
+# twin follows the very same motif in the minor key, slower.
+MAJOR = [0, 2, 4, 5, 7, 9, 11]
+MINOR = [0, 2, 3, 5, 7, 8, 10]          # natural minor: the same degrees, darkened
+RHYTHMS = [[1, .5, .5, 1, 1], [1.5, .5, 1, 1], [.5, .5, 1, .5, .5, 1], [1, 1, .5, .5, 1], [2, 1, 1]]
+
+
+def leitmotif(seed: str, mode: str = "major") -> dict:
+    """The tune: {key (MIDI tonic), notes [(scale degree, beats)], ...}. Same seed,
+    same tune; "minor" is the same tune in the parallel minor."""
+    import hashlib
+    import random
+    rng = random.Random(hashlib.sha256(seed.strip().lower().encode("utf-8")).hexdigest())
+    key = 60 + rng.choice([0, 2, 3, 5, 7])                    # C, D, Eb, F or G
+    rhythm = rng.choice(RHYTHMS)
+    start = rng.choice([0, 0, 2, 4])
+    degrees = [start, start + rng.choice([3, 4])]              # a heroic leap up: a 4th or a 5th
+    while len(degrees) < len(rhythm):
+        step = rng.choice([-1, -1, 1, 1, -2, 2, 0])
+        degrees.append(max(-2, min(9, degrees[-1] + step)))
+    motif = list(zip(degrees, rhythm))
+    # A phrase that goes somewhere: the motif, the motif a step higher, a contrast
+    # (the motif upside down, settling on the dominant), the motif home to the tonic.
+    up = [(d + 1, b) for d, b in motif]
+    contrast = [(2 * degrees[0] - d, b) for d, b in motif][:-1] + [(4, rhythm[-1])]
+    home = motif[:-1] + [(7 if degrees[-1] > 3 else 0, rhythm[-1] + 2)]
+    return {"seed": seed, "mode": mode, "key": key, "motif": motif,
+            "notes": motif + up + contrast + home}
+
+
+def _midi(key: int, degree: int, mode: str) -> int:
+    scale = MINOR if mode == "minor" else MAJOR
+    octave, idx = divmod(degree, 7)
+    return key + 12 * octave + scale[idx]
+
+
+def render_leitmotif(seed: str, mode: str = "major", seconds: float = 20, rate: int = 32000):
+    """The tune as a plain synthesized melody line (what the melody model hears):
+    stretched to ``seconds``; the minor one is also an octave lower."""
+    import numpy as np
+    tune = leitmotif(seed, mode)
+    beats = sum(b for _, b in tune["notes"])
+    beat_s = seconds / beats
+    out = np.zeros(int(seconds * rate) + rate, dtype="float64")
+    t0 = 0.0
+    for degree, b in tune["notes"]:
+        note = _midi(tune["key"], degree, mode) - (12 if mode == "minor" else 0)
+        hz = 440.0 * 2 ** ((note - 69) / 12)
+        n = int(b * beat_s * rate)
+        t = np.arange(n) / rate
+        env = np.minimum(1.0, t / 0.02) * np.exp(-t / max(0.25, b * beat_s * 0.9))
+        tone = sum(a * np.sin(2 * np.pi * hz * k * t) for k, a in ((1, 1.0), (2, .35), (3, .15)))
+        i = int(t0 * rate)
+        out[i:i + n] += 0.3 * env * tone
+        t0 += b * beat_s
+    return out[: int(seconds * rate)].astype("float32")
+
+
 # --- the dark twin of a piece ---
 def darken(samples, rate: int, slow: float = 0.84):
     """The same recording, made ominous: slower and lower (0.84 ≈ three semitones
@@ -294,12 +355,33 @@ def twin_from(base, rate: int, prompt: str, seconds: float, device: str):
     return darken(base, rate), rate, "darkened"
 
 
+def _leitmotif_piece(job: dict, device: str):
+    """(samples, rate) composed on the job's leitmotif by the melody model, or None
+    (no melody model here, or it failed: the caller composes as before)."""
+    lm = job["leitmotif"]
+    if twin_mode(device) != "melody":
+        return None
+    try:
+        seconds = max(1.0, min(float(job.get("seconds", 30)), MAX_SECONDS))
+        score = render_leitmotif(lm["seed"], lm.get("mode", "major"), seconds)
+        return melody_generate(score, 32000, job["prompt"], seconds, device)
+    except Exception as e:
+        print(f"[compose] the leitmotif piece failed ({type(e).__name__}: {e}); composing freely",
+              file=sys.stderr, flush=True)
+        return None
+
+
 def run_job(job: dict, device: str) -> dict:
     """Compose one {prompt, seconds, out, loop} job -> its JSON answer."""
     started = time.time()
     try:
         extra = {}
-        if job.get("melody_from"):          # this piece IS a twin: of a piece already made
+        lm = job.get("leitmotif")
+        score = _leitmotif_piece(job, device) if lm else None
+        if score is not None:               # a character's own tune, arranged by the melody model
+            samples, rate = score
+            used, extra = device, {"how": "leitmotif"}
+        elif job.get("melody_from"):        # this piece IS a twin: of a piece already made
             import soundfile as sf
             base, base_rate = sf.read(job["melody_from"], dtype="float32", always_2d=False)
             if getattr(base, "ndim", 1) > 1:
@@ -312,8 +394,13 @@ def run_job(job: dict, device: str) -> dict:
         samples = finish(samples, rate, bool(job.get("loop")))
         path = write(samples, rate, Path(job["out"]))
         twin = job.get("twin")
-        if twin:                            # and its dark twin, from the same music
+        t_score = _leitmotif_piece({**twin, "seconds": job.get("seconds", 30)}, device) \
+            if twin and twin.get("leitmotif") else None
+        if t_score is not None:             # the same tune in the minor: the dark twin
+            (t_samples, t_rate), how = t_score, "leitmotif"
+        elif twin:                          # and its dark twin, from the same music
             t_samples, t_rate, how = twin_from(raw, rate, twin["prompt"], job.get("seconds", 30), device)
+        if twin:
             t_samples = finish(t_samples, t_rate, bool(twin.get("loop")))
             t_path = write(t_samples, t_rate, Path(twin["out"]))
             extra["twin"] = {"path": str(t_path), "seconds": round(len(t_samples) / t_rate, 1), "how": how}
@@ -350,6 +437,8 @@ def main() -> None:
                     help="Bring already-composed pieces to the standard loudness, in place")
     ap.add_argument("--check", action="store_true", help="Print the hardware that would be used")
     ap.add_argument("--benchmark", action="store_true", help="Time one 30-second piece")
+    ap.add_argument("--leitmotif", metavar="NAME",
+                    help="Write NAME's leitmotif (and its dark twin) as plain melody files to --out's folder")
     ap.add_argument("--fetch-melody", action="store_true",
                     help="Download the melody model (for COMPOSE_TWIN=melody) and exit")
     args = ap.parse_args()
@@ -366,6 +455,16 @@ def main() -> None:
                       flush=True)
             except Exception as e:
                 print(json.dumps({"ok": False, "path": f, "error": f"{type(e).__name__}: {e}"}), flush=True)
+        return
+
+    if args.leitmotif:
+        out = Path(args.out or ".")
+        out.mkdir(parents=True, exist_ok=True)
+        for mode, s in (("major", 20), ("minor", 30)):
+            path = write(render_leitmotif(args.leitmotif, mode, s), 32000,
+                         out / f"motif-{args.leitmotif.strip().lower().replace(' ', '-')}-{mode}.ogg")
+            print(json.dumps({"ok": True, "path": str(path), "mode": mode,
+                              "motif": leitmotif(args.leitmotif, mode)["motif"]}, ensure_ascii=False))
         return
 
     if args.fetch_melody:

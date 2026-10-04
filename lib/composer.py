@@ -127,9 +127,10 @@ def anthem_prompt(sheet: Dict[str, Any], style: str) -> str:
     who = " ".join(str(sheet.get(k) or "") for k in ("race", "class")).strip()
     concept = str(sheet.get("concept") or "").strip().rstrip(".")
     setting = f", {style}" if style else ""
-    return (f"heroic triumphant anthem for {name}" + (f", a {who}" if who else "")
-            + (f", {concept[:100]}" if concept else "") + f"{setting}, soaring brass fanfare, "
-            "uplifting strings, pounding timpani, glorious and inspiring")
+    return (f"heroic character theme for {name}" + (f", a {who}" if who else "")
+            + (f", {concept[:100]}" if concept else "") + f"{setting}, a memorable melody first "
+            "stated by a solo french horn, then taken up by the full orchestra, soaring brass, "
+            "uplifting strings, pounding timpani, building to a triumphant final chord")
 
 
 JUDGMENT = "⚖ Judgment"           # the music of a punishment (composed once per campaign)
@@ -354,6 +355,10 @@ def _compose_remote(jobs: List[Dict[str, Any]], on_piece, timeout_each: int
                        "loop": bool(job.get("loop")), "ext": out.suffix or ".ogg"}
             if job.get("twin"):
                 payload["twin_prompt"] = job["twin"]["prompt"]
+                if job["twin"].get("leitmotif"):
+                    payload["twin_leitmotif"] = job["twin"]["leitmotif"]
+            if job.get("leitmotif"):
+                payload["leitmotif"] = job["leitmotif"]
             if job.get("melody_from"):
                 payload["melody_audio"] = base64.b64encode(Path(job["melody_from"]).read_bytes()).decode("ascii")
                 payload["melody_ext"] = Path(job["melody_from"]).suffix
@@ -382,7 +387,7 @@ def _compose_remote(jobs: List[Dict[str, Any]], on_piece, timeout_each: int
 
 def compose(prompt: str, seconds: float, out: Path, loop: bool = False,
             timeout: int = 3600, local: bool = False, twin: Optional[Dict[str, Any]] = None,
-            melody_from: Optional[str] = None) -> Dict[str, Any]:
+            melody_from: Optional[str] = None, leitmotif: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Compose one piece (blocking: a minute or two on a GPU, several on a CPU).
     ``local``: on this machine's composer even when a GPU server is set. ``twin``
     ({prompt, out}): also its dark twin, from the same music. ``melody_from``: this
@@ -392,6 +397,8 @@ def compose(prompt: str, seconds: float, out: Path, loop: bool = False,
         job["twin"] = twin
     if melody_from:
         job["melody_from"] = str(melody_from)
+    if leitmotif:
+        job["leitmotif"] = leitmotif
     return compose_many([job], timeout_each=timeout, local=local)[0]
 
 
@@ -491,14 +498,17 @@ def compose_pieces(campaign_dir, pieces: List[Dict[str, Any]],
             heroic = anthem(camp, p["name"]) if p["kind"] == "dark_anthem" else None
             if heroic:                      # the twin of the anthem they had: the same music, dark
                 job["melody_from"] = str(camp / "music" / "anthems" / heroic["file"])
+            if p["kind"] == "dark_anthem":  # (with the melody model: their own tune, in the minor)
+                job["leitmotif"] = {"seed": p["name"], "mode": "minor"}
             jobs.append(job)
         else:
             name = p["sheet"].get("name", "hero")
             out = camp / "music" / "anthems" / f"anthem-{slug(name)}.ogg"
             # With its dark twin, from the same music: the villain theme they'd become.
             jobs.append({"prompt": anthem_prompt(p["sheet"], style), "seconds": ANTHEM_SECONDS,
-                         "out": str(out), "loop": False,
+                         "out": str(out), "loop": False, "leitmotif": {"seed": name, "mode": "major"},
                          "twin": {"prompt": dark_anthem_prompt(p["sheet"], style), "loop": True,
+                                  "leitmotif": {"seed": name, "mode": "minor"},
                                   "out": str(camp / "music" / "anthems" / f"anthem-{slug(name)}-dark.ogg")}})
     files: List[Optional[str]] = [None] * len(pieces)
 
@@ -539,7 +549,9 @@ def compose_anthem(campaign_dir, sheet: Dict[str, Any]) -> Dict[str, Any]:
     style = flavor(campaign_dir)
     got = compose(anthem_prompt(sheet, style), ANTHEM_SECONDS, out,
                   twin={"prompt": dark_anthem_prompt(sheet, style), "loop": True,
-                        "out": str(out.with_name(f"anthem-{slug(name)}-dark.ogg"))})
+                        "leitmotif": {"seed": name, "mode": "minor"},
+                        "out": str(out.with_name(f"anthem-{slug(name)}-dark.ogg"))},
+                  leitmotif={"seed": name, "mode": "major"})
     reg = load_registry(campaign_dir)
     key = _key(reg["anthems"], name) or name
     reg["anthems"][key] = {"file": Path(got["path"]).name, "seconds": got.get("seconds", ANTHEM_SECONDS)}
