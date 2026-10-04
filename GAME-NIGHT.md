@@ -327,6 +327,14 @@ computer took and a link to listen. That tells you what to expect: if a 30-secon
   adds MusicGen-Melody (about 3.3 GB more): with a GPU it re-composes each twin on the
   anthem's melody, in a minor, menacing arrangement. If it ever fails, the darkened recording
   is used instead.
+- **Each character's own tune:** with the melody model, every anthem is arranged around a
+  leitmotif made from the character's name and class (always the same one), built like a film
+  theme: a fanfare, a driving rhythm, a soaring line, a bugle call or a hymn, in a march, 3/4
+  or a lilting 6/8, and a mode that suits them (a wizard's Lydian "wonder", a rogue's folk
+  Mixolydian...), laid out as a phrase that develops instead of looping. The dark twin is the
+  same tune turned villainous: minor, a march of repeated notes, half-step sighs, a tritone. Hear a motif
+  alone: `bash tools/gm-music-compose.sh motif "<name>"`; compose the real thing:
+  `bash tools/gm-music-compose.sh anthem "<name>"`.
 - **One bigger composer for everything:** `COMPOSE_MODEL=facebook/musicgen-melody` in `.env`
   makes the melody model compose all the music (richer, but slower, and about 3 GB of RAM
   instead of 0.6). Time it first: `COMPOSE_MODEL=facebook/musicgen-melody bash tools/gm-music-compose.sh test`.

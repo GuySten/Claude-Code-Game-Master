@@ -93,7 +93,7 @@ def test_compose_runs_the_composer_and_reads_its_answer(tmp_path, fake):
 
     prompt = composer.theme_prompt("Grimaldi", "rotting ringmaster", composer.flavor(camp), True)
     assert "boss battle" in prompt and "dark fantasy, grim" in prompt and "rotting ringmaster" in prompt
-    assert "heroic triumphant anthem for Pip, a Halfling Rogue" in composer.anthem_prompt(
+    assert "heroic character theme for Pip, a Halfling Rogue" in composer.anthem_prompt(
         {"name": "Pip", "race": "Halfling", "class": "Rogue"}, "")
 
 
@@ -321,3 +321,111 @@ def test_twins_use_the_melody_model_only_when_its_there_and_on_a_gpu(monkeypatch
     assert mc.twin_mode("cuda") == "darken"
     monkeypatch.setattr(mc, "TWIN", "melody")
     assert mc.twin_mode("cpu") == "melody"                              # asked for: always tried
+
+
+CLASSES = ["Fighter", "Paladin", "Barbarian", "Rogue", "Bard", "Wizard", "Sorcerer", "Warlock",
+           "Cleric", "Druid", "Ranger", "Monk", "Artificer", ""]
+PEOPLE = [("Pip", "Rogue"), ("Bram", "Fighter"), ("רן", "Warlock"), ("ג'ון סמיט", ""), ("Zoë", "Bard"),
+          ("קסטרל", "Ranger")] + [(f"Hero {i}", CLASSES[i % len(CLASSES)]) for i in range(400)]
+
+
+def test_every_heroes_tune_is_built_like_a_film_heroes_theme():
+    """A rise of a 5th or more to the opening's peak, gap-fill after it, a held
+    climax around two-thirds in, a singable range, home to the tonic on a bar line."""
+    from lib import music_compose as mc
+    for name, cls in PEOPLE:
+        t = mc.theme_traits(mc.leitmotif(name, "major", cls))
+        assert t["rise"] >= 5 and t["gap_fill"], (name, cls, t)
+        assert 0.4 <= t["climax_at"] <= 0.75 and t["climax_held"], (name, cls, t)
+        assert t["range"] <= 19 and t["biggest_jump"] <= 12, (name, cls, t)
+        assert t["ends_home"] and t["whole_bars"], (name, cls, t)
+    assert mc.leitmotif("Pip", "major", "Rogue")["notes"] == mc.leitmotif(" pip ", "major", "Rogue")["notes"]
+
+
+def test_every_villains_tune_is_the_same_tune_turned_menacing():
+    """Minor, a march of repeated notes, half-step sighs, a tritone, falling home
+    through the minor 2nd; and still the hero's tune: the same motif, key and meter."""
+    from lib import music_compose as mc
+    for name, cls in PEOPLE:
+        hero, dark = mc.leitmotif(name, "major", cls), mc.leitmotif(name, "minor", cls)
+        t = mc.theme_traits(dark)
+        assert t["minor"] and t["repeated"] and t["tritone"] and t["sighs"] >= 3, (name, cls, t)
+        assert t["falls_home"] and t["ends_home"] and dark["notes"][-2][0] == 1, (name, cls, t)
+        assert t["range"] <= 19 and t["biggest_jump"] <= 12 and t["whole_bars"], (name, cls, t)
+        assert 0.4 <= t["climax_at"] <= 0.75, (name, cls, t)
+        assert dark["shape"] == hero["shape"] and (dark["key"], dark["meter"]) == (hero["key"], hero["meter"])
+
+
+def test_no_two_characters_share_a_tune():
+    """Different kinds, meters and modes: the tunes of different characters differ in
+    their shape and their rhythm (the first version gave 60 names 18 shapes)."""
+    import difflib
+    import itertools
+    from lib import music_compose as mc
+
+    def shape(name, cls):
+        notes = mc.leitmotif(name, "major", cls)["notes"]
+        p = [x for x, _ in notes]
+        contour = tuple("U" if b - a > 2 else "u" if b > a else "=" if b == a else "d" if a - b <= 2 else "D"
+                        for a, b in zip(p, p[1:]))
+        return contour, tuple(round(b, 2) for _, b in notes)
+    people = PEOPLE[:60]
+    shapes = [shape(*p) for p in people]
+    assert len(set(shapes)) == len(people)                                    # no two the same tune
+    assert len({c for c, _ in shapes}) >= 50                                  # nor mostly the same shape
+    alike = [(difflib.SequenceMatcher(None, a[0], b[0]).ratio(), difflib.SequenceMatcher(None, a[1], b[1]).ratio())
+             for a, b in itertools.combinations(shapes, 2)]
+    assert sum(c for c, _ in alike) / len(alike) < 0.6 and sum(r for _, r in alike) / len(alike) < 0.5
+
+
+def test_the_class_picks_the_kind_of_theme():
+    from lib import music_compose as mc
+    wizards = [mc.leitmotif(f"Mage {i}", "major", "Wizard") for i in range(30)]
+    assert all(w["scale"] == "lydian" for w in wizards)                 # wonder: the raised 4th
+    assert any(6 in {p % 12 for p, _ in w["notes"]} for w in wizards)
+    assert all(mc.leitmotif(f"Rogue {i}", "major", "Rogue")["meter"] == "6/8" for i in range(30))
+    assert {mc.leitmotif(f"Knight {i}", "major", "Fighter")["kind"] for i in range(30)} <= {"fanfare", "bugle"}
+    kinds = {mc.leitmotif(f"Someone {i}")["kind"] for i in range(60)}          # no class: any kind
+    assert kinds == set(mc.KINDS)
+
+
+def test_a_tune_renders_as_a_melody_line():
+    pytest.importorskip("numpy")
+    from lib import music_compose as mc
+    for mode, s in (("major", 20), ("minor", 30)):
+        line = mc.render_leitmotif("Pip", mode, s)
+        assert abs(len(line) / 32000 - s) < 0.01 and float(abs(line).max()) > 0.1
+
+
+def test_anthems_are_composed_on_the_leitmotif_with_the_melody_model(tmp_path, fake):
+    camp = tmp_path / "camp"
+    camp.mkdir()
+    seen = []
+    real = composer.compose_many
+    composer.compose_many = lambda jobs, *a, **k: seen.extend(jobs) or real(jobs, *a, **k)
+    try:
+        composer.compose_pieces(camp, [{"kind": "anthem", "sheet": {"name": "Pip", "class": "Rogue"}}])
+    finally:
+        composer.compose_many = real
+    assert seen[0]["leitmotif"] == {"seed": "Pip", "mode": "major", "cls": "Rogue"}
+    assert seen[0]["twin"]["leitmotif"] == {"seed": "Pip", "mode": "minor", "cls": "Rogue"}
+    assert "memorable melody" in seen[0]["prompt"]
+
+
+def test_a_composer_job_follows_the_leitmotif_or_composes_freely(tmp_path, monkeypatch):
+    np = pytest.importorskip("numpy")
+    pytest.importorskip("soundfile")
+    from lib import music_compose as mc
+    tone = np.zeros(32000 * 2, "float32") + 0.1
+    monkeypatch.setattr(mc, "generate", lambda prompt, seconds, device: (tone, 32000, device))
+    heard = []
+    monkeypatch.setattr(mc, "melody_generate",
+                        lambda base, rate, prompt, seconds, device: heard.append((prompt, len(base))) or (tone, 32000))
+    job = {"prompt": "hero", "seconds": 2, "out": str(tmp_path / "h.wav"), "leitmotif": {"seed": "Pip"},
+           "twin": {"prompt": "dark", "out": str(tmp_path / "d.wav"), "leitmotif": {"seed": "Pip", "mode": "minor"}}}
+    monkeypatch.setattr(mc, "twin_mode", lambda device: "melody")
+    r = mc.run_job(job, "cuda")
+    assert r["how"] == "leitmotif" and r["twin"]["how"] == "leitmotif" and [p for p, _ in heard] == ["hero", "dark"]
+    monkeypatch.setattr(mc, "twin_mode", lambda device: "darken")         # no melody model: as before
+    r = mc.run_job(job, "cpu")
+    assert "how" not in r and r["twin"]["how"] == "darkened"
