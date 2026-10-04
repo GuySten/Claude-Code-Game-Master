@@ -17,10 +17,24 @@ The DC ladder below is 5e — use it only when the scene-context KIT block says 
 **Don't roll for:** trivial tasks, impossible tasks, routine professional work, or anything with no meaningful consequence for failure.
 
 ## Process
-1. Declare the DC BEFORE rolling — it goes in the roll itself: `uv run python lib/dice.py "1d20+[mod]" --dc [DC] --for "[PC]" --why "[skill]"` (at an open table the players see the DC and the roll together). 2. Read the printed verdict. 3. Narrate by margin.
+1. Pick the difficulty BEFORE rolling, as a ladder word, and let the referee roll:
+   `bash tools/gm-referee.sh check "[PC]" [skill or ability] --dc hard` (the bonus comes from the
+   sheet; at an open table the players see the DC, the roll and where every bonus came from).
+   A number a record states instead of a word: `--vs-passive "<who>" perception`,
+   `--vs-spell-of "<caster>"`, `--vs-ability "<foe>" "<ability>"`. Saves: `gm-referee.sh save`.
+2. Read the printed verdict. 3. Narrate by margin.
+
+Advantage/disadvantage is never a per-roll choice: it comes from recorded state, for both sides
+alike: conditions on the sheet or `gm-combat.sh condition`, `gm-referee.sh help "<helper>" "<who>"`,
+an earned `hide`, and battlefield effects that hit everyone
+(`gm-referee.sh field "Shaking floor" --effect dis:attack --effect dis:check-dex`, sparing only a
+creature whose record lists `--unless-trait <trait>`; `end-field` when it stops). There is no
+"+2 because": if a rule grants something, record it on the sheet first, in the open. Every call is
+logged (`gm-referee.sh log` / `report`). `lib/dice.py` is only for what no record covers (a random
+table); each use is logged as a free roll.
 
 ## DC ladder
-Trivial 5 · Easy 10 · Moderate 15 · Hard 20 · Very Hard 25 · Nearly Impossible 30.
+`very-easy` 5 · `easy` 10 · `medium` 15 · `hard` 20 · `very-hard` 25 · `nearly-impossible` 30 (the `--dc` words).
 
 ## Narrate by margin
 Nat 20 = exceptional flourish · beat by 10+ = looks easy, extra benefit · success = clean · fail by 1-4 = goal still denied, something small but visible is spent · fail by 5+ = clear fail + complication · nat 1 = mishap. **No band is free** — a near-miss costs less, never nothing.

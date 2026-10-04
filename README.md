@@ -229,6 +229,7 @@ Under the hood, `/gm` calls these for you — you never have to run them yoursel
 | `/world-check` | Validate campaign consistency |
 | `/reset` | Clear campaign state |
 | `/setup` | Verify/fix installation |
+| `/host-setup` | Get this computer ready to host the online table, and open it: campaigns repo, pictures, tunnel, link and code for the players |
 | `/models` | Choose which Claude models run the GM and its helpers (recommended / budget / premium) |
 | `/help` | Full command reference |
 
@@ -281,6 +282,7 @@ The harness is plumbing you can poke at: bash wrappers (`tools/`) → Python man
 | `gm-location.sh` | Locations and connections |
 | `gm-plot.sh` | Quest and storyline tracking |
 | `gm-combat.sh` | Persisted, resumable combat tracking |
+| `gm-referee.sh` | The fair referee: checks, saves, attacks, damage and death saves from the sheets and locked stat blocks, situations applied to both sides, every decision logged (`log`, `report`) |
 | `gm-condition.sh` | Player conditions (poisoned, stunned, etc.) |
 | `gm-consequence.sh` | Schedule future events and triggers |
 | `gm-recall.sh` | Campaign memory — semantic recall, arc entries, memoir |

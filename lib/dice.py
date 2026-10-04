@@ -270,9 +270,25 @@ def main():
             print(describe(shown["result"], goal, label))
             print("   (rolled by the table — every player saw it"
                   + (", as a secret roll)" if args.secret else ")"))
+            _log_free(args, shown.get("result") or {}, goal, label)
             return
 
-    print(describe(roller.roll(args.notation), goal, label))
+    result = roller.roll(args.notation)
+    print(describe(result, goal, label))
+    _log_free(args, result, goal, label)
+
+
+def _log_free(args, result: Dict, goal, label) -> None:
+    """A roll the GM made by hand, outside the referee: logged as such, so the
+    players can see how often numbers were chosen freely (lib/referee.py)."""
+    try:
+        from referee import audit, active_campaign_dir
+    except ImportError:
+        return
+    audit(active_campaign_dir(), {"kind": "free", "who": args.pc, "notation": args.notation,
+                                  "why": args.why, "target": goal, "label": label,
+                                  "secret": bool(args.secret), "total": result.get("total"),
+                                  "natural": natural(result), "outcome": judge(result, goal)})
 
 
 def _utf8_console() -> None:
