@@ -118,3 +118,8 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   villain needs **two pieces on the tune**: the theme for their scenes, and a battle
   piece (fast, an ostinato engine, drums) - the table plays the battle piece in any
   fight they're in.
+- **Timpani rolls** (14 strokes a second, each a full ringing hit, alternating strong and
+  weak): "painfully fast" in the Margrave's battle piece and "a bit too fast" even in
+  his theme - the one instrument far faster than everything else. Rolls are now about
+  9 strokes a second, each ringing into the next, swelling smoothly (and a battle's
+  roll stays under velocity ~104).

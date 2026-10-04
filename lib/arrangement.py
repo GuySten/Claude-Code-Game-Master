@@ -394,11 +394,15 @@ def _build(spec: Dict[str, Any]) -> Dict[str, Any]:
         a, b = float(r["from"]), float(r["to"])
         v0, v1 = (r.get("vel") or [70, 110])
         t0, t1 = T(a), T(b)
-        n = max(2, int((t1 - t0) / float(r.get("every", 0.07))))
+        # One swelling rumble, not a rattle: about 9 strokes a second, each ringing
+        # into the next, rising smoothly (the host: 14 a second, alternating strong and
+        # weak, was "painfully fast" in a battle and "a bit too fast" in a theme).
+        every = float(r.get("every", ROLL_EVERY))
+        n = max(2, int((t1 - t0) / every))
         k = perc_key(part, r.get("note", "root"), a)
         for i in range(n):
             f = i / (n - 1)
-            sc.note(part, k, t0 + (t1 - t0) * i / n, 0.09, v0 + (v1 - v0) * f + (5 if i % 2 else 0))
+            sc.note(part, k, t0 + (t1 - t0) * i / n, every * 2.5, v0 + (v1 - v0) * f ** 1.5)
 
     for h in spec.get("hits") or []:
         part = part_ok(h["part"])
@@ -428,6 +432,7 @@ def render(spec: Dict[str, Any], rate: int = orchestra.RATE, sf2: Path = orchest
 PERCUSSIVE = {"timpani", "taiko", "toms", "kit", "reverse_cymbal", "bells", "harp", "glockenspiel",
               "celesta", "pizzicato"}                  # (struck: playing a note again is normal)
 DRUMS = {"timpani", "taiko", "toms", "kit", "reverse_cymbal"}
+ROLL_EVERY = 0.11          # seconds between a roll's strokes
 
 
 def _where(ctx: Dict[str, Any], u: float) -> str:
