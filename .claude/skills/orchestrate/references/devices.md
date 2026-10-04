@@ -153,3 +153,31 @@ Sources, in brief (details and citations: `research.md`):
 
 Every villain also gets a **Power** battle piece on their tune (the table plays it in any
 fight they're in).
+
+---
+
+## The evidence behind the devices (research.md)
+
+- **Arousal first, then valence.** Tempo and loudness set arousal and outweigh most
+  cues; mode sets positive/negative; cues add up (an additive model explains most of
+  listeners' ratings), so stack several pointing the same way (ch14, ch17).
+- **Madness / unease**: irregular rhythm, a wide range and fast motion read as uneasy;
+  minor seconds, tritones and leaps beyond the octave as unstable; fear is quiet,
+  staccato, with sudden dynamic swings and a high register (ch14) - the breaking
+  violin's leaps too high, its slides and its stumbles. Notes shifted a semitone and
+  then repeated read as "wrong" on purpose (ch13, ch21): the strings drifting.
+- **Lament**: slow, soft, low, legato, dark, minor, falling minor seconds, a solo voice
+  (ch14, ch17); "sad" music gives chills about twice as often (ch21).
+- **Power**: loud and bright, large intervals, unisons and octaves; majesty with
+  consonance and a regular rhythm (ch14).
+- **Façade / dignity**: regular rhythm, little dynamic change, consonant harmony (ch14) -
+  the steady dance the madness breaks.
+- **Shock and the climax**: the strongest chill trigger is a sudden forte after a quiet
+  passage; others are a new voice entering, a theme returning, an unprepared harmony, a
+  texture change (ch21) - why a climax grows in waves and gets one surprise.
+- **Expectation**: uncertainty breeds anxiety; a delayed return or a deceptive cadence
+  keeps working on listeners who know it (ch21) - the madness's breaks, the unresolved
+  ending.
+- **Film**: music recolours a neutral character, before or after they appear, and its
+  emotion attaches to what it's synchronised with (ch31) - why a portrait plays when the
+  character is on stage.
