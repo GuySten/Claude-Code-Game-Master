@@ -789,7 +789,11 @@ def write(samples, rate: int, out: Path) -> Path:
     import soundfile as sf
     out.parent.mkdir(parents=True, exist_ok=True)
     try:
-        sf.write(str(out), samples, rate)
+        # In blocks: libsndfile's OGG encoder can crash on one very long write.
+        channels = 1 if getattr(samples, "ndim", 1) == 1 else samples.shape[1]
+        with sf.SoundFile(str(out), "w", samplerate=rate, channels=channels) as f:
+            for i in range(0, len(samples), 1 << 16):
+                f.write(samples[i:i + (1 << 16)])
         return out
     except Exception:
         wav = out.with_suffix(".wav")

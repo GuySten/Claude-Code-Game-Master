@@ -7,6 +7,8 @@
 #                                            (COMPOSE_MODEL=facebook/musicgen-melody: it composes everything)
 #   gm-music-compose.sh setup --orchestra    The sampled orchestra (~215 MB of real instrument recordings, no GPU)
 #   gm-music-compose.sh orchestra "<PC>" [--stage 0-3]   Their theme played by the orchestra (default: legendary)
+#   gm-music-compose.sh tune "<name>" [--minor] [--stage N]   A tune's notes and times, to arrange it
+#   gm-music-compose.sh arrange <file.json>  Play an arrangement (lib/arrangement.py) into the campaign's music
 #   gm-music-compose.sh check                Which GPU/CPU it would use
 #   gm-music-compose.sh test                 Time one 30-second piece (first run downloads the model)
 #   gm-music-compose.sh theme "<villain>" [--boss] [--look "..."]   Compose a theme now
@@ -119,6 +121,21 @@ print(f\"A villain theme (30 s) takes about {d['elapsed']/60:.1f} min; a hero's 
         DIR="$(get_campaign_dir 2>/dev/null || echo .)/music/anthems"
         mkdir -p "$DIR"
         "$PY" "$LIB_DIR/orchestra.py" "$@" --class "$CLS" --out "$DIR"
+        ;;
+    tune)
+        PY="$(compose_py)"
+        [ -z "$PY" ] && { error "Not set up yet: bash tools/gm-music-compose.sh setup --orchestra"; exit 1; }
+        [ -z "$1" ] && { error "Whose tune? gm-music-compose.sh tune \"<name>\" [--minor]"; exit 1; }
+        CLS="$($PYTHON_CMD "$LIB_DIR/composer.py" class-of "$1" 2>/dev/null)"
+        "$PY" "$LIB_DIR/arrangement.py" tune "$@" --class "$CLS"
+        ;;
+    arrange)
+        PY="$(compose_py)"
+        [ -z "$PY" ] && { error "Not set up yet: bash tools/gm-music-compose.sh setup --orchestra"; exit 1; }
+        [ -f "$1" ] || { error "No such arrangement: $1"; exit 1; }
+        DIR="$(get_campaign_dir 2>/dev/null || echo .)/music/arranged"
+        mkdir -p "$DIR"
+        "$PY" "$LIB_DIR/arrangement.py" play "$1" --out "$DIR/$(basename "${1%.json}").ogg"
         ;;
     theme|anthem|normalize|status)
         $PYTHON_CMD "$LIB_DIR/composer.py" "$ACTION" "$@"

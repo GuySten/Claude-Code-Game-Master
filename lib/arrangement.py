@@ -1,0 +1,440 @@
+#!/usr/bin/env python3
+"""Arrangements: a piece written as notes for the sampled orchestra (lib/orchestra.py).
+
+A character's tune comes from the leitmotif generator (lib/music_compose.py), so it
+is always exactly theirs; an arrangement says what the orchestra does with it: who
+plays the tune when, the chords, the accompaniment, countermelodies, percussion,
+dynamics, tempo. The GM (Claude) writes one per piece, like a composer's score.
+
+See the tune first (its notes, with their times):
+    python3 lib/arrangement.py tune "Kestrel" --class Barbarian [--minor] [--stage 3]
+Play an arrangement:
+    python3 lib/arrangement.py play kestrel.json --out kestrel.ogg
+
+TIME is in the tune's units: beats (4/4, 3/4) or eighth notes (6/8); 0 is where
+the tune starts; an intro is at negative times. PITCHES are names ("C#4", "Eb3",
+"E#4"; C4 = 60) or MIDI numbers. VEL ("vel") is an offset from the dynamics curve,
+except in "hits" and "rolls", where it is the velocity itself (1-127).
+
+{
+  "tune": {"seed": "Kestrel", "mode": "major", "cls": "Barbarian", "stage": 3, "dark": 0},
+                         # mode "minor": the villain's version of the seed's tune
+  "tempo": 60,           # beats a minute (6/8: dotted quarters)
+  "start": -12,          # where the piece starts (an intro before the tune): default 0
+  "length": 96,          # where it ends (default: the end of the last statement)
+  "loop": false,         # true: a seamless loop of [start, length) (battle music)
+  "ritard": {"from": 84, "amount": 0.4},     # slowing to the end (40% slower at the last note)
+  "dynamics": [[-12, 60], [0, 80], [36, 96], [60, 124]],   # velocity, linear between points
+  "statements": [{"at": 0}],                 # where the tune is played (default: once, at 0);
+                         # optional "from"/"to" (a slice of the tune, in its own units) and
+                         # "shift" (semitones): {"at": 96, "from": 0, "to": 36, "shift": -12}
+  "melody": [            # who plays the tune, when, and how many semitones from as written
+    {"from": 0, "to": 18, "parts": {"horns": 0}, "vel": 8},
+    {"from": 18, "to": 36, "parts": {"violins": 12}}
+  ],
+  "chords": [            # roman numerals in the tune's key, [from, to, chord]
+    [0, 6, "I"], [6, 9, "IVadd9"], [9, 12, "I/E#"], [12, 18, "bVII"], [24, 27, "vi7"]
+  ],                     # I ii iii IV V vi vii, b/# before, ° or + after; then 7 maj7 add9
+                         # sus4 sus2 6 5 (a power chord); a bass note after a slash: "I/E#"
+  "harmony": [           # parts playing the chords
+    {"part": "strings", "from": 0, "to": 96, "play": "chord", "range": ["G3", "A#4"], "vel": -20},
+    {"part": "cellos", "from": 0, "to": 60, "play": "bass", "range": ["C2", "B2"],
+     "pattern": "xoo xoo", "step": 1, "legato": 0.55}
+  ],                     # play: chord | bass | root | third | fifth | root5 | octaves
+                         # pattern (repeating from "from", one character a "step" of units):
+                         # x accent, o a note, - holds the previous one on, space or . a rest
+  "lines": [             # anything written out: countermelodies, ostinati, fanfares
+    {"part": "horns", "vel": 0, "notes": [[18, "E#4", 3], [21, "G#4", 3], [24, "A#4", 6, 10]]}
+  ],                     # [at, pitch, units, (vel offset)]
+  "patterns": [          # percussion (or any part) on one note, in a rhythm
+    {"part": "kit", "note": "snare", "from": 36, "to": 60, "pattern": "xoooox", "vel": -30},
+    {"part": "timpani", "note": "root", "from": 0, "to": 84, "pattern": "x     ", "vel": -6}
+  ],                     # note: a pitch, "root"/"fifth" (of the chord, timpani range), or
+                         # snare, bd, crash, cymbal, china, splash, ride, triangle, gong
+  "rolls": [{"part": "timpani", "note": "G#2", "from": 57, "to": 60, "vel": [70, 120]}],
+  "hits": [{"part": "kit", "note": "crash", "at": 60, "len": 6, "vel": 124}]
+}
+
+Parts: violins, violins2, strings (sustained), tremolo, pizzicato, cellos, basses,
+flutes, piccolo, oboe, english_horn, clarinets, bassoons, horns, trumpets,
+trombones, tuba, brass, choir, harp, celesta, glockenspiel, bells, organ,
+timpani, taiko, toms, reverse_cymbal, kit (bd, snare, cymbals). At most 15 of them
+in one piece, besides the kit.
+"""
+
+import argparse
+import json
+import re
+import sys
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import music_compose  # noqa: E402
+import orchestra  # noqa: E402
+
+NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+LETTER = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
+KIT = {"bd": 35, "snare": 38, "crash": 49, "cymbal": 49, "china": 52, "splash": 55,
+       "ride": 51, "triangle": 81, "gong": 57}
+ACCENT = 14
+
+
+class ArrangementError(ValueError):
+    pass
+
+
+# --- pitches and chords ---
+def pitch_class(name: str) -> int:
+    m = re.fullmatch(r"([A-Ga-g])([#b]*)", name.strip())
+    if not m:
+        raise ArrangementError(f"not a note name: {name!r}")
+    return (LETTER[m.group(1).upper()] + m.group(2).count("#") - m.group(2).count("b")) % 12
+
+
+def pitch(p: Any) -> int:
+    """'C#4' (C4 = 60) or a MIDI number -> MIDI number."""
+    if isinstance(p, (int, float)):
+        return int(p)
+    m = re.fullmatch(r"([A-Ga-g][#b]*)(-?\d)", str(p).strip())
+    if not m:
+        raise ArrangementError(f"not a pitch: {p!r} (like 'C#4', or a MIDI number)")
+    letter = m.group(1)
+    acc = letter[1:].count("#") - letter[1:].count("b")
+    return 12 * (int(m.group(2)) + 1) + LETTER[letter[0].upper()] + acc
+
+
+def name_of(midi: int) -> str:
+    return f"{NAMES[midi % 12]}{midi // 12 - 1}"
+
+
+DEGREES = {"I": 0, "II": 2, "III": 4, "IV": 5, "V": 7, "VI": 9, "VII": 11}
+SUFFIXES = ("maj7", "add9", "sus4", "sus2", "7", "6", "5", "9")
+
+
+def chord(symbol: str, key: int) -> Dict[str, Any]:
+    """'bVII', 'vi7', 'IVadd9', 'I/E#', 'v°' in the key (a MIDI tonic) ->
+    {root, bass, pcs (root first), third, fifth}: pitch classes."""
+    s = symbol.strip()
+    body, _, slash = s.partition("/")
+    m = re.match(r"([b#]?)(VII|VI|V|IV|III|II|I|vii|vi|v|iv|iii|ii|i)([°o+]|dim|aug)?", body)
+    if not m:
+        raise ArrangementError(f"not a chord: {symbol!r} (roman numerals: I, bVII, vi7, IVadd9, I/E#)")
+    acc, numeral, quality = m.group(1), m.group(2), m.group(3) or ""
+    rest = body[m.end():]
+    root = (key + DEGREES[numeral.upper()] + (1 if acc == "#" else -1 if acc == "b" else 0)) % 12
+    minor = numeral.islower()
+    third, fifth = (3 if minor else 4), 7
+    if quality in ("°", "o", "dim"):
+        third, fifth = 3, 6
+    elif quality in ("+", "aug"):
+        third, fifth = 4, 8
+    extra: List[int] = []
+    while rest:
+        suf = next((x for x in SUFFIXES if rest.startswith(x)), None)
+        if suf is None:
+            raise ArrangementError(f"not a chord: {symbol!r} (can't read {rest!r})")
+        rest = rest[len(suf):]
+        if suf == "maj7":
+            extra.append(11)
+        elif suf == "7":
+            extra.append(10)
+        elif suf == "9":
+            extra += [10, 2]
+        elif suf == "add9":
+            extra.append(2)
+        elif suf == "6":
+            extra.append(9)
+        elif suf == "sus4":
+            third = 5
+        elif suf == "sus2":
+            third = 2
+        elif suf == "5":
+            third = None
+    tones = [0] + ([third] if third is not None else []) + [fifth] + extra
+    pcs = []
+    for t in tones:
+        pc = (root + t) % 12
+        if pc not in pcs:
+            pcs.append(pc)
+    return {"root": root, "bass": pitch_class(slash) if slash else root, "pcs": pcs,
+            "third": (root + third) % 12 if third is not None else root, "fifth": (root + fifth) % 12}
+
+
+def place(pc: int, lo: int, hi: int) -> int:
+    """The lowest pitch of this pitch class in [lo, hi] (or just under lo + 12)."""
+    n = lo + (pc - lo) % 12
+    return n if n <= hi else n - 12
+
+
+def voicing(pcs: List[int], prev: Optional[List[int]], lo: int, hi: int) -> List[int]:
+    """Every chord tone, in close position within [lo, hi] (the bottom doubled an
+    octave up when there's room for a fourth voice), moving as little as it can."""
+    cands = []
+    for bottom in pcs:
+        for start in (place(bottom, lo, lo + 11), place(bottom, lo, lo + 11) + 12):
+            v = [start]
+            for _ in range(len(pcs) - 1):
+                nxt = v[-1] + 1
+                while nxt % 12 not in pcs or nxt % 12 in [x % 12 for x in v]:
+                    nxt += 1
+                v.append(nxt)
+            if len(v) < 4 and v[0] + 12 <= hi and v[0] + 12 > v[-1]:
+                v.append(v[0] + 12)
+            if v[-1] <= hi and v[0] >= lo:
+                cands.append(v)
+    if not cands:                                     # a narrow range: as many as fit
+        v = sorted({place(pc, lo, hi) for pc in pcs if lo <= place(pc, lo, hi) <= hi})
+        return v or [place(pcs[0], lo, lo + 11)]
+    if prev is None:
+        return min(cands, key=lambda v: (v[0] % 12 != pcs[0], sum(v) / len(v) - (lo + hi) / 2))
+    return min(cands, key=lambda v: sum(min(abs(a - b) for b in prev) for a in v))
+
+
+# --- the piece ---
+def _span(item: Dict[str, Any], start: float, end: float) -> Tuple[float, float]:
+    return float(item.get("from", start)), float(item.get("to", end))
+
+
+def _pattern_hits(pattern: str, a: float, b: float, step: float):
+    """(time, length in steps, accented) for each note of a pattern repeating over [a, b)."""
+    if not pattern:
+        raise ArrangementError("an empty pattern")
+    out, t, i = [], a, 0
+    while t < b - 1e-9:
+        c = pattern[i % len(pattern)]
+        if c in "xo":
+            hold = 1
+            j = i + 1
+            while pattern[j % len(pattern)] == "-" and a + j * step < b - 1e-9:
+                hold, j = hold + 1, j + 1
+            out.append((t, hold, c == "x"))
+        elif c not in "-. ":
+            raise ArrangementError(f"a pattern is x, o, -, or space: {pattern!r}")
+        i += 1
+        t = a + i * step
+    return out
+
+
+def build(spec: Dict[str, Any]) -> Tuple["orchestra.Score", float, Optional[float]]:
+    """An arrangement -> (score, seconds, loop length in seconds or None)."""
+    t = dict(spec.get("tune") or {})
+    if not t.get("seed"):
+        raise ArrangementError('"tune": {"seed": ...} is needed (the character\'s name)')
+    tune = music_compose.leitmotif(t["seed"], t.get("mode", "major"), t.get("cls", ""),
+                                   stage=int(t.get("stage", 1)), dark=int(t.get("dark", 0)))
+    key = tune["key"]
+    notes, u = [], 0.0
+    for st, b in tune["notes"]:
+        notes.append((u, b, st))
+        u += b
+    tune_len = u
+    statements = spec.get("statements") or [{"at": 0}]
+    played = []                                                 # (time, units, MIDI as written)
+    for s in statements:
+        at, lo, hi = float(s.get("at", 0)), float(s.get("from", 0)), float(s.get("to", tune_len))
+        for u0, b, st in notes:
+            if lo - 1e-9 <= u0 < hi - 1e-9:
+                played.append((at + u0 - lo, min(b, hi - u0), key + st + int(s.get("shift", 0))))
+    start = float(spec.get("start", 0))
+    length = float(spec.get("length") or max((p[0] + p[1] for p in played), default=tune_len))
+    loop = bool(spec.get("loop"))
+    tempo = float(spec.get("tempo") or 66)
+    beat = 3 if tune["meter"] == "6/8" else 1
+    unit = 60.0 / tempo / beat
+    rit = spec.get("ritard") if not loop else None
+    rit_from = float(rit["from"]) if rit else None
+    rit_amount = float(rit.get("amount", 0.3)) if rit else 0.0
+
+    def T(x: float) -> float:
+        y = x - start
+        if rit_from is not None and x > rit_from:
+            d = min(x, length) - rit_from
+            y += rit_amount * d * d / (2 * max(length - rit_from, 1e-6)) + rit_amount * max(0, x - length)
+        return y * unit
+
+    dyn_pts = sorted((float(a), float(v)) for a, v in (spec.get("dynamics") or [[start, 90]]))
+
+    def dyn(x: float) -> float:
+        if x <= dyn_pts[0][0]:
+            return dyn_pts[0][1]
+        for (a, va), (b, vb) in zip(dyn_pts, dyn_pts[1:]):
+            if x <= b:
+                return va + (vb - va) * (x - a) / max(b - a, 1e-9)
+        return dyn_pts[-1][1]
+
+    sc = orchestra.Score()
+    used = set()
+
+    def part_ok(part: str) -> str:
+        if part not in orchestra.PARTS:
+            raise ArrangementError(f"no such part: {part!r} (one of: {', '.join(orchestra.PARTS)})")
+        used.add(part)
+        return part
+
+    def note(part: str, k: int, u0: float, dur: float, vel: float, legato: float = 0.97) -> None:
+        if u0 >= length - 1e-9 and loop:
+            return
+        sc.note(part_ok(part), int(k), T(u0), max(0.02, (T(u0 + dur) - T(u0)) * legato), vel)
+
+    # the chords
+    prog = []
+    for item in spec.get("chords") or []:
+        a, b, sym = item
+        prog.append((float(a), float(b), chord(sym, key)))
+    prog.sort(key=lambda c: c[0])
+
+    def chord_at(x: float) -> Optional[Dict[str, Any]]:
+        for a, b, c in prog:
+            if a - 1e-9 <= x < b - 1e-9:
+                return c
+        return None
+
+    # the tune
+    for m in spec.get("melody") or []:
+        a, b = _span(m, start, length)
+        for u0, d, k in played:
+            if a - 1e-9 <= u0 < b - 1e-9:
+                for part, shift in (m.get("parts") or {}).items():
+                    note(part, k + int(shift), u0, d, dyn(u0) + float(m.get("vel", 0)), float(m.get("legato", 0.97)))
+
+    # the harmony
+    for h in spec.get("harmony") or []:
+        part = part_ok(h["part"])
+        a, b = _span(h, start, length)
+        lo, hi = (pitch(x) for x in h.get("range", ["G3", "G4"]))
+        play = h.get("play", "chord")
+        prev = None
+        legato = float(h.get("legato", 1.0 if not h.get("pattern") else 0.6))
+        step = float(h.get("step", 1))
+        for ca, cb, c in prog:
+            s0, s1 = max(a, ca), min(b, cb)
+            if s1 <= s0 + 1e-9:
+                continue
+            if play == "chord":
+                keys = voicing(c["pcs"], prev, lo, hi)
+                prev = keys
+            elif play in ("bass", "root", "third", "fifth"):
+                keys = [place(c[play], lo, hi)]
+            elif play == "root5":
+                r = place(c["root"], lo, hi)
+                keys = [r, r + 7] if r + 7 <= hi else [r - 12, r - 5] if r - 12 >= lo - 12 else [r]
+            elif play == "octaves":
+                r = place(c["bass"], lo, hi)
+                keys = [r, r + 12]
+            else:
+                raise ArrangementError(f"play is chord, bass, root, third, fifth, root5 or octaves, not {play!r}")
+            if h.get("pattern"):
+                # the pattern counts from the harmony's own start, so it carries across chords
+                for t0, hold, acc in _pattern_hits(h["pattern"], a, b, step):
+                    if s0 - 1e-9 <= t0 < s1 - 1e-9:
+                        for k in keys:
+                            note(part, k, t0, hold * step, dyn(t0) + float(h.get("vel", 0)) + (ACCENT if acc else 0), legato)
+            else:
+                for k in keys:
+                    note(part, k, s0, s1 - s0, dyn(s0) + float(h.get("vel", 0)), legato)
+
+    # lines
+    for line in spec.get("lines") or []:
+        part = part_ok(line["part"])
+        for n in line.get("notes") or []:
+            at, p, d = float(n[0]), pitch(n[1]), float(n[2])
+            extra = float(n[3]) if len(n) > 3 else 0.0
+            note(part, p, at, d, dyn(at) + float(line.get("vel", 0)) + extra, float(line.get("legato", 0.97)))
+
+    def perc_key(part: str, what: Any, x: float) -> int:
+        if isinstance(what, str) and what in KIT:
+            return KIT[what]
+        if what in ("root", "fifth"):
+            c = chord_at(x)
+            if c is None:
+                raise ArrangementError(f'"{what}" at {x}: there is no chord there')
+            return place(c[what], 40, 52)
+        return pitch(what)
+
+    for p in spec.get("patterns") or []:
+        part = part_ok(p["part"])
+        a, b = _span(p, start, length)
+        step = float(p.get("step", 1))
+        for t0, hold, acc in _pattern_hits(p["pattern"], a, b, step):
+            note(part, perc_key(part, p.get("note", "root"), t0), t0, max(hold * step, float(p.get("len", 0))),
+                 dyn(t0) + float(p.get("vel", 0)) + (ACCENT if acc else 0), float(p.get("legato", 0.9)))
+
+    for r in spec.get("rolls") or []:
+        part = part_ok(r["part"])
+        a, b = float(r["from"]), float(r["to"])
+        v0, v1 = (r.get("vel") or [70, 110])
+        t0, t1 = T(a), T(b)
+        n = max(2, int((t1 - t0) / float(r.get("every", 0.07))))
+        k = perc_key(part, r.get("note", "root"), a)
+        for i in range(n):
+            f = i / (n - 1)
+            sc.note(part, k, t0 + (t1 - t0) * i / n, 0.09, v0 + (v1 - v0) * f + (5 if i % 2 else 0))
+
+    for h in spec.get("hits") or []:
+        part = part_ok(h["part"])
+        at = float(h["at"])
+        k = perc_key(part, h.get("note", "root"), at)
+        sc.note(part, k, T(at), (T(at + float(h.get("len", 3))) - T(at)), float(h.get("vel", 110)))
+
+    if len([p for p in used if p not in orchestra.DRUMS]) > 15:
+        raise ArrangementError("at most 15 parts in one piece, besides the kit")
+    seconds = T(length)
+    return sc, seconds, (seconds if loop else None)
+
+
+def render(spec: Dict[str, Any], rate: int = orchestra.RATE, sf2: Path = orchestra.SF2):
+    """An arrangement played by the orchestra -> (stereo float32 samples, rate)."""
+    score, seconds, loop = build(spec)
+    if loop:
+        dry = orchestra.play(score, seconds + 3.0, sf2, rate)        # (what rings past the end)
+        wet = orchestra.hall(dry, rate, loop_at=int(round(seconds * rate)))
+        return orchestra.master(wet, rate, loop=True), rate
+    dry = orchestra.play(score, seconds, sf2, rate)
+    return orchestra.master(orchestra.hall(dry, rate), rate), rate
+
+
+def describe(seed: str, mode: str = "major", cls: str = "", stage: int = 1, dark: int = 0) -> str:
+    """The tune, for writing an arrangement: its key, meter, and every note with its time."""
+    tune = music_compose.leitmotif(seed, mode, cls, stage=stage, dark=dark)
+    bar = tune["bar"]
+    lines = [f"{seed} ({mode}{', ' + cls if cls else ''}, stage {stage}, dark {dark}): "
+             f"tonic {name_of(tune['key'])}, {tune['meter']} ({'eighths' if tune['meter'] == '6/8' else 'beats'}), "
+             f"{tune['scale'] if isinstance(tune['scale'], str) else 'scale ' + str(tune['scale'])}, "
+             f"{tune['kind']}, {sum(b for _, b in tune['notes']):g} units = "
+             f"{sum(b for _, b in tune['notes']) / bar:g} bars",
+             "at      bar.pos  note   units"]
+    u = 0.0
+    for st, b in tune["notes"]:
+        lines.append(f"{u:<7g} {int(u // bar) + 1:>3}.{u % bar:<4g} {name_of(tune['key'] + st):<6} {b:g}")
+        u += b
+    return "\n".join(lines)
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description="Arrangements for the sampled orchestra.")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    t = sub.add_parser("tune", help="show a character's tune, to arrange it")
+    t.add_argument("seed")
+    t.add_argument("--class", dest="cls", default="")
+    t.add_argument("--minor", action="store_true", help="the villain's version")
+    t.add_argument("--stage", type=int, default=1)
+    t.add_argument("--dark", type=int, default=0)
+    p = sub.add_parser("play", help="play an arrangement (a JSON file)")
+    p.add_argument("file")
+    p.add_argument("--out", required=True)
+    a = ap.parse_args()
+    if a.cmd == "tune":
+        print(describe(a.seed, "minor" if a.minor else "major", a.cls, a.stage, a.dark))
+        return
+    try:
+        spec = json.loads(Path(a.file).read_text(encoding="utf-8"))
+        samples, rate = render(spec)
+    except (ArrangementError, KeyError, TypeError, ValueError) as e:
+        sys.exit(f"[arrangement] {a.file}: {e}")
+    path = music_compose.write(samples, rate, Path(a.out))
+    print(f"{path} ({len(samples) / rate:.1f}s{', a loop' if spec.get('loop') else ''})")
+
+
+if __name__ == "__main__":
+    main()

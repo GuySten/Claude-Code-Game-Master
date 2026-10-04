@@ -43,10 +43,40 @@ PARTS = {
     "trombones": (0, 57, 90, 92),     # root and fifth
     "tuba": (0, 58, 80, 96),
     "timpani": (0, 47, 64, 118),
-    "kit": (128, 48, 64, 100),        # Orchestra Kit: bass drum, cymbals
+    "kit": (128, 48, 64, 100),        # Orchestra Kit: bass drum, snare, cymbals
+    # (more colours, for arrangements: lib/arrangement.py)
+    "violins2": (0, 48, 76, 100),     # a second violin section, right of centre
+    "piccolo": (0, 72, 72, 76),
+    "oboe": (0, 68, 58, 90),
+    "english_horn": (0, 69, 60, 90),
+    "clarinets": (0, 71, 54, 90),
+    "bassoons": (0, 70, 70, 100),
+    "brass": (0, 61, 64, 100),        # Brass Section: a big, blended brass chord
+    "harp": (0, 46, 36, 96),
+    "celesta": (0, 8, 80, 84),
+    "glockenspiel": (0, 9, 84, 80),
+    "bells": (0, 14, 70, 96),         # Tubular Bells: a tolling bell
+    "organ": (0, 19, 64, 92),         # Church Organ
+    "pizzicato": (0, 45, 44, 96),     # Strings Pizzicato
+    "taiko": (0, 116, 64, 120),       # Taiko drums: war drums
+    "toms": (0, 117, 58, 104),        # Melodic Tom
+    "reverse_cymbal": (0, 119, 64, 96),
 }
-CHANNELS = {name: (i if i < 9 else i + 1) for i, name in enumerate(PARTS)}   # (9 is MIDI's drums)
-CHANNELS["kit"] = 9
+DRUMS = {"kit"}
+
+
+def channels(parts) -> Dict[str, int]:
+    """MIDI channels for the parts a piece uses (15, plus the drum channel)."""
+    free = [c for c in range(16) if c != 9]
+    out, i = {}, 0
+    for part in sorted(set(parts), key=list(PARTS).index):
+        if part in DRUMS:
+            out[part] = 9
+            continue
+        if i >= len(free):
+            raise ValueError(f"too many instruments in one piece (at most {len(free)} besides the drums)")
+        out[part], i = free[i], i + 1
+    return out
 BASS_DRUM, CRASH = 35, 49
 STAGES = ("seed", "theme", "heroic", "legendary")
 
@@ -361,9 +391,10 @@ def play(score: Score, seconds: float, sf2: Path = SF2, rate: int = RATE):
     import tinysoundfont
     syn = tinysoundfont.Synth(gain=-12, samplerate=rate)
     sfid = syn.sfload(str(sf2))
-    for part, (bank, preset, pan, vol) in PARTS.items():
-        ch = CHANNELS[part]
-        syn.program_select(ch, sfid, bank, preset, part == "kit")
+    chans = channels({e[2] for e in score.events})
+    for part, ch in chans.items():
+        bank, preset, pan, vol = PARTS[part]
+        syn.program_select(ch, sfid, bank, preset, part in DRUMS)
         syn.control_change(ch, 7, vol)
         syn.control_change(ch, 10, pan)
     total = int((seconds + 0.5) * rate)
@@ -375,18 +406,20 @@ def play(score: Score, seconds: float, sf2: Path = SF2, rate: int = RATE):
             out[pos:at] = np.frombuffer(syn.generate(at - pos), dtype="float32").reshape(-1, 2)
             pos = at
         if is_on:
-            syn.noteon(CHANNELS[part], key, vel)
+            syn.noteon(chans[part], key, vel)
         else:
-            syn.noteoff(CHANNELS[part], key)
+            syn.noteoff(chans[part], key)
     if pos < total:
         out[pos:] = np.frombuffer(syn.generate(total - pos), dtype="float32").reshape(-1, 2)
     return out
 
 
-def hall(dry, rate: int = RATE, rt60: float = 2.3, wet: float = 0.28, seed: int = 7):
+def hall(dry, rate: int = RATE, rt60: float = 2.3, wet: float = 0.28, seed: int = 7,
+         loop_at: Optional[int] = None):
     """A concert hall: the dry orchestra convolved with a synthetic hall response
     (early reflections, then a diffuse tail that darkens as it decays); the tail
-    is left to ring after the last chord."""
+    is left to ring after the last chord, or, for a loop (``loop_at``: its length
+    in samples), rings on over its start, so the seam can't be heard."""
     import numpy as np
     rng = np.random.default_rng(seed)
     n = int(rt60 * 1.3 * rate)
@@ -419,11 +452,17 @@ def hall(dry, rate: int = RATE, rt60: float = 2.3, wet: float = 0.28, seed: int 
         out[:, c] = y[:len(dry) + tail]
     mix = out * wet
     mix[:len(dry)] += dry * (1 - wet * 0.5)
+    if loop_at:                                            # a loop: what rings past its end
+        n = loop_at                                        # sounds over its start
+        for at in range(n, len(mix), n):
+            seg = mix[at:at + n]
+            mix[:len(seg)] += seg
+        return mix[:n].astype("float32")
     end = len(dry) + int(rt60 * rate)                      # ring out for one decay, then stop
     return mix[:end].astype("float32")
 
 
-def master(x, rate: int = RATE):
+def master(x, rate: int = RATE, loop: bool = False):
     """Loudness like the rest of the table's music, no clipped peaks, a soft fade."""
     import numpy as np
     mono = x.mean(axis=1)
@@ -434,8 +473,9 @@ def master(x, rate: int = RATE):
     limited = music_compose.limit(peak, rate)
     g = np.where(peak > 1e-9, limited / np.maximum(peak, 1e-9), 1.0).astype("float32")
     x = x * g[:, None]
-    n = int(rate * 1.2)
-    x[-n:] *= np.linspace(1, 0, n, dtype="float32")[:, None] ** 2
+    if not loop:                                            # (a loop has no ends)
+        n = int(rate * 1.2)
+        x[-n:] *= np.linspace(1, 0, n, dtype="float32")[:, None] ** 2
     return x
 
 
