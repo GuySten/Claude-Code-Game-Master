@@ -598,6 +598,7 @@
     updateReadToggle();
     updateMusicToggle();
     fillVoiceMenus();
+    try { refreshExtras(true); } catch (e) {}     // (before the table opens: nothing yet)
   }
 
   // -------------------------------------------------------------- api ---
@@ -1532,6 +1533,7 @@
     if (!!info.tts !== ttsOk) { ttsOk = !!info.tts; fillVoiceMenus(); }
     progressState = info.progress || { state: "idle" };
     roundState = info.round || { open: false };
+    fightState = info.fight || null;
     setLoreTerms(info.lore_terms);
     waitingOn = info.waiting_on || [];
     updateProgress();
@@ -1549,10 +1551,36 @@
     partyLive = info.party || [];
     narrationGate = info.narration_id || 0;
     syncParty();
+    refreshExtras();
     const waiting = info.waiting_on || [];
     if (!listening && !noticeShowing()) setStatus(waiting.length ? t("waiting") + waiting.join(", ") : "");
   }
   async function refreshInfo() { renderInfo(await api("/api/info")); }
+
+  // The panels around the story register here: redrawn when the table's state
+  // changes (uiHooks), and the clock-driven ones four times a second (tickHooks).
+  const uiHooks = [], tickHooks = [];
+  let fightState = null, aimAt = null;           // the fight (if any), and the foe I aim at
+  let mySheet = null, mySheetRev = null, mySheetLoading = false;
+  function refreshExtras(langChanged) {
+    uiHooks.forEach((h) => { try { h(langChanged); } catch (e) { console.error(e); } });
+  }
+  function tickExtras() {
+    tickHooks.forEach((h) => { try { h(); } catch (e) { console.error(e); } });
+  }
+  // My own sheet, in the version my party card shows (in step with the story).
+  async function loadMySheet() {
+    const shown = me && partyShown.get(me);
+    const rev = shown && shown.sheet_rev;
+    if (!rev || rev === mySheetRev || mySheetLoading) return;
+    if (sheetCache.has(rev)) { mySheet = sheetCache.get(rev); mySheetRev = rev; return refreshExtras(); }
+    mySheetLoading = true;
+    try {
+      const r = await api("/api/sheet?pc=" + encodeURIComponent(me) + "&rev=" + rev);
+      if (r.ok && r.sheet) { sheetCache.set(r.rev, r.sheet); mySheet = r.sheet; mySheetRev = rev; }
+    } finally { mySheetLoading = false; }
+    refreshExtras();
+  }
 
   // ---------------------------------------- the party, in step with the story ---
   // The server already holds sheet changes back during the GM's turn. Here they
@@ -1616,6 +1644,8 @@
       partyShown.set(pc.name, pc);
     });
     refreshSheet();
+    loadMySheet();
+    refreshExtras();
   }
 
   // ------------------------------------------------- the character sheet ---
@@ -2154,6 +2184,7 @@
     return true;
   }
   function updateProgress() {
+    tickExtras();
     if (showRound()) return;
     $("extend").classList.add("hidden");
     const p = progressState;
