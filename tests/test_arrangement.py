@@ -166,3 +166,16 @@ def test_the_critic_hears_a_thin_battle_and_a_static_theme():
     busy = dict(battle, harmony=held["harmony"] + [
         {"part": p, "play": "root", "range": ["C2", "B3"], "pattern": "xo"} for p in ("cellos", "bassoons", "pizzicato")])
     assert not any("texture" in m or "only the tune" in m for _, m in A.check(busy, listen=False))
+
+
+def test_the_surprise_budget_pairs_a_tune_with_its_setting(monkeypatch, tmp_path):
+    import tune_score
+    corpus = tmp_path / "corpus.json"
+    corpus.write_text("[]")
+    monkeypatch.setattr(tune_score, "CACHE", corpus)
+    plain = spec(chords=[[0, 1000, "I"]])
+    rich = spec(chords=[[0, 8, "I"], [8, 1000, "bVI"]], keys=[{"from": 8, "shift": 2}])
+    for pct, s, verdict in ((95, rich, "both"), (95, plain, "balanced"), (60, plain, "neither"), (60, rich, "balanced")):
+        monkeypatch.setattr(tune_score, "score", lambda mel, p=pct: {"surprise": (0, p)})
+        got = A.surprise_budget(A._build(s), s)
+        assert got[3] == verdict, (pct, got)

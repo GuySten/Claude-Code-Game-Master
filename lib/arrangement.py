@@ -563,6 +563,19 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
             add("note", f"battle or loop texture: {avg:.1f} lines move per bar besides the tune "
                         "(pitched parts): big music keeps three or more going - an ostinato, a "
                         "countermelody or answer, a moving bass or inner line - under the tune")
+    # The surprise budget: a surprising tune wants a supportive setting, a simple tune
+    # a rich one (the host's 2x2: those pairings beat both-plain and both-rich).
+    budget = surprise_budget(ctx, spec)
+    if budget:
+        tune_pct, chromatic, changes, verdict = budget
+        if verdict == "both":
+            add("note", f"a surprising tune (surprise at the {tune_pct}th percentile of real tunes) in a "
+                        f"surprising setting ({chromatic:.0%} chromatic chords, {changes} key change(s)): "
+                        "the host preferred a plainer setting for such a tune - let the tune lead")
+        elif verdict == "neither":
+            add("note", f"a simple tune (surprise at the {tune_pct}th percentile) in a plain setting "
+                        f"({chromatic:.0%} chromatic chords, no key change): spend some surprise in the "
+                        "setting - a key change, a chromatic lift at the climax, a breakdown")
     if not listen:
         return out
     # Listening: render the layers apart and measure them.
@@ -618,6 +631,39 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
     if peak_level < -60:
         add("error", "the piece is silent")
     return out
+
+
+def surprise_budget(ctx: Dict[str, Any], spec: Dict[str, Any]):
+    """(tune surprise percentile, share of time on chords outside the mode, key changes,
+    "both" | "neither" | "balanced"), or None (no tune corpus to measure against)."""
+    try:
+        import tune_score
+        if not tune_score.CACHE.is_file():
+            return None
+        t = spec.get("tune") or {}                     # the tune as written (stage 1): a later
+        plain = music_compose.leitmotif(                # stage's held climax reads as rare anyway
+            t["seed"], t.get("mode", "major"), t.get("cls", ""), stage=1, dark=int(t.get("dark", 0)),
+            gen=int(t.get("gen", 1)), written=t.get("written"))
+        tune_pct = tune_score.score(tune_score.from_leitmotif(plain))["surprise"][1]
+    except Exception:
+        return None
+    scale = ctx["tune"]["scale"]
+    scale = scale if isinstance(scale, list) else music_compose._scale(scale)
+    keys = [(float(k.get("from", ctx["start"])), float(k.get("to", 1e9)), int(k.get("shift", 0)))
+            for k in spec.get("keys") or []]
+    total = chrom = 0.0
+    for a, b, c in ctx["prog"]:
+        shift = next((sh for ka, kb, sh in keys if ka - 1e-9 <= a < kb - 1e-9), 0)
+        home = {(ctx["tune"]["key"] + shift + st) % 12 for st in scale}
+        total += b - a
+        if not set(c["pcs"]) <= home:
+            chrom += b - a
+    chromatic = chrom / total if total else 0.0
+    changes = len(keys)
+    rich = chromatic >= .15 or changes > 0
+    plain = chromatic < .05 and changes == 0
+    verdict = ("both" if tune_pct >= 90 and rich else "neither" if tune_pct <= 75 and plain else "balanced")
+    return tune_pct, chromatic, changes, verdict
 
 
 def describe(seed: str, mode: str = "major", cls: str = "", stage: int = 1, dark: int = 0,

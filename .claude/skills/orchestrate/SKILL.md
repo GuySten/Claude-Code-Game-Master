@@ -102,6 +102,15 @@ in motion at once besides the tune; the critic counts them (give a battle score
 `"role": "battle"`). The professional tracks that outscored ours were the denser
 ones.
 
+**Spend the surprise once: the tune or the setting.** In the host's 2x2 test
+(a simple vs a surprising tune, in a supportive vs a rich arrangement) the
+winners were the simple tune richly set and the surprising tune plainly set;
+both-plain and both-rich were weaker. So a bold, surprising tune gets plain,
+supportive harmony and no key change - let it lead; a simple tune gets the key
+change, the chromatic lift, the breakdown. The critic measures both (the tune's
+surprise against real tunes, the setting's chromatic chords and key changes)
+and notes an unbalanced pair.
+
 **Harmony that moves, and moves with intent.** Change chords every half bar to a
 bar; hold one longer only for effect. Use the mode's own colour (bVII in
 Mixolydian, bII in Phrygian, #IV in Lydian) and end with a cadence that fits:

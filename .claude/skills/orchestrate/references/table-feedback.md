@@ -28,3 +28,9 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   rest.
 - The rater marked trumpets carrying the tune down by 0.6-0.8 (the sound set's
   trumpet is among its weakest recordings alone); horns carry a tune better.
+- **The surprise budget (a 2x2 on Kestrel's legendary theme):** simple tune + rich
+  arrangement and surprising tune + supportive arrangement were "better" than
+  both-plain and both-rich - "the difference is not huge", but consistent. Spend
+  the surprise in the tune or in the setting, not both, and not neither.
+- The Audiobox rater put a Beethoven overture (Egmont, a professional recording)
+  at 7.44 - level with our pieces: its scale is flat; don't read it as quality.
