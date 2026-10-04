@@ -117,8 +117,22 @@ def normalize(samples, rate: int, target_db: float = LOUDNESS_DB):
 
 
 def finish(samples, rate: int, loop: bool):
-    """Loudness, then soft edges (a looping theme gets short fades both ends)."""
-    return fade(normalize(samples, rate), rate, 0.4 if loop else 0.05, 1.5 if loop else 2.0)
+    """Loudness, then soft edges: a looping theme fades at both ends (no click at the
+    seam); a piece that ends (an anthem) keeps its final chord, with a short tail."""
+    return fade(normalize(samples, rate), rate, 0.4 if loop else 0.05, 1.5 if loop else 0.4)
+
+
+def crescendo(samples, rate: int, peak_at: float, depth_db: float = 7.0):
+    """The build: from ``depth_db`` quieter at the start, swelling (smoothly) to full
+    at ``peak_at`` (a fraction of the piece: the tune's climax), then full to the end.
+    (The melody model hears only which note leads, not how loud: the build is shaped
+    here, on the music itself.)"""
+    import numpy as np
+    x = np.asarray(samples, dtype="float32")
+    t = np.linspace(0.0, 1.0, len(x), dtype="float64")
+    p = np.clip(t / max(peak_at, 1e-3), 0.0, 1.0)
+    ramp = p * p * (3 - 2 * p)                                 # smoothstep: no sudden swell
+    return (x * 10 ** (-depth_db * (1 - ramp) / 20)).astype("float32")
 
 
 def pick_device(wanted: str = "auto") -> str:
@@ -582,15 +596,18 @@ def run_job(job: dict, device: str) -> dict:
         else:
             samples, rate, used = generate(job["prompt"], job.get("seconds", 30), device)
         raw = samples
+        if extra.get("how") == "leitmotif" and not job.get("loop"):          # an anthem: build to its climax
+            peak = theme_traits(leitmotif(lm["seed"], lm.get("mode", "major"), lm.get("cls") or ""))["climax_at"]
+            samples = crescendo(samples, rate, peak)
         samples = finish(samples, rate, bool(job.get("loop")))
         path = write(samples, rate, Path(job["out"]))
         twin = job.get("twin")
-        t_score = _leitmotif_piece({**twin, "seconds": job.get("seconds", 30)}, device) \
+        t_score = _leitmotif_piece({**twin, "seconds": twin.get("seconds", job.get("seconds", 30))}, device) \
             if twin and twin.get("leitmotif") else None
         if t_score is not None:             # the same tune in the minor: the dark twin
             (t_samples, t_rate), how = t_score, "leitmotif"
         elif twin:                          # and its dark twin, from the same music
-            t_samples, t_rate, how = twin_from(raw, rate, twin["prompt"], job.get("seconds", 30), device)
+            t_samples, t_rate, how = twin_from(raw, rate, twin["prompt"], twin.get("seconds", job.get("seconds", 30)), device)
         if twin:
             t_samples = finish(t_samples, t_rate, bool(twin.get("loop")))
             t_path = write(t_samples, t_rate, Path(twin["out"]))

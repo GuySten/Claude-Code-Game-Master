@@ -429,3 +429,39 @@ def test_a_composer_job_follows_the_leitmotif_or_composes_freely(tmp_path, monke
     monkeypatch.setattr(mc, "twin_mode", lambda device: "darken")         # no melody model: as before
     r = mc.run_job(job, "cpu")
     assert "how" not in r and r["twin"]["how"] == "darkened"
+
+
+def test_an_anthem_builds_to_its_climax_and_ends_on_its_chord(tmp_path, monkeypatch):
+    np = pytest.importorskip("numpy")
+    sf = pytest.importorskip("soundfile")
+    from lib import music_compose as mc
+    rate = 32000
+    tone = (0.2 * np.sin(2 * np.pi * 220 * np.arange(rate * 10) / rate)).astype("float32")
+    # The swell: quieter at the start, full from the climax on.
+    built = mc.crescendo(tone, rate, 0.5)
+    level = lambda x: 20 * np.log10(np.sqrt(np.mean(x ** 2)))           # noqa: E731
+    assert level(built[: rate]) < level(built[6 * rate: 7 * rate]) - 5
+    assert abs(level(built[8 * rate: 9 * rate]) - level(tone[8 * rate: 9 * rate])) < 0.1
+    # The end: an anthem keeps its final chord (a short tail), a loop still fades at its seam.
+    end = mc.finish(tone, rate, loop=False)
+    assert level(end[-rate // 2: -rate // 4]) > level(end[rate * 5: rate * 6]) - 3
+    # A composer job on the tune: the anthem is shaped; the villain twin gets a theme's length.
+    seconds_asked = []
+    monkeypatch.setattr(mc, "twin_mode", lambda device: "melody")
+    monkeypatch.setattr(mc, "melody_generate", lambda base, r, prompt, seconds, device:
+                        seconds_asked.append((prompt, seconds)) or (np.tile(tone, 4)[: int(seconds * rate)], rate))
+    r = mc.run_job({"prompt": "hero", "seconds": 10, "out": str(tmp_path / "h.wav"),
+                    "leitmotif": {"seed": "Kestrel", "cls": "Barbarian"},
+                    "twin": {"prompt": "dark", "out": str(tmp_path / "d.wav"), "loop": True, "seconds": 30,
+                             "leitmotif": {"seed": "Kestrel", "mode": "minor", "cls": "Barbarian"}}}, "cuda")
+    assert r["how"] == "leitmotif" and seconds_asked == [("hero", 10), ("dark", 30)]
+    hero, _ = sf.read(r["path"], dtype="float32")
+    assert level(hero[: rate]) < level(hero[7 * rate: 8 * rate]) - 4                 # it builds
+    assert sf.info(r["twin"]["path"]).duration == pytest.approx(30, abs=0.1)
+
+
+def test_the_prompts_ask_for_tempo_weight_and_the_build():
+    hero = composer.anthem_prompt({"name": "Kestrel", "class": "Barbarian"}, "")
+    dark = composer.dark_anthem_prompt({"name": "Kestrel"}, "")
+    assert "110 bpm" in hero and "climax" in hero and "held" in hero
+    assert "70 bpm" in dark and "low brass" in dark and "bass" in dark

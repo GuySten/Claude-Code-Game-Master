@@ -128,9 +128,10 @@ def anthem_prompt(sheet: Dict[str, Any], style: str) -> str:
     concept = str(sheet.get("concept") or "").strip().rstrip(".")
     setting = f", {style}" if style else ""
     return (f"heroic character theme for {name}" + (f", a {who}" if who else "")
-            + (f", {concept[:100]}" if concept else "") + f"{setting}, a memorable melody first "
-            "stated by a solo french horn, then taken up by the full orchestra, soaring brass, "
-            "uplifting strings, pounding timpani, building to a triumphant final chord")
+            + (f", {concept[:100]}" if concept else "") + f"{setting}, around 110 bpm, a memorable "
+            "melody first stated by a solo french horn, then taken up by the full orchestra, soaring "
+            "brass, uplifting strings, pounding timpani, building steadily to one powerful climax, "
+            "ending on a long held triumphant final chord")
 
 
 JUDGMENT = "⚖ Judgment"           # the music of a punishment (composed once per campaign)
@@ -146,8 +147,9 @@ def dark_anthem_prompt(sheet: Dict[str, Any], style: str) -> str:
     """A fallen hero's anthem, turned into the villain theme they now are."""
     name = sheet.get("name", "the hero")
     setting = f", {style}" if style else ""
-    return (f"the heroic anthem of {name} turned dark and corrupted: the same fanfare in a minor key, "
-            f"slowed and twisted, distorted brass, dissonant strings, a mournful choir{setting}, "
+    return (f"the heroic anthem of {name} turned dark and corrupted: the same melody in a minor key, "
+            f"slow and heavy, around 70 bpm, deep low brass, pounding timpani, a heavy deep bass, "
+            f"dissonant strings, a grim choir{setting}, menace growing with every bar, "
             "the leitmotif of a fallen hero become a villain")
 
 
@@ -509,6 +511,7 @@ def compose_pieces(campaign_dir, pieces: List[Dict[str, Any]],
             jobs.append({"prompt": anthem_prompt(p["sheet"], style), "seconds": ANTHEM_SECONDS,
                          "out": str(out), "loop": False, "leitmotif": {"seed": name, "mode": "major", "cls": cls},
                          "twin": {"prompt": dark_anthem_prompt(p["sheet"], style), "loop": True,
+                                  "seconds": THEME_SECONDS,
                                   "leitmotif": {"seed": name, "mode": "minor", "cls": cls},
                                   "out": str(camp / "music" / "anthems" / f"anthem-{slug(name)}-dark.ogg")}})
     files: List[Optional[str]] = [None] * len(pieces)
@@ -549,7 +552,7 @@ def compose_anthem(campaign_dir, sheet: Dict[str, Any]) -> Dict[str, Any]:
     out = Path(campaign_dir) / "music" / "anthems" / f"anthem-{slug(name)}.ogg"
     style = flavor(campaign_dir)
     got = compose(anthem_prompt(sheet, style), ANTHEM_SECONDS, out,
-                  twin={"prompt": dark_anthem_prompt(sheet, style), "loop": True,
+                  twin={"prompt": dark_anthem_prompt(sheet, style), "loop": True, "seconds": THEME_SECONDS,
                         "leitmotif": {"seed": name, "mode": "minor", "cls": str(sheet.get("class") or "")},
                         "out": str(out.with_name(f"anthem-{slug(name)}-dark.ogg"))},
                   leitmotif={"seed": name, "mode": "major", "cls": str(sheet.get("class") or "")})
