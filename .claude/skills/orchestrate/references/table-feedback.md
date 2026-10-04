@@ -53,3 +53,6 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   MuseScore_General's horns and trombones ("A is better") - "but I want more
   quality". The sound set itself limits the music: better free samples are worth
   their setup.
+- **Many instruments entering in the same bar** (piece A's climax: five at once, vs
+  the same instruments brought in over a few bars): "I cannot tell". Not a rule
+  worth enforcing for this music; the climax's weakness was its brass lead.

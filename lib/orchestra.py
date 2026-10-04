@@ -403,6 +403,15 @@ RANGES = {
     "celesta": (60, 108), "glockenspiel": (79, 108), "bells": (60, 77), "organ": (24, 96),
     "timpani": (38, 55),
 }
+# How late each instrument's recording is heard after its note starts (seconds to come
+# within 9 dB of its full level, measured from MuseScore_General, less the ~20 ms a
+# listener forgives): play() starts its notes that much early, so instruments
+# playing together are heard together, on the beat (the violins doubling a quick
+# clarinet were ~150 ms behind it). The reverse cymbal is written to swell into the
+# beat; the string pad, which holds chords, is moved at most 250 ms. (Off by default
+# until the host has heard it: play(align=True).)
+ADVANCE = {"violins": 0.15, "violins2": 0.18, "cellos": 0.09, "tremolo": 0.115, "choir": 0.13,
+           "strings": 0.25, "trombones": 0.02, "organ": 0.015, "flutes": 0.012, "piccolo": 0.01}
 BALANCE = {
     "horns": 2, "trumpets": 3, "trombones": 2, "brass": 3, "violins": 1, "strings": -3,
     "tremolo": -2, "choir": 3, "timpani": 2, "taiko": 3, "glockenspiel": -2, "piccolo": -2,
@@ -417,7 +426,7 @@ def level_db(part: str, mix: Optional[Dict[str, float]] = None) -> float:
 
 
 def play(score: Score, seconds: float, sf2: Path = SF2, rate: int = RATE,
-         mix: Optional[Dict[str, float]] = None):
+         mix: Optional[Dict[str, float]] = None, align: bool = False):
     """The score through the SoundFont -> stereo float32 (n, 2), dry. Each part (and
     each layer of one: "horns:4", the tune's notes) is played on its own and mixed
     at its level (level_db, plus the layer's dB), so a piece can use any number."""
@@ -432,6 +441,9 @@ def play(score: Score, seconds: float, sf2: Path = SF2, rate: int = RATE,
         groups.setdefault(e[2], []).append(e)
     for name, events in groups.items():
         part, _, layer = name.partition(":")
+        early = ADVANCE.get(part, 0.0) if align else 0.0
+        if early:                                           # (heard on the beat: see ADVANCE)
+            events = [(max(0.0, t - early), *rest) for t, *rest in events]
         bank, preset, pan, vol = PARTS[part]
         ch = 9 if part in DRUMS else 0
         syn.program_select(ch, sfid, bank, preset, part in DRUMS)
