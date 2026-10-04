@@ -76,6 +76,26 @@ first cymbal, the choir's entry, a timpani roll into it. Afterwards, the return
 home is the fullest statement, and the ending is decided - a held chord with a
 roll and a final stroke, a ritardando, or a last quiet echo of the tune.
 
+**Develop the theme; don't just state it.** One pass through the tune is a
+sketch. A composed piece takes the theme somewhere: a second statement that is
+*different* (a key change up a step or a third - "keys" plus a statement
+"shift" - a new harmonization, a new carrier and texture), the hook alone tossed
+between instruments (call and response, a sequence climbing through keys), a
+breakdown to almost nothing and a rebuild, a countermelody that later becomes the
+main line. In side-by-side tests the more developed versions (a modulated second
+statement, a breakdown) were rated higher than compact ones. Let the piece be as
+long as its development needs: themes ~40-60 s, legendary ~50-75 s, battle loops
+~75-120 s - not padding, but more happening.
+
+**Keep several lines moving.** Think in layers: the tune; an answer or
+countermelody; a rhythmic engine (an ostinato, a walking or pulsing bass,
+arpeggios - harp, pizzicato, strings); harmony (pads); percussion. A pad only
+changes chords - it isn't motion. Where the tune holds a long note, something else
+should move. Big music (battle, the legend's return) keeps three or more lines
+in motion at once besides the tune; the critic counts them (give a battle score
+`"role": "battle"`). The professional tracks that outscored ours were the denser
+ones.
+
 **Harmony that moves, and moves with intent.** Change chords every half bar to a
 bar; hold one longer only for effect. Use the mode's own colour (bVII in
 Mixolydian, bII in Phrygian, #IV in Lydian) and end with a cadence that fits:

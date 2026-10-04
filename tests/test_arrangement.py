@@ -143,3 +143,26 @@ def test_the_critic_hears_a_buried_tune(tmp_path):
     buried = spec(lead=-12, melody=[{"from": 0, "to": 1000, "parts": {"violins": 0}}],
                   harmony=[{"part": "brass", "play": "chord", "range": ["G3", "G4"], "vel": 20}])
     assert any(lv == "error" and "buried" in m for lv, m in A.check(buried))
+
+
+def test_a_key_change_reads_its_chords_in_the_new_key():
+    tune = music_compose.leitmotif("Test Hero", "major", "Fighter")
+    s = spec(statements=[{"at": 0}, {"at": 100, "shift": 2}], keys=[{"from": 100, "shift": 2}],
+             chords=[[0, 100, "I"], [100, 1000, "I"]], harmony=[{"part": "strings", "play": "bass", "range": ["C2", "B2"]}])
+    score, _, _ = A.build(s)
+    basses = sorted((t, k) for t, on, p, k, _ in score.events if on and p == "strings")
+    assert (basses[1][1] - basses[0][1]) % 12 == 2                 # home, a step up
+    horns = [k for t, on, p, k, _ in sorted(score.events) if on and p == "horns:4"]
+    n = len(tune["notes"])
+    assert [b - a for a, b in zip(horns[:n], horns[n:])] == [2] * n
+
+
+def test_the_critic_hears_a_thin_battle_and_a_static_theme():
+    held = spec(chords=[[0, 1000, "I"]], harmony=[{"part": "strings", "play": "chord", "range": ["G3", "G4"]}],
+                patterns=[], hits=[])
+    assert any("only the tune moves" in m for _, m in A.check(held, listen=False))
+    battle = dict(held, role="battle", loop=True)
+    assert any("battle or loop texture" in m for _, m in A.check(battle, listen=False))
+    busy = dict(battle, harmony=held["harmony"] + [
+        {"part": p, "play": "root", "range": ["C2", "B3"], "pattern": "xo"} for p in ("cellos", "bassoons", "pizzicato")])
+    assert not any("texture" in m or "only the tune" in m for _, m in A.check(busy, listen=False))

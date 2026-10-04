@@ -10,9 +10,11 @@ stage you're arranging: `arrangement.py tune "<seed>" --class X --stage N --dark
 - **Stage 0, the seed (a lone voice):** one instrument carries the short tune
   (horn, oboe, clarinet, solo violin line) over almost nothing - a held low note,
   a soft pad. ~15-20 s. Intimate; no percussion, or a single soft timpani.
-- **Stage 1, the theme:** the tune as written, ~20-30 s. Horns or strings carry
-  it, a pad and a bass under it, timpani on strong beats, one build to its top
-  note. A modest ending (a held chord), no fanfare yet.
+- **Stage 1, the theme:** the tune as written, ~40-60 s. Stated small first,
+  then developed: a second statement with a new carrier and texture (often a step
+  up), an answer or countermelody in the held notes, an engine under it (arpeggios,
+  a pulse, pizzicato), one build to its top note. A modest ending (a held chord,
+  or the hook once more, alone), no fanfare yet.
 - **Stage 2, heroic:** the tune reaches higher (the generator raises its climax).
   Brass join from the climb; trumpets on the climax; snare or taiko driving the
   build; choir may enter at the top. Ending with a roll and a stroke.
@@ -61,7 +63,13 @@ cymbal), and a return to the opening texture so the wrap is seamless.
 
 ## A boss fight (a loop for a whole battle)
 
-Relentless but not monotonous, 60-90 s:
+Relentless but not monotonous, 75-120 s, `"role": "battle"`. At every moment
+at least three lines move besides the tune - typically an eighth-note ostinato
+(cellos + bassoons), a second ostinato or countermelody up high (violins2 +
+clarinets, horns answering the tune's phrases), a moving bass, and the drums -
+and each section changes something (key, carrier, texture). A breakdown (drums
+and choir alone, a solo instrument on the hook) before the last build gives the
+table a breath and makes the return hit harder. Typical shape:
 - a drum-and-ostinato vamp (i | bII or i | bVI per bar) with the choir holding a
   chord per bar and brass stabs on downbeats - the intro and the break;
 - statement 1: the villain's tune in low brass (horns + trombones an octave
@@ -70,6 +78,10 @@ Relentless but not monotonous, 60-90 s:
 - the break: the vamp again, toms, a roll into...
 - statement 2: the full orchestra - trumpets and horns on the tune, violins an
   octave up, tuba below, the choir wide in two octaves, crashes on the climaxes;
+  better still a step or a third higher ("keys" + statement "shift") or with a
+  new countermelody, so it isn't the first statement louder;
+- optionally a climax section: the tune's second half fragmented, augmented
+  (slower, in the brass) or over a new chord (bVI7, the aug6), gong;
 - back into the vamp (the loop's start).
 Tempo 120-150. Keep the end's dynamics near the start's.
 

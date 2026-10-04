@@ -23,11 +23,16 @@ except in "hits" and "rolls", where it is the velocity itself (1-127).
   "start": -12,          # where the piece starts (an intro before the tune): default 0
   "length": 96,          # where it ends (default: the end of the last statement)
   "loop": false,         # true: a seamless loop of [start, length) (battle music)
+  "role": "theme",       # what it's for: theme, villain, battle, lament, ... ("battle": the
+                         # critic checks it keeps several lines moving)
   "ritard": {"from": 84, "amount": 0.4},     # slowing to the end (40% slower at the last note)
   "dynamics": [[-12, 60], [0, 80], [36, 96], [60, 124]],   # velocity, linear between points
   "statements": [{"at": 0}],                 # where the tune is played (default: once, at 0);
                          # optional "from"/"to" (a slice of the tune, in its own units) and
                          # "shift" (semitones): {"at": 96, "from": 0, "to": 36, "shift": -12}
+  "keys": [{"from": 96, "to": 192, "shift": 2}],  # a key change: the chords there are read in
+                         # the new key (pair it with that statement's "shift": 2), so "I" is
+                         # still home - the new home
   "melody": [            # who plays the tune, when, and how many semitones from as written
     {"from": 0, "to": 18, "parts": {"horns": 0}, "vel": 8},
     {"from": 18, "to": 36, "parts": {"violins": 12}}
@@ -291,9 +296,15 @@ def _build(spec: Dict[str, Any]) -> Dict[str, Any]:
 
     # the chords
     prog = []
+    keys = [(float(k.get("from", start)), float(k.get("to", 1e9)), int(k.get("shift", 0)))
+            for k in spec.get("keys") or []]
+
+    def key_at(x: float) -> int:                       # a key change: chords read in the new key
+        return key + next((sh for a, b, sh in keys if a - 1e-9 <= x < b - 1e-9), 0)
+
     for item in spec.get("chords") or []:
         a, b, sym = item
-        prog.append((float(a), float(b), {**chord(sym, key), "symbol": sym}))
+        prog.append((float(a), float(b), {**chord(sym, key_at(float(a))), "symbol": sym}))
     prog.sort(key=lambda c: c[0])
 
     def chord_at(x: float) -> Optional[Dict[str, Any]]:
@@ -412,7 +423,8 @@ def render(spec: Dict[str, Any], rate: int = orchestra.RATE, sf2: Path = orchest
 
 # --- the score critic: what a listener would notice, measured (I can't hear) ---
 PERCUSSIVE = {"timpani", "taiko", "toms", "kit", "reverse_cymbal", "bells", "harp", "glockenspiel",
-              "celesta", "pizzicato"}
+              "celesta", "pizzicato"}                  # (struck: playing a note again is normal)
+DRUMS = {"timpani", "taiko", "toms", "kit", "reverse_cymbal"}
 
 
 def _where(ctx: Dict[str, Any], u: float) -> str:
@@ -509,6 +521,45 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
             longest, at = run, a
     if longest > 4 * bar:
         add("note", f"one chord holds {longest / bar:g} bars (up to {_where(ctx, at)}): static, if not meant")
+    # Texture: how many lines move (start notes) in each bar besides the tune. A theme
+    # where only the tune moves over held chords sounds thin and static; battle music
+    # wants several moving layers at once (the tune, an answer or countermelody, an
+    # ostinato, the drums).
+    bounds = []
+    u = ctx["start"]
+    while u < ctx["length"] - 1e-9:
+        bounds.append((u, T(u), T(min(u + bar, ctx["length"]))))
+        u += bar
+    moving = []
+    for u0, a, b in bounds:
+        onsets: Dict[str, Dict[float, int]] = {}
+        for t, is_on, name, *_ in sc.events:
+            if is_on and a - 1e-6 <= t < b - 1e-6 and ":" not in name:
+                at = onsets.setdefault(name.partition(":")[0], {})
+                at[round(t, 3)] = at.get(round(t, 3), 0) + 1
+        parts = set(onsets)
+        # a line in motion: single notes at two or more moments (not a pad changing chords)
+        pitched = {p for p, at in onsets.items() if p not in DRUMS
+                   and len(at) >= 2 and min(at.values()) == 1}
+        tune_moves = any(a - 1e-6 <= T(x) < b - 1e-6 for x, _, _ in ctx["played"])
+        moving.append((u0, len(pitched), len(parts & DRUMS), tune_moves))
+    run = []
+    for u0, n, _, tm in moving + [(None, 9, 0, True)]:
+        if u0 is not None and tm and n == 0:
+            run.append(u0)
+            continue
+        if len(run) >= 3:
+            add("note", f"only the tune moves at {_where(ctx, run[0])}-{_where(ctx, run[-1])} "
+                        f"({len(run)} bars of held chords): an answer, a countermelody or an "
+                        "inner line in motion would bring it to life")
+        run = []
+    ctx["texture"] = sum(n for _, n, _, _ in moving) / max(1, len(moving))
+    if moving:
+        avg = ctx["texture"]
+        if spec.get("role") == "battle" and avg < 3:
+            add("note", f"battle or loop texture: {avg:.1f} lines move per bar besides the tune "
+                        "(pitched parts): big music keeps three or more going - an ostinato, a "
+                        "countermelody or answer, a moving bass or inner line - under the tune")
     if not listen:
         return out
     # Listening: render the layers apart and measure them.
