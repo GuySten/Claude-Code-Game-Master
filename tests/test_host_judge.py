@@ -59,13 +59,31 @@ def test_blind_pairs_then_a_decision(tmp_path):
     (out / "verdicts.json").write_text(json.dumps(verdicts))
     d = hj.decide_tunes(out)
     assert [c for c, *_ in d["ranking"]] == [str(files[0]), str(files[1]), str(files[2])]
-    assert d["ask_host"] is None
+    assert d["close"] is False and d["finalists"] == [str(files[0]), str(files[1])]
     # a split, unsure reader: too close to call -> ask the host
     (out / "verdicts.json").write_text(json.dumps({p: {"prefer": "X", "confidence": 52} for p in st["key"]}))
-    assert hj.decide_tunes(out)["ask_host"] is not None
+    assert hj.decide_tunes(out)["close"] is True
 
 
 def test_validate_counts_how_often_the_judges_agree_with_the_host():
     hj.record(GOOD, LATE)
     got = hj.validate()
     assert got["verdicts"] == 1 and got["tune score"] in ("0/0", "1/1")      # (no corpus: the score is 0 for both)
+
+
+def test_the_finals_judge_finished_pieces(tmp_path):
+    import test_arrangement as ta
+    a, b = ta.spec(), ta.spec(lead=6)
+    files = []
+    for name, sp in (("a", a), ("b", b)):
+        f = tmp_path / f"{name}.json"
+        f.write_text(json.dumps(sp))
+        files.append(f)
+    out = tmp_path / "finals"
+    st = hj.prepare_finals(files, out, seed=2)
+    assert len(st["key"]) == 1 and (out / "pair00" / "X.json").is_file()
+    k = st["key"]["pair00"]
+    (out / "verdicts.json").write_text(json.dumps({"pair00": {"prefer": "X" if k["X"] == str(files[1]) else "Y",
+                                                              "confidence": 90}}))
+    d = hj.decide_finals(out)
+    assert d["ranking"][0][0] == str(files[1]) and d["ask_host"] is None

@@ -559,6 +559,13 @@ def _villain(rng, hero: dict) -> tuple:
     tail = head + [(3, one), (1, one)]                                     # falling home through the minor 2nd
     used = sum(b for _, b in out + tail)
     out += tail + [(0, round(math.ceil((used + 2 * one) / bar - 1e-9) * bar - used, 6))]
+    if hero.get("gen", 1) != 1:                     # (new tunes: long notes on the beat; the old
+        grid, medium = (1, 2) if meter == "6/8" else (.5, 1)   # villain themes stay as they were)
+        for _ in range(6):
+            new = _align(_align(out, BEATS[meter], 0), grid, 0, medium)
+            if new == out:
+                break
+            out = new
     return out, name
 
 
@@ -630,7 +637,7 @@ def leitmotif(seed: str, mode: str = "major", cls: str = "", stage: int = 1, dar
     if written:
         hero = {k: [tuple(n) for n in written.get(k) or []] for k in ("pickup", "motif", "again", "climb", "home")}
         hero.update(kind=written.get("kind", "written"), meter=written["meter"], mode=written["mode"],
-                    hook=int(written.get("hook", len(hero["motif"]))), memorability=0.0)
+                    hook=int(written.get("hook", len(hero["motif"]))), memorability=0.0, gen="written")
         if written.get("key"):
             import arrangement
             key = arrangement.pitch(written["key"])

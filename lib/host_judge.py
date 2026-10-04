@@ -21,7 +21,9 @@ a fresh Claude agent matched the host on every tune pair. So:
   of them, so the judge never drifts from the host's taste.
 
     host_judge.py tunes prepare a.json b.json c.json --out DIR   (blind pairs for the reader)
-    host_judge.py tunes decide DIR                               (after DIR/verdicts.json is written)
+    host_judge.py tunes decide DIR                               (-> the two finalists)
+    host_judge.py finals prepare a-score.json b-score.json --out DIR   (each finalist arranged)
+    host_judge.py finals decide DIR                              (the finished pieces decide)
     host_judge.py clips a.json b.json --out DIR                  (A/B clips to ask the host)
     host_judge.py record WINNER LOSER [--tie] [--note "..."]     (the host's answer)
     host_judge.py validate                                       (the judges vs every verdict)
@@ -111,7 +113,7 @@ def tune_of(spec: Dict[str, Any], stage: int = 1) -> Dict[str, Any]:
                                    stage=stage, gen=int(spec.get("gen", 1)))
 
 
-def tune_floor(tune: Dict[str, Any]) -> Tuple[float, List[str]]:
+def tune_floor(tune: Dict[str, Any], max_range: int = 19) -> Tuple[float, List[str]]:
     """(the research score, its red flags). Red flags drop a candidate: long notes
     off the beat, droning repetition, a rhythm with no variety, broken tune rules.
     (Unusual in the other direction - few repeats, many leaps - is character, not a
@@ -131,9 +133,27 @@ def tune_floor(tune: Dict[str, Any]) -> Tuple[float, List[str]]:
         if s["rhythm_entropy"][1] < 5:
             flags.append("its rhythm has almost no variety")
     t = music_compose.theme_traits(tune)
-    if not (t["whole_bars"] and t["ends_home"] and t["range"] <= 19 and t["biggest_jump"] <= 12):
+    if not (t["whole_bars"] and t["ends_home"] and t["range"] <= max_range and t["biggest_jump"] <= 12):
         flags.append("breaks the tune rules (whole bars, ending home, range, leaps)")
     return composite, flags
+
+
+def versatility(spec: Dict[str, Any]) -> Dict[str, List[str]]:
+    """A leitmotif is heard in many forms: its red flags as the seed, heroic and
+    legendary versions, darkened, and the villain's (the dark twin). {} = all sound.
+    (Raised climaxes may reach 21 semitones: the orchestra, not a singer, plays them.)"""
+    out = {}
+    for label, mode, kw, rng in (("seed", "major", {"stage": 0}, 19), ("heroic", "major", {"stage": 2}, 21),
+                                 ("legendary", "major", {"stage": 3}, 21), ("darkened", "major", {"dark": 2}, 19),
+                                 ("villain", "minor", {}, 21)):
+        if "motif" in spec:
+            tune = music_compose.written_tune(spec, mode, **kw)
+        else:
+            tune = music_compose.leitmotif(spec["seed"], mode, spec.get("cls", ""), gen=int(spec.get("gen", 1)), **kw)
+        flags = tune_floor(tune, rng)[1]
+        if flags:
+            out[label] = flags
+    return out
 
 
 def describe_tune(tune: Dict[str, Any]) -> str:
@@ -206,9 +226,11 @@ def decide_tunes(out: Path) -> Dict[str, Any]:
     share = {c: wins[c] / games[c] if games[c] else .5 for c in cands}
     ranking = sorted(cands, key=lambda c: (share[c], cands[c]["composite"]), reverse=True)
     close = len(ranking) > 1 and share[ranking[0]] - share[ranking[1]] < CLOSE / 2
+    finalists = [c for c in ranking if not versatility(cands[c]["spec"])][:2]
     return {"ranking": [(c, round(share[c], 3), cands[c]["composite"]) for c in ranking],
             "dropped": {c: d["flags"] for c, d in state["dropped"].items()},
-            "ask_host": [ranking[0], ranking[1]] if close else None}
+            "finalists": finalists,            # (to be arranged and judged as finished pieces)
+            "close": close}
 
 
 # --- arrangements ---
@@ -224,6 +246,72 @@ def judge_arrangement(spec: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": not errors and not warns, "errors": errors, "warnings": warns,
             "budget": budget[3] if budget else "unmeasured", "score": (0 if errors else 1) + (1 if not warns else 0)
             + (1 if balanced else 0)}
+
+
+# --- the finals: the finalist tunes, each arranged, judged as finished music ---
+SCORE_READER = """You are judging finished orchestral pieces blind, from their scores, to predict
+which a regular listener (a player at a tabletop RPG night) would enjoy more as that
+character's music. Each folder pairNN holds X.json and Y.json: arrangement scores in the
+format documented at the top of lib/arrangement.py (read it; arrangement._build(spec) gives
+the tune's notes and the chords). Judge the music as heard: how memorable the tune is in
+its setting, whether the orchestration serves it, the development and the build, and a
+level of surprise that engages without overloading. Don't render or rate audio. Read only
+these files and lib/. Write verdicts.json in this folder: {"pair00": {"prefer": "X" or
+"Y", "confidence": 50-100, "why": "..."}, ...}."""
+
+
+def _clean(spec: Dict[str, Any]) -> Dict[str, Any]:
+    spec = json.loads(json.dumps(spec))
+    for k in [k for k in spec if k in ("title", "notes", "comment", "about") or k.startswith("_")]:
+        spec.pop(k)
+    return spec
+
+
+def prepare_finals(files: List[Path], out: Path, seed: int = 0) -> Dict[str, Any]:
+    out.mkdir(parents=True, exist_ok=True)
+    cands = {}
+    for f in files:
+        spec = json.loads(Path(f).read_text(encoding="utf-8"))
+        cands[str(f)] = {"spec": spec, "checks": judge_arrangement(spec)}
+    rng = random.Random(seed or int(time.time()))
+    key = {}
+    for i, (a, b) in enumerate(itertools.combinations(sorted(cands), 2)):
+        x, y = (a, b) if rng.random() < .5 else (b, a)
+        d = out / f"pair{i:02d}"
+        d.mkdir(exist_ok=True)
+        (d / "X.json").write_text(json.dumps(_clean(cands[x]["spec"]), indent=1, ensure_ascii=False))
+        (d / "Y.json").write_text(json.dumps(_clean(cands[y]["spec"]), indent=1, ensure_ascii=False))
+        key[d.name] = {"X": x, "Y": y}
+    (out / "README.txt").write_text(SCORE_READER)
+    state = {"candidates": cands, "key": key}
+    (out.parent / f"{out.name}.key.json").write_text(json.dumps(state, indent=1, ensure_ascii=False))
+    return state
+
+
+def decide_finals(out: Path) -> Dict[str, Any]:
+    """The finished pieces ranked: the critic and the surprise budget first (a piece
+    with errors, warnings or an unbalanced budget loses), then the blind reader."""
+    state = json.loads((out.parent / f"{out.name}.key.json").read_text(encoding="utf-8"))
+    verdicts = json.loads((out / "verdicts.json").read_text(encoding="utf-8"))
+    cands = state["candidates"]
+    wins = {c: 0.0 for c in cands}
+    games = {c: 0 for c in cands}
+    for pair, k in state["key"].items():
+        v = verdicts.get(pair)
+        if not v:
+            continue
+        w = (v.get("confidence", 75) - 50) / 50
+        win, lose = (k["X"], k["Y"]) if v["prefer"] == "X" else (k["Y"], k["X"])
+        wins[win] += .5 + w / 2
+        wins[lose] += .5 - w / 2
+        games[win] += 1
+        games[lose] += 1
+    share = {c: wins[c] / games[c] if games[c] else .5 for c in cands}
+    ranking = sorted(cands, key=lambda c: (cands[c]["checks"]["score"], share[c]), reverse=True)
+    close = (len(ranking) > 1 and cands[ranking[0]]["checks"]["score"] == cands[ranking[1]]["checks"]["score"]
+             and share[ranking[0]] - share[ranking[1]] < CLOSE / 2)
+    return {"ranking": [(c, round(share[c], 3), cands[c]["checks"]) for c in ranking],
+            "ask_host": [ranking[0], ranking[1]] if close else None}
 
 
 # --- asking the host ---
@@ -289,6 +377,10 @@ def main() -> None:
     t.add_argument("step", choices=["prepare", "decide"])
     t.add_argument("files", nargs="*")
     t.add_argument("--out", required=False)
+    fz = sub.add_parser("finals", help="the finalists, each arranged: judged as finished pieces")
+    fz.add_argument("step", choices=["prepare", "decide"])
+    fz.add_argument("files", nargs="*")
+    fz.add_argument("--out", required=False)
     c = sub.add_parser("clips")
     c.add_argument("files", nargs=2)
     c.add_argument("--out", required=True)
@@ -307,6 +399,14 @@ def main() -> None:
                              indent=1, ensure_ascii=False))
         else:
             print(json.dumps(decide_tunes(Path(a.out or a.files[0])), indent=1, ensure_ascii=False))
+    elif a.cmd == "finals":
+        if a.step == "prepare":
+            st = prepare_finals([Path(f) for f in a.files], Path(a.out))
+            print(json.dumps({"pairs": len(st["key"]), "checks": {k: v["checks"] for k, v in st["candidates"].items()},
+                              "next": f"a fresh agent reads {a.out}/README.txt and writes {a.out}/verdicts.json"},
+                             indent=1, ensure_ascii=False))
+        else:
+            print(json.dumps(decide_finals(Path(a.out or a.files[0])), indent=1, ensure_ascii=False))
     elif a.cmd == "clips":
         print("\n".join(str(p) for p in clips([Path(f) for f in a.files], Path(a.out))))
     elif a.cmd == "record":

@@ -71,16 +71,26 @@ people judge pairs, not scores. `lib/host_judge.py` approximates their taste wit
 the judges that matched their verdicts (the audio models, Audiobox and SongEval,
 did no better than a coin flip on our music):
 
-- **Tunes:** `host_judge.py tunes prepare a.json b.json c.json --out DIR` drops
-  candidates with red flags (long notes off the beat, droning, no rhythmic
-  variety, broken tune rules) and writes the survivors as blind pairs. Spawn a
-  **fresh agent** (it must not know which is which, or that one is yours) to read
-  `DIR/README.txt` and write `DIR/verdicts.json`; then
-  `host_judge.py tunes decide DIR` ranks them.
+- **Tunes are chosen by their finished music, not alone.** The host put it
+  plainly: which tune they like bare isn't which makes the best piece once the
+  orchestra is added (in the 2x2, the simpler tune richly set matched the bold
+  one plainly set). So bare-tune judging only narrows the field:
+  `host_judge.py tunes prepare a.json b.json c.json --out DIR` drops red-flagged
+  candidates and writes blind pairs; a **fresh agent** (it must not know which is
+  which, or that one is yours) reads `DIR/README.txt` and writes
+  `DIR/verdicts.json`; `host_judge.py tunes decide DIR` names two **finalists** -
+  candidates that also hold up as a leitmotif in every form (seed, heroic,
+  legendary, darkened, the villain's: `versatility`).
+- **Then the finals:** arrange each finalist for the same role with the same care,
+  budget-matched (a bold tune plainly set, a simple tune richly set), check both
+  clean, and `host_judge.py finals prepare a-score.json b-score.json --out DIR`;
+  a fresh agent reads the scores blind; `host_judge.py finals decide DIR` picks
+  the piece - and with it the tune.
 - **Arrangements:** the critic clean, and the surprise budget balanced.
-- **Close calls only go to the host:** when `decide` says `ask_host`, make two
-  short clips (`host_judge.py clips a.json b.json --out DIR`), send them, and ask
-  which they prefer - "can't tell" is a fine answer.
+- **Close calls only go to the host:** when `finals decide` says `ask_host`, send
+  the two finished pieces (`host_judge.py clips a-score.json b-score.json --out
+  DIR`) and ask which they prefer - "can't tell" is a fine answer. Never ask the
+  host to choose between bare tunes for the final pick.
 - **Record every preference the host states** - an A/B answer, or "this one's
   better" about anything - with `host_judge.py record WINNER.json LOSER.json
   [--tie] [--note "their words"]`. Their verdicts live in the campaigns folder
