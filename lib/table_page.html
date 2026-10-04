@@ -92,9 +92,22 @@
   /* The public dice log: every roll the table makes, with its DC/AC. */
   .msg.roll { background: transparent; border: 1px dashed var(--line); max-width: 560px;
               padding: 6px 12px; font-size: .92rem; }
-  .msg.roll .goal { color: var(--muted); font-size: .85rem; }
-  .msg.roll .dice { font-variant-numeric: tabular-nums; }
-  .msg.roll .total { font-weight: bold; font-size: 1.05rem; }
+  .msg.roll .goal { color: var(--muted); font-size: .85rem; display: flex; gap: 6px; align-items: baseline; }
+  .msg.roll .goal .what { flex: 1; }
+  .msg.roll .dice { font-variant-numeric: tabular-nums; font-size: 1.05rem; }
+  .msg.roll .total { font-weight: bold; font-size: 1.45rem; display: inline-block; min-width: 1.6em;
+                     text-align: center; border: 2px solid var(--line); border-radius: 8px;
+                     padding: 0 6px; margin-inline-start: 2px; }
+  .msg.roll.success { border: 1px solid var(--hp); background: color-mix(in srgb, var(--hp) 7%, transparent); }
+  .msg.roll.success .total { border-color: var(--hp); color: var(--hp); }
+  .msg.roll.failure { border: 1px solid var(--hp-low); background: color-mix(in srgb, var(--hp-low) 7%, transparent); }
+  .msg.roll.failure .total { border-color: var(--hp-low); color: var(--hp-low); }
+  .msg.roll .why-btn { border: 1px solid var(--line); border-radius: 6px; padding: 0 6px; font-size: .8rem;
+                       background: var(--panel); }
+  .msg.roll .why-list { margin: 4px 0 0; padding-inline-start: 1.2em; font-size: .82rem; color: var(--muted); }
+  .msg.roll.fresh .total { animation: roll-in .7s cubic-bezier(.2, 1.6, .4, 1); }
+  @keyframes roll-in { from { transform: rotate(-200deg) scale(.3); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .msg.roll.fresh .total { animation: none; } }
   .msg.roll .ok { color: var(--hp); font-weight: bold; }
   .msg.roll .bad { color: var(--hp-low); font-weight: bold; }
   .msg.roll .nat { font-weight: bold; color: var(--accent); }
@@ -2379,12 +2392,36 @@
     const ev = m.event || {};
     if (ev.secret) { d.textContent = t("rollSecret"); return; }
     const r = ev.roll || {};
-    const why = (ev.why_tr || {})[lang] || ev.why || "";
+    let why = (ev.why_tr || {})[lang] || ev.why || "";
+    // The referee's rolls say where every number came from: "⚖ what · why · why".
+    const sourced = /^⚖/.test(ev.why || "");
+    let reasons = [];
+    if (/^⚖/.test(why)) {
+      const parts = why.replace(/^⚖\s*/, "").split(" · ").filter(Boolean);
+      why = parts.shift() || "";
+      reasons = parts;
+    }
+    if (r.outcome) d.classList.add(r.outcome === "success" ? "success" : "failure");
     const head = document.createElement("div");
     head.className = "goal";
-    head.textContent = "🎯 " + [m.pc || t("rollBy"), why].filter(Boolean).join(" — ")
+    const what = document.createElement("span");
+    what.className = "what";
+    what.textContent = "🎯 " + [m.pc || t("rollBy"), why].filter(Boolean).join(" — ")
       + (r.target != null ? ` · ${t(r.target_label === "AC" ? "rollAC" : "rollDC")} ${r.target}` : "");
-    head.dir = dirFor(head.textContent);
+    what.dir = dirFor(what.textContent);
+    head.appendChild(what);
+    const list = document.createElement("ul");
+    list.className = "why-list hidden";
+    if (sourced) {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "why-btn"; b.textContent = "⚖"; b.title = t("rollWhy");
+      b.setAttribute("aria-expanded", "false");
+      b.onclick = () => b.setAttribute("aria-expanded", String(!list.classList.toggle("hidden")));
+      head.appendChild(b);
+      (reasons.length ? reasons : [t("rollNoEdge")]).concat(
+        r.modifier ? [t("rollMod").replace("{n}", (r.modifier > 0 ? "+" : "−") + Math.abs(r.modifier))] : [])
+        .forEach((x) => { const li = document.createElement("li"); li.textContent = x; li.dir = "auto"; list.appendChild(li); });
+    }
     // The sum is an isolated left-to-right block (math reads that way in both
     // languages); the words around it follow the reader's language, each in its
     // own isolate so Hebrew never pulls the numbers out of order.
@@ -2407,7 +2444,7 @@
     if (r.natural === 20 || r.natural === 1) word(t(r.natural === 20 ? "rollNat20" : "rollNat1"), "nat");
     if (r.outcome) word(t(r.outcome === "success" ? "rollSuccess" : "rollFailure"),
                         r.outcome === "success" ? "ok" : "bad");
-    d.append(head, line);
+    d.append(head, line, list);
   }
 
   // Your own action stays editable until the GM answers it (the server checks too).
@@ -2750,6 +2787,7 @@
         const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
         r.messages.forEach((m) => {
           allMessages.push(m); addMessage(m); lastId = Math.max(lastId, m.id);
+          if (historyLoaded && m.kind === "roll" && msgEls.get(m.id)) msgEls.get(m.id).classList.add("fresh");
           if (m.kind === "gm") lastNarrSeen = Math.max(lastNarrSeen, m.id);
           // The GM ruled my action can't work: my turn to choose again, now.
           if (historyLoaded && m.kind === "gm" && m.event && m.event.type === "redo" && m.event.pc === me
