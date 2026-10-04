@@ -132,6 +132,24 @@ def anthem_prompt(sheet: Dict[str, Any], style: str) -> str:
             "uplifting strings, pounding timpani, glorious and inspiring")
 
 
+JUDGMENT = "⚖ Judgment"           # the music of a punishment (composed once per campaign)
+
+
+def judgment_prompt(style: str) -> str:
+    setting = f", {style}" if style else ""
+    return ("doom-laden judgment music: a tolling funeral bell, dissonant low brass, a grim choir "
+            f"chord, pounding slow drums, cold and merciless{setting}, the sound of a terrible fate")
+
+
+def dark_anthem_prompt(sheet: Dict[str, Any], style: str) -> str:
+    """A fallen hero's anthem, turned into the villain theme they now are."""
+    name = sheet.get("name", "the hero")
+    setting = f", {style}" if style else ""
+    return (f"the heroic anthem of {name} turned dark and corrupted: the same fanfare in a minor key, "
+            f"slowed and twisted, distorted brass, dissonant strings, a mournful choir{setting}, "
+            "the leitmotif of a fallen hero become a villain")
+
+
 # --- the composer process: started once, keeps the model in RAM ---
 SERVER_LOG = Path(tempfile.gettempdir()) / "gm-composer.log"
 _server: Optional[subprocess.Popen] = None
@@ -425,6 +443,10 @@ def compose_pieces(campaign_dir, pieces: List[Dict[str, Any]],
             out = camp / "music" / "themes" / f"{slug(p['name'])}-{'boss' if p['boss'] else 'theme'}.ogg"
             jobs.append({"prompt": theme_prompt(p["name"], p.get("look", ""), style, p["boss"]),
                          "seconds": THEME_SECONDS, "out": str(out), "loop": True})
+        elif p["kind"] in ("judgment", "dark_anthem"):       # (registered as themes: they play as one)
+            out = camp / "music" / "themes" / f"{slug(p['name'])}-theme.ogg"
+            prompt = judgment_prompt(style) if p["kind"] == "judgment" else dark_anthem_prompt(p["sheet"], style)
+            jobs.append({"prompt": prompt, "seconds": THEME_SECONDS, "out": str(out), "loop": True})
         else:
             name = p["sheet"].get("name", "hero")
             out = camp / "music" / "anthems" / f"anthem-{slug(name)}.ogg"
@@ -435,9 +457,9 @@ def compose_pieces(campaign_dir, pieces: List[Dict[str, Any]],
     def landed(i: int, r: Dict[str, Any]) -> None:
         p, f = pieces[i], Path(r["path"]).name
         reg = load_registry(camp)
-        if p["kind"] == "theme":
+        if p["kind"] in ("theme", "judgment", "dark_anthem"):
             key = _key(reg["themes"], p["name"]) or p["name"]
-            reg["themes"].setdefault(key, {})["boss" if p["boss"] else "normal"] = f
+            reg["themes"].setdefault(key, {})["boss" if p.get("boss") else "normal"] = f
         else:
             name = p["sheet"].get("name", "hero")
             key = _key(reg["anthems"], name) or name

@@ -75,6 +75,65 @@ def table(tmp_path, monkeypatch):
     httpd.server_close()
 
 
+def test_cruelty_is_warned_once_then_punished(table):
+    from lib import party_roster
+    call, camp, state = table["call"], table["camp"], table["state"]
+    state.set_round_seconds(0)
+    made = []
+    state.music_maker = lambda kind, name, boss, look, sheet: made.append((kind, name)) or f"{kind}.ogg"
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    bram = call("/api/create", {"code": CODE, "name": "Bram", "concept": "a dwarf"})[1]["token"]
+    kara = call("/api/create", {"code": CODE, "name": "Kara", "concept": "an elf"})[1]["token"]
+    call("/api/gm/inbox", {}, host=True)
+    # Not warned: no punishment.
+    status, body = call("/api/gm/punish", {"pc": "Bram", "way": "death", "reason": "x"}, host=True)
+    assert status == 409 and "warn first" in body["error"]
+    call("/api/say", {"code": CODE, "token": bram, "text": "I kick the puppy."})
+    call("/api/gm/inbox", {}, host=True)
+    status, body = call("/api/gm/redo", {"pc": "Bram", "text": "That is cruelty. Choose again.",
+                                         "lang": "en", "warn": True}, host=True)
+    assert status == 200 and body["message"]["event"] == {"type": "redo", "pc": "Bram", "warn": True}
+    assert "Bram" in state.conduct["warnings"] and state.round_state()["waiting_on"] == ["Bram"]
+    state.music_pass()
+    assert ("judgment", "⚖ Judgment") in made                    # ready before it's needed
+    # He insists: lost to madness. His seat is freed, he becomes a villain NPC.
+    call("/api/say", {"code": CODE, "token": bram, "text": "I kick it again."})
+    call("/api/gm/inbox", {}, host=True)
+    status, body = call("/api/gm/punish", {"pc": "Bram", "way": "madness",
+                                           "reason": "The guilt broke him."}, host=True)
+    assert status == 200 and body["villain"] == "Bram"
+    assert call(f"/api/info?code={CODE}&token={bram}")[1]["me"] is None
+    npc = json.loads((camp / "npcs.json").read_text())["Bram"]
+    assert npc["villain"] and npc["former_pc"] and "guilt" in npc["description"]
+    assert json.loads(next((camp / "departed").glob("*.json")).read_text())["status"] == "lost to madness"
+    assert state.music["mood"] == "dread"                         # the judgment music
+    state.music_pass()
+    assert ("dark_anthem", "Bram") in made
+    # His player's next character: Bram is their nemesis.
+    call("/api/create", {"code": CODE, "token": bram, "name": "Tamar", "concept": "a paladin"})
+    assert json.loads((camp / "npcs.json").read_text())["Bram"]["nemesis_of"] == "Tamar"
+    seen = call(f"/api/messages?code={CODE}&token={pip}&after=0")[1]["messages"]
+    assert any((m.get("event") or {}) == {"type": "nemesis", "of": "Bram"} for m in seen)
+    assert any((m.get("event") or {}).get("type") == "punished" and m["pc"] == "Bram" for m in seen)
+    # A curse: Kara plays on, cursed (the referee's checks are at disadvantage) until she atones.
+    call("/api/gm/redo", {"pc": "Kara", "text": "No.", "warn": True}, host=True)
+    call("/api/say", {"code": CODE, "token": kara, "text": "I burn the orphanage."})
+    call("/api/gm/inbox", {}, host=True)
+    assert call("/api/gm/punish", {"pc": "Kara", "way": "curse", "reason": "The gods"}, host=True)[0] == 200
+    sheet = json.loads(party_roster.find_pc(camp, "Kara").read_text())
+    assert "cursed" in sheet["conditions"] and sheet["curse"]["lifted_by"] == "atonement"
+    assert call(f"/api/info?code={CODE}&token={kara}")[1]["me"] == "Kara"
+    from lib import referee
+    assert "cursed" in referee.CHECK_DIS
+    assert call("/api/gm/atone", {"pc": "Kara"}, host=True)[0] == 200
+    assert "cursed" not in json.loads(party_roster.find_pc(camp, "Kara").read_text())["conditions"]
+    # Death: warned, insisted, killed; the warning is spent.
+    call("/api/gm/redo", {"pc": "Tamar", "text": "No.", "warn": True}, host=True)
+    assert call("/api/gm/punish", {"pc": "Tamar", "way": "death", "reason": "Assassins"}, host=True)[0] == 200
+    assert "Tamar" not in state.conduct["warnings"] and party_roster.find_pc(camp, "Tamar") is None
+    assert [e["kind"] for e in state.conduct["log"]].count("punish") == 3
+
+
 def test_a_wrong_code_is_turned_away(table):
     status, body = table["call"]("/api/info?code=nope")
     assert status == 403 and not body["ok"]

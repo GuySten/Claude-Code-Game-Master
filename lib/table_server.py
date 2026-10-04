@@ -409,6 +409,13 @@ class TableState:
         # (the last message id then), reason}. Their players choose again, on a fresh
         # round clock; the GM resolves nothing until they have (or their time is up).
         self.redo: Dict[str, Dict[str, Any]] = {}
+        # Cruelty to clear innocents: who was warned, punishments, and the players
+        # who owe their next character a nemesis (table/conduct.json).
+        self.conduct_path = self.dir / "conduct.json"
+        conduct = self._read_json(self.conduct_path, {})
+        self.conduct: Dict[str, Any] = conduct if isinstance(conduct, dict) else {}
+        for k in ("warnings", "nemesis_for", "log"):
+            self.conduct.setdefault(k, [] if k == "log" else {})
         # Who added a minute to the round: {"round": its started_at, "by": [PC, ...]}.
         self.extended: Dict[str, Any] = {"round": None, "by": []}
         try:
@@ -577,6 +584,165 @@ class TableState:
             rnd["redo"] = {pc: r["reason"] for pc, r in redo.items()}
         return rnd
 
+    # --- conduct: cruelty to clear innocents is warned once, then punished ---
+    def _save_conduct(self) -> None:
+        tmp = self.conduct_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(self.conduct, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(self.conduct_path)
+
+    def warn(self, pc: str, text: str, lang: Optional[str] = None) -> Dict[str, Any]:
+        """The GM warns a player whose action is cruelty to clear innocents: the
+        action is taken back and they choose again (once, on a fresh clock). The
+        warning is recorded: only a warned player can be punished. The judgment
+        music is composed now, so it's ready if they insist."""
+        msg = self.ask_redo(pc, text, lang, warn=True)
+        with self.lock:
+            if pc not in self.conduct["warnings"]:
+                self.conduct["warnings"][pc] = {"t": _now(), "warning": text}
+                self.conduct["log"].append({"t": _now(), "pc": pc, "kind": "warn", "text": text})
+                self._save_conduct()
+        if (self.music_maker is not None or composer.available()) and not composer.has_theme(
+                self.campaign_dir, composer.JUDGMENT, False) and not any(
+                j["kind"] == "judgment" for j in self.music_jobs):
+            self.music_jobs.append({"kind": "judgment", "name": composer.JUDGMENT, "boss": False, "look": ""})
+            self.portrait_wake.set()
+        return msg
+
+    def judgment_music(self) -> Optional[Dict[str, Any]]:
+        """The punishment's music: the composed judgment piece, else the darkest mood."""
+        track = composer.theme_file(self.campaign_dir, composer.JUDGMENT, False)
+        if track:
+            music = self.set_music(track, 0.8, True, composer.JUDGMENT, mood="dread", theme=composer.JUDGMENT)
+        else:
+            music = self.apply_mood("dread", force=True)
+        if music:
+            self.announce_music(music)
+        return music
+
+    def _write_sheet(self, path: Path, sheet: Dict[str, Any]) -> None:
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(sheet, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(path)
+
+    def punish(self, pc: str, way: str, reason: str) -> Dict[str, Any]:
+        """A warned player insisted. Three punishments, with the judgment music:
+        death (the character is killed; the player rolls a new one), madness (the
+        character is lost to the GM as a villain; the player's next character is
+        their nemesis, and the old anthem turns dark as the villain's theme), or a
+        curse (they play on, at disadvantage on every ability check, until they
+        atone). The GM narrates it, with the reason it invented."""
+        if way not in ("death", "madness", "curse"):
+            return {"ok": False, "error": "the punishment is death, madness or curse"}
+        path = party_roster.find_pc(self.campaign_dir, pc)
+        if path is None:
+            return {"ok": False, "error": f"no player character named {pc}"}
+        sheet = to_flat(party_roster._read(path) or {})
+        real = sheet.get("name") or pc
+        with self.lock:
+            warned = next((n for n in self.conduct["warnings"] if party_roster._same_name(n, real)), None)
+        if warned is None:
+            return {"ok": False, "error": f"{real} was never warned: warn first "
+                                          f"(gm-table.sh warn \"{real}\" \"…\"); punish only if they insist"}
+        reason = " ".join(str(reason).split())[:400]
+        music = self.judgment_music()
+        out: Dict[str, Any] = {"ok": True, "pc": real, "way": way, "music": music}
+        if way == "curse":
+            conds = [c for c in (sheet.get("conditions") or [])]
+            if "cursed" not in [str(c).lower() for c in conds]:
+                conds.append("cursed")
+            sheet["conditions"] = conds
+            sheet["curse"] = {"reason": reason, "since": _now(),
+                              "effect": "disadvantage on every ability check", "lifted_by": "atonement"}
+            self._write_sheet(path, sheet)
+        else:
+            with self.lock:
+                tokens = [t for t, n in self.seats.items() if party_roster._same_name(n, real)]
+                if way == "madness":
+                    for t in tokens:
+                        self.conduct["nemesis_for"][t] = real
+            self.free(real)
+            sheet["status"] = "dead" if way == "death" else "lost to madness"
+            sheet["fate"] = {"punished": way, "reason": reason, "at": _now()}
+            if way == "death":
+                sheet.setdefault("hp", {})["current"] = 0
+            if path.name == party_roster.LEAD_FILE:
+                self._write_sheet(path, sheet)          # (the lead stays on the record, out of play)
+            else:
+                departed = self.campaign_dir / "departed"
+                departed.mkdir(parents=True, exist_ok=True)
+                self._write_sheet(departed / path.name, sheet)
+                path.unlink()
+            if way == "madness":
+                self._villain_from(sheet, reason)
+                out["villain"] = real
+        with self.lock:
+            self.conduct["warnings"].pop(warned, None)
+            self.conduct["log"].append({"t": _now(), "pc": real, "kind": "punish", "way": way, "reason": reason})
+            self._save_conduct()
+        self.append("system", f"⚖ Judgment falls on {real}.", pc=real,
+                    event={"type": "punished", "way": way})
+        return out
+
+    def _villain_from(self, sheet: Dict[str, Any], reason: str) -> None:
+        """A PC lost to madness joins the NPCs as a villain, with their anthem turned dark."""
+        name = sheet.get("name")
+        path = self.campaign_dir / "npcs.json"
+        data = self._read_json(path, {})
+        data = data if isinstance(data, dict) else {}
+        npcs = data["npcs"] if isinstance(data.get("npcs"), dict) else data
+        npcs[name] = {**(npcs.get(name) or {}),
+                      "description": f"Once one of the party. {reason}".strip(),
+                      "attitude": "hostile", "villain": True, "former_pc": True, "nemesis_of": None,
+                      "created": _now(), "events": [], "tags": {"locations": [], "quests": []},
+                      "visual_appearance": sheet.get("visual_appearance") or {},
+                      "portrait": sheet.get("portrait")}
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(path)
+        if self.music_maker is not None or composer.available():
+            self.music_jobs.append({"kind": "dark_anthem", "name": name, "boss": False, "look": "",
+                                    "sheet": sheet})
+            self.portrait_wake.set()
+
+    def link_nemesis(self, token: str, new_pc: str) -> Optional[str]:
+        """The player of a character lost to madness made a new one: the old one is
+        the new one's nemesis now (the GM invents why)."""
+        with self.lock:
+            old = self.conduct["nemesis_for"].pop(token, None) if token else None
+            if old:
+                self._save_conduct()
+        if not old:
+            return None
+        path = self.campaign_dir / "npcs.json"
+        data = self._read_json(path, {})
+        npcs = data.get("npcs") if isinstance(data.get("npcs"), dict) else data
+        if isinstance(npcs, dict) and isinstance(npcs.get(old), dict):
+            npcs[old]["nemesis_of"] = new_pc
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+            tmp.replace(path)
+        self.append("system", f"⚔ {new_pc}'s nemesis: {old}.", pc=new_pc, event={"type": "nemesis", "of": old})
+        return old
+
+    def atone(self, pc: str) -> Dict[str, Any]:
+        """The curse is lifted (the atonement was made, in the story)."""
+        path = party_roster.find_pc(self.campaign_dir, pc)
+        if path is None:
+            return {"ok": False, "error": f"no player character named {pc}"}
+        sheet = to_flat(party_roster._read(path) or {})
+        conds = [c for c in (sheet.get("conditions") or []) if str(c).lower() != "cursed"]
+        if len(conds) == len(sheet.get("conditions") or []) and not sheet.get("curse"):
+            return {"ok": False, "error": f"{sheet.get('name', pc)} isn't cursed"}
+        sheet["conditions"] = conds
+        sheet.pop("curse", None)
+        self._write_sheet(path, sheet)
+        with self.lock:
+            self.conduct["log"].append({"t": _now(), "pc": sheet.get("name", pc), "kind": "atone"})
+            self._save_conduct()
+        self.append("system", f"✨ {sheet.get('name', pc)}'s curse is lifted.", pc=sheet.get("name", pc),
+                    event={"type": "atoned"})
+        return {"ok": True, "pc": sheet.get("name", pc)}
+
     def extend_round(self, pc: str) -> Dict[str, Any]:
         """A player who hasn't acted yet asks for more time: the round's clock gets
         EXTEND_SECONDS more. Once per player per round."""
@@ -594,7 +760,7 @@ class TableState:
         self.append("system", f"{pc} asks for one more minute.", pc=pc, event={"type": "extend"})
         return {"ok": True, "round": self.round_state()}
 
-    def ask_redo(self, pc: str, text: str, lang: Optional[str] = None) -> Dict[str, Any]:
+    def ask_redo(self, pc: str, text: str, lang: Optional[str] = None, warn: bool = False) -> Dict[str, Any]:
         """The GM rules a player's action can't work: it tells them why (``text``,
         a GM beat everyone sees), marks the action, and gives its player a fresh
         round clock to choose another. Called once per table language, the clock
@@ -613,7 +779,7 @@ class TableState:
             again = pending is not None and not any(
                 m["id"] > pending["after"] and m["kind"] == "player"
                 and party_roster._same_name(m.get("pc") or "", pc) for m in self.messages)
-        msg = self.append("gm", text, lang=lang, event={"type": "redo", "pc": pc})
+        msg = self.append("gm", text, lang=lang, event={"type": "redo", "pc": pc, **({"warn": True} if warn else {})})
         with self.lock:
             if again:
                 pending["after"] = msg["id"]      # (the same ruling in another language)
@@ -2802,6 +2968,7 @@ def make_handler(state: TableState, code: str, host_key: str):
                                             f"pick them in the list above to play them.")
                         created["existing"] = name
                     return self._json(created, 409)
+                state.link_nemesis(str(data.get("token") or ""), created["pc"])
                 rolled = state.apply_roll(created["pc"], data.get("roll_id"))
                 result = state.claim(created["pc"])
                 if result["ok"]:
@@ -3009,13 +3176,19 @@ def make_handler(state: TableState, code: str, host_key: str):
                 if lang and lang not in state.table_langs():
                     return self._err(f"this adventure isn't played in {lang} (its languages: "
                                      f"{', '.join(state.languages)})")
-                msg = state.ask_redo(seated, text, lang)
+                msg = (state.warn if data.get("warn") else state.ask_redo)(seated, text, lang)
                 missing = state.missing_versions() if lang else {}
                 reminder = ("Now the same ruling in " + ", ".join(
                     f"{lang_name(l)} (redo \"{seated}\" \"…\" --lang {l})" for l in missing)
                     + ".") if missing else None
                 return self._json({"ok": True, "message": msg, "round": state.round_state(),
                                    "reminder": reminder})
+            if path == "/api/gm/punish":
+                r = state.punish(str(data.get("pc", "")), str(data.get("way", "")), str(data.get("reason", "")))
+                return self._json({k: v for k, v in r.items() if k != "music"}, 200 if r["ok"] else 409)
+            if path == "/api/gm/atone":
+                r = state.atone(str(data.get("pc", "")))
+                return self._json(r, 200 if r["ok"] else 409)
             if path == "/api/gm/music":
                 if "auto" in data:
                     state.set_auto_music(bool(data["auto"]))
@@ -3629,6 +3802,17 @@ def main() -> None:
     rd.add_argument("text", help="Why it can't work, and that they choose again (one or two sentences)")
     rd.add_argument("--lang", help="The language it's written in (once per table language)")
 
+    wn = sub.add_parser("warn", help="Cruelty to clear innocents: warn the player; they choose again (once)")
+    wn.add_argument("pc")
+    wn.add_argument("text", help="The warning, and that they choose another action")
+    wn.add_argument("--lang", help="The language it's written in (once per table language)")
+    pu = sub.add_parser("punish", help="A warned player insisted: death | madness | curse (judgment music)")
+    pu.add_argument("pc")
+    pu.add_argument("way", choices=["death", "madness", "curse"])
+    pu.add_argument("--reason", required=True, help="The reason you invented (the avengers, the guilt...)")
+    at = sub.add_parser("atone", help="Lift a curse (the atonement was made in the story)")
+    at.add_argument("pc")
+
     al = sub.add_parser("alias", help="Another spelling of a name (e.g. its Hebrew form), for hover cards")
     al.add_argument("name", help="The name as the campaign knows it (NPC, place, faction)")
     al.add_argument("alias", help="The other spelling, as it appears in the narration")
@@ -3892,9 +4076,25 @@ def main() -> None:
               else "MUSIC stopped")
         return
 
-    if args.action == "redo":
+    if args.action == "punish":
+        r = _call(campaign_dir, "POST", "/api/gm/punish", {"pc": args.pc, "way": args.way, "reason": args.reason})
+        if not r.get("ok"):
+            sys.exit(f"[ERROR] {r.get('error')}")
+        print({"death": f"{r['pc']} is dead; their player rolls a new character. Narrate it now, with the judgment music.",
+               "madness": f"{r['pc']} is lost to madness and is a villain NPC now (its anthem turns dark as its "
+                          f"theme). When their player's new character arrives, invent why the two are nemeses.",
+               "curse": f"{r['pc']} is cursed: disadvantage on every ability check until they atone "
+                        f"(set the atonement quest; then gm-table.sh atone \"{r['pc']}\")."}[r["way"]])
+        return
+
+    if args.action == "atone":
+        r = _call(campaign_dir, "POST", "/api/gm/atone", {"pc": args.pc})
+        print(f"{r['pc']}'s curse is lifted." if r.get("ok") else f"[ERROR] {r.get('error')}")
+        return
+
+    if args.action in ("redo", "warn"):
         r = _call(campaign_dir, "POST", "/api/gm/redo",
-                  {"pc": args.pc, "text": args.text, "lang": args.lang})
+                  {"pc": args.pc, "text": args.text, "lang": args.lang, "warn": args.action == "warn"})
         if not r.get("ok"):
             sys.exit(f"[ERROR] {r.get('error')}")
         rnd = r.get("round") or {}

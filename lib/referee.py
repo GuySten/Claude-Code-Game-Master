@@ -67,7 +67,7 @@ ATTACKER_DIS = {"blinded", "frightened", "poisoned", "prone", "restrained"}
 TARGET_GIVES_ADV = {"blinded", "paralyzed", "petrified", "restrained", "stunned", "unconscious"}
 TARGET_GIVES_DIS = {"invisible"}
 MELEE_AUTO_CRIT = {"paralyzed", "unconscious"}
-CHECK_DIS = {"poisoned", "frightened"}
+CHECK_DIS = {"poisoned", "frightened", "cursed"}   # (cursed: the table's punishment, until atonement)
 AUTO_FAIL_STR_DEX_SAVES = {"paralyzed", "petrified", "stunned", "unconscious"}
 COVER_AC = {"half": 2, "three-quarters": 5}
 # Battlefield effects: what an effect may change, nothing else.

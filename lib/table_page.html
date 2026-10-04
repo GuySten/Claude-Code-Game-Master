@@ -96,6 +96,8 @@
   .msg .redo-note { font-size: .85rem; color: var(--muted); margin-top: 2px; }
   .msg.gm.redo { border-inline-start: 4px solid var(--hp-low); }
   .msg.gm.redo.for-me { box-shadow: 0 0 0 2px var(--hp-low); }
+  .msg.gm.redo.warn { background: color-mix(in srgb, var(--hp-low) 10%, var(--gm)); }
+  .msg.system.punished { color: var(--hp-low); font-weight: bold; font-style: normal; font-size: 1.05rem; }
   .msg .edit-box { width: 100%; box-sizing: border-box; font: inherit; min-height: 3.2em;
                    resize: vertical; margin-top: 2px; }
   .msg .edit-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 4px; }
@@ -1884,7 +1886,7 @@
     blinded: "עיוור", charmed: "מוקסם", deafened: "חירש", frightened: "מפוחד",
     grappled: "אחוז", incapacitated: "חסר אונים", invisible: "בלתי נראה",
     paralyzed: "משותק", petrified: "מאובן", poisoned: "מורעל", prone: "שרוע",
-    restrained: "כבול", stunned: "המום", unconscious: "מחוסר הכרה", exhaustion: "תשישות",
+    restrained: "כבול", stunned: "המום", unconscious: "מחוסר הכרה", exhaustion: "תשישות", cursed: "מקולל",
     "proficiency bonus": "בונוס התמחות", saves: "הצלות", "saving throws": "הצלות",
     speed: "מהירות", initiative: "יוזמה", languages: "שפות", proficiencies: "התמחויות",
     cantrips: "לחשי בסיס", used: "בשימוש", remaining: "נותרו", total: "סך הכול",
@@ -2347,6 +2349,8 @@
     if (ev.type === "npc") return ev.of ? t("ev_npc_of").replace("{name}", ev.name || "").replace("{pc}", ev.of)
                                         : t("ev_npc").replace("{name}", ev.name || "");
     if (ev.type === "levelready") return s.replace("{level}", ev.level);
+    if (ev.type === "punished") return t("ev_punished_" + ev.way).replace("{pc}", m.pc || "");
+    if (ev.type === "nemesis") return s.replace("{name}", ev.of || "");
     if (ev.type === "loot") return t("ev_loot").replace("{name}", ev.name || "")
       + (ev.owner ? " — " + t("lootFor").replace("{pc}", ev.owner) : "");
     if (ev.type === "levelup") {
@@ -2826,13 +2830,14 @@
     const d = document.createElement("div");
     d.className = "msg " + m.kind + (m.to ? " whisper" : "") + (m.pc === me && m.kind === "player" ? " mine" : "");
     const redoFor = m.kind === "gm" && m.event && m.event.type === "redo" ? m.event.pc : null;
-    if (redoFor) d.classList.add("redo", ...(redoFor === me ? ["for-me"] : []));
+    if (redoFor) d.classList.add("redo", ...(redoFor === me ? ["for-me"] : []), ...(m.event.warn ? ["warn"] : []));
     if (m.kind === "player" && m.redo) d.classList.add("redone");
     if (m.kind === "roll") {
       renderRoll(m, d);
     } else if (m.kind === "system") {
       d.textContent = systemText(m);
       d.dir = dirFor(d.textContent);
+      if ((m.event || {}).type === "punished") d.classList.add("punished");
       if (m.image) {
         const img = imageEl(m.image, 800);
         const ev = m.event || {};
@@ -2851,7 +2856,8 @@
       const label = document.createElement("span");
       if (m.kind === "gm") {
         label.textContent = t("gm") + (m.to ? " — " + t("whisper") : "")
-          + (redoFor ? " — " + (redoFor === me ? t("redoYou") : t("redoThem").replace("{pc}", redoFor)) : "");
+          + (redoFor ? " — " + (m.event.warn ? (redoFor === me ? t("warnYou") : t("warnThem").replace("{pc}", redoFor))
+                       : redoFor === me ? t("redoYou") : t("redoThem").replace("{pc}", redoFor)) : "");
       } else {
         const name = document.createElement("span");      // hover: who they are
         name.textContent = m.pc || "?";

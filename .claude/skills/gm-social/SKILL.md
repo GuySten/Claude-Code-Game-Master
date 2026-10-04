@@ -48,3 +48,24 @@ A real social victory — a hard persuasion landed, a daring bluff, turning a ho
 
 ## Craft (see gm-craft)
 NPCs have agendas, not quests. Don't over-share — secrets revealed slowly are 10x better. NPCs can say no, lie, or give bad advice. End with a conversation-ender if they're done.
+
+## Conduct: cruelty to clear innocents
+When a player's action is plainly evil against the clearly innocent (harming a child, a
+bystander who did nothing, a helpless animal), not a hard choice in a grey situation:
+
+1. **Warn, once, before anything is rolled or narrated:**
+   `bash tools/gm-table.sh warn "<PC>" "<in the world's voice: this is cruelty; choose another action>" --lang <each>`.
+   Their action is crossed out and they choose again on a fresh clock. Then `wait`.
+2. **If they insist** (the new action is the same cruelty, or worse), choose ONE punishment
+   and run it before narrating; it starts the judgment music:
+   - `punish "<PC>" death --reason "<the avengers you invent: the victims' kin, a hired assassin...>"` —
+     narrate the death; the player rolls a new character on their page.
+   - `punish "<PC>" madness --reason "<the guilt or horror that breaks them>"` — the character
+     becomes a villain NPC (its anthem turned dark is its theme). When the player's new character
+     joins (`⚔ <new>'s nemesis: <old>` in the inbox), invent why the two are nemeses, and bring the
+     villain on with `say ... --theme "<old>" --villain`.
+   - `punish "<PC>" curse --reason "<who or what curses them>"` — they play on at disadvantage on
+     every ability check (the referee applies it) until they atone: set an atonement quest
+     (`gm-plot.sh add`), and when it's done, `gm-table.sh atone "<PC>"`.
+3. Never punish without the warning first (the table refuses), and never for a joke, a fair
+   fight, or a choice the story made hard. Everything is in the campaign's `table/conduct.json`.

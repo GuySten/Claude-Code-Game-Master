@@ -474,6 +474,10 @@ Copy, fill in the link and code, and send:
    behind you...) is crossed out: the GM tells you why, before rolling anything, and you choose
    another on a fresh countdown. Nothing of that round is played out until you have, or your
    time is up (then your character hesitates).
+   **Cruelty to the clearly innocent** (people or animals) gets a ⚠ warning and one chance to
+   choose again. Insist, and judgment music plays and the GM punishes the character: death (roll
+   a new one), madness (the old character becomes the new one's villainous nemesis, to a dark
+   version of their own anthem), or a curse (disadvantage on every ability check until they atone).
 5. **While the GM works**, the bar above the text box shows what it's doing (reading your
    actions, rolling dice, updating the sheets, writing the story) and roughly how long is
    left. It learns this table's pace, so it gets more accurate as you play.
