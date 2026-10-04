@@ -78,3 +78,7 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   instruments. The earlier "VPO brass is better" was heard with VPO's own room left in,
   so it may have been the room too. Narrowing a stereo recording (summing its two
   microphones) can also make it hollow - another reason not to swap sample sets lightly.
+- **Brass only (Ode to Joy, horns and trombones), the current brass given +9 dB more hall
+  to match VPO's stereo width:** the current one "feels smoothed", VPO's "crisper". The
+  smoothing is likely the extra hall, not the instrument. "Crisp" keeps coming up as
+  what the host notices and likes (the flutes too): the hall may be too much overall.
