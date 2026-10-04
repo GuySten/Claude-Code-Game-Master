@@ -63,3 +63,10 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   (orchestra.ADVANCE). Lesson for every listening test of the *sound* (timing,
   instruments, mix): play it on a tune the host knew before this campaign, so the
   ear can tell what's off from what's new.
+- **Instruments from another sample set (Ode to Joy, trumpets and flutes A/B):** "I
+  think the difference is mainly in the acoustics." Measured: Virtual Playing
+  Orchestra's recordings carry their own room and stereo width (2-4x wider than
+  MuseScore_General's near-mono recordings, which take their space from our hall), so
+  they sounded like another room. Instruments from different sets must be placed in
+  the same space (width, position, hall send) before they're compared or mixed;
+  orchestra.ROOM sends each recording to the hall by the room it already carries.

@@ -413,6 +413,27 @@ RANGES = {
 # their own measurement.)
 ADVANCE = {"violins": 0.15, "violins2": 0.18, "cellos": 0.09, "tremolo": 0.115, "choir": 0.13,
            "strings": 0.25, "trombones": 0.02, "organ": 0.015, "flutes": 0.012, "piccolo": 0.01}
+# How much room each recording carries already (dB: its energy after a short note is
+# released, against the note's), measured from MuseScore_General for the instruments
+# whose sound stops when they do (bowed strings, the choir and ringing instruments
+# are left out: their own ring isn't a room). The hall adds about HALL_ROOM to a dry
+# one; each part is sent to it just enough to end at that same room, so the orchestra
+# sounds like one place (the host heard recordings with their own room as a different
+# acoustic: "the difference is mainly in the acoustics").
+ROOM = {"flutes": -20.8, "horns": -17.5, "trumpets": -39.3, "trombones": -25.5, "tuba": -25.6,
+        "piccolo": -22.3, "oboe": -24.1, "english_horn": -34.2, "clarinets": -33.4, "bassoons": -25.6,
+        "brass": -20.9, "organ": -15.4, "pizzicato": -24.9, "taiko": -20.9, "toms": -28.9}
+HALL_ROOM = -12.8
+
+
+def send_db(room: Optional[float]) -> float:
+    """The hall send (dB) for a recording carrying ``room`` dB of its own room."""
+    if room is None:
+        return 0.0
+    need = 10 ** (HALL_ROOM / 10) - 10 ** (room / 10)
+    return -12.0 if need <= 10 ** ((HALL_ROOM - 12) / 10) else max(-12.0, 10 * math.log10(need) - HALL_ROOM)
+
+
 BALANCE = {
     "horns": 2, "trumpets": 3, "trombones": 2, "brass": 3, "violins": 1, "strings": -3,
     "tremolo": -2, "choir": 3, "timpani": 2, "taiko": 3, "glockenspiel": -2, "piccolo": -2,
@@ -426,6 +447,21 @@ def level_db(part: str, mix: Optional[Dict[str, float]] = None) -> float:
     return -LOUDNESS.get(part, 0.0) + BALANCE.get(part, 0) + float((mix or {}).get(part, 0))
 
 
+_DRY = None
+
+
+def _dry_type():
+    """An array type for play()'s dry mix that carries its hall send (``.send``)."""
+    global _DRY
+    if _DRY is None:
+        import numpy as np
+
+        class Dry(np.ndarray):
+            send = None
+        _DRY = Dry
+    return _DRY
+
+
 def play(score: Score, seconds: float, sf2: Path = SF2, rate: int = RATE,
          mix: Optional[Dict[str, float]] = None, align: bool = True):
     """The score through the SoundFont -> stereo float32 (n, 2), dry. Each part (and
@@ -436,7 +472,8 @@ def play(score: Score, seconds: float, sf2: Path = SF2, rate: int = RATE,
     syn = tinysoundfont.Synth(gain=-12, samplerate=rate)
     sfid = syn.sfload(str(sf2))
     total = int((seconds + 0.5) * rate)
-    out = np.zeros((total, 2), dtype="float32")
+    out = np.zeros((total, 2), dtype="float32").view(_dry_type())
+    out.send = np.zeros((total, 2), dtype="float32")      # what goes to the hall (see ROOM)
     groups: Dict[str, list] = {}
     for e in score.events:
         groups.setdefault(e[2], []).append(e)
@@ -467,12 +504,14 @@ def play(score: Score, seconds: float, sf2: Path = SF2, rate: int = RATE,
         syn.generate(256)                                   # (let the cut voices go)
         gain = level_db(part, mix) + (float(layer) if layer else 0.0)
         out += stem * np.float32(10 ** (gain / 20))
+        out.send += stem * np.float32(10 ** ((gain + send_db(ROOM.get(part))) / 20))
     return out
 
 
 def hall(dry, rate: int = RATE, rt60: float = 2.3, wet: float = 0.28, seed: int = 7,
          loop_at: Optional[int] = None):
-    """A concert hall: the dry orchestra convolved with a synthetic hall response
+    """A concert hall: the dry orchestra (its hall send, when play() made it: see
+    ROOM) convolved with a synthetic hall response
     (early reflections, then a diffuse tail that darkens as it decays); the tail
     is left to ring after the last chord, or, for a loop (``loop_at``: its length
     in samples), rings on over its start, so the seam can't be heard."""
@@ -503,8 +542,11 @@ def hall(dry, rate: int = RATE, rt60: float = 2.3, wet: float = 0.28, seed: int 
     tail = len(ir)
     size = 1 << int(math.ceil(math.log2(len(dry) + tail)))
     out = np.zeros((len(dry) + tail, 2))
+    send = getattr(dry, "send", None)
+    send = dry if send is None else send
+    dry = np.asarray(dry)
     for c in range(2):
-        y = np.fft.irfft(np.fft.rfft(dry[:, c], size) * np.fft.rfft(ir[:, c], size), size)
+        y = np.fft.irfft(np.fft.rfft(send[:, c], size) * np.fft.rfft(ir[:, c], size), size)
         out[:, c] = y[:len(dry) + tail]
     mix = out * wet
     mix[:len(dry)] += dry * (1 - wet * 0.5)
