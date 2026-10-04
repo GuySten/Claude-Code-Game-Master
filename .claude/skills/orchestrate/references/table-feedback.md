@@ -178,3 +178,8 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   instruments should represent madness, following the violin when they accompany it":
   scores now take "unhinge" stretches (the named parts waver and drift off pitch, each
   its own way); the other sections stay true.
+- **All the strings following the violin's madness: the scope is right, the duration
+  wasn't** - "every madness is felt clearly, so it should not take a lot of duration";
+  "more incremental". A strong effect is a flash: about a beat at first, growing a
+  little each time through the piece (here 1 -> 2 beats), and longer and more often
+  one level down.
