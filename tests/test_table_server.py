@@ -1229,6 +1229,87 @@ def test_the_gm_waits_for_everyone_or_a_minute_after_the_first_action(table):
     assert TableState(table["camp"], str(table["world"])).round_seconds == 0
 
 
+def test_a_player_who_has_not_acted_may_add_a_minute_once_a_round(table):
+    import table_server
+    call, state = table["call"], table["state"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    bram = call("/api/create", {"code": CODE, "name": "Bram", "concept": "a dwarf"})[1]["token"]
+    call("/api/gm/inbox", {}, host=True)
+    assert call("/api/extend", {"code": CODE, "token": bram})[0] == 409     # no round yet
+    call("/api/say", {"code": CODE, "token": pip, "text": "I check the door."})
+    assert call("/api/extend", {"code": CODE, "token": pip})[1]["error"].startswith("You've already acted")
+    status, body = call("/api/extend", {"code": CODE, "token": bram})
+    rnd = body["round"]
+    assert status == 200 and rnd["extended_by"] == ["Bram"] and rnd["total"] == 120
+    assert 119 <= rnd["deadline"] - time.time() <= 120
+    assert "already added a minute" in call("/api/extend", {"code": CODE, "token": bram})[1]["error"]
+    later = state.round_state(now=time.time() + table_server.ROUND_SECONDS + 1)
+    assert later["open"] and not later["timed_out"]                       # the extra minute holds
+    seen = call(f"/api/messages?code={CODE}&token={pip}&after=0")[1]["messages"]
+    assert any((m.get("event") or {}).get("type") == "extend" and m.get("pc") == "Bram" for m in seen)
+    # The next round starts with a clean slate.
+    call("/api/say", {"code": CODE, "token": bram, "text": "I guard the rear."})
+    call("/api/gm/inbox", {}, host=True)
+    call("/api/gm/say", {"text": "The door holds."}, host=True)
+    call("/api/say", {"code": CODE, "token": pip, "text": "I push."})
+    assert state.round_state()["extended_by"] == [] and state.round_state()["total"] == 60
+    assert call("/api/extend", {"code": CODE, "token": bram})[0] == 200
+
+
+def test_an_action_that_cannot_work_is_chosen_again_on_a_fresh_clock(table):
+    import table_server
+    call, state = table["call"], table["state"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    bram = call("/api/create", {"code": CODE, "name": "Bram", "concept": "a dwarf"})[1]["token"]
+    call("/api/gm/inbox", {}, host=True)
+    call("/api/say", {"code": CODE, "token": pip, "text": "I fly over the chasm."})
+    call("/api/say", {"code": CODE, "token": bram, "text": "I guard the rear."})
+    assert len(call("/api/gm/inbox", {}, host=True)[1]["messages"]) == 2
+
+    # Pip can't fly: the GM says so, and Pip alone gets a fresh round to choose again.
+    status, body = call("/api/gm/redo", {"pc": "pip", "text": "Pip, you have no wings: "
+                                         "choose another action.", "lang": "en"}, host=True)
+    assert status == 200 and body["message"]["event"] == {"type": "redo", "pc": "Pip"}
+    rnd = state.round_state()
+    assert rnd["open"] and rnd["waiting_on"] == ["Pip"] and "Pip" in rnd["redo"]
+    assert 59 <= rnd["deadline"] - time.time() <= 60
+    assert state.waiting_on() == ["Pip"]
+    seen = call(f"/api/messages?code={CODE}&token={bram}&after=0")[1]["messages"]
+    assert next(m for m in seen if m.get("text") == "I fly over the chasm.")["redo"] is True
+    assert not next(m for m in seen if m.get("text") == "I guard the rear.").get("redo")
+    # Nothing is resolved or narrated until Pip has chosen again.
+    assert call("/api/gm/inbox", {}, host=True)[1]["held"]
+    status, body = call("/api/gm/say", {"text": "Bram watches the dark."}, host=True)
+    assert status == 409 and "Pip" in body["error"]
+    # Bram acting again doesn't close it; Pip's new action does.
+    call("/api/say", {"code": CODE, "token": bram, "text": "I light a torch."})
+    assert state.round_state()["open"]
+    call("/api/say", {"code": CODE, "token": pip, "text": "I climb down the rope."})
+    assert state.round_state()["open"] is False
+    got = call("/api/gm/inbox", {}, host=True)[1]
+    assert [m["text"] for m in got["messages"] if m["kind"] == "player"] == [
+        "I light a torch.", "I climb down the rope."] and got["redo_missed"] == []
+    assert not state.redo and call("/api/gm/say", {"text": "Down you go."}, host=True)[0] == 200
+    # The mark survives a restart.
+    again = TableState(table["camp"], str(table["world"]))
+    assert next(m for m in again.messages if m.get("text") == "I fly over the chasm.")["redo"]
+
+    # Out of time: the GM is told Pip chose nothing, and resolves the round without them.
+    call("/api/say", {"code": CODE, "token": pip, "text": "I punch the dragon's soul."})
+    call("/api/say", {"code": CODE, "token": bram, "text": "I wait."})
+    call("/api/gm/inbox", {}, host=True)
+    call("/api/gm/redo", {"pc": "Pip", "text": "Souls can't be punched: choose again."}, host=True)
+    first = state.redo["Pip"]["t"]
+    call("/api/gm/redo", {"pc": "Pip", "text": "(the same, in another language)"}, host=True)
+    assert state.redo["Pip"]["t"] == first                       # one clock, not two
+    rnd = state.round_state(now=time.time() + table_server.ROUND_SECONDS + 1)
+    assert rnd["timed_out"] and not rnd["open"] and rnd["waiting_on"] == ["Pip"]
+    state.redo["Pip"]["t"] -= table_server.ROUND_SECONDS + 1    # (the minute passes)
+    got = call("/api/gm/inbox", {}, host=True)[1]
+    assert got["messages"] == [] and got["redo_missed"] == ["Pip"] and not state.redo
+    assert call("/api/gm/redo", {"pc": "Nobody", "text": "x"}, host=True)[0] == 400
+
+
 def test_the_round_never_waits_for_a_pc_who_cannot_act(table):
     import table_server
     call, state, camp = table["call"], table["state"], table["camp"]

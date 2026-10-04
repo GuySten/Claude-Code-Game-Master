@@ -29,7 +29,8 @@ setup step on the host's computer, and the game plays fine without them.
 - **Voice.** Speak your actions; hear the story read aloud (Hebrew in a natural voice).
 - **A fair, shared table.** Every die roll is public, with the DC set before the dice land.
   Rounds: the GM answers when everyone has acted, or a minute after the first player did, with
-  a countdown for the rest. Mistyped? Fix your action until the GM reads it (always at least 5 seconds).
+  a countdown for the rest (anyone who hasn't acted can add a minute, once a round). An action
+  that can't work comes back to its player to choose again, on a fresh clock. Mistyped? Fix your action until the GM reads it (always at least 5 seconds).
 - **The story, told as it happens.** Narration appears in step with the voice, and HP changes
   land when the story reaches you.
 - **Characters.** Roll one at the table; open your full character sheet, in your own language;
@@ -463,7 +464,13 @@ Copy, fill in the link and code, and send:
    The GM answers once everyone has acted, or when the minute is up. In the last 15 seconds
    it turns red and chimes for whoever hasn't acted yet. Nothing ticks while the table is on a
    break: the countdown starts only with the first action. A character who can't act
-   (unconscious, stunned, dead…) isn't waited for.
+   (unconscious, stunned, dead…) isn't waited for. Need more time? If you haven't acted yet,
+   **+1 min** next to the countdown adds a minute to the round (once per player per round;
+   everyone sees who asked).
+   **An action that can't work** (you have no wings to fly with, the door you'd open is
+   behind you...) is crossed out: the GM tells you why, before rolling anything, and you choose
+   another on a fresh countdown. Nothing of that round is played out until you have, or your
+   time is up (then your character hesitates).
 5. **While the GM works**, the bar above the text box shows what it's doing (reading your
    actions, rolling dice, updating the sheets, writing the story) and roughly how long is
    left. It learns this table's pace, so it gets more accurate as you play.

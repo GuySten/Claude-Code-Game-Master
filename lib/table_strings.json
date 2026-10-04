@@ -213,7 +213,14 @@
   "readOnSpoken": "Reading aloud is on.",
   "language": "Language",
   "menu": "Menu",
-  "chatClear": "Clear the chat (only on your screen)"
+  "chatClear": "Clear the chat (only on your screen)",
+  "redoYou": "⟲ your action can't work — choose another",
+  "redoThem": "⟲ {pc} chooses again",
+  "redoMark": "⟲ couldn't work — replaced by a new action",
+  "roundRedo": "⟲ {t} to choose a new action",
+  "extend": "+1 min",
+  "extendTitle": "Ask for one more minute (once a round)",
+  "ev_extend": "⏳ {pc} asks for one more minute"
  },
  "he": {
   "title": "השולחן",
@@ -429,6 +436,13 @@
   "readOnSpoken": "ההקראה פועלת.",
   "language": "שפה",
   "menu": "תפריט",
-  "chatClear": "ניקוי הצ'אט (רק אצלך)"
+  "chatClear": "ניקוי הצ'אט (רק אצלך)",
+  "redoYou": "⟲ הפעולה שלך לא יכולה לעבוד — בחרו פעולה אחרת",
+  "redoThem": "⟲ {pc} בוחר/ת שוב",
+  "redoMark": "⟲ לא יכלה לעבוד — הוחלפה בפעולה חדשה",
+  "roundRedo": "⟲ נותרו {t} לבחור פעולה חדשה",
+  "extend": "עוד דקה",
+  "extendTitle": "בקשו עוד דקה (פעם אחת בסבב)",
+  "ev_extend": "⏳ {pc} מבקש/ת עוד דקה"
  }
 }

@@ -79,6 +79,11 @@
          display: flex; justify-content: space-between; gap: 8px; }
   .who button { border: 0; background: none; padding: 0 4px; font-size: .9rem; color: var(--muted); }
   .who .edited { font-style: italic; margin-inline-start: 4px; }
+  /* An action the GM ruled can't work (its player chose again), and that ruling. */
+  .msg.redone .body { text-decoration: line-through; opacity: .6; }
+  .msg .redo-note { font-size: .85rem; color: var(--muted); margin-top: 2px; }
+  .msg.gm.redo { border-inline-start: 4px solid var(--hp-low); }
+  .msg.gm.redo.for-me { box-shadow: 0 0 0 2px var(--hp-low); }
   .msg .edit-box { width: 100%; box-sizing: border-box; font: inherit; min-height: 3.2em;
                    resize: vertical; margin-top: 2px; }
   .msg .edit-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 4px; }
@@ -106,6 +111,7 @@
   #progress .label { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
                      font-size: .9rem; }
   #progress .eta { color: var(--muted); font-size: .85rem; }
+  #progress #extend { padding: 2px 10px; font-size: .85rem; margin-inline-start: auto; }
   #progress .track { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden;
                      margin-top: 6px; }
   #progress .fill { height: 100%; width: 0; background: var(--accent); border-radius: 3px;
@@ -415,7 +421,8 @@
     <div id="log" aria-live="polite"></div>
     <div id="progress" class="hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100"
          aria-live="polite">
-      <div class="label"><span id="progress-what"></span><span class="eta" id="progress-eta"></span></div>
+      <div class="label"><span id="progress-what"></span><span class="eta" id="progress-eta"></span><button
+        id="extend" type="button" class="hidden" data-i18n="extend"></button></div>
       <div class="track"><div class="fill"></div></div>
     </div>
     <div id="status"></div>
@@ -2130,19 +2137,25 @@
     const box = $("progress");
     if (!(left > 0)) { box.classList.remove("urgent"); return false; }
     const mine = !!me && (r.waiting_on || []).includes(me);
+    // Not acted yet: one extra minute per round, for the asking.
+    const ext = $("extend");
+    ext.classList.toggle("hidden", !(mine && !(r.extended_by || []).includes(me)));
+    ext.title = t("extendTitle");
     const urgent = mine && left <= ROUND_URGENT;
     const clock = fmtClock(Math.ceil(left));
     const out = me && (r.out_of_action || {})[me];
-    showProgress(mine ? t(urgent ? "roundHurry" : "roundYours").replace("{t}", clock)
+    const redo = mine && (r.redo || {})[me] != null;
+    showProgress(mine ? t(redo ? "roundRedo" : urgent ? "roundHurry" : "roundYours").replace("{t}", clock)
                  : out ? t("roundOut").replace("{why}", out).replace("{t}", clock)
                  : t("roundWaiting").replace("{names}", (r.waiting_on || []).join(", ")).replace("{t}", clock),
-                 "", 100 * left / Math.max(1, r.seconds));
+                 "", 100 * left / Math.max(1, r.total || r.seconds));
     box.classList.toggle("urgent", urgent);
     if (urgent && !roundChimed[r.started_at]) { roundChimed[r.started_at] = true; chime(); }
     return true;
   }
   function updateProgress() {
     if (showRound()) return;
+    $("extend").classList.add("hidden");
     const p = progressState;
     if (p.state === "working" && lastGmId <= p.start_id) {
       const now = serverNow(), elapsed = Math.max(0, now - p.started_at);
@@ -2167,6 +2180,14 @@
     $("progress").classList.add("hidden");
   }
   setInterval(updateProgress, 250);
+  $("extend").onclick = async () => {
+    $("extend").disabled = true;
+    const r = await api("/api/extend", {});
+    $("extend").disabled = false;
+    if (r.round) roundState = r.round;
+    if (!r.ok) setStatus(r.error || "?");
+    updateProgress();
+  };
 
   // Every player reads one language. A message written in another one shows its
   // translation (sent by the GM with `gm-table.sh translate`), with the original a
@@ -2458,6 +2479,9 @@
     if (m.kind === "gm" && !m.to) lastGmId = Math.max(lastGmId, m.id);
     const d = document.createElement("div");
     d.className = "msg " + m.kind + (m.to ? " whisper" : "") + (m.pc === me && m.kind === "player" ? " mine" : "");
+    const redoFor = m.kind === "gm" && m.event && m.event.type === "redo" ? m.event.pc : null;
+    if (redoFor) d.classList.add("redo", ...(redoFor === me ? ["for-me"] : []));
+    if (m.kind === "player" && m.redo) d.classList.add("redone");
     if (m.kind === "roll") {
       renderRoll(m, d);
     } else if (m.kind === "system") {
@@ -2480,7 +2504,8 @@
       who.className = "who";
       const label = document.createElement("span");
       if (m.kind === "gm") {
-        label.textContent = t("gm") + (m.to ? " — " + t("whisper") : "");
+        label.textContent = t("gm") + (m.to ? " — " + t("whisper") : "")
+          + (redoFor ? " — " + (redoFor === me ? t("redoYou") : t("redoThem").replace("{pc}", redoFor)) : "");
       } else {
         const name = document.createElement("span");      // hover: who they are
         name.textContent = m.pc || "?";
@@ -2512,6 +2537,12 @@
       body.innerHTML = md(heDice(useTr ? tr.text : (m.text || "")));
       if (m.kind === "gm") wrapLore(body);
       d.append(who, body);
+      if (m.kind === "player" && m.redo) {
+        const note = document.createElement("div");
+        note.className = "redo-note";
+        note.textContent = t("redoMark");
+        d.appendChild(note);
+      }
       if (tr) {
         const note = document.createElement("div");
         note.className = "tr-note";
@@ -2570,6 +2601,12 @@
         r.messages.forEach((m) => {
           allMessages.push(m); addMessage(m); lastId = Math.max(lastId, m.id);
           if (m.kind === "gm") lastNarrSeen = Math.max(lastNarrSeen, m.id);
+          // The GM ruled my action can't work: my turn to choose again, now.
+          if (historyLoaded && m.kind === "gm" && m.event && m.event.type === "redo" && m.event.pc === me
+              && shownToMe(m)) {
+            mySentId = 0; chime();
+            setTimeout(() => { try { $("text").focus(); } catch (e) {} }, 0);
+          }
           // Only NEW narration is told (revealed, and read aloud) — not the history.
           if (historyLoaded && m.kind === "gm" && shownToMe(m) && msgEls.get(m.id)) {
             const r = startReveal(m, msgEls.get(m.id));

@@ -230,6 +230,7 @@ MAX_PENDING_ROLLS = 200
 # A round: once the first player acts, the GM waits until every seated player has
 # acted, or this many seconds (gm-table.sh round <seconds|off>).
 ROUND_SECONDS = 60
+EXTEND_SECONDS = 60          # a player who hasn't acted may add this once per round
 # Every action can be fixed for at least this long: the GM can't read it sooner.
 EDIT_GRACE = 5.0
 # The players' side chat: kept in memory only, never on disk and never in any
@@ -312,6 +313,8 @@ class TableState:
                             target.setdefault("tr", {}).update(entry["tr"])
                         if entry.get("read"):  # the GM read it: no more editing
                             target["read"] = True
+                        if entry.get("redo"):  # it couldn't work: its player chose again
+                            target["redo"] = True
                         target["rev"] = self.rev
                     continue
                 entry["rev"] = self.rev
@@ -399,6 +402,12 @@ class TableState:
         self.visited: List[str] = [v for v in visited if isinstance(v, str)]
         # Characters rolled on the join screen, not created yet: roll id -> roll.
         self.pending_rolls: Dict[str, Dict[str, Any]] = {}
+        # Actions the GM ruled can't work: PC -> {t (the redo's clock starts), after
+        # (the last message id then), reason}. Their players choose again, on a fresh
+        # round clock; the GM resolves nothing until they have (or their time is up).
+        self.redo: Dict[str, Dict[str, Any]] = {}
+        # Who added a minute to the round: {"round": its started_at, "by": [PC, ...]}.
+        self.extended: Dict[str, Any] = {"round": None, "by": []}
         try:
             self.gm_cursor = int(self.cursor_path.read_text().strip())
         except (OSError, ValueError):
@@ -527,27 +536,87 @@ class TableState:
         """The round the GM will answer next: the actions it hasn't read yet. It
         opens with the first of them (so nobody is timed while the table is on a
         break) and closes when every seated player has acted, or after
-        round_seconds. While it's open the GM can't read the actions or narrate."""
+        round_seconds. While it's open the GM can't read the actions or narrate.
+        After the GM ruled an action can't work (``ask_redo``), the round is that
+        player's choosing again: it waits on them alone, on a fresh clock."""
         now = now or time.time()
         secs = self.round_seconds
         with self.lock:
             acts = [m for m in self.messages if m["id"] > self.gm_cursor and m["kind"] == "player"]
             seated = list(dict.fromkeys(self.seats.values()))
-        if not acts:
+            redo = {pc: dict(r) for pc, r in self.redo.items()}
+        if not acts and not redo:
             return {"open": False, "seconds": secs, "settling": False}
-        acted = {party_roster.slugify(m.get("pc", "")) for m in acts}
         out = self.out_of_action()
-        waiting = [n for n in seated if party_roster.slugify(n) not in acted and n not in out]
-        started = self._sent_at(acts[0])
-        deadline = started + secs
+        if redo:
+            waiting = [pc for pc, r in redo.items() if pc not in out and not any(
+                party_roster._same_name(m.get("pc") or "", pc) and m["id"] > r["after"]
+                for m in acts)]
+            started = min(r["t"] for r in redo.values())
+        else:
+            acted = {party_roster.slugify(m.get("pc", "")) for m in acts}
+            waiting = [n for n in seated if party_roster.slugify(n) not in acted and n not in out]
+            started = self._sent_at(acts[0])
+        with self.lock:
+            by = list(self.extended["by"]) if self.extended["round"] == started else []
+        total = secs + EXTEND_SECONDS * len(by)
+        deadline = started + total
         # The newest action is a few seconds old at most: its player may still be
         # fixing a typo. The GM waits that out too (rounds on or off).
-        ready_at = max(self._sent_at(m) for m in acts) + EDIT_GRACE
-        return {"open": bool(secs and waiting and now < deadline), "seconds": secs,
-                "settling": now < ready_at, "ready_at": ready_at,
-                "out_of_action": {n: why for n, why in out.items() if n in seated},
-                "started_at": started, "deadline": deadline, "waiting_on": waiting,
-                "timed_out": bool(secs and waiting and now >= deadline)}
+        ready_at = max(self._sent_at(m) for m in acts) + EDIT_GRACE if acts else 0
+        rnd = {"open": bool(secs and waiting and now < deadline), "seconds": secs,
+               "total": total, "extended_by": by,
+               "settling": now < ready_at, "ready_at": ready_at,
+               "out_of_action": {n: why for n, why in out.items() if n in seated},
+               "started_at": started, "deadline": deadline, "waiting_on": waiting,
+               "timed_out": bool(secs and waiting and now >= deadline)}
+        if redo:
+            rnd["redo"] = {pc: r["reason"] for pc, r in redo.items()}
+        return rnd
+
+    def extend_round(self, pc: str) -> Dict[str, Any]:
+        """A player who hasn't acted yet asks for more time: the round's clock gets
+        EXTEND_SECONDS more. Once per player per round."""
+        rnd = self.round_state()
+        if not rnd.get("open"):
+            return {"ok": False, "error": "No round is running."}
+        if pc not in rnd["waiting_on"]:
+            return {"ok": False, "error": "You've already acted this round."}
+        with self.lock:
+            if self.extended["round"] != rnd["started_at"]:
+                self.extended = {"round": rnd["started_at"], "by": []}
+            if pc in self.extended["by"]:
+                return {"ok": False, "error": "You've already added a minute this round."}
+            self.extended["by"].append(pc)
+        self.append("system", f"{pc} asks for one more minute.", pc=pc, event={"type": "extend"})
+        return {"ok": True, "round": self.round_state()}
+
+    def ask_redo(self, pc: str, text: str, lang: Optional[str] = None) -> Dict[str, Any]:
+        """The GM rules a player's action can't work: it tells them why (``text``,
+        a GM beat everyone sees), marks the action, and gives its player a fresh
+        round clock to choose another. Called once per table language, the clock
+        starts once."""
+        with self.lock:
+            acted = [m for m in self.messages if m["kind"] == "player" and not m.get("to")
+                     and party_roster._same_name(m.get("pc") or "", pc)]
+            last = acted[-1] if acted else None
+            if last is not None and not last.get("redo"):
+                last["redo"] = True
+                self.rev += 1
+                last["rev"] = self.rev
+                with open(self.log_path, "a", encoding="utf-8") as f:
+                    f.write(json.dumps({"patch": last["id"], "redo": True}) + "\n")
+            pending = self.redo.get(pc)
+            again = pending is not None and not any(
+                m["id"] > pending["after"] and m["kind"] == "player"
+                and party_roster._same_name(m.get("pc") or "", pc) for m in self.messages)
+        msg = self.append("gm", text, lang=lang, event={"type": "redo", "pc": pc})
+        with self.lock:
+            if again:
+                pending["after"] = msg["id"]      # (the same ruling in another language)
+            else:
+                self.redo[pc] = {"t": _stamp(), "after": msg["id"], "reason": text}
+        return msg
 
     def out_of_action(self) -> Dict[str, str]:
         """Seated PCs who can't act (dead, unconscious...): name -> why. Read from
@@ -1458,6 +1527,7 @@ class TableState:
                             f.write(json.dumps({"patch": m["id"], "read": True}) + "\n")
                 self.gm_cursor = self.messages[-1]["id"]
                 self.cursor_path.write_text(str(self.gm_cursor))
+                self.redo.clear()               # their new actions are in (or their time is up)
                 if any(m["kind"] == "player" for m in unread):
                     self._start_turn()
             return unread
@@ -1529,7 +1599,10 @@ class TableState:
             return {"state": "queued" if queued else "idle"}
 
     def waiting_on(self) -> List[str]:
-        """Seated PCs who have not acted since the GM last spoke."""
+        """Seated PCs who have not acted since the GM last spoke (while a player
+        chooses again after an action that couldn't work: just them)."""
+        if self.redo:
+            return self.round_state().get("waiting_on", [])
         with self.lock:
             last_gm = max((m["id"] for m in self.messages if m["kind"] == "gm"), default=0)
             acted = {party_roster.slugify(m.get("pc", "")) for m in self.messages
@@ -2398,6 +2471,10 @@ def sheet_strings(sheet: Dict[str, Any], lang: str = "he") -> List[str]:
 
 def _held_note(rnd: Dict[str, Any]) -> str:
     """Why the GM can't read or narrate yet, for the GM."""
+    if rnd.get("open") and rnd.get("redo"):
+        left = max(0, int(rnd["deadline"] - time.time()))
+        return (f"{', '.join(rnd['waiting_on'])} is choosing a new action (the action couldn't "
+                f"work) — {left} s left")
     if rnd.get("open"):
         left = max(0, int(rnd["deadline"] - time.time()))
         return (f"The players are still acting — waiting for {', '.join(rnd['waiting_on'])} "
@@ -2632,6 +2709,11 @@ def make_handler(state: TableState, code: str, host_key: str):
                 return self._json(result, 200 if result["ok"] else 409)
 
             me = state.pc_for(data.get("token"))
+            if url.path == "/api/extend":
+                if not me:
+                    return self._err("Take a seat first.", 403)
+                r = state.extend_round(me)
+                return self._json(r, 200 if r["ok"] else 409)
             if url.path == "/api/say":
                 if not me:
                     return self._err("Take a seat first.", 403)
@@ -2707,8 +2789,9 @@ def make_handler(state: TableState, code: str, host_key: str):
                                        "waiting_on": rnd["waiting_on"], "langs": state.seated_langs(),
                                        "languages": state.languages,
                                        "music": state.music, "auto_music": state.auto_music})
+                redo_missed = rnd["waiting_on"] if rnd.get("redo") else []
                 unread = state.gm_unread(mark=True)
-                return self._json({"ok": True, "messages": unread,
+                return self._json({"ok": True, "messages": unread, "redo_missed": redo_missed,
                                    "waiting_on": state.waiting_on(),
                                    "langs": state.seated_langs(),
                                    "languages": state.languages,
@@ -2789,6 +2872,30 @@ def make_handler(state: TableState, code: str, host_key: str):
                     f"{lang_name(l)} (say --lang {l})" for l in missing) + ".") if missing else None
                 return self._json({"ok": True, "message": msg, "music": music,
                                    "warning": warning, "reminder": reminder})
+            if path == "/api/gm/redo":
+                text = str(data.get("text", "")).strip()
+                if not text:
+                    return self._err("say why the action can't work, and that they choose again")
+                if len(text) > MAX_TEXT * 2:
+                    return self._err("too long: one or two sentences")
+                path_ = party_roster.find_pc(state.campaign_dir, str(data.get("pc", "")))
+                if path_ is None:
+                    return self._err(f"no player character named {data.get('pc')}")
+                pc = (party_roster._read(path_) or {}).get("name") or str(data.get("pc"))
+                seated = next((n for n in state.seats.values() if party_roster._same_name(n, pc)), None)
+                if seated is None:
+                    return self._err(f"{pc} isn't at the table: nobody can choose again for them")
+                lang = data.get("lang")
+                if lang and lang not in state.table_langs():
+                    return self._err(f"this adventure isn't played in {lang} (its languages: "
+                                     f"{', '.join(state.languages)})")
+                msg = state.ask_redo(seated, text, lang)
+                missing = state.missing_versions() if lang else {}
+                reminder = ("Now the same ruling in " + ", ".join(
+                    f"{lang_name(l)} (redo \"{seated}\" \"…\" --lang {l})" for l in missing)
+                    + ".") if missing else None
+                return self._json({"ok": True, "message": msg, "round": state.round_state(),
+                                   "reminder": reminder})
             if path == "/api/gm/music":
                 if "auto" in data:
                     state.set_auto_music(bool(data["auto"]))
@@ -3225,6 +3332,12 @@ def _call(campaign_dir: Path, method: str, path: str, data: Optional[dict] = Non
         sys.exit(f"[ERROR] Could not reach the table server: {e.reason}")
 
 
+def _print_redo_missed(r: dict) -> None:
+    if r.get("redo_missed"):
+        print(f"TIME UP: {', '.join(r['redo_missed'])} chose no new action — they hesitate and "
+              f"lose the moment. Resolve the round (the actions read before) without them.")
+
+
 def _print_translate_request(needed: List[dict]) -> None:
     """Tell the GM exactly what to translate, as a ready-to-fill command."""
     if not needed:
@@ -3384,6 +3497,12 @@ def main() -> None:
     f = sub.add_parser("free", help="Free a player's seat so they can rejoin from another device")
     f.add_argument("pc")
 
+    rd = sub.add_parser("redo", help="An action can't work: tell its player why; they choose "
+                                     "another on a fresh round clock")
+    rd.add_argument("pc")
+    rd.add_argument("text", help="Why it can't work, and that they choose again (one or two sentences)")
+    rd.add_argument("--lang", help="The language it's written in (once per table language)")
+
     al = sub.add_parser("alias", help="Another spelling of a name (e.g. its Hebrew form), for hover cards")
     al.add_argument("name", help="The name as the campaign knows it (NPC, place, faction)")
     al.add_argument("alias", help="The other spelling, as it appears in the narration")
@@ -3481,6 +3600,7 @@ def main() -> None:
         if r.get("held"):
             print(f"({_held_note(r['round'])} — run wait)")
             return
+        _print_redo_missed(r)
         return _print_messages(r.get("messages", []), r.get("waiting_on", []), r.get("langs"),
                                r.get("music"), r.get("auto_music", True),
                                r.get("translate"), r.get("languages"), r.get("missing"))
@@ -3495,6 +3615,8 @@ def main() -> None:
             if rnd.get("settling"):                 # a player may still be fixing a typo
                 time.sleep(max(0.2, min(1.0, rnd["ready_at"] - time.time() + 0.05)))
                 continue
+            if rnd.get("redo") and rnd.get("timed_out"):
+                break                               # chose nothing new in time
             if r.get("unread") and rnd.get("seconds"):
                 # Rounds: every seated player has acted, or the round's time is up.
                 if not rnd.get("open") and (not args.all or not r.get("waiting_on")):
@@ -3512,10 +3634,12 @@ def main() -> None:
         if r.get("held"):
             print(f"(the players are still acting — run wait again)")
             return
+        _print_redo_missed(r)
         if not r.get("messages"):
-            print(f"(no player messages after {args.timeout}s — run wait again)")
+            if not r.get("redo_missed"):
+                print(f"(no player messages after {args.timeout}s — run wait again)")
             return
-        if rnd.get("timed_out"):
+        if rnd.get("timed_out") and not rnd.get("redo"):
             print(f"ROUND CLOSED after {rnd['seconds']} s: {', '.join(rnd['waiting_on'])} didn't act "
                   f"— narrate for those who did; the others act in the next beat.")
         if rnd.get("out_of_action"):
@@ -3640,6 +3764,19 @@ def main() -> None:
         m = r["music"]
         print(f"MUSIC {m['title']} ({m['track']}, volume {m['volume']})" if m.get("track")
               else "MUSIC stopped")
+        return
+
+    if args.action == "redo":
+        r = _call(campaign_dir, "POST", "/api/gm/redo",
+                  {"pc": args.pc, "text": args.text, "lang": args.lang})
+        if not r.get("ok"):
+            sys.exit(f"[ERROR] {r.get('error')}")
+        rnd = r.get("round") or {}
+        clock = f"{rnd['seconds']} s" if rnd.get("seconds") else "no time limit (rounds are off)"
+        print(f"Told {', '.join(rnd.get('waiting_on') or [args.pc])} to choose again ({clock}). "
+              f"Resolve and narrate nothing of this round yet: run wait.")
+        if r.get("reminder"):
+            print(r["reminder"])
         return
 
     if args.action == "free":
