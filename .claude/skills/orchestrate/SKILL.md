@@ -20,6 +20,9 @@ So the loop below is not optional ceremony; it's how you hear.
 
 ## The loop
 
+0. **Main characters: write the tune yourself** (the host clearly preferred
+   hand-written tunes to the generator's): `references/tunes.md`. Everyone else
+   gets the generator's (gen 2).
 1. **Read the tune.**
    `python lib/arrangement.py tune "<seed>" --class <Class> [--minor] [--stage N] [--dark N]`
    (on the host's laptop: `bash tools/gm-music-compose.sh tune "<name>" [--minor]`).
