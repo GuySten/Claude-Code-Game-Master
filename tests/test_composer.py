@@ -310,3 +310,14 @@ def test_a_composer_job_writes_the_piece_and_its_twin(tmp_path, monkeypatch):
     again = mc.run_job({"prompt": "dark", "seconds": 3, "out": str(tmp_path / "v.wav"), "loop": True,
                         "melody_from": r["path"]}, "cpu")
     assert again["ok"] and again["how"] == "darkened"
+
+
+def test_twins_use_the_melody_model_only_when_its_there_and_on_a_gpu(monkeypatch):
+    from lib import music_compose as mc
+    monkeypatch.setattr(mc, "TWIN", "auto")
+    monkeypatch.setattr(mc, "melody_ready", lambda: True)
+    assert mc.twin_mode("cuda") == "melody" and mc.twin_mode("cpu") == "darken"
+    monkeypatch.setattr(mc, "melody_ready", lambda: False)             # not downloaded: no surprise download
+    assert mc.twin_mode("cuda") == "darken"
+    monkeypatch.setattr(mc, "TWIN", "melody")
+    assert mc.twin_mode("cpu") == "melody"                              # asked for: always tried

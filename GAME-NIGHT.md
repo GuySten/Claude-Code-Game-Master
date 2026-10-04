@@ -322,11 +322,14 @@ computer took and a link to listen. That tells you what to expect: if a 30-secon
 
 - **No NVIDIA card?** `setup --cpu` works on any computer, but each piece takes several
   minutes. The music still arrives, just later.
-- **Dark twins that keep the tune:** by default a twin is the anthem's own recording made
+- **Dark twins that keep the tune:** without it, a twin is the anthem's own recording made
   dark (slower, lower, muffled, echoing). `bash tools/gm-music-compose.sh setup --melody`
-  adds MusicGen-Melody (about 3.3 GB more): it re-composes each twin on the anthem's melody,
-  in a minor, menacing arrangement. It's heavier on the GPU; if it ever fails, the darkened
-  recording is used instead.
+  adds MusicGen-Melody (about 3.3 GB more): with a GPU it re-composes each twin on the
+  anthem's melody, in a minor, menacing arrangement. If it ever fails, the darkened recording
+  is used instead.
+- **One bigger composer for everything:** `COMPOSE_MODEL=facebook/musicgen-melody` in `.env`
+  makes the melody model compose all the music (richer, but slower, and about 3 GB of RAM
+  instead of 0.6). Time it first: `COMPOSE_MODEL=facebook/musicgen-melody bash tools/gm-music-compose.sh test`.
 - **Pictures and music take turns on the GPU; both models stay in RAM.** When the table
   starts, it loads both into RAM in the background, one after the other: first Forge's
   picture model (Forge paints one tiny throwaway picture), then the music model. After

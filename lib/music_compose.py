@@ -16,12 +16,15 @@ The model (facebook/musicgen-small by default; COMPOSE_MODEL to change) is
 downloaded from Hugging Face on first use. Its weights are licensed CC-BY-NC
 4.0: fine for a home game, not for selling the music.
 
+COMPOSE_MODEL=facebook/musicgen-melody makes the bigger melody model (1.5 B
+parameters, half precision on the GPU) the composer for everything.
+
 A piece can have a dark TWIN: the same music, made ominous (a hero's anthem and
-the villain theme they'd become). COMPOSE_TWIN=melody re-composes it with
-MusicGen-Melody, which keeps the melody of the original and changes everything
-else (an extra ~3.3 GB model: `gm-music-compose.sh setup --melody`); otherwise,
-or if that fails, the original recording itself is darkened: slower and lower,
-muffled, with a cavernous echo.
+the villain theme they'd become). MusicGen-Melody re-composes it on the melody of
+the original, changing everything else: with COMPOSE_TWIN=auto (the default) when
+it is the composer, or downloaded already (`gm-music-compose.sh setup --melody`)
+and there's a GPU. Otherwise, or if that fails, the original recording itself is
+darkened: slower and lower, muffled, with a cavernous echo.
 """
 
 import argparse
@@ -35,7 +38,7 @@ from pathlib import Path
 
 MODEL = os.environ.get("COMPOSE_MODEL", "facebook/musicgen-small")
 MELODY_MODEL = os.environ.get("COMPOSE_MELODY_MODEL", "facebook/musicgen-melody")
-TWIN = os.environ.get("COMPOSE_TWIN", "darken").strip().lower()      # melody | darken
+TWIN = os.environ.get("COMPOSE_TWIN", "auto").strip().lower()        # auto | melody | darken
 TOKENS_PER_SECOND = 50          # MusicGen's audio frame rate
 MAX_SECONDS = 30                # the model's context: ~1500 tokens
 # How loud a finished piece is (gated RMS, dBFS: close to LUFS for music). MusicGen's
@@ -134,13 +137,31 @@ _cache = {}
 PARK_HALF = os.environ.get("COMPOSE_RAM_HALF", "1").strip().lower() not in ("0", "no", "off", "false")
 
 
+def is_melody(name: str) -> bool:
+    """Is this checkpoint a MusicGen-Melody one (it needs its own model class)?"""
+    from transformers import AutoConfig
+    return AutoConfig.from_pretrained(name).model_type == "musicgen_melody"
+
+
+def _model_class(name: str):
+    import transformers
+    return (transformers.MusicgenMelodyForConditionalGeneration if is_melody(name)
+            else transformers.MusicgenForConditionalGeneration)
+
+
 def _load():
     """The processor and model, in RAM (read from disk once per process)."""
-    from transformers import AutoProcessor, MusicgenForConditionalGeneration
+    from transformers import AutoProcessor
     if "processor" not in _cache:
         _cache["processor"] = AutoProcessor.from_pretrained(MODEL)
-        _cache["model"] = MusicgenForConditionalGeneration.from_pretrained(MODEL).eval()
+        _cache["model"] = _model_class(MODEL).from_pretrained(MODEL).eval()
     return _cache["processor"], _cache["model"]
+
+
+def _gpu_dtype(model):
+    """Big models (the 1.5 B melody one) run in half precision on the card."""
+    import torch
+    return torch.float16 if sum(p.numel() for p in model.parameters()) > 1e9 else torch.float32
 
 
 def _park(model) -> None:
@@ -161,8 +182,11 @@ def generate(prompt: str, seconds: float, device: str):
     step = lambda what: print(f"[compose] {what}", file=sys.stderr, flush=True)  # noqa: E731
     try:
         step(f"moving the model to {device}")
-        model.to(device, torch.float32)
+        dtype = _gpu_dtype(model) if device != "cpu" else torch.float32
+        model.to(device, dtype)
         inputs = processor(text=[prompt], padding=True, return_tensors="pt").to(device)
+        if dtype != torch.float32:
+            inputs = {k: (v.to(dtype) if v.is_floating_point() else v) for k, v in inputs.items()}
         step(f"composing {seconds:.0f} s on {device}")
         with torch.no_grad():
             audio = model.generate(**inputs, do_sample=True, guidance_scale=3.0,
@@ -206,6 +230,8 @@ def darken(samples, rate: int, slow: float = 0.84):
 
 def _load_melody():
     from transformers import AutoProcessor, MusicgenMelodyForConditionalGeneration
+    if is_melody(MODEL):                    # the composer IS the melody model: no second copy
+        return _load()
     if "melody" not in _cache:
         _cache["melody_processor"] = AutoProcessor.from_pretrained(MELODY_MODEL)
         _cache["melody"] = MusicgenMelodyForConditionalGeneration.from_pretrained(MELODY_MODEL).eval()
@@ -239,9 +265,26 @@ def melody_generate(base, rate: int, prompt: str, seconds: float, device: str):
             _park(model)
 
 
+def melody_ready() -> bool:
+    """Can a twin be re-composed on the melody without a download? (auto mode)"""
+    try:
+        if is_melody(MODEL):
+            return True
+        from huggingface_hub import try_to_load_from_cache
+        return isinstance(try_to_load_from_cache(MELODY_MODEL, "config.json"), str)
+    except Exception:
+        return False
+
+
+def twin_mode(device: str) -> str:
+    if TWIN in ("melody", "darken"):
+        return TWIN
+    return "melody" if device != "cpu" and melody_ready() else "darken"
+
+
 def twin_from(base, rate: int, prompt: str, seconds: float, device: str):
     """(samples, rate, how): the dark twin of ``base``."""
-    if TWIN == "melody":
+    if twin_mode(device) == "melody":
         try:
             samples, out_rate = melody_generate(base, rate, prompt, seconds, device)
             return samples, out_rate, "melody"
