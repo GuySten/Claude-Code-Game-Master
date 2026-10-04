@@ -122,6 +122,21 @@ def finish(samples, rate: int, loop: bool):
     return fade(normalize(samples, rate), rate, 0.4 if loop else 0.05, 1.5 if loop else 0.4)
 
 
+def heavy(samples, rate: int, bass_db: float = 6.0, bass_below: float = 150.0,
+          treble_db: float = -3.0, treble_above: float = 3000.0):
+    """A villain's weight, whatever the model made of "heavy deep bass": the deep bass
+    up (a smooth shelf below ``bass_below``), the highs softened, the rumble under
+    25 Hz cut. Zero-phase, on the whole piece (a loop stays seamless)."""
+    import numpy as np
+    x = np.asarray(samples, dtype="float64")
+    spec = np.fft.rfft(x)
+    f = np.fft.rfftfreq(len(x), 1 / rate)
+    gain_db = (bass_db / (1 + (f / bass_below) ** 4)
+               + treble_db * (f / treble_above) ** 4 / (1 + (f / treble_above) ** 4))
+    rumble = (f / 25.0) ** 8 / (1 + (f / 25.0) ** 8)                   # (steep: 40 Hz keeps 98%)
+    return np.fft.irfft(spec * 10 ** (gain_db / 20) * rumble, len(x)).astype("float32")
+
+
 def crescendo(samples, rate: int, peak_at: float, depth_db: float = 7.0):
     """The build: from ``depth_db`` quieter at the start, swelling (smoothly) to full
     at ``peak_at`` (a fraction of the piece: the tune's climax), then full to the end.
@@ -599,6 +614,8 @@ def run_job(job: dict, device: str) -> dict:
         if extra.get("how") == "leitmotif" and not job.get("loop"):          # an anthem: build to its climax
             peak = theme_traits(leitmotif(lm["seed"], lm.get("mode", "major"), lm.get("cls") or ""))["climax_at"]
             samples = crescendo(samples, rate, peak)
+        if job.get("heavy"):                # a villain theme: its weight, for certain
+            samples = heavy(samples, rate)
         samples = finish(samples, rate, bool(job.get("loop")))
         path = write(samples, rate, Path(job["out"]))
         twin = job.get("twin")
@@ -608,8 +625,8 @@ def run_job(job: dict, device: str) -> dict:
             (t_samples, t_rate), how = t_score, "leitmotif"
         elif twin:                          # and its dark twin, from the same music
             t_samples, t_rate, how = twin_from(raw, rate, twin["prompt"], twin.get("seconds", job.get("seconds", 30)), device)
-        if twin:
-            t_samples = finish(t_samples, t_rate, bool(twin.get("loop")))
+        if twin:                            # (a twin is always the dark one: heavy)
+            t_samples = finish(heavy(t_samples, t_rate), t_rate, bool(twin.get("loop")))
             t_path = write(t_samples, t_rate, Path(twin["out"]))
             extra["twin"] = {"path": str(t_path), "seconds": round(len(t_samples) / t_rate, 1), "how": how}
         return {"ok": True, "path": str(path), "seconds": round(len(samples) / rate, 1),

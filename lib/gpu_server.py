@@ -149,7 +149,8 @@ def run_job(kind: str, payload: Dict[str, Any]) -> Dict[str, Any]:
                 melody_from.write_bytes(base64.b64decode(payload["melody_audio"]))
             more = {**({"twin": twin} if twin else {}),
                     **({"melody_from": str(melody_from)} if melody_from else {}),
-                    **({"leitmotif": payload["leitmotif"]} if isinstance(payload.get("leitmotif"), dict) else {})}
+                    **({"leitmotif": payload["leitmotif"]} if isinstance(payload.get("leitmotif"), dict) else {}),
+                    **({"heavy": True} if payload.get("heavy") else {})}
             r = composer.compose(str(payload.get("prompt", "")), float(payload.get("seconds", 30)),
                                  out, loop=bool(payload.get("loop")), local=True, **more)
             path = Path(r["path"])

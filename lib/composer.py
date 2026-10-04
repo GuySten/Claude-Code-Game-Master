@@ -361,6 +361,8 @@ def _compose_remote(jobs: List[Dict[str, Any]], on_piece, timeout_each: int
                     payload["twin_leitmotif"] = job["twin"]["leitmotif"]
             if job.get("leitmotif"):
                 payload["leitmotif"] = job["leitmotif"]
+            if job.get("heavy"):
+                payload["heavy"] = True
             if job.get("melody_from"):
                 payload["melody_audio"] = base64.b64encode(Path(job["melody_from"]).read_bytes()).decode("ascii")
                 payload["melody_ext"] = Path(job["melody_from"]).suffix
@@ -389,7 +391,8 @@ def _compose_remote(jobs: List[Dict[str, Any]], on_piece, timeout_each: int
 
 def compose(prompt: str, seconds: float, out: Path, loop: bool = False,
             timeout: int = 3600, local: bool = False, twin: Optional[Dict[str, Any]] = None,
-            melody_from: Optional[str] = None, leitmotif: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+            melody_from: Optional[str] = None, leitmotif: Optional[Dict[str, Any]] = None,
+            heavy: bool = False) -> Dict[str, Any]:
     """Compose one piece (blocking: a minute or two on a GPU, several on a CPU).
     ``local``: on this machine's composer even when a GPU server is set. ``twin``
     ({prompt, out}): also its dark twin, from the same music. ``melody_from``: this
@@ -401,6 +404,8 @@ def compose(prompt: str, seconds: float, out: Path, loop: bool = False,
         job["melody_from"] = str(melody_from)
     if leitmotif:
         job["leitmotif"] = leitmotif
+    if heavy:
+        job["heavy"] = True
     return compose_many([job], timeout_each=timeout, local=local)[0]
 
 
@@ -496,7 +501,8 @@ def compose_pieces(campaign_dir, pieces: List[Dict[str, Any]],
         elif p["kind"] in ("judgment", "dark_anthem"):       # (registered as themes: they play as one)
             out = camp / "music" / "themes" / f"{slug(p['name'])}-theme.ogg"
             prompt = judgment_prompt(style) if p["kind"] == "judgment" else dark_anthem_prompt(p["sheet"], style)
-            job = {"prompt": prompt, "seconds": THEME_SECONDS, "out": str(out), "loop": True}
+            job = {"prompt": prompt, "seconds": THEME_SECONDS, "out": str(out), "loop": True,
+                   "heavy": p["kind"] == "dark_anthem"}
             heroic = anthem(camp, p["name"]) if p["kind"] == "dark_anthem" else None
             if heroic:                      # the twin of the anthem they had: the same music, dark
                 job["melody_from"] = str(camp / "music" / "anthems" / heroic["file"])

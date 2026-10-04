@@ -465,3 +465,43 @@ def test_the_prompts_ask_for_tempo_weight_and_the_build():
     dark = composer.dark_anthem_prompt({"name": "Kestrel"}, "")
     assert "110 bpm" in hero and "climax" in hero and "held" in hero
     assert "70 bpm" in dark and "low brass" in dark and "bass" in dark
+
+
+def test_a_villain_theme_is_made_heavy_whatever_the_model_did(tmp_path, monkeypatch):
+    np = pytest.importorskip("numpy")
+    sf = pytest.importorskip("soundfile")
+    from lib import music_compose as mc
+    rate = 32000
+    t = np.arange(rate * 4) / rate
+    mix = (0.2 * np.sin(2 * np.pi * 60 * t) + 0.2 * np.sin(2 * np.pi * 1000 * t)
+           + 0.2 * np.sin(2 * np.pi * 6000 * t) + 0.2 * np.sin(2 * np.pi * 12 * t)).astype("float32")
+    band = lambda x, hz: np.abs(np.fft.rfft(x))[int(hz * len(x) / rate)]          # noqa: E731
+    db = lambda a, b: 20 * np.log10(a / b)                                         # noqa: E731
+    out = mc.heavy(mix, rate)
+    assert len(out) == len(mix)
+    assert db(band(out, 60) / band(out, 1000), band(mix, 60) / band(mix, 1000)) > 5      # deep bass up
+    assert db(band(out, 6000) / band(out, 1000), band(mix, 6000) / band(mix, 1000)) < -2  # highs softened
+    assert band(out, 12) < band(mix, 12) / 10                                       # rumble cut
+    # In a job: the dark twin comes out heavy; the hero doesn't.
+    monkeypatch.setattr(mc, "generate", lambda prompt, seconds, device: (mix, rate, device))
+    monkeypatch.setattr(mc, "twin_mode", lambda device: "darken")
+    r = mc.run_job({"prompt": "hero", "seconds": 4, "out": str(tmp_path / "h.wav"),
+                    "twin": {"prompt": "dark", "out": str(tmp_path / "d.wav"), "loop": True}}, "cpu")
+    hero, _ = sf.read(r["path"], dtype="float32")
+    dark, _ = sf.read(r["twin"]["path"], dtype="float32")
+    bass_share = lambda x: (np.abs(np.fft.rfft(x))[: int(150 * len(x) / rate)] ** 2).sum() / (np.abs(np.fft.rfft(x)) ** 2).sum()  # noqa: E731
+    assert bass_share(dark) > bass_share(mix) * 1.5 and abs(bass_share(hero) - bass_share(mix)) < 0.02
+
+
+def test_a_dark_anthem_made_later_asks_for_its_weight_too(tmp_path, fake):
+    camp = tmp_path / "camp"
+    camp.mkdir()
+    seen = []
+    real = composer.compose_many
+    composer.compose_many = lambda jobs, *a, **k: seen.extend(jobs) or real(jobs, *a, **k)
+    try:
+        composer.compose_pieces(camp, [{"kind": "dark_anthem", "name": "Bram", "sheet": {"name": "Bram"}},
+                                       {"kind": "judgment", "name": composer.JUDGMENT}])
+    finally:
+        composer.compose_many = real
+    assert seen[0]["heavy"] is True and not seen[1].get("heavy")
