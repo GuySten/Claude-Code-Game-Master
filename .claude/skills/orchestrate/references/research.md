@@ -1,6 +1,6 @@
 # Research: what music psychology says (a digest)
 
-A paraphrased digest, with each finding cited by chapter, of five chapters of Juslin & Sloboda (eds.), *Handbook of Music and Emotion: Theory, Research, Applications* (Oxford University Press, 2010): ch13 (Simonton, composition), ch14 (Gabrielsson & Lindström, structure and emotion), ch17 (Juslin, performance), ch21 (Huron & Margulis, expectancy and thrills), ch31 (Cohen, film). Its tables were not available, and nothing in it is about villains or madness directly: rules marked *(inference)* combine nearby findings. The device library (devices.md) cites it; the host's verdicts (table-feedback.md) outrank it.
+A paraphrased digest, with each finding cited by chapter, of fifteen chapters of Juslin & Sloboda (eds.), *Handbook of Music and Emotion: Theory, Research, Applications* (Oxford University Press, 2010): ch13 (Simonton, composition), ch14 (Gabrielsson & Lindström, structure and emotion), ch17 (Juslin, performance), ch21 (Huron & Margulis, expectancy and thrills), ch31 (Cohen, film); and, in parts 7-8, ch02 (Davies, philosophy), ch03 (Cook & Dibben, musicology), ch05 (Peretz, neuroscience), ch08 (Zentner & Eerola, emotion models), ch19 (Hargreaves & North, liking), ch20 (Gabrielsson, strong experiences), ch22 (Juslin et al., mechanisms), ch23 (Trehub et al., infancy), ch27 (Thompson & Balkwill, culture), ch32 (North & Hargreaves, context). Its tables were not available, and nothing in it is about villains or madness directly: rules marked *(inference)* combine nearby findings. The device library (devices.md) cites it; the host's verdicts (table-feedback.md) outrank it.
 
 ## 1. Feature -> expression map
 
@@ -569,3 +569,611 @@ Each rule notes its source chapter or chapters. *(Inference)* marks rules that c
 38. **Peace/serenity:** slow, tonal, stepwise motion opening into a leap, flute timbre, low melodic and rhythmic complexity, regular flowing rhythm. (ch14)
 39. **Shape dynamics within phrases.** Dynamic variation adds more expressiveness than tempo variation (rubato), and emphasising significant notes with accents of time, loudness or articulation intensifies the target emotion. (ch14, ch17)
 40. **Use voice-like solo lines (violin, cello, voice) for emotional contagion.** The closer to a voice, the more contagious, according to Juslin's hypothesis. Bright high-frequency energy around 1–6 kHz (screams, the singer's formant) is maximally attention-grabbing. (ch17, ch21)
+
+## 7. Musicology, emotion models, liking, strong experiences, philosophy (ch03, ch08, ch19, ch20, ch02)
+
+This digest paraphrases and cites five chapters of Juslin & Sloboda (eds.), *Handbook of Music and Emotion* (OUP 2010):
+- ch03, Cook & Dibben (musicology, history, "topics")
+- ch08, Zentner & Eerola (emotion models, GEMS)
+- ch19, Hargreaves & North (experimental aesthetics, complexity and liking)
+- ch20, Gabrielsson (strong experiences)
+- ch02, Davies (philosophy, contour theory)
+
+It is a companion to `research.md`, which digests ch13, 14, 17, 21 and 31, and it leaves out what that file already covers: the cue-by-cue feature map, Simonton's originality curve, the chill triggers from ch21, and film music. The chapters' tables (8.4, 19.1, 20.1–20.3) are missing from the source text, so percentages appear only where the prose gives them.
+
+**Strength key** (same as research.md):
+- **[strong]**: replicated, large-sample, or treated by the authors as settled.
+- **[moderate]**: several sources agree, but the effect depends on context.
+- **[weak]**: one study, a contested theory, or an interpretive (non-empirical) claim.
+
+Rules that combine findings beyond what a chapter states are marked *(inference)*.
+
+---
+
+### 7.1 Ch03: Cook & Dibben, "Emotion in culture and history: perspectives from musicology"
+
+This is a historiographic chapter with no experiments. Its value for a composer lies in the **conventions** it documents and in its **narrative and form** ideas. All of it is **[weak]** as evidence of listener response, but **[moderate]** as evidence of what composers deliberately used and what period audiences understood.
+
+#### 1.1 Historical models of how music carries emotion (§3.2–3.3)
+- **Mimesis vs catharsis:** the Greek split between music that *imitates* an outside reality and music that *purges* the listener through feeling. Baroque opera (from about 1600) took the mimetic side: music heightens the emotion that the words and stage action already name.
+- **Baroque "affections":** one typified, static emotion per piece, carried by catalogued figures. The examples given are melodic repetition, fugal imitation, and dissonance used for expressive effect, all borrowed from rhetoric's *decoratio* (Mattheson; Burmeister 1601). The da capo aria is the model: return to the opening = return to the same affect.
+  - Use for a place or character that *does not change*, e.g. a shrine or a stoic NPC: commit to one affect and keep the same figures throughout *(inference)*.
+- **Classical "topics"** (Ratner 1980; Agawu 1991; Allanbrook 1983): by the late 18th century, a fixed stock of types, each with its own connotation, appears in **rapid, kaleidoscopic succession** within one piece. Transitions between emotions became a feature in their own right, and contemporaries found Mozart's ensembles striking for exactly this. The chapter names four kinds of topic:
+  - **dances:** minuet, gigue
+  - **styles:** "brilliant", "Turkish"
+  - **compositional procedures:** the "learned" style (counterpoint, fugue)
+  - **extra-musical references:** the hunt (horn calls)
+- **How topics signify** (§3.3): there are three routes.
+  1. **Syntactic types.** The example given is closure in a Mozart quartet, encoded by V–I plus *motivic liquidation* (the theme is whittled down to fragments as the cadence nears).
+  2. **Other music and where it is performed.** An orchestral march points to the parade ground.
+  3. **An outside reality.**
+
+  Composers used these on purpose. Mozart's letter about *Die Entführung* says he used the Turkish style to make Osmin's rage *comic*, and a late change of key and metre at the end of an aria to *surprise* his audience. [moderate as documented practice]
+  - For game use: an exotic "foreign" idiom laid over rage turns menace into comedy, which suits a blustering ogre or a pompous official *(inference)*.
+
+#### 1.2 Lexical theories (Cooke, Tagg)
+- **Cooke (1959), *The Language of Music*:** expression lives in the tension of each scale degree and the motion between degrees. Timbre and texture are only "characterizing agents" that modify tensions set up by pitch, time and dynamics. His lexicon (paraphrased):
+
+  | Degree | Cooke's reading |
+  |---|---|
+  | Tonic | Neutral; signals finality. |
+  | Minor 2nd falling to the tonic, in minor | Anguish without spirit; final. |
+  | Major 2nd falling to the tonic, in major | Pleasurable longing. As a passing note it is neutral. |
+  | Minor 3rd | Stoic acceptance; tragedy. |
+  | Major 3rd | Joy. |
+
+  **[weak]**: the chapter calls it ethnocentric and dependent on texts. Ch14 (see research.md) found empirical support only for joy and sorrow.
+- **Tagg's "musemes"** (1982; Tagg & Clarida 2003): minimal units of musical meaning, checked by asking listeners (inter-subjective comparison) and by substituting musemes from comparable texted contexts (inter-objective comparison). His sign types (fn 9) are a useful **toolkit for place music** [weak–moderate]:
+  - **Style indicators:** markers of the home style's norms.
+  - **Genre synecdoche:** a snippet of a "foreign" style calls up that whole genre and culture. This is the mechanism behind "a few bars of bagpipe = Highlands" or "a modal oud line = desert city".
+  - **Anaphones:** sounds whose structure mirrors a sonic, kinetic or tactile event, such as galloping rhythm, rippling water figures or a lurching gait.
+  - **Episodic markers:** sounds that flag a structural function, such as "something new begins" or "ending now".
+- **Caveat [moderate]:** lexical meanings shift with musical context, so a museme carries no guaranteed fixed meaning (Middleton 1990; Robinson 1998, fn 11). Complex emotions are expressed through **large-scale form**, not isolated bars.
+
+#### 1.3 Hanslick and Meyer
+- **Hanslick (1854):** music cannot present the *noun* of an emotion ("love"), only its *adjectives*, meaning its dynamic shape: fast or slow, strong or weak, rising or falling. Love can be gentle or stormy and still be love. [weak; consistent with ch02]
+  - The composer's corollary: a theme cannot say "jealousy". It can only give the motion pattern, and the story supplies the object *(inference)*.
+- **Meyer (1956):** affect arises when a tendency is blocked or delayed. A dominant seventh that delays resolution, then resolves deceptively to vi, raises affect twice. This is already in research.md via ch21. Two points are new here:
+  - Meyer separates **"embodied" meaning** (built from expectation inside the music) from **"designative" meaning** (reference to things outside it).
+
+#### 1.4 Expressive trajectories and narrative (§3.4–3.5), the most usable part for themes and arcs
+- **"Plot archetypes" / "expressive genres"** (Newcomb 1984; Hatten 1994), with documented examples:
+  - **Suffering → healing or redemption:** Schumann's 2nd Symphony.
+  - **Suffering transmuted into joy:** Beethoven's 9th.
+  - **Struggle → victory, or dark → light:** Shostakovich's 10th. Karl & Robinson (1997) show the third movement building **hope**, and specifically **false hope**: optimistic material is undercut so the victory does not convince.
+- **Kivy's (1993) examples** of large-scale expressive resolution:
+  - Mozart's "Dissonance" Quartet: a dark, anguished introduction followed by a sunny allegro produces a strong sense of resolution.
+  - Haydn: a movement that goes tonic minor → relative major → tonic minor (dark–light–dark) feels different from one that ends in the tonic major (dark → light).
+
+  [weak, interpretive] For a campaign: a villain's arc ends back in minor, a redeemed character's in major *(inference)*.
+- **Hatten's micro-devices** (Beethoven Op. 130 Cavatina) [weak]:
+  - A "willed", mostly **stepwise ascent over a stepwise bass** reads as hopeful.
+  - A registral **wedge** expanding to a peak, then an immediate **registral collapse**, makes the collapse the expressive crux rather than the peak.
+  - A move to the **relative minor (vi)** reads as troubled opposition to the major's serenity.
+  - **Anomalous chords** (repeated iv⁷ after a cadential 6-4) sound "parenthetical", outside normal time, like a frozen instant of tragic insight.
+
+  Hatten treats formal oddities as expressive opportunities, not errors.
+- **Music as drama** (Maus 1988): listeners make sense of musical events as **actions of imaginary agents** with motives, so an opening unison outburst is literally heard as an *outburst*. This underwrites writing character themes as agents that act, interrupt and answer one another *(inference)*. [weak]
+- **The "outsider" narrative** (Fisk 1997 on the left-hand trill in bar 7 of Schubert's D. 960; Guck 1994 on the C♭ in bar 53 of the slow movement of Mozart's K. 550):
+  - Each begins from a single **portentous foreign element**, a trill or a chromatic pitch that does not belong.
+  - Over the piece the element passes through trials and is finally **absorbed into the whole**, so the outsider becomes an insider.
+
+  This is a ready template for a character theme that starts as an intrusion in the party's music and is gradually harmonised into it *(inference)*. [weak]
+- **Words shape hearing** (§3.5) [moderate]:
+  - Discourse about music helps *create* its expressive meaning. Programme notes and critics' readings lead listeners to hear the music that way.
+  - Spitzer (1987): critics wrote more favourably, and fixed on the same passages and metaphors, when they believed a piece was by Mozart.
+  - Zbikowski's (1999) conceptual blending: when text and music share structure, their attributes merge and new meaning emerges in the combination. Cook (1998) applies the same idea to multimedia.
+  - For the table: how the DM introduces a theme ("this is the Drowned King's music") will colour how players hear it. Compare ch19's prestige effects *(inference)*.
+
+---
+
+### 7.2 Ch08: Zentner & Eerola, "Self-report measures and models"
+
+#### 2.1 Perceived vs felt emotion (§8.1, 8.6) [strong]
+- Recognising an emotion in music and feeling it are different responses, and they can be measured apart (Evans & Schubert 2008; Kallinen & Ravaja 2006; Zentner et al. 2008).
+- **Key asymmetry:**
+  - Basic-emotion terms (sad, fear, anger) fit **perceived** emotion better.
+  - The music-specific GEMS terms fit **felt** emotion better.
+  - Music can *depict* negative emotions, but listeners rarely *feel* them, because nothing is at stake for them.
+- For the composer: you can portray fear or anger clearly, but expect players to feel *tension*, *power* or *wonder* rather than fear itself *(inference)*.
+
+#### 2.2 Dimensional models (§8.4)
+- **Russell's circumplex** (valence × arousal) is used in about a third of studies. It cannot separate emotions that sit close together; fear and anger, for example, are both negative and high-arousal (Scherer et al. 2003). [strong]
+- **Thayer's split** of arousal into **energetic arousal** (readiness for vigorous action) and **tense arousal** (the emergency system). The two can move in **opposite directions**, as in the hypoglycaemia study by Gold et al. 1995.
+  - The best-supported model has three dimensions: **valence, energy and tension** (Schimmack & Grob 2000). [moderate]
+  - Vieillard et al. (2007) mapped 56 *specially composed* excerpts and found **tension and energy** explained the similarity space better than valence and arousal. [moderate]
+  - Practical upshot: treat "energetic" and "tense" as **separate dials**. A battle march is high-energy and low-tension; a stalking scene is low-energy and high-tension *(inference)*.
+- **Other proposed music dimensions:**
+  - Wedin (1972): **gaiety–gloom**, **tension–relaxation**, **solemnity–triviality**.
+  - Others: **potency**, intensity, dominance, interest.
+
+  "Solemnity" is a distinct axis, not just slow sadness. [moderate]
+- **Bigand et al. (2005)**, a similarity-sorting task with no verbal labels: two axes matched valence and arousal. A third axis was unexplained, possibly **gesture or body posture**, which matches ch02's contour theory. [moderate]
+- **Hevner's adjective clock** (1936): eight clusters in a circle, with happiness opposite sadness (cluster A vs F). Rigg (1964) found broad agreement across researchers. Schubert (2003) updated it. [moderate]
+
+#### 2.3 GEMS, the nine emotions music actually evokes (§8.5) [strong for the list; moderate for the interpretations]
+This is Zentner, Grandjean & Scherer 2008. They compiled 66 candidate terms, then collected 801 questionnaires at Geneva's Fête de la Musique (72% classical, 11% rock, 10% world, 7% jazz) and ran confirmatory factor analysis. The **most frequently felt** states were **moved, nostalgic, relaxed, enchanted and tender**; "admiring" was the term listeners added most often, and the Swedish samples (Juslin & Laukka 2004; Laukka 2007) agree.
+
+Ch08 gives **no feature-level musical correlates** for GEMS. In the list below, correlates *stated in ch08* are marked "ch08", and suggested correlates drawn from research.md §1 are marked *(inference)*.
+
+1. **Wonder**
+   - **Terms:** filled with wonder, amazed, allured, dazzled, admiring, moved.
+   - **ch08:** music's "arresting" quality and the most potent, most rewarding emotion, the one that hooks people. The authors link it to seduction (the Sirens; Darwin's courtship song).
+   - *(inference)* Pair a sudden new timbre or harmonic turn with beauty: an unexpected modulation, a shimmer of harp or celesta, a widened register.
+2. **Transcendence**
+   - **Terms:** inspired, feeling of transcendence, spirituality, overwhelmed, thrills.
+   - **ch08:** together with wonder, this covers English *awe*; the French-language study lacked a word for awe.
+   - *(inference)* Slow-building massed sound in a reverberant space; see ch20 §4.4.
+3. **Tenderness**
+   - **Terms:** in love, sensual, affectionate, tender, mellowed.
+   - **ch08:** one of music's two forms of "love".
+   - *(inference)* Slow, soft, legato, dark timbre (research.md rule 5).
+4. **Nostalgia**
+   - **Terms:** nostalgic, melancholic, dreamy, sentimental.
+   - **ch08:** remarkably prominent. It is tied to music's everyday role as a **reminder of valued past events**, which works through memory and imagery.
+   - *(inference)* Return to an earlier theme, slower and thinner, in a key or instrument associated with "home".
+5. **Peacefulness**
+   - **Terms:** calm, relaxed, serene, soothed, meditative.
+   - **ch08:** reflects the listener's safe detachment from the real world. Music has been used as a relaxant since a 13th-century asylum in Fez.
+   - *(inference)* research.md rule 38.
+6. **Power**
+   - **Terms:** energetic, triumphant, fiery, strong, heroic.
+   - **ch08:** speculatively rooted in display: triumph over rivals and defence of territory.
+   - *(inference)* Loud, bright, wide leaps, unisons and octaves (research.md rule 10).
+7. **Joyful activation**
+   - **Terms:** stimulated, joyful, animated, feel like dancing, amused.
+   - **ch08:** musical joy carries an **urge to dance**. Music has **no general "happiness" factor**: happiness appears either as enchantment (in wonder) or as joy fused with movement.
+   - *(inference)* Strong danceable metre and a clear pulse.
+8. **Tension**
+   - **Terms:** agitated, nervous, tense, impatient, irritated.
+   - **ch08:** two senses. The first is Meyer-style expectancy; but **surprise is rarely reported** as a felt emotion, and non-experts may feel a *thrill or amazement* where an expert registers surprise. The second is **irritation**, which music itself causes only rarely, e.g. through "an inordinate amount" of successive sharp, unresolved dissonances. Dissonance aversion appears in infants and is probably universal (Masataka 2006; Zentner & Kagan 1996).
+9. **Sadness**
+   - **Terms:** sad, sorrowful.
+   - **ch08:** "musical" sadness lacks the aversive side. Listeners almost never report feeling gloomy, depressed or unhappy (also Laukka 2007).
+
+**Absent as felt emotions** [moderate]:
+- **Fear:** horror and thriller fear is probably *learned association* or narrative-driven, since music and story are confounded in film.
+- **Anger:** comes mostly from **disliked music**. Heavy metal raised anger only in listeners who did not like it (Gowensmith & Bloom 1997).
+
+#### 2.4 Other usable points
+- **Mixed emotions:** music can evoke happy and sad at the same moment (Hunter et al. 2008). [moderate]
+- **Physiology** (Krumhansl 1997): **sad** excerpts produced the largest changes across cardiac, vascular, electrodermal and respiratory measures, while happy excerpts mainly changed respiration. Continuous emotion ratings correlated with physiology only weakly. [moderate]
+- **Peak-end memory** (Kahneman et al. 1993, cited for method): retrospective judgements of an experience follow its **peak and its end**, not its average. A cue is remembered by its best moment and its last bars *(inference for composition)*. [moderate, borrowed from pain research]
+
+---
+
+### 7.3 Ch19: Hargreaves & North, "Experimental aesthetics and liking for music"
+
+#### 3.1 Berlyne's inverted U (§19.4.1) [moderate overall; strong as the field's dominant framework]
+- **Arousal potential** comes from three kinds of property:
+  - **"collative" variables**, which the listener collates: **complexity, familiarity/novelty, surprisingness, orderliness**
+  - **"psychophysical"** properties, the raw physical ones such as loudness and tempo
+  - **"ecological"** properties: signal value or meaningfulness
+- **Liking peaks at intermediate arousal potential** and falls away towards both extremes (the Wundt curve).
+- **How "complexity" was operationalised:** these are the concrete levers for "too dense" or "too plain".
+  - **Information content / unpredictability of tone sequences:** Vitz 1966 found an inverted U for pleasantness. Crozier 1974 and Simon & Wohlwill 1968 found the same.
+  - **Melodic redundancy and the number of distinct pitches used:** in McMullen 1974, schoolchildren preferred melodies of *intermediate* complexity.
+  - **Rhythmic redundancy:** in McMullen & Arnold 1976, preference for rhythm patterns was an inverted-U function of redundancy.
+  - **Whole pieces:** Heyduk (1975) composed four piano pieces at graded complexity levels and confirmed an "optimal complexity".
+- **What follows for the composer** *(inference from these operationalisations)*:
+  - **Too plain:** few distinct pitches, much literal repetition, highly predictable steps and rhythm, so redundancy is high.
+  - **Too dense:** many distinct pitches, little repetition, unpredictable successions and rhythms, so information is high.
+  - Loudness and fast tempo also add arousal potential through the psychophysical route (North & Hargreaves used loud+fast vs slow+quiet versions of one piece as high- vs low-arousal).
+- **The optimum is relative, not absolute** [moderate]:
+  - Steck & Machotka (1975): where the preference peak fell depended on the **range of stimuli presented**, not on absolute complexity.
+  - So the "right" density for a cue depends on the other music players hear in the session; the same theme seems busy among sparse ambiences and plain among battle cues *(inference)*.
+- **The familiarity version of the inverted U is weaker** [weak–moderate]:
+  - Erdelyi (1940): as radio "plugging" rose, a song's sheet-music sales **rose and then fell**. Changes in plugging preceded sales by about two weeks in 18 of 20 songs.
+- **Repetition depends on starting complexity** (objective vs subjective complexity) [moderate]:
+  - If a piece starts **below** the listener's optimum, repetition **lowers** liking; this is boredom.
+  - If it starts **above** the optimum, repetition **raises** liking, because it becomes learnable.
+  - Hargreaves (1986) reviewed 10 studies: about half showed the inverted U and half showed a steadily rising "mere exposure" effect (Zajonc 1968). He concluded that the inverted U is the general form, with mere exposure as its rising limb.
+- **Long-run effect of complexity** (Eerola 1997, the 12 UK Beatles albums scored for complexity against weeks in the charts) [weak–moderate]:
+  - **Simpler** albums (*Please Please Me*) **peaked early and faded**.
+  - **Complex** ones (*Abbey Road*) **peaked later and lasted**.
+  - The campaign implication: a theme heard every session should be complex enough to survive repetition, while a one-off cue can be immediately catchy *(inference)*.
+
+#### 3.2 Prototypes (Martindale) and the reconciliation (§19.4.2)
+- **Preference for prototypes:** we like what is **typical of its category**, because typical items are encoded more strongly.
+  - For classical themes, typicality explained **51%** of the variance in liking and complexity only **4%** (Martindale & Moore 1989).
+  - For polygons, colour typicality explained 79% vs 1% for complexity (Moore & Martindale 1983). [moderate]
+- **North & Hargreaves (2000a) reconciliation** [moderate]:
+  - Whichever variable *varies more* in a stimulus set dominates the result.
+  - Prototypes carry collative levels: jazz fans' prototype is complex, new-age fans' is simple, dance fans' is fast.
+  - **Complexity only exists relative to a culture's prototypes:** Japanese traditional music sounds erratic to Western ears and conventional to a Japanese listener.
+  - Composer reading: a theme should sound like a *good example of its genre* (march, lament, jig, chorale) and get its interest from a controlled amount of deviation *(inference)*.
+
+#### 3.3 Situation: arousal moderation and arousal goals (§19.5) [moderate]
+- **Konečni, Crozier & Doob (1976):**
+  - Insulted participants who then waited idle chose **simple** melodies on about 70% of trials, to keep their arousal from rising.
+  - Those allowed to "retaliate" showed no preference.
+- **Mental load:** people doing hard mental tasks chose simpler melodies (Konečni & Sargent-Pollock 1976).
+  - In a driving game, lap times were slowest with loud, fast music combined with backwards counting (North & Hargreaves 1999). Music competes for processing capacity.
+- **Arousal-state goals** (North & Hargreaves 2000b):
+  - *After* exercise people preferred slow, quiet versions, and *after* relaxing they preferred loud, fast ones: they **moderated** their arousal.
+  - *During* exercise or relaxation they chose music that **matched and intensified** the activity: they **polarized** it.
+  - Aerobics and yoga classes rate the "appropriate" music differently for both liking and complexity (1996).
+- *(inference)* For the table:
+  - Keep under-score **simple and low-arousal during puzzles, negotiations and rules-heavy turns**, where players think hard.
+  - Use **polarizing** high-arousal music during action.
+  - Use **moderating** music for the cool-down after a fight.
+
+#### 3.4 Social influence and listener differences [moderate]
+- **Compliance:** music students conformed to a wrong group answer on 30% of pitch and 49% of loudness trials (Radocy 1975).
+- **Prestige:** false attribution to Beethoven or Strauss shifted quality judgements (Fiese 1990). A teacher's or DJ's endorsement raised liking (Alpert 1982). Labelling identical radio programmes "classical" or "popular" changed listening figures (Geiger 1950). Such effects may be stronger for music than for other arts. **Caveat:** Crozier & Chapman (1981) found prestige effects across the arts small and unstable.
+- **Training:** more musical training goes with preference for **more complex** music (Rubin-Rabson 1940; Hargreaves et al. 1980).
+
+---
+
+### 7.4 Ch20: Gabrielsson, "Strong experiences with music" (SEM)
+
+#### 4.1 The data [strong as a descriptive survey]
+- 953 Swedish participants aged 13–91 gave 1,354 free reports of "the strongest, most intense experience of music" they had ever had.
+- **Where and how SEM happened:**
+  - **73% during live music**; 81% while listening rather than performing.
+  - 54% with music already heard before.
+  - Mostly **with others**: 68% with acquaintances, 12% with strangers, 19% alone.
+  - SEM is rare, about once a year or less.
+  - It usually does **not recur** at full strength when the same music is heard again.
+- **Genres:** classical (non-religious) 30.6%; religious 15.6%; songs and tunes 9.7%; opera and musicals 6.6%; rock 6.6%; jazz 6.1%; folk 5.7%; with strong age and gender differences.
+
+#### 4.2 What happens (SEM descriptive system, §20.3), with prevalence
+- **Body:**
+  - **tears 24%** (women 28%, men 18%), mostly with positive feelings
+  - chills 10%, goose bumps 5%
+  - two opposite behaviours: **moving, dancing or clapping (11%, typical of rock and pop)** vs **becoming motionless and silent (9%, typical of classical)**
+  - floating, weightless or "lifted" sensations 9%, and about 10 out-of-body reports
+- **Perception:**
+  - Striking **timbre**, **loudness** or **acoustics** (reverberation, direction, diffusion).
+  - Being **enveloped/surrounded by sound** was described as especially strong.
+  - **Bass felt in the body** through the floor and feet.
+  - Synaesthetic **light** imagery appears too.
+  - About half mention what they *saw*.
+- **Cognition:**
+  - expectancy or receptiveness beforehand 30%
+  - total absorption 20%
+  - **altered time and space** (time stands still, ego dissolves, "all fits together") 35%
+  - **loss of control / being overwhelmed** 42%, the single most common cognitive aspect
+  - merging with the music 20%
+  - personal memories 12%, highly idiosyncratic
+  - **inner imagery 10%** (nature, people, another and better life)
+- **Feelings:**
+  - **Positive 72%.** The most common were joy, happiness, delight and beauty. Next came low-arousal **peace, calm, harmony and stillness**, and high-arousal **elation, euphoria, rapture and ecstasy**.
+  - Intense but unspecified feelings 15%.
+  - **Negative 23%**, mostly caused by life circumstances rather than the music.
+  - **Mixed 13%, changed 11%:** bittersweet feelings, and negative turning to positive (for example at funerals).
+- **When the music itself caused negative feelings** [moderate], the triggers were:
+  - **loud sound level**
+  - **sharp or shrill timbre**
+  - **frequent dissonance**
+- **Existential (8%), transcendental (~15%: magical, ecstasy or trance, cosmic, other worlds), religious (11%).**
+- **After-effects:**
+  - new insight, catharsis, consolation or courage 41%
+  - **community with other listeners or performers 18%**
+  - a lasting turn towards that music 44%
+
+#### 4.3 What causes SEM (§20.5) [moderate]
+- **Music, person and situation interact.** No musical recipe guarantees SEM. It needs a fit between the piece, the listener and the moment.
+- **Musical triggers named** range from a single tone or chord to a whole piece:
+  - timbre of an instrument or voice; perfect or special intonation; loud *or* soft level
+  - dynamics, tempo, mode
+  - motives, harmonic progressions, themes, form
+  - performers' skill and charisma
+- Scherer et al. (2001–2) likewise found highly individual factors mattered most.
+- **Personal factors:** fatigue or illness, open expectation, a ripe life moment, teenage sensitivity, association with loved people, exotic places, war or death.
+- **Situation:** good diffusion and reverberation and feeling surrounded; the **border between waking and sleep**; night radio.
+- **Awe and the sublime:** Konečni (2008) argues sublime awe needs **vast spaces with superb acoustics**, such as cathedrals. [weak]
+
+#### 4.4 Earlier findings reported in ch20 that research.md does not already cover
+- **Lowis (1998):** "up-beat" pieces (the ending of *The Firebird*) produced significantly **more** spine-tingle button presses than "gentle" ones (*Nimrod*). This sits in tension with Panksepp's finding that sad music produces more chills, which is in research.md. [weak]
+- **Panzarella (1980):** factor analysis found four kinds of aesthetic ecstasy: **renewal**, **motor-sensory**, **withdrawal** and **fusion with the object**. **Motor-sensory and fusion ecstasy were stronger for music than for visual art.** [weak]
+- **Konečni et al. (2007):** thrills can accompany profound experiences but carry little psychological significance in themselves. Do not equate a chill with a strong experience. [moderate]
+
+---
+
+### 7.5 Ch02: Davies, "Emotions expressed and aroused by music: philosophical perspectives"
+
+All of this is philosophy, so **[weak]** as evidence, but it supplies the best theory for *why* character themes work.
+
+- **Contour (resemblance) theory** (§2.6.3):
+  - Music presents **emotion characteristics** the way a basset hound "looks sad" or a willow "weeps", without anyone feeling anything.
+  - It does so through resemblance between its **dynamic structure** (motion, energy, tension, inertia, texture, teleological pull, unfolding in time) and human **gait, carriage, bearing and movement**, rather than faces or vocal noises.
+  - A downcast bearing and slow movement go with sadness; joy is upbeat and lively.
+  - Composer reading: **design a character theme as that character's walk and posture** (heavy, limping, strutting, gliding, darting) *(inference)*.
+- **Prosody vs large-scale shape:**
+  - Speech-like cues (contour, phrasing, accent, loudness; Juslin & Laukka 2003) produce *local, short-lived* effects.
+  - A *sustained* mood across a long piece depends more on the **large-scale pattern of dynamic movement**.
+  - Short-excerpt experiments miss this.
+- **Instrumental music cannot convey cognitively complex emotions** such as shame, jealousy or envy, because those emotions depend on their thought content.
+  - Music can give **moods** (objectless general feelings: dread, depression, happiness) and the dynamic profile of emotions.
+  - Matravers (1998): music arouses only fairly general feelings, so it can express a limited range of emotions.
+  - Davies doubts that "bursting with joy" and "blowing one's top" differ in inner dynamics.
+  - Composer reading: let narrative and leitmotif association supply the "jealous" or "treacherous" content; the music supplies its motion *(inference)*.
+- **Timbre associations** (§2.6.1):
+  - **Felt as natural (synaesthetic):** high trumpet is *bright*; low clarinet is *dark*; celesta is *ethereal*; high string harmonics are *brittle*. These colour the ambience but cannot by themselves generate the expression.
+  - **Historical convention:** **oboe = bucolic/pastoral**, **organ = religiosity**, **trumpet = regality or warlikeness**.
+- **The persona:** many philosophers (Levinson; Robinson; Walton) hold that listeners imagine a persona living through the music's emotional journey. Davies objects that pure instrumental music constrains this imagining too loosely. For game themes, the *story and the named character* provide the missing constraint *(inference)*.
+- **Contagion is the likeliest route to felt "mirroring" emotion** (§2.7):
+  - Listeners "catch" the music's mood without believing anything sad has happened.
+  - Proposed carriers are bodily: **postural mimicry**, **sub-vocal singing along**, and an inner miming of the music's **tensing and relaxing**.
+  - Ambient music in shops and restaurants shows non-attentive contagion as well (Bruner 1990; North & Hargreaves 1997).
+  - *(inference)* **Singable melodies and gesture-like rhythms** should spread their mood more readily.
+- **Discord and sadness are not bad** (§2.1):
+  - A dissonance can be "deliciously piquant" when it bends the music towards a far-off return to the tonic.
+  - Even raw unresolved discords can be savoured or pleasantly shocking.
+  - Davies doubts that an isolated minor triad leans either way expressively; context decides.
+- **Why people seek sad music** (§2.8): the negative is integral to the whole and accepted as part of understanding it, the way marathoners accept pain. A campaign's tragic cues need not be softened *(inference)*.
+- **Cross-cultural limits** (§2.6.4) [moderate]:
+  - Expressive conventions of foreign music are often opaque. "High" and "low" pitch are relative to each style's range, and occasions differ (death mourned vs celebrated).
+  - Gregory & Varney (1996): Vivaldi's "Spring" vs a monsoon raga found no cross-cultural match.
+  - Most "cross-cultural" listeners already know Western film and pop idioms.
+  - Lullabies are recognised across cultures, probably through their motherese-like delivery (Trehub et al. 1993; fn 3).
+  - For invented fantasy cultures: players decode them through *Western* conventions and genre synecdoche, not authentic ethnic meaning *(inference)*.
+
+---
+
+### 7.6 Rules for the composer
+
+1. **Use topics as shorthand.** Dances, styles, learned counterpoint and hunt or march calls carry ready connotations. Change topics quickly for mercurial characters; hold one affect for static places or stoic figures. (ch03 §3.3)
+2. **Build place music with genre synecdoche.** A brief, characteristic snippet of a "foreign" idiom (instrument, mode, rhythm) is enough to evoke a whole culture. Add **anaphones**, whose shapes imitate local motion or sound (water, wind, hooves, machinery). (ch03, Tagg fn 9; ch02 §2.6.4)
+3. **Make a blustering villain comic** by overlaying rage with an exotic or ostentatious stylistic topic, as Mozart did with Osmin. (ch03 §3.3)
+4. **Plan each recurring character's arc as a key/mode trajectory:**
+   - redemption: dark → light, ending in the tonic major
+   - tragedy or relapse: minor → relative major → minor
+   - false hope: optimism that is undercut
+
+   (ch03 §3.4, Kivy; Karl & Robinson)
+5. **The outsider theme:** introduce a foreign element (a trill, a chromatic pitch) that disrupts the party's music, test it, then harmonise it into the whole as the character is accepted. (ch03 §3.5, Fisk; Guck)
+6. **Write themes as agents and gestures.** Model a character theme on how the character *moves and holds themselves*, not on a facial expression. Let themes interrupt, answer and collapse like actions. (ch02 §2.6.3; ch03 Maus)
+7. **Don't ask a theme to say "jealous" or "treacherous".** Music gives the dynamic adjective (stormy, gentle, rising, sinking). The story, the DM's framing and leitmotif pairing supply the object. (ch02 §2.6.3; ch03 Hanslick)
+8. **Hope** = a mostly stepwise rising line over a stepwise bass. **A crux of grief** = expand to a peak, then collapse registrally at once. **Troubled opposition** = turn to the relative minor. **A frozen moment of insight** = an anomalous, "parenthetical" chord outside the cadence's logic. (ch03 §3.4, Hatten)
+9. **Aim at the emotions music actually induces:** wonder, transcendence, tenderness, nostalgia, peacefulness, power, joyful activation, tension, gentle sadness. Depicted fear or anger will be *recognised* but mostly felt as tension or power. (ch08 §8.5–8.6)
+10. **Treat energy and tension as two separate dials.** A march is high-energy and low-tension; a stalk is low-energy and high-tension. Add solemnity–triviality as a third axis. (ch08 §8.4, Thayer; Vieillard; Wedin)
+11. **Nostalgia comes from memory.** Recall themes the players already associate with earlier sessions. Joy needs a **danceable pulse**, and wonder needs an **arresting** event. (ch08 §8.5)
+12. **Use sustained harsh dissonance, shrill timbre and excessive loudness sparingly.** They are the main *musical* causes of irritation and negative strong experiences. Short, purposeful discords that lean toward resolution are savoured. (ch08 §8.5; ch20 §20.3.5; ch02 §2.1)
+13. **Pitch complexity at the middle of the inverted U.**
+    - Too plain means few distinct pitches, heavy literal repetition, and fully predictable melody and rhythm.
+    - Too dense means many pitches, little redundancy, and unpredictable succession in both melody and rhythm.
+    - Calibrate against the other cues in the session, because the optimum is relative.
+
+    (ch19 §19.4.1, Vitz; McMullen; Heyduk; Steck & Machotka)
+14. **Write themes that recur every session somewhat above "instantly catchy".** Repetition raises liking for music that starts above the optimum and lowers it for music that starts below. Simple material peaks early and wears out. (ch19 §19.4.1, Hargreaves 1986; Eerola 1997; Erdelyi 1940)
+15. **Make each cue a good example of its type** (a typical march, lament or jig), then add controlled deviation. Typicality predicts liking more than complexity does. (ch19 §19.4.2, Martindale & Moore 1989; North & Hargreaves 2000a)
+16. **Lower music's load when players are thinking** (puzzles, negotiation, rules). In action, choose music that *polarizes* arousal; after action, choose music that *moderates* it. (ch19 §19.5, Konečni; North & Hargreaves 1999, 2000b)
+17. **Frame the music verbally.** Naming a theme and its owner, or attaching prestige to it, shapes how players hear and value it. (ch03 §3.5, Spitzer; ch19 §19.5.3)
+18. **For awe and transcendence,** aim for an *enveloping* sound (wide spatial spread, reverberant "cathedral" acoustics, felt bass) and remarkable timbre. Sustain the moment so that time seems to stop. Expect the effect to be strongest the first time. (ch20 §20.3.3, 20.5.3; Konečni 2008)
+19. **Make the peak and the ending of each cue the strongest.** Players' memory of a scene's music follows the peak and the end, not the average. (ch08 §8.2.4, Kahneman, *inference*)
+20. **Allow bittersweet mixtures and negative-to-positive turns** (laments that brighten, as at funerals). Mixed and changed feelings are common in the strongest musical experiences. (ch20 §20.3.5; ch08 §8.3, Hunter 2008)
+21. **Use conventional timbres for quick tagging:**
+    - oboe for pastoral
+    - organ for sacred
+    - trumpet for regal or martial
+    - celesta or string harmonics for ethereal or brittle
+    - low clarinet for dark
+
+    Let the line's motion carry the actual emotion. (ch02 §2.6.1)
+22. **Give mood-setting themes a singable shape and a bodily rhythm** so players catch the mood by mimicry. (ch02 §2.7, *inference*)
+
+## 8. Mechanisms, infancy, culture, context, the brain (ch22, ch23, ch27, ch32, ch05)
+
+A paraphrased digest of five more chapters of Juslin & Sloboda (eds.), *Handbook of Music and Emotion* (OUP 2010): ch22 (Juslin, Liljeström, Västfjäll & Lundqvist, induction mechanisms), ch23 (Trehub, Hannon & Schachner, infancy), ch27 (Thompson & Balkwill, cross-cultural), ch32 (North & Hargreaves, marketing / background music), ch05 (Peretz, neurobiology). It complements `research.md` (ch13, 14, 17, 21, 31), which already covers the cue-to-emotion map, cue combination, chills, Meyer/Huron expectancy and film music; none of that is repeated here. Tables and figures were not in the text, so Table 22.3 (mechanism hypotheses) is known only from the prose describing it.
+
+Strength key:
+- **[strong]**: replicated, or called the clearest result by the authors.
+- **[moderate]**: several studies agree, but the result is context-dependent or indirect.
+- **[weak]**: one study, a case report, or a hypothesis the authors flag as untested.
+
+*(Table)* marks an application to music playing at an RPG table. These applications are inferences; the chapters do not make them.
+
+---
+
+### 8.1 Ch22: how music *induces* emotion (BRECVEM)
+
+#### 1.1 What listeners actually feel (§22.2–22.3)
+- **Felt musical emotion is mostly positive.** In a representative Swedish survey (Juslin et al. 2009, N = 706, free report), 84% of episodes were positive and over half were happy-elated. The next most common were sad-melancholic, calm-content and nostalgic-longing. About 11% were mixed. "Being moved", wonder, awe and chills were rare: they belong to peak experiences (§22.6). [strong for the sample]
+- **Music compared with other everyday events** (experience-sampling study, Juslin et al. 2008): music produced more happiness and nostalgia, and less anger, boredom and anxiety. Music induced any emotion in only about 55–65% of episodes, so people often perceive an emotion without feeling it (§22.5.2). [moderate]
+- **Setting changes the emotion.** Happiness, pleasure and also *irritation* clustered in social settings; calm, nostalgia and sadness clustered in solitary ones (§22.3.1). [moderate] *(Table: a table of players is a social setting, which favours energy and irritation over melancholy.)*
+- **What listeners named as the cause** (Juslin et al. 2009): musical features 45%, the situation 27%, memories 24%, lyrics 10%. Pleasure went with visual imagery and with listening alone; nostalgia went with episodic memory (§22.3.2). [moderate/weak]
+
+#### 1.2 The seven mechanisms (§22.4.1) and how to use them
+In daily life the most often reported mechanisms were **contagion, brain-stem reflex and episodic memory (71% together)**. Cognitive appraisal was rarest (§22.3.2). [moderate; based on self-report, so implicit mechanisms like conditioning are probably under-counted]
+
+**Brain-stem reflex.** Low-level hearing treats sudden, loud, dissonant or very fast sounds as possibly urgent and raises arousal. It is the fastest mechanism (under a second), works even before birth, is barely shaped by culture, and is involuntary. [moderate]
+- Use it for stingers, sforzandi, cluster stabs and sudden tutti. It works on people who are not attending.
+- Avoid abrupt onsets in loops played under conversation. A pretty cue with a sudden attack still fires the reflex. *(Table)*
+
+**Rhythmic entrainment.** A strong external pulse pulls heart rate or breathing toward it, and the bodily change feeds the feeling.
+- Evidence: infants' breathing locked to lullabies (Kneutgen 1970); heart rate tracked tempo (Landreth & Landreth 1974); listeners' pulse could be "driven" (Harrer & Harrer 1977).
+- It needs a **marked pulse near resting heart or breathing rate**, and it is **slow to take hold**: the period of the rhythm adjusts more slowly than its phase (Clayton et al. 2005). It has not been studied systematically for emotion. [weak–moderate]
+
+**Evaluative conditioning.** Music repeatedly paired with a good or bad event comes to evoke that feeling by itself.
+- It can form and fire **without awareness** (Martin et al. 1984), **resists extinction**, and ignores the music's structure; the music serves only as a cue.
+- Mere exposure is treated as a variant: what is heard often without harm becomes liked. Only one direct music study is cited (Blair & Shimp 1992). [moderate as theory, weak in music]
+- *(Table)* This is how a character theme gets its meaning. The consistency of pairing matters more than what the theme expresses on its own.
+
+**Emotional contagion.** The listener perceives the music's emotional expression, especially its voice-like features, and mirrors it internally.
+- It is fast, automatic and "modular": knowing it is only music does not stop it. It produces mainly **basic** emotions.
+- Lundqvist et al. 2009: specially composed, unfamiliar happy versus sad music produced matching smile-muscle activity, skin conductance, finger temperature and felt emotion. Koelsch et al. 2006 found premotor vocal areas activated by listening. [moderate]
+
+**Visual imagery.** The listener builds images and reacts to them. The images come from mapping musical shape onto bodily schemata, such as pitch moving "up".
+- It is the **most volitional** mechanism, since images can be summoned and dismissed, and it can produce any emotion.
+- It **needs attentional resources**: the authors propose blocking it with an attention-demanding task (§22.4.3). The evidence comes mostly from music therapy (Bonny's Guided Imagery and Music). [weak–moderate]
+- *(Table)* Busy table talk is likely to crowd imagery out. Place music works best while the GM is describing the scene and the table is listening.
+
+**Episodic memory.** Music recalls a specific personal event, and the event's emotion comes back with it. It is the main route to **nostalgia**, can be intense, and is strongest for music from young adulthood (Schulkind, Hennis & Rubin 1999; Janata et al. 2007). It is conscious, and the music's structure matters little. [moderate]
+
+**Musical expectancy.** Emotion comes from confirming, delaying or violating a style-based expectation. It depends on **learned, culture-specific** knowledge, matures only around ages 5–11, takes **several seconds** to work, and depends heavily on the exact structure (Steinbeis, Koelsch & Sloboda 2006). [moderate]
+
+**Cognitive appraisal** (outside BRECVEM) is rare: it happens when music blocks a goal, like a neighbour's loud stereo. [moderate] *(Table: a mix too loud or too busy to talk over gets appraised as an obstacle and causes irritation.)*
+
+#### 1.3 Implications (§22.4.2, 22.5–22.6)
+- **No single mechanism explains musical emotion.** The mechanisms differ in speed, learning, volition, awareness and dependence on structure. [moderate]
+- **Felt and perceived emotion can match or diverge.** Contagion yields the *same* emotion the music expresses. Memory and expectancy can yield a *different* one: a happy tune can recall a loss. Lab studies with unfamiliar music find felt ≈ perceived (Kallinen & Ravaja 2006; Schubert 2007) because only contagion-type routes are open there. [moderate]
+- **Emotion, liking and aesthetic judgement are partly independent.** Music can sadden an inattentive listener through conditioning, or be liked without stirring any emotion (§22.6). [weak–moderate]
+- **Individual differences come mostly from the learned mechanisms** (conditioning, memory, expectancy). One client's relaxing music is another's irritant (Guzzetta 1991). [moderate]
+
+---
+
+### 8.2 Ch23: lullabies, play songs, and what infants respond to
+
+- **Two caregiver registers (§23.2.1)** [strong; documented across many languages]:
+  - **Playful/arousing:** high pitch, **wide range**, slow tempo, rhythmic, repetitive. Rising contours, as in questions, catch attention and raise arousal (Fernald 1991).
+  - **Soothing:** **low pitch, falling contours, very slow**.
+- **Lullabies (§23.2.4):** slow; repetition in melody, rhythm and syllables; **smooth falling contours** (Unyk et al. 1992). Adults pick out foreign lullabies even when matched on culture *and tempo*, so the lullaby quality is more than slowness (Trehub, Unyk & Trainor 1993a). [strong]
+- **Cultures differ in which they favour.** Cultures that prize calm infants and constant contact favour lullabies; cultures that prize vitality favour play songs. American mothers drive excitement, while Japanese mothers use falling contours to calm (Morikawa et al. 1988). [moderate]
+- **How parents sing to infants (§23.2.5)** [strong for pitch and tempo; moderate for the rest]:
+  - **1–2 semitones higher and slower** than the same song sung alone (Trainor 1996).
+  - **Strict, metronomic timing with no rubato.** They compensate with accents in which **pitch peaks and loudness peaks coincide**, and dynamics change more **gradually** (Nakata & Trehub 2008).
+  - The distinctive sign is a **"smiling", warm, soft timbre** (Trehub et al. 1997; Tartter & Braun 1994).
+- **Register suits purpose.** Infants preferred *lower*-pitched versions of expressive lullabies (Volkova, Trehub & Schellenberg 2006). High pitch suits arousing songs; low pitch suits soothing ones (§23.2.6). [moderate]
+- **Song holds attention better than speech** even though song is less acoustically salient (Nakata & Trehub 2004). Vocal music holds attention longer than instrumental music (§23.2.6). [moderate]
+- **Song regulates arousal both ways.** The same live singing calmed aroused infants and lifted drowsy ones (Shenfield, Trehub & Nakata 2003). Singing needs no extra exaggeration at a distance, while speech does (Nakata & Trehub 2002). [weak–moderate]
+- **Consonance (§23.5.1).** Newborns prefer consonant over dissonant intervals and passages. They process octaves, fifths, and melodies built around perfect fifths more easily (Trainor & Heinmiller 1998; Zentner & Kagan 1996; Schellenberg & Trehub 1996). The octave, fifth and fourth are found across many cultures. [strong]
+- **Timing (§23.5.2).** Irregular rhythm impairs infants' processing, and infants seem to prefer regular sequences (Nakata & Mitani 2005). In adults, unpredictable sequences raise arousal unpleasantly (Herry et al. 2007), while expressive timing has mild positive effects. [moderate]
+- **Children and emotion labels (§23.6–23.7):**
+  - Four-year-olds confuse fear with anger (Dolgin & Adelson 1990). [moderate]
+  - Children aged 5–10 judge a singer's feeling by the **lyrics**; adults judge by expressive style (Morton & Trehub 2007). [moderate]
+  - Tonal-structure knowledge arrives late (key around age 5, stability around 7). The authors suspect structural tension matters most to trained, attentive listeners. [weak]
+- **Interest is the most basic response (§23.9).** Adults use positive words (relaxed, dreamy, nostalgic, touched) for what they *feel*, and negative words for what music *expresses*. [moderate]
+
+---
+
+### 8.3 Ch27: shared vs culture-specific cues
+
+#### 3.1 Models (§27.3–27.4, 27.7)
+- **Cue-redundancy model (Balkwill & Thompson 1999)** [strong]:
+  - **Psychophysical cues** need no enculturation and mean much the same everywhere, in music, speech, animal calls and alarms. They include **tempo, intensity, pitch height and range, melodic and rhythmic complexity, contour and timbre**.
+  - **Culture-specific cues** (scales, cadences, instruments with conventional meanings, progressions) add precision for insiders but can **mask** the shared cues for outsiders.
+- **FES (fractionating emotional systems).** Infants start with the shared layer. Enculturation gradually splits music from speech and one culture from another, but the shared layer stays usable for life. Enculturation can add nuance to psychophysical cues, but there is little evidence that it ever reverses them. [moderate]
+
+#### 3.2 Findings (§27.5)
+- **Gundlach 1932**, archive of North American Indigenous songs [weak–moderate]:
+  - **War songs:** low, fast, wide range, most rhythmic changes.
+  - **Love songs:** high, slow, moderate range.
+  - **Healing songs:** fewest rhythmic changes.
+- **Balkwill & Thompson 1999** (Canadians hearing ragas) and **Balkwill, Thompson & Matsunaga 2004** (Japanese hearing Japanese, Western and Hindustani music) [moderate]:
+  - **Joy:** fast with *simple* melody.
+  - **Sadness:** slow with *complex* melody.
+  - **Anger:** loud with complex melody.
+  - Ragas on **strings** were heard as far angrier than ragas on flute.
+  - Japanese listeners were not reliably better on Japanese music.
+- **Fritz et al. 2009**, with Mafa listeners in Cameroon who had never heard Western music [strong for a cross-cultural floor]:
+  - Recognition of happy, sad and scary was above chance. **Happy was best** (65% versus Germans' 99%); sad (49%) and scary (48%) were lower.
+  - Accuracy **correlated with liking**: clearer expression went with more appreciation.
+- **Failures.** Liberian Loma listeners were indifferent to Western classical music (Morey 1940). British listeners could not read ragas (Gregory & Varney 1996). In both cases, culture-specific surface features swamped the shared cues. [moderate]
+- **Unfamiliar idiom produces uncertainty, felt as tension.** In Huron's betting paradigm, Balinese listeners' uncertainty rose mid-melody and fell at both ends. Americans showed only a slow, flat decline (§27.5.3). [moderate]
+- **Pitch proximity is expected across cultures** (Krumhansl 1995; Schellenberg 1996). Large leaps therefore plausibly raise arousal and surprise in any idiom. [moderate]
+- **Outsiders hear the most frequent pitches as tonally stable.** This held for North Indian, Balinese and Sami music (Castellano, Bharucha & Krumhansl 1984; Kessler et al. 1984; Krumhansl et al. 2000). [strong]
+- **Complexity is judged similarly across cultures,** but familiarity changes what drives the judgement (Eerola et al. 2006). [moderate]
+- **Meanings are learned and change over time.** The dangers once assigned to the tritone, to ragtime and to heavy metal were learned, and mode sensitivity appears only after about age 5 (§27.1). [strong]
+
+#### 3.3 Speech prosody as the shared code (§27.6)
+- **Profiles** (Juslin & Laukka 2003; Scherer 1986) [strong]:
+  - **Joy:** fast, high, wide range, bright.
+  - **Sadness:** slow, low, narrow, quiet.
+  - **Hot anger:** fast, high, wide, loud, *rising*.
+  - **Fear:** fast, high, very variable pitch, uneven loudness.
+- **Anger and sadness are decoded best; joy and fear worst** (Banse & Scherer 1996; Scherer et al. 2001, nine countries, 66% overall). Prosody crosses cultures less well than faces do (Elfenbein & Ambady 2002). [strong]
+- **Anger reads well in music,** but composers struggle to express it through pitch or rhythm alone (Thompson & Robitaille 1992). Anger lives in intensity and timbre. [moderate]
+- **Music training improves emotion reading in an unfamiliar language** (Thompson, Schellenberg & Husain 2004), which points to cues shared between music and speech. [moderate]
+- **Seeing a performer's face and gestures** shapes the emotional response (Thompson, Graham & Russo 2005). [moderate]
+- **Candidate universals** [moderate; the authors warn these may stem from shared environments, not genes]:
+  - a few unevenly spaced scale steps
+  - contour before exact intervals
+  - octave equivalence
+  - sensitivity to consonance
+  - grouping by pitch proximity
+  - an advantage for regular metre
+  - a tonal reference pitch
+
+  Phrase length is limited by memory and breath.
+
+---
+
+### 8.4 Ch32: context, fit and background music
+
+#### 4.1 Pace and liking (§32.3.1)
+- **Tempo and volume set the pace of behaviour.** [strong as a pattern]
+  - Loud music sped shoppers up (Smith & Curnow 1966).
+  - Slow music slowed diners down and increased bar spending (Milliman 1986).
+  - Fast music sped up drinking (McElrea & Standing 1992).
+- **Liked music produces approach** (the Mehrabian & Russell model): people stay longer, explore, talk and are more satisfied (Caldwell & Hibbert 2002; North & Hargreaves 1996). Uplifting rather than annoying gym music increased helpfulness (North, Tarrant & Hargreaves 2004). [moderate–strong]
+- The prediction that arousal amplifies liking or disliking has **mixed** support (Dubé, Chebat & Morin 1995). [weak]
+- **The right music added about 10% to turnover,** and styles differed clearly in their effects (§32.4). [moderate]
+
+#### 4.2 Fit and priming (§32.2, 32.3.2)
+- **Music primes its stereotypes.** [strong pattern; mechanism unknown]
+  - French versus German music shifted wine sales toward the matching country (North, Hargreaves & McKendrick 1997, 1999).
+  - Classical music raised spending and choice of pricier wine (Areni & Kim 1993; North & Hargreaves 1998; North, Shilcock & Hargreaves 2003).
+  - Classical music with soft light implied quality (Baker et al. 1994).
+- **Music style made premises seem more or less upbeat, aggressive, or dignified/cerebral** (North, Hargreaves & McKendrick 2000). [moderate] *(Table: a ready axis set for place music.)*
+- **Fit works without words.** Energetic dance music made a sports drink seem youthful; conservative classical music suited a bank. Fitting music also **improved memory** for the product compared with ill-fitting or no music (North, Hargreaves, MacKenzie & Law 2004). Congruent sound effects increased listeners' mental imagery (Miller & Marks 1992). [moderate]
+- **Listeners resolve mismatches into meaning.** "Incongruous" avant-garde music under rainforest coffee images was heard as "adventure" (Hung 2000). Only blunt, widely shared connotations transfer reliably (§32.2). [weak–moderate]
+- **Purpose-made beats borrowed.** Jingles beat hit songs for recall because they had only ever been heard with the product (Tom 1990). Sung slogans were recalled better than spoken ones (Yalch 1991). Fans resent their music being co-opted (Englis & Pennell 1994). [moderate]
+- **Conditioning and involvement.** Liking the music transferred to a product only when people were not about to make a deliberate choice (Gorn 1982; the Elaboration Likelihood Model). Several replications failed. Fit still works on attentive listeners. [moderate, contested]
+- **Radio favours familiar, unobjectionable tracks** because its aim is to avoid tune-outs, not to delight (§32.1.2). [descriptive]
+
+#### 4.3 Time perception (§32.3.3)
+- **When people are busy and judge time afterwards** (discrete-events account), louder music (Kellaris & Altsech 1992), faster music (Oakes 2003), *more and shorter* pieces (Bailey & Areni 2006a) and *liked* music (Kellaris & Mantel 1994) all make the interval feel **longer**. [moderate]
+- **When people are clock-watching,** music distracts them and makes waits feel **shorter** (Bailey & Areni 2006b). [weak–moderate; between them, the two accounts can explain almost any result]
+
+---
+
+### 8.5 Ch05: neuroscience of dissonance, mode, tempo, fear
+
+- **Speed (§5.1).** Happy versus sad is judged from **under 0.25 s** of music, a single chord or a few notes (Peretz, Gagnon & Bouchard 1998). Judgements are consistent regardless of musical training (Vieillard et al. 2008). [strong]
+- **Partly innate.** Hearing newborns of deaf, signing parents preferred infant-directed singing (Masataka 1999) and consonance (Masataka 2006). Chinese listeners used mode and tempo just as Westerners do (Table 5.1, unpublished). [moderate]
+- **Familiarity bias.** Listeners prefer familiar music without being aware of its familiarity (Peretz, Gaudreau & Bonnel 1998). Exposure may partly underlie both the consonance preference and the major = happy link. [moderate]
+- **Emotion survives loss of recognition (§5.2.1).**
+  - Patient IR, with auditory-cortex damage, could not recognise tunes or spot wrong notes, yet judged happy versus sad from mode and tempo normally and instantly.
+  - Patient CN recognised Albinoni's Adagio only *through* the sadness it made her feel.
+  - Dementia patients still respond to music.
+
+  [moderate; case studies]
+- **Sensory dissonance (§5.2.2).** Simultaneous tones **1–2 semitones apart** beat on the basilar membrane and sound rough, so the unpleasantness arises early in hearing. Right parahippocampal activity rises with dissonance (Blood, Zatorre, Bermudez & Evans 1999). Parahippocampal resection made dissonance sound *pleasant* (Gosselin et al. 2006). IR's case suggests the reaction needs a cortical relay. [strong for roughness; moderate for brain localisation]
+- **Screams as vocal dissonance (§5.4.2).** Strained vocal folds in cries and screams add subharmonics. The resulting roughness is aversive and draws a quick response (Fitch, Neubauer & Herzel 2002), so musical roughness may tap an alarm system. [weak]
+- **Scary music without dissonance.** Some film-inspired threat clips were consonant and regular. Dissonance, expectancy violation and irregularity did *not* predict how accurately clips were judged scary (Gosselin et al. 2005; Vieillard et al. 2008). [moderate]
+- **The amygdala is needed to read musical threat.** [moderate–strong]
+  - Patients with the amygdala removed (especially on the right) called scary music peaceful or happy.
+  - Patient SM, with bilateral amygdala damage, failed on scary and sad music but not happy, while processing mode, tempo and dissonance normally.
+  - Scary film scores raise amygdala activity (Baumgartner et al. 2006; Eldar et al. 2007).
+- **Candidate fast triggers of threat:** high-frequency (bright, hissy) spectra, highly dynamic sounds and highly unpredictable sounds. Auditory uncertainty does engage the amygdala (Herry et al. 2007). [weak; untested]
+- **Reflex versus considered routes.** A sudden dissonant chord or cymbal crash triggers a fast subcortical alarm, the horror-score device. Klezmer's major/minor shifts are processed cortically. [weak–moderate, illustrative]
+- **Startle depends on context.** The acoustic startle (brain stem) is amplified in aversive contexts via the amygdala and damped by pleasant music (Roy et al. 2009). [moderate]
+- **Reward.** Pleasant music engages the nucleus accumbens, as food and drugs do (Blood & Zatorre 2001; Menon & Levitin 2005). [strong]
+- **Hemispheres.** EEG shows relatively more left-frontal activity for pleasant music and more right-frontal for unpleasant music, but the evidence is contested. Major/minor chord judgements engaged the inferior frontal gyrus, medial thalamus and anterior cingulate (Mizuno & Sugishita 2007). [moderate/weak]
+- **Music as a "super-expressive voice" (§5.4.2).** Music may co-opt the brain's vocal-emotion circuits, much as caricature exaggerates faces. Music was rated higher than speech for both valence and arousal (Ilie & Thompson 2006). [weak–moderate] Fixed, innate responses (roughness) should differ from learned ones (minor = sad), which develop over the early years. [weak]
+
+---
+
+### 8.6 Rules for the composer
+
+1. **Match each cue to its mechanism.** Stingers rely on brain-stem reflex, character themes on conditioning, callbacks on memory, the lead line on contagion, place music on imagery, harmonic twists on expectancy. Reflexes and contagion work in under a second without attention; imagery and expectancy need seconds and a listening table. (ch22 §22.4.1–22.4.2; ch05 §5.1)
+2. **No abrupt onsets under conversation.** Sudden, loud, rough or very fast events trigger arousal whether or not anyone is listening. Save them for deliberate interruptions such as an ambush or a reveal. Fade everything else in. (ch22 §22.4.1; ch05 §5.2.2)
+3. **Make themes by consistent pairing.** Play a character's theme only when that character is in focus. The association forms without awareness and is hard to undo, so keep themes away from frustrating or dead stretches. (ch22 §22.4.1; ch32 §32.4)
+4. **Write originals rather than borrowing famous tunes.** Purpose-made music gets tied to one referent; a known tune brings outside memories, and fans resent its reuse. (ch32 §32.2, Tom 1990, Englis & Pennell 1994)
+5. **Bring themes back at callbacks.** A theme heard during a memorable session will later recall that night's feeling, which is the main route to nostalgia, even if the music's own mood differs. (ch22 §22.4.1, 22.5.2)
+6. **Give the melody a voice.** If you want the table to feel the expressed emotion, write speech-like contours in a vocal range and pace, on voice-like instruments. This works for basic emotions; complex ones need context. (ch22 §22.4.1, Lundqvist et al. 2009; ch05 §5.4.2)
+7. **Set the table's pace with tempo and volume.** Slow and soft makes people linger and talk; fast and loud hurries them. Use a marked pulse and change tempo gradually, because entrainment is slow. (ch32 §32.3.1; ch22 §22.4.1)
+8. **For safe, calm places, write like a lullaby.** Slow, repetitive, smoothly falling, *low* register, strict even timing, gradual dynamics, warm timbre. (ch23 §23.2.1, 23.2.4–23.2.6)
+9. **For playful characters, write like a play song.** Higher, wide range, rising contours that grab attention, strong regular rhythm, with pitch peaks landing on accents. (ch23 §23.2.1, 23.2.5)
+10. **Comfort comes from regular metre and consonant cores; take them away for unease.** Both are processed more easily from birth. Unpredictable timing raises arousal unpleasantly, while gentle rubato does not. (ch23 §23.5; ch05 §5.2.2)
+11. **Use seconds for roughness.** Harshness comes from simultaneous tones 1–2 semitones apart, which sound scream-like. Spread the voicing for tension without grate. (ch05 §5.2.2, 5.4.2)
+12. **Dread does not need dissonance.** Threat can read through consonant, regular music. Try bright or hissy spectra, sudden dynamic swings and unpredictable events. (ch05 §5.2.2)
+13. **Prime before you strike.** An ominous bed amplifies startle and a pleasant one damps it, so a stinger lands harder after dread. (ch05 §5.2.2, Roy et al. 2009)
+14. **Let psychophysical cues carry the emotion and use exotic colour for identity.** For foreign peoples and places, tempo, loudness, register, range, timbre and complexity must carry the feeling, because unfamiliar scales and instruments can mask it. (ch27 §27.3, 27.7)
+15. **Cross-cultural recipes** (ch27 §27.5.1, Gundlach 1932, Balkwill & Thompson 1999/2004):
+    - **Joy:** fast with a simple tune.
+    - **Sorrow:** slow with an ornate line.
+    - **Anger:** loud and complex, on strings rather than flute.
+    - **War:** low, fast, wide-ranging, with changing rhythms.
+    - **Love:** higher, slow, moderate range.
+    - **Ritual or healing:** rhythmically unchanging.
+16. **Anchor invented scales by repetition.** Outsiders hear the most frequent pitch as home. An unfamiliar idiom adds unpredictability and tension by itself, which suits fey or alien places but works against comfort. (ch27 §27.5.3)
+17. **Use leaps for surprise.** The expectation that the next note will be close in pitch seems to hold across cultures. (ch27 §27.5.3)
+18. **Use clear stereotypes for status and era.** Courtly or classical writing reads as wealth and quality, dance energy as youth, and regional idioms as their regions. Score places on three axes: upbeat, aggressive, dignified. Only obvious connotations transfer. (ch32 §32.2, 32.3.2)
+19. **Expect players to interpret mismatches.** An odd pairing may be heard as "adventure" rather than as a clash. When the reading matters, back it up with narration. (ch32 §32.2, Hung 2000)
+20. **Keep long beds liked and unobjectionable.** Liked place music keeps people staying, exploring and talking; annoying music lowers engagement. (ch32 §32.3.1, 32.1.2)
+21. **Shorten downtime with a few long, calm pieces.** Many short, loud or fast pieces make busy time feel longer. (ch32 §32.3.3)
+22. **Write dark music for what it expresses, not for what the table will feel.** Felt responses are mostly positive or "interested", and groups lean toward energy rather than melancholy. Don't expect the table to feel fear or grief on cue. (ch22 §22.2.1, 22.3.1; ch23 §23.9)
+23. **With children at the table, lyrics set the mood.** Children judge a song's feeling by its words, not its musical style. (ch23 §23.6, Morton & Trehub 2007)
