@@ -98,3 +98,11 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   Bumblebee (brass) "almost the same". The hall tweak isn't heard - the old hall stays.
   The attack measure tracks big differences (an instrument, 9 dB more hall), not
   this small one (it leaned the other way on the brass Mountain King).
+- **What was wrong with the Margrave's piece B, in the host's own words, remembered:**
+  "the climax did not go with what was before" - not the brass. At its climax the
+  harp, the countermelody and the tune's carriers stopped as six new parts started
+  (the orchestra jumped from 6 to 10 parts in one bar). So brass may carry a climax's
+  tune again; what's forbidden is the seam. The critic now warns at a seam (parts
+  stopping as others start) and at a sudden doubling of the orchestra. (Heard as
+  20-second excerpts, the old render of that climax also beat both timing-fixed
+  renders - unexplained; the timing fix stays on, from Ode to Joy.)

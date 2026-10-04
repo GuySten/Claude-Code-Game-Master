@@ -563,6 +563,45 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
             add("note", f"battle or loop texture: {avg:.1f} lines move per bar besides the tune "
                         "(pitched parts): big music keeps three or more going - an ostinato, a "
                         "countermelody or answer, a moving bass or inner line - under the tune")
+    # Seams: a section that drops what was playing and starts a new set of instruments
+    # at one moment sounds like another piece glued on (the host, of a climax where the
+    # harp, the countermelody and the tune's carriers all stopped as six new parts
+    # began: "the climax did not go with what was before"). A climax grows out of what
+    # came before: a layer or two carries across, the bars before it build, the new
+    # instruments arrive in waves.
+    sounding: Dict[str, List[Tuple[float, float]]] = {}
+    held: Dict[Tuple[str, int], float] = {}
+    for t, is_on, name, key, _ in sorted(sc.events, key=lambda e: (e[0], e[1])):
+        part = name.partition(":")[0]
+        if is_on:
+            held[(part, key)] = t
+        elif (part, key) in held:
+            sounding.setdefault(part, []).append((held.pop((part, key)), t))
+
+    def plays(part: str, a_s: float, b_s: float) -> bool:
+        return any(x < b_s - 1e-6 and y > a_s + 1e-6 for x, y in sounding.get(part, []))
+
+    parts_all = [p for p in sounding if p not in DRUMS]
+    for i in range(2, len(bounds) - 1):
+        u0, a_s, b_s = bounds[i]
+        if ctx["loop"] and i >= len(bounds) - 2:
+            continue
+        before = {p for p in parts_all if plays(p, bounds[i - 1][1], bounds[i - 1][2])}
+        earlier = {p for p in parts_all if plays(p, bounds[i - 2][1], bounds[i - 2][2])}
+        now = {p for p in parts_all if plays(p, a_s, b_s)}
+        after = {p for p in parts_all if plays(p, bounds[i + 1][1], bounds[i + 1][2])}
+        stopped = sorted(p for p in before if p not in now and p not in after)
+        started = sorted(p for p in now if p not in before and p not in earlier)
+        kept = before & now
+        if len(started) >= 3 and (len(stopped) >= 2 or len(started) >= 5) and len(stopped) >= len(kept):
+            add("warn", f"a seam at {_where(ctx, u0)}: {', '.join(stopped) or 'nothing'} stop as "
+                        f"{', '.join(started)} start - heard as another piece glued on. Carry a layer "
+                        "or two across it, build the bars before it, and bring the new parts in waves")
+        elif len(started) >= 4 and len(now) >= 1.6 * max(1, len(before)):
+            add("warn", f"the orchestra jumps from {len(before)} to {len(now)} parts at {_where(ctx, u0)} "
+                        f"({', '.join(started)} all start): a climax that doesn't grow out of what came "
+                        "before. Build into it over the bars before (a crescendo, a roll, a rising line) "
+                        "and bring the new parts in waves")
     # The surprise budget: a surprising tune wants a supportive setting, a simple tune
     # a rich one (the host's 2x2: those pairings beat both-plain and both-rich).
     budget = surprise_budget(ctx, spec)

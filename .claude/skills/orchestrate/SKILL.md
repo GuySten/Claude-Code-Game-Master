@@ -110,6 +110,14 @@ return) gets a different carrier, and the carrier should *mean* something: a sol
 voice is intimate or lonely, horns are noble, trumpets triumphant, low brass
 menacing, a choir is fate. The first statement is usually the smallest.
 
+**The climax grows out of what came before.** The host's ear catches a seam at
+once ("the climax did not go with what was before"): never drop what's playing and
+start a new set of instruments in one bar. Keep the accompaniment that defines the
+piece (its pulse, its bass, its pad) running through every section, carry a line
+across each seam (the tune's old carrier turns countermelody), build the bars before
+the climax (a crescendo, a roll, a rising line), and bring new instruments in waves -
+a few bars apart. The critic warns at a seam or a sudden doubling of the orchestra.
+
 **Build to one climax, then make it different.** Dynamics rise toward the tune's
 highest note. Give that moment something nothing before it had: a harmonic
 surprise (a chromatic mediant like bIII or bVI under the held top note), the
