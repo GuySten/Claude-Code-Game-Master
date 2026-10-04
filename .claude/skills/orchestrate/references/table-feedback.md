@@ -165,3 +165,8 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   maddest). It does recognise style ("an elegant waltz" tracked the waltz versions). So
   no model judges a piece's character for this host: ask them for a brief in their own
   words before writing, and for one listen at the end.
+  The host: "pieces is a bad way to score music" - and the model only hears 10-second
+  clips (it averages them by design). A character lives in a piece's arc (the voice that
+  plays along and then breaks, the facade that cracks), which no clip-based judge can
+  hear; scored by each piece's strongest clip instead, still a coin flip (evil 3/6,
+  madness 1/2).
