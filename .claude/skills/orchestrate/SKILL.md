@@ -40,7 +40,16 @@ So the loop below is not optional ceremony; it's how you hear.
    have a musical reason not to.
 5. **Play it** - `python lib/arrangement.py play <file> --out <file.ogg>` (laptop:
    `gm-music-compose.sh arrange <file>`).
-6. **Tell the host what to listen for** - timestamps and what happens there ("0:24
+6. **Rate it** (when the rater is set up: `gm-music-compose.sh setup --rater`) -
+   `python lib/music_rate.py <file.ogg> music/<same-role>-*.mp3`: Meta's
+   Audiobox Aesthetics scores enjoyment (CE), usefulness (CU), complexity (PC)
+   and production quality (PQ), 1-10. Compare with the library tracks in the same
+   role (boss-*, sad-*, victory-*...: professional music) and with your previous
+   version. It hears the sound, not the composition, and a sampled orchestra
+   loses some PQ to real recordings whatever the notes - so use it to compare
+   versions of the same piece and to catch a piece that's clearly weaker (CE well
+   under its peers), not as a verdict. Report the numbers to the host.
+7. **Tell the host what to listen for** - timestamps and what happens there ("0:24
    - the climax lands on E major instead of home: the lift"), and ask what doesn't
    work. When they answer, record it in `references/table-feedback.md`: their
    ears are the final judge, and that file is how the next piece benefits.

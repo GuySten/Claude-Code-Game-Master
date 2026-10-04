@@ -9,6 +9,8 @@
 #   gm-music-compose.sh orchestra "<PC>" [--stage 0-3]   Their theme played by the orchestra (default: legendary)
 #   gm-music-compose.sh tune "<name>" [--minor] [--stage N]   A tune's notes and times, to arrange it
 #   gm-music-compose.sh arrange <file.json>  Play an arrangement (lib/arrangement.py) into the campaign's music
+#   gm-music-compose.sh setup --rater        Meta's Audiobox Aesthetics, to rate music 1-10 (~1 GB model)
+#   gm-music-compose.sh rate <files...>      Rate pieces: enjoyment, usefulness, complexity, quality
 #   gm-music-compose.sh check                Which GPU/CPU it would use
 #   gm-music-compose.sh test                 Time one 30-second piece (first run downloads the model)
 #   gm-music-compose.sh theme "<villain>" [--boss] [--look "..."]   Compose a theme now
@@ -50,6 +52,25 @@ case "$ACTION" in
             uv pip install --python "$PY" --no-deps tinysoundfont || exit 1   # (its audio-device extra isn't needed)
             "$PY" "$LIB_DIR/orchestra.py" --fetch-only || exit 1
             success "The orchestra is ready. Try: bash tools/gm-music-compose.sh orchestra \"<PC>\""
+            exit 0
+        fi
+        if [ "$1" = "--rater" ]; then
+            PY="$(compose_py)"
+            if [ -z "$PY" ]; then
+                command -v uv >/dev/null 2>&1 || { error "uv is needed (the installer sets it up): https://docs.astral.sh/uv/"; exit 1; }
+                uv venv "$VENV" --python 3.11 || exit 1
+                PY="$(compose_py)"
+            fi
+            if ! "$PY" -c "import torch" 2>/dev/null; then
+                info "Installing PyTorch (CPU build is enough to rate music)..."
+                uv pip install --python "$PY" torch torchaudio --index-url https://download.pytorch.org/whl/cpu || exit 1
+            elif ! "$PY" -c "import torchaudio" 2>/dev/null; then
+                TORCH_VER="$("$PY" -c 'import torch; print(torch.__version__.split("+")[0])')"
+                TORCH_IDX="$("$PY" -c 'import torch; v = torch.version.cuda; print("https://download.pytorch.org/whl/" + ("cu" + v.replace(".", "") if v else "cpu"))')"
+                uv pip install --python "$PY" "torch==$TORCH_VER" torchaudio --index-url "$TORCH_IDX" || exit 1
+            fi
+            uv pip install --python "$PY" audiobox_aesthetics soundfile requests huggingface_hub safetensors || exit 1
+            success "The rater is ready. Try: bash tools/gm-music-compose.sh rate music/*.mp3"
             exit 0
         fi
         if [ "$1" = "--melody" ]; then
@@ -136,6 +157,12 @@ print(f\"A villain theme (30 s) takes about {d['elapsed']/60:.1f} min; a hero's 
         DIR="$(get_campaign_dir 2>/dev/null || echo .)/music/arranged"
         mkdir -p "$DIR"
         "$PY" "$LIB_DIR/arrangement.py" play "$1" --out "$DIR/$(basename "${1%.json}").ogg"
+        ;;
+    rate)
+        PY="$(compose_py)"
+        [ -z "$PY" ] && { error "Not set up yet: bash tools/gm-music-compose.sh setup --rater"; exit 1; }
+        [ -z "$1" ] && { error "What to rate? gm-music-compose.sh rate <files...>"; exit 1; }
+        "$PY" "$LIB_DIR/music_rate.py" "$@"
         ;;
     theme|anthem|normalize|status)
         $PYTHON_CMD "$LIB_DIR/composer.py" "$ACTION" "$@"
