@@ -495,10 +495,56 @@ def _villain(rng, hero: dict) -> tuple:
     return out, name
 
 
-def leitmotif(seed: str, mode: str = "major", cls: str = "") -> dict:
+# Where the character's story is (lib/character_arcs.py) shapes their theme; its
+# hook never changes. The stage: 0 a lone voice (the hook and its answer, home);
+# 1 the theme as written; 2 heroic (the climax reaches a third higher); 3 the
+# finale's legendary version (and a grand, held ending). Dark deeds borrow darker
+# notes, one by one (the 7th, then the 3rd, then the 6th, then the 2nd: toward the
+# villain twin); light gives them back.
+DARKENING = [(6, 11, 10), (2, 4, 3), (5, 9, 8), (1, 2, 1)]   # (scale index, from, to)
+
+
+def _darkened(scale: list, dark: int) -> list:
+    out, left = list(scale), dark
+    for idx, frm, to in DARKENING:
+        if left <= 0:
+            break
+        if out[idx] == frm:
+            out[idx], left = to, left - 1
+    return out
+
+
+def _grown(hero: dict, stage: int, dark: int) -> list:
+    """The hero's tune at a stage of their story, in semitones."""
+    scale = _darkened(MODES[hero["mode"]], dark)
+    bar = METERS[hero["meter"]]
+    one = 1 if hero["meter"] != "6/8" else 2
+    if stage <= 0:                                         # a lone voice: the hook, its answer, home
+        body = hero["motif"] + hero["again"][:-1]
+        before = sum(b for _, b in body)
+        at_least = 2 * one if hero["meter"] != "6/8" else 3
+        secs = hero["pickup"] + body + [(0, round(math.ceil((before + at_least) / bar - 1e-9) * bar - before, 6))]
+    else:
+        climb = list(hero["climb"])
+        if stage >= 2:                                     # reaching higher: a third above the climax
+            i = max(range(len(climb)), key=lambda k: climb[k][0])
+            top, b = climb[i]
+            low = min(_semitones(d, scale) for d, _ in hero["pickup"] + hero["motif"] + hero["again"] + hero["home"])
+            up = 2 if _semitones(top + 2, scale) - low <= 21 else 1          # (or a step, kept singable)
+            climb[i:i + 1] = [(top, .4 * b), (top + up, .6 * b + bar)]
+        home = list(hero["home"])
+        if stage >= 3:                                     # the legend's ending: held a bar longer
+            home[-1] = (home[-1][0], home[-1][1] + bar)
+        secs = hero["pickup"] + hero["motif"] + hero["again"] + climb + home
+    return [(_semitones(d, scale), b) for d, b in secs]
+
+
+def leitmotif(seed: str, mode: str = "major", cls: str = "", stage: int = 1, dark: int = 0,
+              **_arc) -> dict:
     """The tune: {key (MIDI tonic), notes [(semitones from the tonic, units)], motif
     (its first statement), hook (where it starts, how many notes), kind, meter,
-    scale, memorability}. Same seed and class, same tune; "minor" is the villain."""
+    scale, memorability}. Same seed and class, same tune; "minor" is the villain;
+    ``stage`` and ``dark``: where the character's story is (see _grown)."""
     import hashlib
     import random
     seed_hex = hashlib.sha256(seed.strip().lower().encode("utf-8")).hexdigest()
@@ -510,7 +556,7 @@ def leitmotif(seed: str, mode: str = "major", cls: str = "") -> dict:
         start = 4                                                          # (after the march)
     else:
         scale = hero["mode"]
-        notes = _hero_notes(hero)
+        notes = _grown(hero, stage, dark)
         start = len(hero["pickup"])
     return {"seed": seed, "mode": mode, "key": key, "notes": notes,
             "motif": notes[start:start + len(hero["motif"])], "hook": (start, hero["hook"]),
@@ -564,11 +610,11 @@ def _recurrences(pitch: list, beats: list, start: int, length: int) -> int:
 
 
 def render_leitmotif(seed: str, mode: str = "major", seconds: float = 20, rate: int = 32000,
-                     cls: str = ""):
+                     cls: str = "", **arc):
     """The tune as a plain synthesized melody line (what the melody model hears):
     stretched to ``seconds``; the villain is also an octave lower."""
     import numpy as np
-    tune = leitmotif(seed, mode, cls)
+    tune = leitmotif(seed, mode, cls, **arc)
     units = sum(b for _, b in tune["notes"])
     unit_s = seconds / units
     out = np.zeros(int(seconds * rate) + rate, dtype="float64")
@@ -683,7 +729,8 @@ def _leitmotif_piece(job: dict, device: str):
         return None
     try:
         seconds = max(1.0, min(float(job.get("seconds", 30)), MAX_SECONDS))
-        score = render_leitmotif(lm["seed"], lm.get("mode", "major"), seconds, cls=lm.get("cls") or "")
+        score = render_leitmotif(lm["seed"], lm.get("mode", "major"), seconds, cls=lm.get("cls") or "",
+                                 **{k: lm[k] for k in ("stage", "dark") if k in lm})
         return melody_generate(score, 32000, job["prompt"], seconds, device)
     except Exception as e:
         print(f"[compose] the leitmotif piece failed ({type(e).__name__}: {e}); composing freely",
@@ -712,8 +759,10 @@ def run_job(job: dict, device: str) -> dict:
             samples, rate, used = generate(job["prompt"], job.get("seconds", 30), device)
         raw = samples
         if extra.get("how") == "leitmotif" and not job.get("loop"):          # an anthem: build to its climax
-            peak = theme_traits(leitmotif(lm["seed"], lm.get("mode", "major"), lm.get("cls") or ""))["climax_at"]
-            samples = crescendo(samples, rate, peak)
+            arc = {k: lm[k] for k in ("stage", "dark") if k in lm}
+            peak = theme_traits(leitmotif(lm["seed"], lm.get("mode", "major"), lm.get("cls") or "", **arc))["climax_at"]
+            gentle = lm.get("stage", 1) == 0 or lm.get("wound")                 # (a lone voice, a lament)
+            samples = crescendo(samples, rate, peak, 3.0 if gentle else 7.0)
         if job.get("heavy"):                # a villain theme: its weight, for certain
             samples = heavy(samples, rate)
         samples = finish(samples, rate, bool(job.get("loop")))

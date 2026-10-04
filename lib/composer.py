@@ -31,6 +31,7 @@ from typing import Any, Callable, Dict, List, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from gpu_turn import gpu_turn  # noqa: E402
 import gpu_remote  # noqa: E402
+import character_arcs  # noqa: E402
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 COMPOSE_VENV = PROJECT_ROOT / ".compose-venv"
@@ -122,16 +123,52 @@ def theme_prompt(name: str, look: str, style: str, boss: bool) -> str:
             "dark and brooding, slow build, cinematic")
 
 
-def anthem_prompt(sheet: Dict[str, Any], style: str) -> str:
+def anthem_prompt(sheet: Dict[str, Any], style: str, arc: Optional[Dict[str, Any]] = None) -> str:
+    """The anthem's description, for where the character's story is (``arc``: their
+    stage, dark notes, wound and bonds; lib/character_arcs.py). No arc: the theme as written."""
+    arc = arc or {"stage": 1, "dark": 0, "wound": False, "warm": False}
     name = sheet.get("name", "the hero")
     who = " ".join(str(sheet.get(k) or "") for k in ("race", "class")).strip()
     concept = str(sheet.get("concept") or "").strip().rstrip(".")
     setting = f", {style}" if style else ""
-    return (f"heroic character theme for {name}" + (f", a {who}" if who else "")
-            + (f", {concept[:100]}" if concept else "") + f"{setting}, around 110 bpm, a memorable "
-            "melody first stated by a solo french horn, then taken up by the full orchestra, soaring "
-            "brass, uplifting strings, pounding timpani, building steadily to one powerful climax, "
-            "ending on a long held triumphant final chord")
+    who_bits = (f", a {who}" if who else "") + (f", {concept[:100]}" if concept else "") + setting
+    stage = arc.get("stage", 1)
+    tempo = "around 70 bpm" if arc.get("wound") else ("around 90 bpm" if stage == 0 else
+                                                      "around 100 bpm" if stage == 3 else "around 110 bpm")
+    if stage <= 0:
+        body = (f"a quiet, simple character theme for {name}{who_bits}, {tempo}, the melody alone on a "
+                "single solo french horn over soft sustained strings, intimate and hopeful, a promise "
+                "of something more, ending on a gentle held note")
+    elif stage == 1:
+        body = (f"heroic character theme for {name}{who_bits}, {tempo}, a memorable melody first "
+                "stated by a solo french horn, then taken up by the full orchestra, soaring brass, "
+                "uplifting strings, pounding timpani, building steadily to one powerful climax, "
+                "ending on a long held triumphant final chord")
+    elif stage == 2:
+        body = (f"grand heroic character theme for {name}{who_bits}, {tempo}, the melody proclaimed "
+                "by the full brass section over the whole orchestra, confident and soaring, pounding "
+                "timpani, building to a towering climax, ending on a long held triumphant final chord")
+    else:
+        body = (f"epic legendary character theme for {name}{who_bits}, {tempo}, a massive orchestra "
+                "and a full choir, thundering timpani, majestic and monumental, the melody sung by "
+                "the whole choir at its climax, ending on a long, enormous final chord")
+    shade = []
+    if arc.get("wound"):
+        shade.append("as a lament: tender and grieving, a solo cello carrying the melody, soft strings")
+    dark = arc.get("dark", 0)
+    if dark:
+        shade.append(["with an undercurrent of shadow", "darker and conflicted, minor-key shadows",
+                      "tormented, darkness overtaking it, dissonant low brass"][min(dark, 3) - 1])
+    if arc.get("warm"):
+        shade.append("warm and heartfelt, close harmonies")
+    return body + "".join(", " + x for x in shade)
+
+
+def anthem_seconds(arc: Optional[Dict[str, Any]] = None) -> float:
+    """A lone voice is short; the legend is long; a lament takes its time."""
+    arc = arc or {"stage": 1}
+    secs = {0: 16, 1: ANTHEM_SECONDS, 2: 22, 3: 28}.get(arc.get("stage", 1), ANTHEM_SECONDS)
+    return min(30.0, secs * (1.25 if arc.get("wound") else 1))
 
 
 JUDGMENT = "⚖ Judgment"           # the music of a punishment (composed once per campaign)
@@ -456,11 +493,31 @@ def has_theme(campaign_dir, name: str, boss: bool) -> bool:
 
 
 def anthem(campaign_dir, name: str) -> Optional[Dict[str, Any]]:
+    """This PC's anthem, in the version for where their story is now (if that one is
+    composed yet; else the one they had). None: no anthem yet."""
     reg = load_registry(campaign_dir)["anthems"]
     rec = reg.get(_key(reg, name))
-    if rec and (Path(campaign_dir) / "music" / "anthems" / rec.get("file", "")).is_file():
-        return rec
-    return None
+    folder = Path(campaign_dir) / "music" / "anthems"
+    if not rec or not (folder / rec.get("file", "")).is_file():
+        return None
+    now = character_arcs.version(character_arcs.spec(character_arcs.state_of(campaign_dir, name)))
+    got = (rec.get("versions") or {}).get(now)
+    if got and (folder / got.get("file", "")).is_file():
+        return {**rec, "file": got["file"], "seconds": got.get("seconds", rec.get("seconds")), "version": now}
+    return rec
+
+
+LEGACY = "s1-d0-w0-b0"     # what an anthem composed before story arcs is
+
+
+def has_version(campaign_dir, name: str, arc: Dict[str, Any]) -> bool:
+    """Is this PC's anthem composed for that point of their story?"""
+    reg = load_registry(campaign_dir)["anthems"]
+    rec = reg.get(_key(reg, name)) or {}
+    got = (rec.get("versions") or {}).get(character_arcs.version(arc))
+    if not got and not rec.get("versions") and rec.get("file") and character_arcs.version(arc) == LEGACY:
+        got = rec                                # (an anthem from before story arcs: the full theme)
+    return bool(got and (Path(campaign_dir) / "music" / "anthems" / got.get("file", "")).is_file())
 
 
 def dark_anthem(campaign_dir, name: str) -> Optional[Path]:
@@ -509,13 +566,24 @@ def compose_pieces(campaign_dir, pieces: List[Dict[str, Any]],
             if p["kind"] == "dark_anthem":  # (with the melody model: their own tune, in the minor)
                 job["leitmotif"] = {"seed": p["name"], "mode": "minor", "cls": str((p.get("sheet") or {}).get("class") or "")}
             jobs.append(job)
+        elif p["kind"] == "anthem_version":             # where the character's story is now
+            name = p["sheet"].get("name", "hero")
+            arc = p["spec"]
+            out = camp / "music" / "anthems" / f"anthem-{slug(name)}-{character_arcs.version(arc)}.ogg"
+            jobs.append({"prompt": anthem_prompt(p["sheet"], style, arc), "seconds": anthem_seconds(arc),
+                         "out": str(out), "loop": False,
+                         "leitmotif": {"seed": name, "mode": "major", "cls": str(p["sheet"].get("class") or ""),
+                                       "stage": arc["stage"], "dark": arc["dark"], "wound": arc["wound"]}})
         else:
             name = p["sheet"].get("name", "hero")
             out = camp / "music" / "anthems" / f"anthem-{slug(name)}.ogg"
             cls = str(p["sheet"].get("class") or "")       # (the class picks the kind of theme)
+            arc = p.get("spec") or {"stage": 1, "dark": 0, "wound": False, "warm": False}
             # With its dark twin, from the same music: the villain theme they'd become.
-            jobs.append({"prompt": anthem_prompt(p["sheet"], style), "seconds": ANTHEM_SECONDS,
-                         "out": str(out), "loop": False, "leitmotif": {"seed": name, "mode": "major", "cls": cls},
+            jobs.append({"prompt": anthem_prompt(p["sheet"], style, arc), "seconds": anthem_seconds(arc),
+                         "out": str(out), "loop": False,
+                         "leitmotif": {"seed": name, "mode": "major", "cls": cls, "stage": arc["stage"],
+                                       "dark": arc["dark"], "wound": arc["wound"]},
                          "twin": {"prompt": dark_anthem_prompt(p["sheet"], style), "loop": True,
                                   "seconds": THEME_SECONDS,
                                   "leitmotif": {"seed": name, "mode": "minor", "cls": cls},
@@ -528,10 +596,18 @@ def compose_pieces(campaign_dir, pieces: List[Dict[str, Any]],
         if p["kind"] in ("theme", "judgment", "dark_anthem"):
             key = _key(reg["themes"], p["name"]) or p["name"]
             reg["themes"].setdefault(key, {})["boss" if p.get("boss") else "normal"] = f
+        elif p["kind"] == "anthem_version":
+            name = p["sheet"].get("name", "hero")
+            key = _key(reg["anthems"], name) or name
+            rec = reg["anthems"].setdefault(key, {"file": f, "seconds": r.get("seconds")})
+            rec.setdefault("versions", {})[character_arcs.version(p["spec"])] = {
+                "file": f, "seconds": r.get("seconds", ANTHEM_SECONDS)}
         else:
             name = p["sheet"].get("name", "hero")
             key = _key(reg["anthems"], name) or name
-            reg["anthems"][key] = {"file": f, "seconds": r.get("seconds", ANTHEM_SECONDS)}
+            version = character_arcs.version(p.get("spec") or {"stage": 1, "dark": 0, "wound": False})
+            reg["anthems"][key] = {"file": f, "seconds": r.get("seconds", ANTHEM_SECONDS), "version": version,
+                                   "versions": {version: {"file": f, "seconds": r.get("seconds", ANTHEM_SECONDS)}}}
             if r.get("twin"):
                 reg["anthems"][key].update(dark=Path(r["twin"]["path"]).name, dark_how=r["twin"].get("how"))
         save_registry(camp, reg)
@@ -557,14 +633,20 @@ def compose_anthem(campaign_dir, sheet: Dict[str, Any]) -> Dict[str, Any]:
     name = sheet.get("name", "hero")
     out = Path(campaign_dir) / "music" / "anthems" / f"anthem-{slug(name)}.ogg"
     style = flavor(campaign_dir)
-    got = compose(anthem_prompt(sheet, style), ANTHEM_SECONDS, out,
+    arc = character_arcs.spec(character_arcs.state_of(campaign_dir, name))
+    got = compose(anthem_prompt(sheet, style, arc), anthem_seconds(arc), out,
                   twin={"prompt": dark_anthem_prompt(sheet, style), "loop": True, "seconds": THEME_SECONDS,
                         "leitmotif": {"seed": name, "mode": "minor", "cls": str(sheet.get("class") or "")},
                         "out": str(out.with_name(f"anthem-{slug(name)}-dark.ogg"))},
-                  leitmotif={"seed": name, "mode": "major", "cls": str(sheet.get("class") or "")})
+                  leitmotif={"seed": name, "mode": "major", "cls": str(sheet.get("class") or ""),
+                             "stage": arc["stage"], "dark": arc["dark"], "wound": arc["wound"]})
     reg = load_registry(campaign_dir)
     key = _key(reg["anthems"], name) or name
-    reg["anthems"][key] = {"file": Path(got["path"]).name, "seconds": got.get("seconds", ANTHEM_SECONDS),
+    version = character_arcs.version(arc)
+    f, secs = Path(got["path"]).name, got.get("seconds", ANTHEM_SECONDS)
+    reg["anthems"][key] = {"file": f, "seconds": secs, "version": version,
+                           "versions": {**(reg["anthems"].get(key) or {}).get("versions", {}),
+                                        version: {"file": f, "seconds": secs}},
                            **({"how": got["how"]} if got.get("how") else {})}
     if got.get("twin"):
         reg["anthems"][key].update(dark=Path(got["twin"]["path"]).name, dark_how=got["twin"].get("how"))

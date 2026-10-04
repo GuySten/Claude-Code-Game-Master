@@ -335,6 +335,11 @@ computer took and a link to listen. That tells you what to expect: if a 30-secon
   same tune turned villainous: minor, a march of repeated notes, half-step sighs, a tritone. Hear a motif
   alone: `bash tools/gm-music-compose.sh motif "<name>"`; compose the real thing:
   `bash tools/gm-music-compose.sh anthem "<name>"`.
+- **Themes that grow with the story:** when the story truly changes a character (a fear faced,
+  a bond, a loss, a dark deed, atonement, the finale), the GM records it and the table says
+  "<name> has changed: ...". Their theme quietly follows: a lone voice at first, the full theme
+  as they grow, a lament while they grieve, darker notes creeping in with dark deeds, and the
+  legendary version at the campaign's climax. Listen for it at their next heroic moment.
 - **One bigger composer for everything:** `COMPOSE_MODEL=facebook/musicgen-melody` in `.env`
   makes the melody model compose all the music (richer, but slower, and about 3 GB of RAM
   instead of 0.6). Time it first: `COMPOSE_MODEL=facebook/musicgen-melody bash tools/gm-music-compose.sh test`.

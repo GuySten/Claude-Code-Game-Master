@@ -23,6 +23,8 @@
 #   gm-table.sh warn "<pc>" "..." --lang en  Cruelty to clear innocents: warn; they choose again (once)
 #   gm-table.sh punish "<pc>" death|madness|curse --reason "..."  They insisted (judgment music)
 #   gm-table.sh atone "<pc>"              Lift a curse once they have atoned in the story
+#   gm-table.sh grow "<pc>" growth|bond|wound|healing|darkness|light|finale "what happened"
+#                                         A moment in the story changed them (their theme follows)
 #   gm-table.sh round 90 | round off      How long the GM waits for everyone (default 60 s)
 #   gm-table.sh alias "Marta" "מרתה"      Another spelling of a name (hover cards)
 #   gm-table.sh free "<pc>"               Free a seat (player switching devices)
@@ -38,7 +40,7 @@ ACTION=$1
 shift
 
 case "$ACTION" in
-    "serve"|"start"|"status"|"wait"|"inbox"|"say"|"redo"|"warn"|"punish"|"atone"|"translate"|"music"|"free"|"stop"|"round"|"alias"|"languages")
+    "serve"|"start"|"status"|"wait"|"inbox"|"say"|"redo"|"warn"|"punish"|"atone"|"grow"|"translate"|"music"|"free"|"stop"|"round"|"alias"|"languages")
         $PYTHON_CMD "$LIB_DIR/table_server.py" "$ACTION" "$@"
         ;;
 

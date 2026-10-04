@@ -134,6 +134,31 @@ def test_cruelty_is_warned_once_then_punished(table):
     assert [e["kind"] for e in state.conduct["log"]].count("punish") == 3
 
 
+def test_the_gm_records_a_moment_that_changed_a_character(table):
+    from lib import character_arcs, party_roster
+    call, camp, state = table["call"], table["camp"], table["state"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    status, body = call("/api/gm/grow", {"pc": "pip", "kind": "growth", "what": "stood alone at the gate",
+                                         "what_tr": {"he": "עמד לבד בשער"}}, host=True)
+    assert status == 200 and body["arc"]["stage"] == 1
+    seen = call(f"/api/messages?code={CODE}&token={pip}&after=0")[1]["messages"]
+    told = [m for m in seen if (m.get("event") or {}).get("type") == "grew"]
+    assert told[0]["text"] == "Pip has changed: stood alone at the gate"           # the character, not the music
+    assert told[0]["event"]["what_tr"]["he"] == "עמד לבד בשער"
+    assert "theme" not in told[0]["text"].lower() and "music" not in told[0]["text"].lower()
+    sheet = json.loads(party_roster.find_pc(camp, "Pip").read_text())
+    assert sheet["story"] == ["stood alone at the gate"]                           # their story, on their sheet
+    assert character_arcs.state_of(camp, "Pip")["stage"] == 1
+    assert call("/api/gm/grow", {"pc": "Pip", "kind": "levelup", "what": "x"}, host=True)[0] == 409
+    assert call("/api/gm/grow", {"pc": "Pip", "kind": "growth", "what": ""}, host=True)[0] == 409
+    assert call("/api/gm/grow", {"pc": "Nobody", "kind": "growth", "what": "x"}, host=True)[0] == 409
+    # The music follows in the background: the anthem for now, and the next growth, ahead.
+    made = []
+    state.music_maker = lambda kind, name, boss, look, sheet: made.append((kind, name)) or f"{kind}.ogg"
+    state.music_pass()
+    assert ("anthem", "Pip") in made
+
+
 def test_a_wrong_code_is_turned_away(table):
     status, body = table["call"]("/api/info?code=nope")
     assert status == 403 and not body["ok"]
@@ -1195,7 +1220,8 @@ def test_villains_bosses_and_heroes_get_composed_music(table):
 
     # The fight turns into a boss fight: a boss theme, without asking.
     call("/api/gm/say", {"text": "He grows!", "mood": "boss"}, host=True)
-    assert state.music_pass() == ["Grimaldi"] and made[-1] == ("theme", "Grimaldi", True)
+    assert state.music_pass() == ["Grimaldi", "Pip"]                   # (+ Pip's next growth, ahead)
+    assert ("theme", "Grimaldi", True) in made
     assert state.music["track"] == "grimaldi-boss.ogg" and state.music["boss"] is True
     assert state.mood_files("boss") == []           # never picked for some other fight
 
@@ -1220,11 +1246,12 @@ def test_the_table_composes_with_the_model_kept_in_ram(table, monkeypatch, tmp_p
         assert sorted(state.music_pass()) == ["Bram", "Grimaldi", "Pip"]
         assert state.music["track"] == "grimaldi-theme.ogg"    # took over
         assert composer.anthem(camp, "Bram") and composer.anthem(camp, "Pip")
+        assert sorted(state.music_pass()) == ["Bram", "Pip"]   # their next growth, ready ahead of time
         assert state.music_pass() == []                        # nothing left
         call("/api/gm/say", {"text": "He grows!", "mood": "boss"}, host=True)
         assert state.music_pass() == ["Grimaldi"] and state.music["track"] == "grimaldi-boss.ogg"
         assert log.read_text() == "load\n"                    # read from disk once, all evening
-        assert len(released) == 4                              # Forge stepped off the card each time
+        assert len(released) == 6                              # Forge stepped off the card each time
     finally:
         composer.stop_server()
 
@@ -1925,6 +1952,6 @@ def test_the_host_wrapper_knows_every_table_command():
     import re
     root = Path(__file__).resolve().parent.parent
     commands = set(re.findall(r'sub\.add_parser\("([a-z-]+)"', (root / "lib" / "table_server.py").read_text(encoding="utf-8")))
-    case = re.search(r'^\s*("serve"[^)]*)\)', (root / "tools" / "gm-table.sh").read_text(encoding="utf-8"), re.M).group(1)
-    allowed = set(re.findall(r'"([a-z-]+)"', case))
+    cases = re.findall(r'^\s*("[a-z-]+"(?:\|"[a-z-]+")*)\)', (root / "tools" / "gm-table.sh").read_text(encoding="utf-8"), re.M)
+    allowed = {c for case in cases for c in re.findall(r'"([a-z-]+)"', case)}
     assert commands <= allowed, commands - allowed

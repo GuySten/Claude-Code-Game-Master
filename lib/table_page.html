@@ -98,6 +98,7 @@
   .msg.gm.redo.for-me { box-shadow: 0 0 0 2px var(--hp-low); }
   .msg.gm.redo.warn { background: color-mix(in srgb, var(--hp-low) 10%, var(--gm)); }
   .msg.system.punished { color: var(--hp-low); font-weight: bold; font-style: normal; font-size: 1.05rem; }
+  .msg.system.grew { color: var(--accent); font-weight: bold; font-style: normal; }
   .msg .edit-box { width: 100%; box-sizing: border-box; font: inherit; min-height: 3.2em;
                    resize: vertical; margin-top: 2px; }
   .msg .edit-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 4px; }
@@ -2041,7 +2042,7 @@
       });
       sec("companions", t("sheet_companions"), ul);
     }
-    const order = ["conditions", "skills", "saves", "features", "spells", "spell_slots", "equipment",
+    const order = ["conditions", "story", "skills", "saves", "features", "spells", "spell_slots", "equipment",
                    "background", "alignment", "pronouns", "traits", "ideals", "bonds", "flaws",
                    "notes", "visual_appearance"];
     const done = new Set([...SHEET_HIDE, "stats", "companions"]);
@@ -2350,6 +2351,7 @@
                                         : t("ev_npc").replace("{name}", ev.name || "");
     if (ev.type === "levelready") return s.replace("{level}", ev.level);
     if (ev.type === "punished") return t("ev_punished_" + ev.way).replace("{pc}", m.pc || "");
+    if (ev.type === "grew") return s.replace("{what}", (ev.what_tr || {})[lang] || ev.what || "");
     if (ev.type === "nemesis") return s.replace("{name}", ev.of || "");
     if (ev.type === "loot") return t("ev_loot").replace("{name}", ev.name || "")
       + (ev.owner ? " — " + t("lootFor").replace("{pc}", ev.owner) : "");
@@ -2838,6 +2840,7 @@
       d.textContent = systemText(m);
       d.dir = dirFor(d.textContent);
       if ((m.event || {}).type === "punished") d.classList.add("punished");
+      if ((m.event || {}).type === "grew") d.classList.add("grew");
       if (m.image) {
         const img = imageEl(m.image, 800);
         const ev = m.event || {};

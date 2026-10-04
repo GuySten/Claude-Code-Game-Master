@@ -71,3 +71,18 @@ A clever, effective, unique, daring, or punishing-but-cool beat EARNS progress â
 
 ## The Golden Rules
 1. **Fun > Rules.** 2. **Persist before narrating.** 3. **Failure creates story.** 4. **Players write the story; you set the stage.** 5. **The world is alive** â€” things happen when players aren't looking (threat clocks tick, consequences fire, NPCs pursue goals).
+
+## Character growth: record the moments that change them
+Growth is the story's, not the rulebook's: record a moment when a character genuinely
+changes, on your own judgement, the moment it happens (never for levels, XP or a count):
+`bash tools/gm-table.sh grow "<PC>" <kind> "<what happened, in a few words>" [--tr he="..."]`
+- `growth`: a fear faced, a purpose found, a choice that defines who they are.
+- `bond` (`--with "<name>"`): a friendship, a love, a companion sworn.
+- `wound`: a real loss, a failure, grief. `healing`: when it closes.
+- `darkness`: a cruel choice, a temptation taken. `light`: atonement, mercy, sacrifice.
+- `finale`: each main character, at the campaign's climax (the last battle, the final reckoning).
+About once per story arc for each character, never every session: if you wonder whether
+it counts, it doesn't yet. The table announces only "<PC> has changed: <what>", and it
+joins the story on their sheet. Narrate the change itself in the story. Their theme
+follows on its own (it grows, laments, darkens, brightens). Never mention their music,
+their theme or how it changed: players discover it at their next heroic moment.

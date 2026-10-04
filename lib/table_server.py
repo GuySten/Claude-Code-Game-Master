@@ -76,6 +76,7 @@ from urllib.parse import parse_qs, urlparse
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+import character_arcs
 import composer
 import languages
 import party_roster
@@ -745,6 +746,33 @@ class TableState:
                     event={"type": "atoned"})
         return {"ok": True, "pc": sheet.get("name", pc)}
 
+    def grow(self, pc: str, kind: str, what: str, other: Optional[str] = None,
+             what_tr: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+        """The GM records a moment in the story that changed this character. The
+        table says so ("Kestrel has changed: ..."), it joins the story on their sheet,
+        and their theme follows, unannounced (composed in the background; it plays
+        from their next heroic moment)."""
+        if kind not in character_arcs.KINDS:
+            return {"ok": False, "error": f"a moment is one of: {', '.join(character_arcs.KINDS)}"}
+        what = " ".join(str(what or "").split())[:300]
+        if not what:
+            return {"ok": False, "error": "say what happened (it is told to the table, and kept)"}
+        path = party_roster.find_pc(self.campaign_dir, pc)
+        if path is None:
+            return {"ok": False, "error": f"no player character named {pc}"}
+        sheet = to_flat(party_roster._read(path) or {})
+        real = sheet.get("name") or pc
+        state = character_arcs.record(self.campaign_dir, real, kind, what, other)
+        sheet["story"] = list(sheet.get("story") or []) + [what]           # their story, in their own sheet
+        self._write_sheet(path, sheet)
+        tr = {l: " ".join(str(t).split())[:300] for l, t in (what_tr or {}).items()
+              if languages.valid(l) and str(t).strip()}
+        self.append("system", f"{real} has changed: {what}", pc=real,
+                    event={"type": "grew", "what": what, **({"what_tr": tr} if tr else {})})
+        self.portrait_wake.set()                                           # (the music pass)
+        return {"ok": True, "pc": real, "arc": character_arcs.spec(state),
+                "milestones": len(state["milestones"])}
+
     def extend_round(self, pc: str) -> Dict[str, Any]:
         """A player who hasn't acted yet asks for more time: the round's clock gets
         EXTEND_SECONDS more. Once per player per round."""
@@ -1320,12 +1348,21 @@ class TableState:
         for path, raw in party_roster.all_pcs(self.campaign_dir):
             sheet = to_flat(raw)
             name = sheet.get("name") or path.stem
-            if composer.anthem(self.campaign_dir, name):
-                continue
-            if time.time() - self.portrait_tried.get("anthem:" + name, -PORTRAIT_RETRY) < PORTRAIT_RETRY:
-                continue
-            self.portrait_tried["anthem:" + name] = time.time()
-            pieces.append({"kind": "anthem", "name": name, "boss": False, "look": "", "sheet": sheet})
+            base = composer.anthem(self.campaign_dir, name)
+            if base and not base.get("version") and not character_arcs.load(self.campaign_dir).get(name):
+                # (an anthem from before story arcs: it was the full theme; their arc starts there)
+                character_arcs.save(self.campaign_dir, {**character_arcs.load(self.campaign_dir),
+                                                        name: {"stage": 1, "milestones": []}})
+            arc = character_arcs.spec(character_arcs.state_of(self.campaign_dir, name))
+            wanted = ([("anthem", arc)] if not base else
+                      [("anthem_version", a) for a in (arc, character_arcs.next_growth(arc))
+                       if a and not composer.has_version(self.campaign_dir, name, a)])
+            for kind, a in wanted:                   # now, and the next growth: ready when earned
+                tried = f"anthem:{name}:{character_arcs.version(a)}"
+                if time.time() - self.portrait_tried.get(tried, -PORTRAIT_RETRY) < PORTRAIT_RETRY:
+                    continue
+                self.portrait_tried[tried] = time.time()
+                pieces.append({"kind": kind, "name": name, "boss": False, "look": "", "sheet": sheet, "spec": a})
         if not pieces:
             return []
         done: List[str] = []
@@ -3185,6 +3222,10 @@ def make_handler(state: TableState, code: str, host_key: str):
                     + ".") if missing else None
                 return self._json({"ok": True, "message": msg, "round": state.round_state(),
                                    "reminder": reminder})
+            if path == "/api/gm/grow":
+                r = state.grow(str(data.get("pc", "")), str(data.get("kind", "")), str(data.get("what", "")),
+                               data.get("with") or None, data.get("what_tr") if isinstance(data.get("what_tr"), dict) else None)
+                return self._json(r, 200 if r["ok"] else 409)
             if path == "/api/gm/punish":
                 r = state.punish(str(data.get("pc", "")), str(data.get("way", "")), str(data.get("reason", "")))
                 return self._json({k: v for k, v in r.items() if k != "music"}, 200 if r["ok"] else 409)
@@ -3814,6 +3855,14 @@ def main() -> None:
     pu.add_argument("--reason", required=True, help="The reason you invented (the avengers, the guilt...)")
     at = sub.add_parser("atone", help="Lift a curse (the atonement was made in the story)")
     at.add_argument("pc")
+    gr = sub.add_parser("grow", help="A moment in the story changed a character (the table is told; "
+                                     "their theme follows)")
+    gr.add_argument("pc")
+    gr.add_argument("kind", choices=list(character_arcs.KINDS))
+    gr.add_argument("what", help="What happened, in a few words (told to the table, kept on their sheet)")
+    gr.add_argument("--with", dest="other", help="(a bond) with whom")
+    gr.add_argument("--tr", action="append", default=[], metavar="LANG=TEXT",
+                    help="What happened, in another of the table's languages (repeat)")
 
     al = sub.add_parser("alias", help="Another spelling of a name (e.g. its Hebrew form), for hover cards")
     al.add_argument("name", help="The name as the campaign knows it (NPC, place, faction)")
@@ -4087,6 +4136,16 @@ def main() -> None:
                           f"theme). When their player's new character arrives, invent why the two are nemeses.",
                "curse": f"{r['pc']} is cursed: disadvantage on every ability check until they atone "
                         f"(set the atonement quest; then gm-table.sh atone \"{r['pc']}\")."}[r["way"]])
+        return
+
+    if args.action == "grow":
+        tr = dict(x.split("=", 1) for x in args.tr if "=" in x)
+        r = _call(campaign_dir, "POST", "/api/gm/grow", {"pc": args.pc, "kind": args.kind, "what": args.what,
+                                                         "with": args.other, "what_tr": tr})
+        if not r.get("ok"):
+            sys.exit(f"[ERROR] {r.get('error')}")
+        print(f"{r['pc']} has changed (the table is told). Their story: {r['milestones']} moment(s). "
+              f"Narrate the change itself in the story; never mention their music.")
         return
 
     if args.action == "atone":

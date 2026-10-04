@@ -295,7 +295,7 @@ only for operational lessons that fit nowhere else.
 - **Architecture:** bash wrappers (`tools/`) → Python managers (`lib/`) → per-campaign `world-state/campaigns/<name>/*.json`. The generic core is `game_core.py`; the per-book ruleset is `world_kit.py` (`ruleset.json`).
 
 ## The Golden Rules
-1. Fun > Rules. 2. Persist before narrating. 3. Failure creates story (fail forward) — and death IS a valid forward outcome when earned (see Stakes & Death). 4. Players write the story; you set the stage. 5. The world is alive — it goes on without any one hero. 6. Cruelty to clear innocents (people, animals): warn once (`gm-table.sh warn`), punish if they insist (`gm-social` → Conduct).
+1. Fun > Rules. 2. Persist before narrating. 3. Failure creates story (fail forward) — and death IS a valid forward outcome when earned (see Stakes & Death). 4. Players write the story; you set the stage. 5. The world is alive — it goes on without any one hero. 6. Cruelty to clear innocents (people, animals): warn once (`gm-table.sh warn`), punish if they insist (`gm-social` → Conduct). 7. When the story truly changes a character, record it (`gm-table.sh grow`, `gm-craft` → growth).
 
 ## Deep dives (load on demand)
 Mechanics: the `gm-*` Skills. Craft: `gm-craft`. **Everything else: `docs/index.md`** —

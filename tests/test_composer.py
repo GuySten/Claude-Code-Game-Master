@@ -87,7 +87,8 @@ def test_compose_runs_the_composer_and_reads_its_answer(tmp_path, fake):
     assert composer.has_theme(camp, "Grimaldi", True) and not composer.has_theme(camp, "Grimaldi", False)
 
     rec = composer.compose_anthem(camp, {"name": "Pip", "race": "Halfling", "class": "Rogue"})
-    assert rec == {"file": "anthem-pip.ogg", "seconds": 20.0,
+    assert rec == {"file": "anthem-pip.ogg", "seconds": 16.0, "version": "s0-d0-w0-b0",  # a new character:
+                   "versions": {"s0-d0-w0-b0": {"file": "anthem-pip.ogg", "seconds": 16.0}},  # a lone voice
                    "dark": "anthem-pip-dark.ogg", "dark_how": "darkened"}        # (with its dark twin)
     assert composer.anthem(camp, "PIP") == rec
 
@@ -409,7 +410,8 @@ def test_anthems_are_composed_on_the_leitmotif_with_the_melody_model(tmp_path, f
         composer.compose_pieces(camp, [{"kind": "anthem", "sheet": {"name": "Pip", "class": "Rogue"}}])
     finally:
         composer.compose_many = real
-    assert seen[0]["leitmotif"] == {"seed": "Pip", "mode": "major", "cls": "Rogue"}
+    assert seen[0]["leitmotif"] == {"seed": "Pip", "mode": "major", "cls": "Rogue", "stage": 1, "dark": 0,
+                                    "wound": False}
     assert seen[0]["twin"]["leitmotif"] == {"seed": "Pip", "mode": "minor", "cls": "Rogue"}
     assert "memorable melody" in seen[0]["prompt"]
 
@@ -526,3 +528,59 @@ def test_one_of_the_most_memorable_candidate_tunes_is_kept():
         best = max(sc for sc, _, _ in found)
         assert len(found) == mc.CANDIDATES and tune["memorability"] >= best - .5 - 1e-9, (name, tune["memorability"], best)
         assert tune["memorability"] >= 7, (name, cls, tune["memorability"])
+
+
+def test_the_theme_follows_the_characters_story():
+    """The hook never changes; the stage reshapes the tune (a lone voice, the theme,
+    heroic, legendary); dark deeds borrow darker notes, one by one."""
+    from lib import music_compose as mc
+    for name, cls in PEOPLE[:30]:
+        by_stage = [mc.leitmotif(name, "major", cls, stage=s) for s in range(4)]
+        traits = [mc.theme_traits(t) for t in by_stage]
+        for t in traits:
+            assert t["whole_bars"] and t["ends_home"] and t["biggest_jump"] <= 12 and t["range"] <= 22, (name, t)
+        seed, full = by_stage[0], by_stage[1]
+        hook_at, hook_len = full["hook"]
+        assert seed["notes"][hook_at:hook_at + hook_len] == full["notes"][hook_at:hook_at + hook_len]  # same hook
+        assert traits[0]["hook_repeats"] >= 2 and len(seed["notes"]) < len(full["notes"])          # a lone voice
+        assert max(p for p, _ in by_stage[2]["notes"]) > max(p for p, _ in full["notes"])         # reaching higher
+        assert sum(b for _, b in by_stage[3]["notes"]) > sum(b for _, b in by_stage[2]["notes"])   # the legend's end
+        pcs = [{p % 12 for p, _ in mc.leitmotif(name, "major", cls, stage=1, dark=d)["notes"]} for d in range(4)]
+        darker = [len(pc & {1, 3, 8, 10}) for pc in pcs]                    # the dark notes it uses
+        assert darker == sorted(darker) and darker[3] > darker[0], (name, cls, darker)
+
+
+def test_each_point_of_the_story_has_its_own_anthem(tmp_path, fake):
+    from lib import character_arcs as arcs
+    camp = tmp_path / "camp"
+    camp.mkdir()
+    sheet = {"name": "Kestrel", "class": "Barbarian"}
+    composer.compose_pieces(camp, [{"kind": "anthem", "sheet": sheet,
+                                    "spec": arcs.spec(arcs.state_of(camp, "Kestrel"))}])
+    assert composer.anthem(camp, "Kestrel")["version"] == "s0-d0-w0-b0"     # a lone voice, to begin
+    arcs.record(camp, "Kestrel", "growth", "stood alone at the drowned gate")
+    now = arcs.spec(arcs.state_of(camp, "Kestrel"))
+    assert not composer.has_version(camp, "Kestrel", now)
+    assert composer.anthem(camp, "Kestrel")["file"] == "anthem-kestrel.ogg"  # (until the new one is ready)
+    seen = []
+    real = composer.compose_many
+    composer.compose_many = lambda jobs, *a, **k: seen.extend(jobs) or real(jobs, *a, **k)
+    try:
+        composer.compose_pieces(camp, [{"kind": "anthem_version", "sheet": sheet, "spec": now}])
+    finally:
+        composer.compose_many = real
+    assert seen[0]["leitmotif"]["stage"] == 1 and "twin" not in seen[0]
+    assert composer.has_version(camp, "Kestrel", now)
+    assert composer.anthem(camp, "Kestrel")["file"] == "anthem-kestrel-s1-d0-w0-b0.ogg"
+    assert composer.anthem(camp, "Kestrel")["dark"] == "anthem-kestrel-dark.ogg"   # (the villain twin stays)
+
+
+def test_the_anthem_is_described_for_where_the_story_is():
+    sheet = {"name": "Kestrel", "class": "Barbarian"}
+    p = lambda **a: composer.anthem_prompt(sheet, "", {"stage": 1, "dark": 0, "wound": False, "warm": False, **a})  # noqa: E731
+    assert "solo" in p(stage=0) and "orchestra" not in p(stage=0)
+    assert "choir" in p(stage=3) and "legendary" in p(stage=3)
+    assert "lament" in p(wound=True) and "70 bpm" in p(wound=True)
+    assert "shadow" in p(dark=1) and "tormented" in p(dark=3) and "warm" in p(warm=True)
+    assert composer.anthem_seconds({"stage": 0}) < composer.anthem_seconds({"stage": 1}) < \
+        composer.anthem_seconds({"stage": 3}) <= 30
