@@ -110,6 +110,8 @@ def use_of(spec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     if not who:
         return None
     out["who"] = str(who)
+    if use["as"] in ("theme", "boss") and "dark" in use:
+        out["descent"] = int(use["dark"])                  # (a villain's theme, as far as they've fallen)
     if use["as"] == "anthem":
         out.update(stage=int(use.get("stage", tune.get("stage", 1))), dark=int(use.get("dark", tune.get("dark", 0))),
                    wound=bool(use.get("wound", False)), warm=bool(use.get("warm", False)))
@@ -120,7 +122,8 @@ def use_of(spec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 def _key(use: Dict[str, Any]) -> str:
     if use["as"] == "place":
         return "place:" + use["place"].casefold()
-    return f"{use['as']}:{use['who'].casefold()}" + (f":{use['version']}" if use["as"] == "anthem" else "")
+    return (f"{use['as']}:{use['who'].casefold()}" + (f":{use['version']}" if use["as"] == "anthem" else "")
+            + (f":d{use['descent']}" if use.get("descent") is not None else ""))
 
 
 def index(campaign_dir) -> List[Dict[str, Any]]:
@@ -152,11 +155,14 @@ def index(campaign_dir) -> List[Dict[str, Any]]:
 
 
 def has_score(campaign_dir, kind: str, who: str, version: Optional[str] = None) -> bool:
-    """Has the GM written this piece (a score in use, not one set aside)?"""
-    want = {"as": kind, "who": who, **({"version": version} if version else {})}
+    """Has the GM written this piece (a score in use, not one set aside)? (A villain's
+    theme in any of its versions counts.)"""
     if kind == "place":
-        want = {"as": "place", "place": who}
-    return any(not it["problem"] and _key(it["use"]) == _key(want) for it in index(campaign_dir))
+        want = _key({"as": "place", "place": who})
+        return any(not it["problem"] and _key(it["use"]) == want for it in index(campaign_dir))
+    want = _key({"as": kind, "who": who, **({"version": version} if version else {})})
+    return any(not it["problem"] and (_key(it["use"]) == want or _key(it["use"]).startswith(want + ":d"))
+               for it in index(campaign_dir))
 
 
 # --- where the rendered music goes, and the registry the table reads ---
@@ -169,7 +175,8 @@ def target(campaign_dir, use: Dict[str, Any], how: str = "score") -> Path:
         return music / "anthems" / f"anthem-{who}-{use['version']}-{'score' if how == 'score' else 'orch'}.ogg"
     if use["as"] == "dark":
         return music / "anthems" / f"anthem-{who}-dark-score.ogg"
-    return music / "themes" / f"{who}-{'boss' if use['as'] == 'boss' else 'theme'}-score.ogg"
+    d = f"-d{use['descent']}" if use.get("descent") is not None else ""
+    return music / "themes" / f"{who}-{'boss' if use['as'] == 'boss' else 'theme'}{d}-score.ogg"
 
 
 def registry(campaign_dir) -> Dict[str, Any]:
@@ -188,7 +195,12 @@ def registered(campaign_dir, use: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     elif use["as"] in ("theme", "boss"):
         rec = reg["themes"].get(composer._key(reg["themes"], use["who"]) or "", {})
         kind = "boss" if use["as"] == "boss" else "normal"
-        rec = {"file": rec.get(kind), **(rec.get("scores") or {}).get(kind, {})} if rec.get(kind) else None
+        if use.get("descent") is not None:
+            v = f"d{use['descent']}"
+            f = ((rec.get("versions") or {}).get(kind) or {}).get(v)
+            rec = {"file": f, **((rec.get("scores") or {}).get(kind + ":" + v) or {})} if f else None
+        else:
+            rec = {"file": rec.get(kind), **(rec.get("scores") or {}).get(kind, {})} if rec.get(kind) else None
         folder = music / "themes"
     else:
         rec = reg["anthems"].get(composer._key(reg["anthems"], use["who"]) or "", {})
@@ -216,8 +228,15 @@ def register(campaign_dir, use: Dict[str, Any], path: Path, seconds: float, how:
         key = composer._key(reg["themes"], use["who"]) or use["who"]
         kind = "boss" if use["as"] == "boss" else "normal"
         rec = reg["themes"].setdefault(key, {})
-        rec[kind] = f
-        rec.setdefault("scores", {})[kind] = extra
+        if use.get("descent") is not None:
+            v = f"d{use['descent']}"
+            rec.setdefault("versions", {}).setdefault(kind, {})[v] = f
+            rec.setdefault("scores", {})[kind + ":" + v] = extra
+            if not rec.get(kind) or use["descent"] == 0:
+                rec[kind] = f
+        else:
+            rec[kind] = f
+            rec.setdefault("scores", {})[kind] = extra
     else:
         key = composer._key(reg["anthems"], use["who"]) or use["who"]
         rec = reg["anthems"].setdefault(key, {})

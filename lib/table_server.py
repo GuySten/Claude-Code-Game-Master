@@ -773,7 +773,17 @@ class TableState:
             return {"ok": False, "error": "say what happened (it is told to the table, and kept)"}
         path = party_roster.find_pc(self.campaign_dir, pc)
         if path is None:
-            return {"ok": False, "error": f"no player character named {pc}"}
+            npcs = self._read_json(self.campaign_dir / "npcs.json", {})
+            npcs = npcs.get("npcs", npcs) if isinstance(npcs, dict) else {}
+            real = next((n for n in npcs if party_roster._same_name(n, pc)), None)
+            if real is None:
+                return {"ok": False, "error": f"no player character or NPC named {pc}"}
+            # A villain's descent (or redemption): kept, and their music follows - but the
+            # table isn't told; the players hear it.
+            state = character_arcs.record(self.campaign_dir, real, kind, what, other)
+            self.portrait_wake.set()
+            return {"ok": True, "npc": real, "arc": character_arcs.spec(state),
+                    "milestones": len(state["milestones"])}
         sheet = to_flat(party_roster._read(path) or {})
         real = sheet.get("name") or pc
         state = character_arcs.record(self.campaign_dir, real, kind, what, other)

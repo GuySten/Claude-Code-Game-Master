@@ -151,3 +151,10 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   stroke ringing into the next.
   Of two rolls at about 6.5 and 5.6 strokes a second, the slower was better: rolls are
   now about 5.5 a second.
+- **The Margrave portrait:** "dramatically better" - its weak point: the madness. As GM:
+  he is turning mad from his wrongdoing, and his theme follows his descent (versions by
+  how many atrocities the GM records, quietly). The host's definition: "turning mad
+  means that a violin that follows along with the rest of the orchestra suddenly
+  misbehaves - turns too high, breaks pitch and stride". And "the piece should end with
+  the violin alone (and briefly start with it)": the loop's end and start are the
+  violin alone - unravelled, then composed again.

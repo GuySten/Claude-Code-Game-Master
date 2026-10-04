@@ -232,3 +232,23 @@ def test_a_villains_battle_music_plays_in_any_fight_with_them(table):  # noqa: F
     call("/api/gm/say", {"text": "Peace.", "mood": "calm"}, host=True)
     call("/api/gm/say", {"text": "Ambush!", "theme": "Grimaldi", "mood": "combat"}, host=True)
     assert state.music["track"] == "grimaldi-boss-score.ogg"
+
+
+def test_a_villains_theme_follows_their_descent_unannounced(table):  # noqa: F811
+    call, state, camp = table["call"], table["state"], table["camp"]
+    state.orchestra_maker = _orchestra(camp, [])
+    (camp / "npcs.json").write_text(json.dumps({"Grimaldi": {"description": "the Margrave of somewhere"}}))
+    _score(camp, "grim-0", {"as": "theme", "who": "Grimaldi", "dark": 0})
+    _score(camp, "grim-1", {"as": "theme", "who": "Grimaldi", "dark": 1})
+    state.music_pass()
+    assert composer.theme_file(camp, "Grimaldi", False) == "grimaldi-theme-d0-score.ogg"
+    before = len(state.messages)
+    _, body = call("/api/gm/grow", {"pc": "grimaldi", "kind": "darkness", "what": "He tithed the children."}, host=True)
+    assert body["ok"] and body["npc"] == "Grimaldi" and body["arc"]["dark"] == 1
+    assert len(state.messages) == before                                  # (the table isn't told)
+    assert composer.theme_file(camp, "Grimaldi", False) == "grimaldi-theme-d1-score.ogg"
+    call("/api/gm/grow", {"pc": "Grimaldi", "kind": "darkness", "what": "And more."}, host=True)
+    assert composer.theme_file(camp, "Grimaldi", False) == "grimaldi-theme-d1-score.ogg"   # (the deepest written)
+    call("/api/gm/say", {"text": "Grimaldi bows.", "theme": "Grimaldi"}, host=True)
+    assert state.music["track"] == "grimaldi-theme-d1-score.ogg"
+    assert score_music.has_score(camp, "theme", "Grimaldi")

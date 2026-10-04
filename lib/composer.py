@@ -475,13 +475,22 @@ def _key(table: Dict[str, Any], name: str) -> Optional[str]:
 
 
 def theme_file(campaign_dir, name: str, boss: bool) -> Optional[str]:
-    """The composed theme for this foe (the boss one when asked, else the other)."""
+    """The composed theme for this foe (the boss one when asked, else the other) - in
+    the version for how far they have fallen ("versions": {"normal": {"d1": file}}: the
+    deepest one their darkness has reached), else the one they have."""
     reg = load_registry(campaign_dir)["themes"]
     rec = reg.get(_key(reg, name)) or {}
+    folder = Path(campaign_dir) / "music" / "themes"
+    dark = character_arcs.state_of(campaign_dir, name)["dark"]
     order = ("boss", "normal") if boss else ("normal", "boss")
     for kind in order:
+        versions = {int(v[1:]): f for v, f in ((rec.get("versions") or {}).get(kind) or {}).items()
+                    if v[1:].isdigit() and (folder / f).is_file()}
+        reached = [d for d in versions if d <= dark]
+        if versions:
+            return versions[max(reached)] if reached else versions[min(versions)]
         f = rec.get(kind)
-        if f and (Path(campaign_dir) / "music" / "themes" / f).is_file():
+        if f and (folder / f).is_file():
             return f
     return None
 
