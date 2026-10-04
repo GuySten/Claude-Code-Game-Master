@@ -149,3 +149,5 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   cracks (the mind fraying), each heard at its moment.
 - **Timpani rolls at 9 strokes a second: "still too fast".** Now about 6 a second, each
   stroke ringing into the next.
+  Of two rolls at about 6.5 and 5.6 strokes a second, the slower was better: rolls are
+  now about 5.5 a second.
