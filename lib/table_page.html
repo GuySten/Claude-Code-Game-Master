@@ -343,6 +343,7 @@
   .more-menu { display: contents; }
   #leave { order: 1; }
   #more-toggle { display: none; }
+  #tabs { display: none; }
 
   @media (max-width: 760px) {
     #table { grid-template-columns: 1fr; }
@@ -393,6 +394,21 @@
     .say-row #me { display: none; }
     #send { min-height: 40px; padding: 6px 18px; }
     #chat input, #narrator-form input { font-size: 16px; }
+
+    /* Phone: Story / Party / Sheet / Chat tabs at the bottom; the action box and
+       the countdown stay pinned just above them. */
+    #sheet-toggle, #party-toggle, #chat-toggle { display: none !important; }
+    #tabs { display: flex; border-top: 1px solid var(--line); background: var(--panel);
+            padding-bottom: env(safe-area-inset-bottom); }
+    #tabs button { flex: 1; border: 0; border-radius: 0; background: none; min-height: 52px; padding: 4px 2px;
+                   font-size: .75rem; display: flex; flex-direction: column; align-items: center; gap: 1px;
+                   position: relative; }
+    #tabs button .i { font-size: 1.3rem; line-height: 1.2; }
+    #tabs button[aria-pressed="true"] { color: var(--accent); box-shadow: inset 0 3px 0 var(--accent); }
+    #tabs .badge { position: absolute; top: 4px; inset-inline-end: 22%; background: var(--hp-low); color: #fff;
+                   border-radius: 9px; font-size: .68rem; padding: 0 5px; }
+    aside, #chat.open { bottom: var(--tabs-h, 56px) !important; }
+    aside { max-height: none; overflow-y: auto; }
 
     /* Drawers and dialogs use the whole phone. */
     #chat.open { width: 100%; }
@@ -492,6 +508,12 @@
         <button class="primary" type="submit" id="send" data-i18n="send"></button>
       </div>
     </form>
+    <nav id="tabs">
+      <button type="button" id="tab-story" aria-pressed="true"><span class="i">📖</span><span data-i18n="tabStory"></span></button>
+      <button type="button" id="tab-party" aria-pressed="false"><span class="i">👥</span><span data-i18n="tabParty"></span></button>
+      <button type="button" id="tab-sheet" aria-pressed="false"><span class="i">🧾</span><span data-i18n="tabSheet"></span></button>
+      <button type="button" id="tab-chat" aria-pressed="false"><span class="i">💬</span><span data-i18n="tabChat"></span><span class="badge hidden" id="tab-chat-unread"></span></button>
+    </nav>
   </div>
   <aside id="party">
     <h2 data-i18n="partyTitle"></h2>
@@ -1458,6 +1480,8 @@
     chatUnread = n;
     $("chat-unread").textContent = String(n);
     $("chat-unread").classList.toggle("hidden", !n);
+    $("tab-chat-unread").textContent = String(n);
+    $("tab-chat-unread").classList.toggle("hidden", !n);
   }
   // Long polling: the server holds this request until a line arrives (or ~25 s),
   // so chat lands at once instead of on the next poll.
@@ -2994,6 +3018,33 @@
     $("chat").classList.remove("open");
     setMoreMenu(false);
   };
+  // Phone: the bottom tabs. Party and chat open as panels over the story, between
+  // the header and the tabs; the sheet opens as its dialog.
+  function syncTabs() {         // (what's open, however it was opened)
+    const which = $("sheet").open ? "sheet" : $("party").classList.contains("open") ? "party"
+      : $("chat").classList.contains("open") ? "chat" : "story";
+    ["story", "party", "sheet", "chat"].forEach((k) => {
+      const b = $("tab-" + k), on = String(k === which);
+      if (b.getAttribute("aria-pressed") !== on) b.setAttribute("aria-pressed", on);
+    });
+  }
+  tickHooks.push(syncTabs);
+  function setTab(which) {
+    const top = headerBottom() + "px";
+    document.documentElement.style.setProperty("--tabs-h", $("tabs").getBoundingClientRect().height + "px");
+    $("party").classList.toggle("open", which === "party");
+    $("chat").classList.toggle("open", which === "chat");
+    $("party").style.top = top; $("chat").style.top = top;
+    if (which === "chat") { setUnread(0); $("chat-log").scrollTop = $("chat-log").scrollHeight; }
+    if (which === "sheet" && me) openSheet(me);
+    else if ($("sheet").open) $("sheet").close();
+    setMoreMenu(false);
+    syncTabs();
+  }
+  $("tab-story").onclick = () => setTab("story");
+  $("tab-party").onclick = () => setTab($("party").classList.contains("open") ? "story" : "party");
+  $("tab-sheet").onclick = () => setTab("sheet");
+  $("tab-chat").onclick = () => setTab($("chat").classList.contains("open") ? "story" : "chat");
   // The ⋯ menu (phone only): music, reading aloud, language, leaving. It closes
   // after a choice, on a tap anywhere else, and when another drawer opens.
   function setMoreMenu(open) {
