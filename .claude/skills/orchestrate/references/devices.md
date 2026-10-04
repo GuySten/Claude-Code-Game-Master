@@ -28,7 +28,7 @@ Sources, in brief (details and citations: `research.md`):
 - **This table's ears** - `table-feedback.md` (the host's verdicts win over all of these).
 
 
-Entries marked **(from knowledge)** are general film and game scoring practice written from memory (the TV Tropes pages for mood, genre and regional music could not be fetched; the Heroic Music Index was reviewed from the host's paste); names marked † were not checked against the site. The orchestra has no piano, harpsichord, guitar, accordion, saxophone, bagpipes, harmonica, xylophone or steel drums: where a device names one, it says what to write instead.
+Entries marked **(from knowledge)** are general film and game scoring practice written from memory (the Heroic Music Index, Genre Motif and Regional Riff pages were reviewed from the host's paste; the Mood Motif page's examples were folded away, so instrument colours are general practice); names marked † were not checked against the site. The orchestra has no piano, harpsichord, guitar, accordion, saxophone, bagpipes, harmonica, xylophone or steel drums: where a device names one, it says what to write instead.
 
 ---
 
@@ -755,6 +755,99 @@ Entries marked **(from knowledge)** are general film and game scoring practice w
 ---
 
 ## Places and peoples ("Regional Riff", "Genre Motif"; fetches blocked, from knowledge where marked)
+
+### Instrument colours ("Mood Motif"; from general orchestration practice)
+- **Signals**: what each instrument tends to say on its own - some associations feel
+  natural (a low clarinet is dark, a celesta ethereal), others are learned conventions
+  (the oboe pastoral, the organ sacred, the trumpet royal or military) and work because
+  listeners share them (research §7.5).
+- **Write it** - a palette, not rules:
+  - *flute*: air, birds, innocence, magic, the wild; *piccolo*: whimsy, a fife's march;
+  - *oboe*: pastoral, plaintive, a lonely voice; *english horn*: distance, solitude,
+    longing; *clarinet*: low - dark, sly, secretive; high - playful, bright; *bassoon*:
+    comic when quick and staccato, grave when slow and low;
+  - *horns*: heroism, nobility, the hunt, distance and nature, a call across a valley;
+    *trumpets*: royalty, the army, alarm, triumph; *trombones*: solemnity, judgement,
+    the sacred, doom, weight; *tuba*: mass, menace, or comedy;
+  - *strings*: feeling, warmth, longing; *tremolo*: tension, shimmer; *pizzicato*:
+    sneaking, comedy, a clock; *solo violin*: intimacy, the fiddler, the devil's
+    instrument of folklore; *solo cello*: grief, nobility, a human voice; *basses*:
+    the ground, the deep, dread;
+  - *harp*: heaven, magic, elegance, water; *celesta*: fairies, a music box, enchantment;
+    *glockenspiel*: childhood, sparkle; *bells*: church, celebration, death, a city's
+    hour; *organ*: the sacred, the gothic, horror;
+  - *choir*: the sacred, the epic, a people, mourning, the ominous (low, chanting);
+  - *timpani*: thunder, fate, a heartbeat; *snare*: the army; *bass drum*: doom, a march,
+    footsteps; *gong*: ceremony, a far land, an ending; *triangle*: sparkle.
+- **Not**: an instrument used against its colour without meaning to - a tuba lead for an
+  elf princess is a joke, so only do it as one.
+
+### A genre as a people's sound ("Genre Motif")
+- **Signals**: a subculture known by its music: smooth city criminals, a frontier, a
+  merry town, an old court, a youth in revolt.
+- **Write it**: borrow the genre's rhythm and harmony, played by the orchestra:
+  - *swing* (jazz feel: long-short pairs of eighths, 7th and 9th chords, walking
+    pizzicato bass, a muted or sly clarinet lead, snare brushed on 2 and 4 as `kit`
+    snare softly) - a smooth rogue, a thieves' guild, a gambling den;
+  - *the open frontier* (open fifths and wide spacing, horns and strings, a hoedown's
+    quick fiddle tune on violins over a pizzicato "oom-pah", plain I-IV-V) - a frontier
+    town, cattle-drovers, a wide plain;
+  - *the oompah band* (tuba on 1, horns or trombones on 2-3 or the offbeat, clarinets
+    on the tune, 2/4 or 3/4, major) - a jolly town, a beer hall, a festival;
+  - *driving rock* - see the rock drive; *folk* - the tavern; *the court* - the court
+    dance; *ambient* - dungeon ambience.
+- **Not**: a modern genre where the setting can't bear it, unless the anachronism is the
+  point.
+
+### Regional colour - borrowing a real tradition ("Regional Riff")
+- **Signals**: where we are. In this world the peoples are invented, so a real
+  tradition is a palette to build one from: take its scale, rhythm and colour, change
+  it, and give the people their own motif.
+- **Write it** (the orchestra has none of these instruments; the substitutes):
+  - *South Asian*: a held drone (tonic and fifth, strings or organ), a melismatic oboe
+    or english horn with slides and ornaments, toms in a long cycle;
+  - *Japanese*: harp plucked sparsely (koto), a breathy flute with bends (shakuhachi),
+    the in scale (1 b2 4 5 b6), silence between phrases, taiko for warriors;
+  - *Chinese*: pentatonic, a solo violin with expressive slides (erhu), harp or
+    pizzicato tremolo (zither), gong to mark a scene;
+  - *Mongolian / the steppe*: a low choir drone with a high flute floating over it
+    (throat singing's overtone), horse-gait rhythms in toms;
+  - *Southeast Asian*: interlocking celesta, glockenspiel, bells and harp in a five-note
+    scale, layered cycles (gamelan);
+  - *Middle Eastern*: the Phrygian dominant (Hijaz) or a minor scale with a lowered
+    second, an oud's plucked chords on harp, a solo voice line (oboe), frame-drum toms;
+    see Desert;
+  - *Armenian / Caucasian*: a low, slow english horn or clarinet with soft ornaments
+    over a drone (duduk); a fast dance in 6/8 (lezginka) on violins and toms;
+  - *Greek / Italian*: fast pizzicato tremolo (bouzouki, mandolin), the tarantella's
+    quick 6/8;
+  - *Spanish*: strummed pizzicato chords, the Phrygian cadence (iv - bIII - bII - I),
+    claps as `kit` snare or toms, castanet-like quick ticks;
+  - *Central European*: the oompah band; a cimbalom's shimmer as harp with celesta;
+    *Alpine*: horns on natural notes with echoes;
+  - *Klezmer*: clarinet and violin with bends and laughing slides, the freygish mode
+    (Phrygian dominant), a dance that speeds up;
+  - *Russian*: a deep male choir (basso profundo: low `choir` on long notes), a
+    balalaika as pizzicato tremolo, the peasant choir's open harmonies;
+  - *Georgian*: a choir in close, clashing three-part harmony resolving to open fifths;
+  - *Scandinavian*: a fiddle tune with drones (Hardanger fiddle: solo violin over held
+    open strings); see The north;
+  - *British / Irish*: stately ceremonial brass (England), Highland pipes (see that
+    entry), a jig on fiddle and flute (the tavern), a Welsh male voice choir;
+  - *American*: a Sousa march (brass, piccolo, snare), the frontier's open fifths, a
+    jazz clarinet's slide up into a big-city tune;
+  - *Latin American*: trumpets in thirds over strummed pizzicato in a fast 3/4
+    (mariachi), a breathy pentatonic flute (Andes quena), layered samba toms, snare and
+    taiko (batucada);
+  - *Australian*: a basses' drone with rhythmic accents (didgeridoo);
+  - *the cold far south, or space*: silence, wind-like tremolo, a held drone, very slow
+    consonant music.
+- **Not** - the clichés the convention itself counts as discredited or lazy: one
+  "oriental riff" for every eastern people; generic "war drums" for any native people;
+  generic jungle drums and chanting for a whole continent; the Hijaz scale for every
+  people from Morocco to India; bagpipes for Ireland, mariachi for all of Latin
+  America. A people is more than its stereotype - give them a motif of their own and
+  vary the palette.
 
 ### The road ("'Setting Off' Song", "Wanderlust Song")
 - **Signals**: travel, the journey begun, a wanderer, a caravan, the open road.
