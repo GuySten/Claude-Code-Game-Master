@@ -183,6 +183,19 @@
   .bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; margin: 4px 0; }
   .bar > div { height: 100%; background: var(--hp); }
   .pc .meta { font-size: .8rem; color: var(--muted); }
+  /* My character, always in sight: HP, AC, slots, conditions; what just changed. */
+  #mycard { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: .88rem;
+            padding: 6px 16px 0; cursor: pointer; }
+  #mycard .hpbar { width: 90px; height: 7px; background: var(--line); border-radius: 4px; overflow: hidden;
+                   display: inline-block; vertical-align: middle; margin-inline-start: 4px; }
+  #mycard .hpbar > div { height: 100%; background: var(--hp); transition: width .9s ease; }
+  #mycard .cond { color: var(--hp-low); }
+  #mycard .slots { font-variant-numeric: tabular-nums; letter-spacing: .05em; }
+  #mycard .delta { font-weight: bold; border-radius: 6px; padding: 0 6px; color: #fff; animation: delta-in .4s ease-out; }
+  #mycard .delta.down { background: var(--hp-low); }
+  #mycard .delta.up { background: var(--hp); }
+  @keyframes delta-in { from { transform: translateY(6px); opacity: 0; } }
+  @media (max-width: 760px) { #mycard { padding: 4px 10px 0; font-size: .82rem; gap: 2px 10px; } }
   .pc { cursor: pointer; border-radius: 6px; }
   .pc:hover, .pc:focus-visible { background: var(--me); outline: none; }
   .pc .open-sheet { float: inline-end; font-size: .75rem; color: var(--muted); }
@@ -493,6 +506,7 @@
       <div class="track"><div class="fill"></div></div>
     </div>
     <div id="status"></div>
+    <div id="mycard" class="hidden" role="button" tabindex="0"></div>
     <form id="say">
       <div id="chips" class="chips"></div>
       <div class="input-row">
@@ -2136,6 +2150,74 @@
   $("sheet").addEventListener("click", (ev) => { if (ev.target === $("sheet")) $("sheet").close(); });
   $("sheet").addEventListener("close", () => { sheetFor = null; });
   $("sheet-toggle").onclick = () => { if (me) openSheet(me); };
+
+  // --------------------------------------- my character, always in sight ---
+  // HP, AC, spell slots and conditions, in step with the story (the party card's
+  // version), and for a few seconds what the last beat changed ("−4 HP").
+  let lastCard = null;
+  const deltas = [];                   // [{k (a word's key), n, c (a condition), cls, until}]
+  const deltaText = (d) => d.c ? (d.cls === "down" ? "+ " : "− ") + tx(d.c)
+    : t(d.k).replace("{n}", d.n == null ? "" : (d.n > 0 ? "+" : "−") + Math.abs(d.n));
+  function slotsOf(sheet) {
+    const v = sheet && sheet.spell_slots;
+    if (!v || typeof v !== "object" || Array.isArray(v)) return [];
+    return Object.entries(v).map(([lv, x]) => {
+      const n = String(lv).match(/\d+/);
+      let max = null, left = null;
+      if (typeof x === "number") { max = x; left = x; }
+      else if (x && typeof x === "object") {
+        max = x.max ?? x.total ?? x.slots ?? null;
+        left = x.remaining ?? x.current ?? x.left ?? (max != null && x.used != null ? max - x.used : max);
+      }
+      return max ? { lv: n ? n[0] : lv, max: Number(max), left: Math.max(0, Number(left ?? max)) } : null;
+    }).filter(Boolean);
+  }
+  function renderMyCard() {
+    const card = $("mycard"), pc = me && partyShown.get(me);
+    if (!pc) { card.classList.add("hidden"); return; }
+    card.classList.remove("hidden");
+    const conds = (pc.conditions || []).map((c) => String(c && c.name ? c.name : c));
+    const fresh = !!mySheet && mySheetRev === pc.sheet_rev;       // (else: this version is still loading)
+    const slots = slotsOf(mySheet);
+    const mine = lastCard && lastCard.name === me;
+    const now = { name: me, hp: pc.hp, conds,
+                  slots: fresh ? slots.map((x) => x.lv + ":" + x.left).join(",") : mine ? lastCard.slots : null };
+    if (mine) {
+      const until = Date.now() + 7000;
+      if (now.hp !== lastCard.hp && typeof now.hp === "number" && typeof lastCard.hp === "number") {
+        const d = now.hp - lastCard.hp;
+        deltas.push({ k: "dHp", n: d, cls: d > 0 ? "up" : "down", until });
+      }
+      conds.filter((c) => !lastCard.conds.includes(c)).forEach((c) => deltas.push({ c, cls: "down", until }));
+      lastCard.conds.filter((c) => !conds.includes(c)).forEach((c) => deltas.push({ c, cls: "up", until }));
+      if (lastCard.slots && now.slots && lastCard.slots !== now.slots) {
+        const used = (s) => s.split(",").reduce((a, x) => a + Number(x.split(":")[1] || 0), 0);
+        const d = used(now.slots) - used(lastCard.slots);
+        if (d) deltas.push({ k: d < 0 ? "dSlotUsed" : "dSlotBack", cls: d < 0 ? "down" : "up", until });
+      }
+    }
+    lastCard = now;
+    const live = deltas.filter((d) => d.until > Date.now());
+    deltas.length = 0; deltas.push(...live);
+    const sig = [lang, pc.hp, pc.hp_max, pc.ac, conds.join(","), slots.map((x) => x.lv + ":" + x.left + "/" + x.max).join(","),
+                 live.map(deltaText).join("|")].join("/");
+    if (card.dataset.sig === sig) return;
+    card.dataset.sig = sig;
+    const pct = hpPct(pc);
+    const color = pct <= 25 ? "var(--hp-low)" : pct <= 50 ? "var(--hp-mid)" : "var(--hp)";
+    card.innerHTML =
+      `<span>❤ ${esc(t("sheet_hp"))} <b>${esc(pc.hp)}</b>/${esc(pc.hp_max)}<span class="hpbar"><div style="width:${pct}%;background:${color}"></div></span></span>` +
+      (pc.ac != null ? `<span>🛡 ${esc(t("sheet_ac"))} <b>${esc(pc.ac)}</b></span>` : "") +
+      (slots.length ? `<span class="slots">✨ ` + slots.map((x) =>
+        `${esc(t("lvl"))} ${esc(x.lv)}: ${"●".repeat(Math.min(x.left, 9))}${"○".repeat(Math.max(0, Math.min(x.max, 9) - x.left))}`).join(" · ") + `</span>` : "") +
+      (conds.length ? `<span class="cond">⚠ ${esc(conds.map((c) => tx(c)).join(", "))}</span>` : "") +
+      live.map((d) => `<span class="delta ${d.cls}">${esc(deltaText(d))}</span>`).join("");
+    card.title = t("openSheet");
+  }
+  uiHooks.push(renderMyCard);
+  $("mycard").onclick = () => { if (me) openSheet(me); };
+  $("mycard").onkeydown = (ev) => { if ((ev.key === "Enter" || ev.key === " ") && me) { ev.preventDefault(); openSheet(me); } };
+  setInterval(() => { if (deltas.some((d) => d.until <= Date.now())) renderMyCard(); }, 1000);
 
   // ------------------------------------------ narration, revealed as told ---
   // New narration appears a few words at a time — in step with the voice when

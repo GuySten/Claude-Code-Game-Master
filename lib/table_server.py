@@ -1913,6 +1913,7 @@ class TableState:
                 "race": c.get("race", ""), "class": c.get("class", ""),
                 "concept": c.get("concept", ""),
                 "hp": hp.get("current", 0), "hp_max": hp.get("max", 0),
+                "ac": c.get("ac", c.get("armor_class")),
                 "status": c.get("status", "alive"),
                 "conditions": c.get("conditions", []),
                 "claimed": self.claimed_by_anyone(c.get("name", "")),
