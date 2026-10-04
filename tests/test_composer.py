@@ -323,20 +323,47 @@ def test_twins_use_the_melody_model_only_when_its_there_and_on_a_gpu(monkeypatch
     assert mc.twin_mode("cpu") == "melody"                              # asked for: always tried
 
 
-def test_each_character_has_a_tune_of_their_own_and_its_dark_twin_is_the_same_tune():
+NAMES = ["Pip", "Bram", "רן", "ג'ון סמיט", "Izrin", "Kara", "Grimaldi the Grey", "Zoë", "קסטרל"] + \
+    [f"Hero {i}" for i in range(300)]
+
+
+def test_every_heroes_tune_is_built_like_a_film_heroes_theme():
+    """A pickup into a big leap, gap-fill, a fanfare rhythm, a held climax about
+    two-thirds in, a singable range, home to the tonic: for every name."""
+    from lib import music_compose as mc
+    for name in NAMES:
+        tune = mc.leitmotif(name)
+        t = mc.theme_traits(tune)
+        assert t["leap"] in (7, 12) and t["gap_fill"] and t["fanfare"], (name, t)
+        assert 0.45 <= t["climax_at"] <= 0.75 and t["climax_held"], (name, t)
+        assert t["range"] <= 19 and t["biggest_jump"] <= 12 and t["ends_home"], (name, t)
+        body = sum(b for _, b in tune["notes"]) - sum(b for _, b in tune["motif"]) + 8   # (after the pickup)
+        assert abs(body / 4 - round(body / 4)) < 1e-6, (name, body)                  # whole bars
+    assert mc.leitmotif("Pip")["notes"] == mc.leitmotif(" pip ")["notes"]           # always the same tune
+    motifs = {tuple(mc.leitmotif(n)["motif"]) for n in NAMES}
+    assert len(motifs) >= 12                                                     # and not everyone's
+
+
+def test_every_villains_tune_is_the_same_tune_turned_menacing():
+    """Minor, a march of repeated notes, half-step sighs, a tritone, falling home
+    through the minor 2nd; and still recognisably the hero's tune."""
+    from lib import music_compose as mc
+    for name in NAMES:
+        hero, dark = mc.leitmotif(name), mc.leitmotif(name, "minor")
+        t, h = mc.theme_traits(dark), mc.theme_traits(hero)
+        assert t["minor"] and t["repeated"] and t["tritone"] and t["sighs"] >= 3, (name, t)
+        assert t["falls_home"] and t["ends_home"] and dark["notes"][-2][0] == 1, (name, t)
+        assert t["range"] <= 19 and t["biggest_jump"] <= 12, (name, t)
+        assert t["leap"] == h["leap"] and dark["key"] == hero["key"]             # the same opening leap
+        assert 0.45 <= t["climax_at"] <= 0.75, (name, t)
+
+
+def test_a_tune_renders_as_a_melody_line():
     pytest.importorskip("numpy")
     from lib import music_compose as mc
-    pip, also_pip, bram = mc.leitmotif("Pip"), mc.leitmotif(" pip "), mc.leitmotif("Bram")
-    assert pip == {**also_pip, "seed": "Pip"} and pip["motif"] != bram["motif"]   # stable, personal
-    first, second = pip["motif"][0][0], pip["motif"][1][0]
-    assert second - first in (3, 4)                                      # opens with a heroic leap
-    assert len(pip["notes"]) >= 4 * len(pip["motif"]) - 1                # a phrase, not one bar looped
-    dark = mc.leitmotif("Pip", "minor")
-    assert dark["notes"] == pip["notes"] and dark["key"] == pip["key"]   # the same tune...
-    k = pip["key"]
-    assert [mc._midi(k, d, "minor") for d, _ in dark["notes"]] != [mc._midi(k, d, "major") for d, _ in pip["notes"]]
-    score = mc.render_leitmotif("Pip", "major", 20)
-    assert abs(len(score) / 32000 - 20) < 0.01 and float(abs(score).max()) > 0.1
+    for mode, s in (("major", 20), ("minor", 30)):
+        line = mc.render_leitmotif("Pip", mode, s)
+        assert abs(len(line) / 32000 - s) < 0.01 and float(abs(line).max()) > 0.1
 
 
 def test_anthems_are_composed_on_the_leitmotif_with_the_melody_model(tmp_path, fake):

@@ -207,54 +207,135 @@ def generate(prompt: str, seconds: float, device: str):
 
 # --- a character's leitmotif: a tune of their own, for the melody model to follow ---
 # MusicGen left to itself tends to loop one short phrase. Given a melody line, the
-# melody model arranges THAT: so each character gets a short motif (from their
-# name: always the same), laid out as a phrase that goes somewhere, and their dark
-# twin follows the very same motif in the minor key, slower.
+# melody model arranges THAT. So each character gets a motif (from their name:
+# always the same), built the way film heroes' themes are, and laid out as a
+# phrase that goes somewhere. Their dark twin is the same tune turned villainous.
+#
+# The hero (Star Wars, Superman, Indiana Jones, Jurassic Park...): a pickup into a
+# strong-beat leap up a fifth or an octave; then gap-fill, stepping back down in a
+# fanfare rhythm (dotted or triplet); the motif again a step higher; a climb to the
+# climax (the highest note, held) about two-thirds of the way in; the motif once
+# more, home to the tonic, held. A singable range: about an octave and a half.
+#
+# The villain (the Imperial March, Jaws, Mordor...): the same tune in the minor,
+# its pickup a dotted march of repeated notes, each phrase ending on a half-step
+# sigh (minor 6th to 5th), a tritone before the climax, and the last phrase
+# falling home through the minor 2nd (the dark, "Phrygian" cadence).
 MAJOR = [0, 2, 4, 5, 7, 9, 11]
 MINOR = [0, 2, 3, 5, 7, 8, 10]          # natural minor: the same degrees, darkened
-RHYTHMS = [[1, .5, .5, 1, 1], [1.5, .5, 1, 1], [.5, .5, 1, .5, .5, 1], [1, 1, .5, .5, 1], [2, 1, 1]]
+T = 1 / 3                               # a triplet's share of a beat
+
+
+import math  # noqa: E402  (the tune generator's only need)
+
+
+def _semitones(degree: int, scale) -> int:
+    octave, idx = divmod(degree, 7)
+    return 12 * octave + scale[idx]
+
+
+def _hero(rng) -> dict:
+    """The heroic phrase, in scale degrees: {sections: {name: [(degree, beats)]}}."""
+    leap = rng.choice([4, 7, 7])                                  # a fifth, or (mostly) an octave
+    start = 0
+    if leap == 7:                                                 # (the range stays singable)
+        pickup = rng.choice([[(0, T), (0, T), (0, T)], [(0, .75), (0, .25)], [(4, 1)]])
+    else:
+        pickup = rng.choice([[(-3, 1)], [(-3, .75), (-3, .25)], [(0, T), (0, T), (0, T)]])
+    d0 = rng.choice([1, 1.5])
+    figure = rng.choice([[.75, .25], [T, T, T]])                 # the fanfare: dotted, or a triplet
+    fill = [leap - 1 - i for i in range(len(figure))]             # gap-fill: stepping back down
+    nxt = fill[-1] - 1
+    landing = nxt + (rng.choice([1, 2]) if leap == 7 else 1)      # a half cadence, lifting
+    motif = [(start, d0), (leap, 2)] + list(zip(fill, figure)) + [(nxt, 1)]
+    motif.append((landing, 8 - sum(b for _, b in motif)))
+    up = [(d + 1, b) for d, b in motif]                           # the motif again, a step higher
+    top = 9 if leap == 7 else 7                                   # the climax: the highest note, on a chord tone
+    climb = [(top - 3, .75), (top - 2, .25), (top - 1, 1), (top, 2.5), (top - 1, 1), (top - 3, 1)]
+    climb.append((4, 8 - sum(b for _, b in climb)))
+    head = motif[:2 + len(figure)]                                # the motif, then home
+    last = head[-1][0]
+    if leap == 7:                                                 # stepping up to the high tonic
+        home, tonic = head + [(d, 1) for d in range(last + 1, 7)], 7
+    else:                                                         # stepping down to the tonic
+        home, tonic = head + [(d, 1) for d in range(last - 1, 0, -1)], 0
+    used = sum(b for _, b in home)
+    home.append((tonic, math.ceil((used + 3) / 4) * 4 - used))    # held to the bar line (3+ beats)
+    return {"pickup": pickup, "motif": motif, "up": up, "climb": climb, "home": home}
+
+
+def _villain(hero: dict) -> list:
+    """The same tune, turned villainous: [(semitones from the tonic, beats)]."""
+    st = lambda d: _semitones(d, MINOR)                           # noqa: E731
+    sigh = lambda b: [(8, b / 2), (7, b / 2)]                     # noqa: E731  minor 6th -> 5th
+    out = [(0, .75), (0, .25), (0, .75), (0, .25)]               # a march of repeated notes
+    for name in ("motif", "up"):
+        sec = hero[name]
+        out += [(st(d), b) for d, b in sec[:-1]] + sigh(sec[-1][1])
+    climb = [(st(d), b) for d, b in hero["climb"]]
+    peak = max(range(len(climb)), key=lambda i: climb[i][0])
+    climb[peak - 1] = (6, climb[peak - 1][1])                     # the tritone, before the peak
+    out += climb[:-1] + sigh(climb[-1][1])
+    head = [(st(d), b) for d, b in hero["home"][:len(hero["motif"]) - 2]]   # its opening
+    out += head + [(3, 1), (1, 1), (0, 3)]                        # falling home through the minor 2nd
+    return out
 
 
 def leitmotif(seed: str, mode: str = "major") -> dict:
-    """The tune: {key (MIDI tonic), notes [(scale degree, beats)], ...}. Same seed,
-    same tune; "minor" is the same tune in the parallel minor."""
+    """The tune: {key (MIDI tonic), notes [(semitones from the tonic, beats)],
+    motif (its first statement)}. Same seed, same tune; "minor" is the villain."""
     import hashlib
     import random
     rng = random.Random(hashlib.sha256(seed.strip().lower().encode("utf-8")).hexdigest())
-    key = 60 + rng.choice([0, 2, 3, 5, 7])                    # C, D, Eb, F or G
-    rhythm = rng.choice(RHYTHMS)
-    start = rng.choice([0, 0, 2, 4])
-    degrees = [start, start + rng.choice([3, 4])]              # a heroic leap up: a 4th or a 5th
-    while len(degrees) < len(rhythm):
-        step = rng.choice([-1, -1, 1, 1, -2, 2, 0])
-        degrees.append(max(-2, min(9, degrees[-1] + step)))
-    motif = list(zip(degrees, rhythm))
-    # A phrase that goes somewhere: the motif, the motif a step higher, a contrast
-    # (the motif upside down, settling on the dominant), the motif home to the tonic.
-    up = [(d + 1, b) for d, b in motif]
-    contrast = [(2 * degrees[0] - d, b) for d, b in motif][:-1] + [(4, rhythm[-1])]
-    home = motif[:-1] + [(7 if degrees[-1] > 3 else 0, rhythm[-1] + 2)]
-    return {"seed": seed, "mode": mode, "key": key, "motif": motif,
-            "notes": motif + up + contrast + home}
+    key = 60 + rng.choice([0, 2, 3, 5, 7])                        # C, D, Eb, F or G
+    hero = _hero(rng)
+    if mode == "minor":
+        notes = _villain(hero)
+        motif = notes[:4 + len(hero["motif"]) + 1]
+    else:
+        notes = [(_semitones(d, MAJOR), b)
+                 for name in ("pickup", "motif", "up", "climb", "home") for d, b in hero[name]]
+        motif = notes[:len(hero["pickup"]) + len(hero["motif"])]
+    return {"seed": seed, "mode": mode, "key": key, "motif": motif, "notes": notes}
 
 
-def _midi(key: int, degree: int, mode: str) -> int:
-    scale = MINOR if mode == "minor" else MAJOR
-    octave, idx = divmod(degree, 7)
-    return key + 12 * octave + scale[idx]
+def theme_traits(tune: dict) -> dict:
+    """What a tune has of a film hero's (or villain's) theme: used to check every one."""
+    notes = tune["notes"]
+    pitch = [p for p, _ in notes]
+    beats = [b for _, b in notes]
+    steps = [b - a for a, b in zip(pitch, pitch[1:])]
+    total = sum(beats)
+    leap_at = next((i for i, s in enumerate(steps[:6]) if s >= 7), None)
+    top = pitch.index(max(pitch))
+    return {
+        "leap": steps[leap_at] if leap_at is not None else 0,
+        "gap_fill": leap_at is not None and leap_at + 1 < len(steps) and steps[leap_at + 1] < 0,
+        "fanfare": any(abs(b - .75) < 1e-6 or abs(b - T) < 1e-6 for b in beats),
+        "climax_at": sum(beats[:top]) / total,
+        "climax_held": beats[top] >= 2,
+        "range": max(pitch) - min(pitch),
+        "biggest_jump": max(abs(s) for s in steps),
+        "ends_home": pitch[-1] % 12 == 0 and beats[-1] >= 3,
+        "minor": 3 in {p % 12 for p in pitch} and 4 not in {p % 12 for p in pitch},
+        "sighs": sum(1 for s in steps if s == -1),
+        "repeated": any(s == 0 for s in steps),
+        "tritone": 6 in {p % 12 for p in pitch},
+        "falls_home": steps[-1] < 0,
+    }
 
 
 def render_leitmotif(seed: str, mode: str = "major", seconds: float = 20, rate: int = 32000):
     """The tune as a plain synthesized melody line (what the melody model hears):
-    stretched to ``seconds``; the minor one is also an octave lower."""
+    stretched to ``seconds``; the villain is also an octave lower."""
     import numpy as np
     tune = leitmotif(seed, mode)
     beats = sum(b for _, b in tune["notes"])
     beat_s = seconds / beats
     out = np.zeros(int(seconds * rate) + rate, dtype="float64")
     t0 = 0.0
-    for degree, b in tune["notes"]:
-        note = _midi(tune["key"], degree, mode) - (12 if mode == "minor" else 0)
+    for st, b in tune["notes"]:
+        note = tune["key"] + st - (12 if mode == "minor" else 0)
         hz = 440.0 * 2 ** ((note - 69) / 12)
         n = int(b * beat_s * rate)
         t = np.arange(n) / rate
