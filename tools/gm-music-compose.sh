@@ -3,6 +3,8 @@
 # (local AI: MusicGen, on this computer's GPU — optional)
 #
 #   gm-music-compose.sh setup [--cpu]        Install the composer (its own .compose-venv, ~3 GB)
+#   gm-music-compose.sh setup --melody       Also the melody model (~3.3 GB): dark twins keep the anthem's tune
+#                                            (COMPOSE_MODEL=facebook/musicgen-melody: it composes everything)
 #   gm-music-compose.sh check                Which GPU/CPU it would use
 #   gm-music-compose.sh test                 Time one 30-second piece (first run downloads the model)
 #   gm-music-compose.sh theme "<villain>" [--boss] [--look "..."]   Compose a theme now
@@ -30,6 +32,24 @@ shift || true
 
 case "$ACTION" in
     setup)
+        if [ "$1" = "--melody" ]; then
+            PY="$(compose_py)"
+            [ -z "$PY" ] && { error "Set up the composer first: bash tools/gm-music-compose.sh setup"; exit 1; }
+            # The melody model's processor needs torchaudio, built for the same torch.
+            TORCH_VER="$("$PY" -c 'import torch; print(torch.__version__.split("+")[0])')" || exit 1
+            TORCH_IDX="$("$PY" -c 'import torch; v = torch.version.cuda; print("https://download.pytorch.org/whl/" + ("cu" + v.replace(".", "") if v else "cpu"))')"
+            info "Installing torchaudio for torch $TORCH_VER..."
+            if [ "$(uname -s)" = "Darwin" ]; then
+                uv pip install --python "$PY" "torch==$TORCH_VER" torchaudio || exit 1
+            else
+                uv pip install --python "$PY" "torch==$TORCH_VER" torchaudio --index-url "$TORCH_IDX" || exit 1
+            fi
+            info "Downloading the melody model (about 3.3 GB, once)..."
+            "$PY" "$LIB_DIR/music_compose.py" --fetch-melody || exit 1
+            success "Dark twins now keep each anthem's tune. To compose EVERYTHING with it, add"
+            echo "  COMPOSE_MODEL=facebook/musicgen-melody   to .env (try: COMPOSE_MODEL=facebook/musicgen-melody bash tools/gm-music-compose.sh test)"
+            exit 0
+        fi
         if ! command -v uv >/dev/null 2>&1; then
             error "uv is needed (the installer sets it up): https://docs.astral.sh/uv/"
             exit 1

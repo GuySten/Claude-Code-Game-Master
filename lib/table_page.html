@@ -70,8 +70,17 @@
   .lang-pick { padding: 5px 8px; width: auto; max-width: 11em; }
   #log { flex: 1; overflow-y: auto; padding: 16px; }
   .msg { max-width: 760px; margin: 0 auto 14px; padding: 10px 14px; border-radius: 10px; position: relative; }
-  .msg.gm { background: var(--gm); border: 1px solid var(--line); }
-  .msg.player { background: var(--me); }
+  /* The story is the page: narration reads like a book; actions are compact. */
+  .msg.gm { background: var(--gm); border: 1px solid var(--line); font-size: 1.07rem; line-height: 1.7;
+            padding: 14px 18px; box-shadow: 0 1px 3px rgba(0, 0, 0, .06); }
+  .msg.player { background: var(--me); font-size: .95rem; max-width: 640px; padding: 7px 12px; }
+  .msg.player.mine { margin-inline-start: auto; margin-inline-end: max(0px, calc((100% - 760px) / 2)); }
+  /* Joins, music, "one more minute"…: a quiet strip between the beats. */
+  .notices { max-width: 760px; margin: -6px auto 10px; text-align: center; font-size: .8rem;
+             color: var(--sys); font-style: italic; line-height: 1.5; }
+  .notices .msg.system { display: inline; margin: 0; padding: 0; font-size: inherit; }
+  .notices .msg.system + .msg.system::before { content: " · "; font-style: normal; }
+  @media (max-width: 760px) { .msg.gm { font-size: 1.02rem; padding: 11px 13px; } }
   .msg.player.mine { border-inline-start: 3px solid var(--accent); }
   .msg.system { color: var(--sys); font-style: italic; text-align: center; padding: 2px; }
   .msg.whisper { background: var(--whisper); }
@@ -79,6 +88,16 @@
          display: flex; justify-content: space-between; gap: 8px; }
   .who button { border: 0; background: none; padding: 0 4px; font-size: .9rem; color: var(--muted); }
   .who .edited { font-style: italic; margin-inline-start: 4px; }
+  /* My action: sent (still mine to fix), then read by the GM. */
+  .msg .pend { font-size: .78rem; color: var(--muted); margin-top: 3px; }
+  .msg .pend.read { color: var(--accent); }
+  /* An action the GM ruled can't work (its player chose again), and that ruling. */
+  .msg.redone .body { text-decoration: line-through; opacity: .6; }
+  .msg .redo-note { font-size: .85rem; color: var(--muted); margin-top: 2px; }
+  .msg.gm.redo { border-inline-start: 4px solid var(--hp-low); }
+  .msg.gm.redo.for-me { box-shadow: 0 0 0 2px var(--hp-low); }
+  .msg.gm.redo.warn { background: color-mix(in srgb, var(--hp-low) 10%, var(--gm)); }
+  .msg.system.punished { color: var(--hp-low); font-weight: bold; font-style: normal; font-size: 1.05rem; }
   .msg .edit-box { width: 100%; box-sizing: border-box; font: inherit; min-height: 3.2em;
                    resize: vertical; margin-top: 2px; }
   .msg .edit-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 4px; }
@@ -87,9 +106,22 @@
   /* The public dice log: every roll the table makes, with its DC/AC. */
   .msg.roll { background: transparent; border: 1px dashed var(--line); max-width: 560px;
               padding: 6px 12px; font-size: .92rem; }
-  .msg.roll .goal { color: var(--muted); font-size: .85rem; }
-  .msg.roll .dice { font-variant-numeric: tabular-nums; }
-  .msg.roll .total { font-weight: bold; font-size: 1.05rem; }
+  .msg.roll .goal { color: var(--muted); font-size: .85rem; display: flex; gap: 6px; align-items: baseline; }
+  .msg.roll .goal .what { flex: 1; }
+  .msg.roll .dice { font-variant-numeric: tabular-nums; font-size: 1.05rem; }
+  .msg.roll .total { font-weight: bold; font-size: 1.45rem; display: inline-block; min-width: 1.6em;
+                     text-align: center; border: 2px solid var(--line); border-radius: 8px;
+                     padding: 0 6px; margin-inline-start: 2px; }
+  .msg.roll.success { border: 1px solid var(--hp); background: color-mix(in srgb, var(--hp) 7%, transparent); }
+  .msg.roll.success .total { border-color: var(--hp); color: var(--hp); }
+  .msg.roll.failure { border: 1px solid var(--hp-low); background: color-mix(in srgb, var(--hp-low) 7%, transparent); }
+  .msg.roll.failure .total { border-color: var(--hp-low); color: var(--hp-low); }
+  .msg.roll .why-btn { border: 1px solid var(--line); border-radius: 6px; padding: 0 6px; font-size: .8rem;
+                       background: var(--panel); }
+  .msg.roll .why-list { margin: 4px 0 0; padding-inline-start: 1.2em; font-size: .82rem; color: var(--muted); }
+  .msg.roll.fresh .total { animation: roll-in .7s cubic-bezier(.2, 1.6, .4, 1); }
+  @keyframes roll-in { from { transform: rotate(-200deg) scale(.3); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .msg.roll.fresh .total { animation: none; } }
   .msg.roll .ok { color: var(--hp); font-weight: bold; }
   .msg.roll .bad { color: var(--hp-low); font-weight: bold; }
   .msg.roll .nat { font-weight: bold; color: var(--accent); }
@@ -101,11 +133,20 @@
   .msg h3 { margin: .2em 0 .4em; font-size: 1.05rem; }
   .msg code { font-family: ui-monospace, Menlo, monospace; font-size: .9em; }
   #status { padding: 4px 16px; font-size: .85rem; color: var(--muted); min-height: 1.6em; }
+  /* Whose move it is, in one glance. */
+  #turn { margin: 0 16px; padding: 8px 14px; border-radius: 10px; font-weight: bold; font-size: 1.02rem;
+          border: 2px solid var(--line); background: var(--panel); text-align: center; }
+  #turn.yours { border-color: var(--accent); color: var(--accent); }
+  #turn.redo { border-color: var(--hp-low); color: var(--hp-low); animation: pulse 1.2s ease-in-out infinite; }
+  #turn.sent, #turn.gm, #turn.out { color: var(--muted); font-weight: normal; }
+  .pc .turn-tick { float: inline-end; margin-inline-end: 8px; font-size: .85rem; }
+  @media (max-width: 760px) { #turn { margin: 0 8px; padding: 6px 10px; font-size: .95rem; } }
   /* The GM's turn: what it's doing and roughly how long is left. */
   #progress { padding: 8px 16px 2px; }
   #progress .label { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
                      font-size: .9rem; }
   #progress .eta { color: var(--muted); font-size: .85rem; }
+  #progress #extend { padding: 2px 10px; font-size: .85rem; margin-inline-start: auto; }
   #progress .track { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden;
                      margin-top: 6px; }
   #progress .fill { height: 100%; width: 0; background: var(--accent); border-radius: 3px;
@@ -132,6 +173,11 @@
   .say-row label { margin: 0; display: flex; align-items: center; gap: 6px; }
   .say-row input[type=checkbox] { width: auto; }
   .say-row .opts { display: flex; gap: 6px 14px; flex-wrap: wrap; }
+  /* One-tap starters for an action, from the character sheet. */
+  .chips { display: flex; gap: 6px; overflow-x: auto; padding: 0 0 8px; scrollbar-width: thin; }
+  .chips:empty { display: none; }
+  .chips button { flex: 0 0 auto; padding: 4px 10px; font-size: .85rem; border-radius: 16px; }
+  @media (max-width: 760px) { .chips button { min-height: 36px; } }
 
   aside { border-inline-start: 1px solid var(--line); overflow-y: auto; padding: 12px 14px; }
   aside h2 { font-size: .95rem; margin: 4px 0 10px; color: var(--muted); font-weight: normal;
@@ -142,9 +188,24 @@
   .bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; margin: 4px 0; }
   .bar > div { height: 100%; background: var(--hp); }
   .pc .meta { font-size: .8rem; color: var(--muted); }
+  /* My character, always in sight: HP, AC, slots, conditions; what just changed. */
+  #mycard { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: .88rem;
+            padding: 6px 16px 0; cursor: pointer; }
+  #mycard .hpbar { width: 90px; height: 7px; background: var(--line); border-radius: 4px; overflow: hidden;
+                   display: inline-block; vertical-align: middle; margin-inline-start: 4px; }
+  #mycard .hpbar > div { height: 100%; background: var(--hp); transition: width .9s ease; }
+  #mycard .cond { color: var(--hp-low); }
+  #mycard .slots { font-variant-numeric: tabular-nums; letter-spacing: .05em; }
+  #mycard .delta { font-weight: bold; border-radius: 6px; padding: 0 6px; color: #fff; animation: delta-in .4s ease-out; }
+  #mycard .delta.down { background: var(--hp-low); }
+  #mycard .delta.up { background: var(--hp); }
+  @keyframes delta-in { from { transform: translateY(6px); opacity: 0; } }
+  @media (max-width: 760px) { #mycard { padding: 4px 10px 0; font-size: .82rem; gap: 2px 10px; } }
   .pc { cursor: pointer; border-radius: 6px; }
   .pc:hover, .pc:focus-visible { background: var(--me); outline: none; }
   .pc .open-sheet { float: inline-end; font-size: .75rem; color: var(--muted); }
+  .pc .kick { float: inline-end; border: 0; background: none; padding: 0 4px; margin-inline-start: 6px;
+              font-size: .85rem; color: var(--hp-low); }
   .pc .avatar { width: 30px; height: 30px; border-radius: 50%; object-fit: cover;
                 vertical-align: middle; margin-inline-end: 6px; border: 1px solid var(--line); }
   #sheet-body .portrait { float: inline-end; width: min(180px, 42%); border-radius: 10px;
@@ -188,6 +249,13 @@
   @keyframes healed { from { background: color-mix(in srgb, var(--hp) 35%, transparent); } }
   /* Narration being told: tap it to show the rest at once. */
   .msg.revealing { cursor: pointer; }
+  /* "Previously…": the story so far, for a player sitting (back) down. */
+  #recap { max-width: 760px; margin: 12px auto; padding: 12px 16px; border: 1px solid var(--accent);
+           border-radius: 12px; background: var(--gm); }
+  #recap h3 { margin: 0 0 6px; font-size: 1rem; color: var(--accent); }
+  #recap .text { white-space: pre-line; }
+  #recap .text.pending { opacity: .75; }
+  #recap .row { justify-content: flex-end; margin-top: 8px; }
   .msg.queued { display: none; }
 
   /* The character sheet */
@@ -233,6 +301,20 @@
   .voice-settings input[type=range] { width: 100%; padding: 0; }
   #now-playing { margin-bottom: 6px; }
   #party-toggle { display: none; }
+  /* The fight: order, whose turn, how the foes look, what's on the battlefield. */
+  #fight { margin: 6px 16px 0; padding: 6px 10px; border: 1px solid var(--hp-low); border-radius: 10px;
+           background: color-mix(in srgb, var(--hp-low) 5%, var(--panel)); font-size: .88rem; }
+  #fight .fhead { display: flex; justify-content: space-between; gap: 8px; color: var(--hp-low); font-weight: bold; }
+  #fight .order { display: flex; gap: 6px; overflow-x: auto; padding: 6px 0 2px; scrollbar-width: thin; }
+  #fight .fc { flex: 0 0 auto; display: block; border: 1px solid var(--line); border-radius: 8px;
+               padding: 3px 9px; background: var(--panel); color: var(--ink); text-align: start; font-size: .85rem; }
+  #fight .fc .h { display: block; font-size: .74rem; color: var(--muted); }
+  #fight .fc.foe { border-color: color-mix(in srgb, var(--hp-low) 55%, var(--line)); }
+  #fight .fc.now { box-shadow: 0 0 0 2px var(--accent); }
+  #fight .fc.target { outline: 2px dashed var(--hp-low); outline-offset: 1px; }
+  #fight .fc.down { opacity: .5; text-decoration: line-through; }
+  #fight .fields { margin-top: 4px; }
+  @media (max-width: 760px) { #fight { margin: 4px 8px 0; } }
 
   /* The players' side chat (the GM never sees it): a third column on wide screens,
      a drawer from the side on narrower ones. */
@@ -288,6 +370,7 @@
   .more-menu { display: contents; }
   #leave { order: 1; }
   #more-toggle { display: none; }
+  #tabs { display: none; }
 
   @media (max-width: 760px) {
     #table { grid-template-columns: 1fr; }
@@ -338,6 +421,21 @@
     .say-row #me { display: none; }
     #send { min-height: 40px; padding: 6px 18px; }
     #chat input, #narrator-form input { font-size: 16px; }
+
+    /* Phone: Story / Party / Sheet / Chat tabs at the bottom; the action box and
+       the countdown stay pinned just above them. */
+    #sheet-toggle, #party-toggle, #chat-toggle { display: none !important; }
+    #tabs { display: flex; border-top: 1px solid var(--line); background: var(--panel);
+            padding-bottom: env(safe-area-inset-bottom); }
+    #tabs button { flex: 1; border: 0; border-radius: 0; background: none; min-height: 52px; padding: 4px 2px;
+                   font-size: .75rem; display: flex; flex-direction: column; align-items: center; gap: 1px;
+                   position: relative; }
+    #tabs button .i { font-size: 1.3rem; line-height: 1.2; }
+    #tabs button[aria-pressed="true"] { color: var(--accent); box-shadow: inset 0 3px 0 var(--accent); }
+    #tabs .badge { position: absolute; top: 4px; inset-inline-end: 22%; background: var(--hp-low); color: #fff;
+                   border-radius: 9px; font-size: .68rem; padding: 0 5px; }
+    aside, #chat.open { bottom: var(--tabs-h, 56px) !important; }
+    aside { max-height: none; overflow-y: auto; }
 
     /* Drawers and dialogs use the whole phone. */
     #chat.open { width: 100%; }
@@ -412,14 +510,19 @@
                 data-i18n-label="menu">⋯</button>
       </div>
     </header>
+    <div id="fight" class="hidden" aria-live="polite"></div>
     <div id="log" aria-live="polite"></div>
+    <div id="turn" class="hidden" aria-live="polite"></div>
     <div id="progress" class="hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100"
          aria-live="polite">
-      <div class="label"><span id="progress-what"></span><span class="eta" id="progress-eta"></span></div>
+      <div class="label"><span id="progress-what"></span><span class="eta" id="progress-eta"></span><button
+        id="extend" type="button" class="hidden" data-i18n="extend"></button></div>
       <div class="track"><div class="fill"></div></div>
     </div>
     <div id="status"></div>
+    <div id="mycard" class="hidden" role="button" tabindex="0"></div>
     <form id="say">
+      <div id="chips" class="chips"></div>
       <div class="input-row">
         <button id="mic" type="button" aria-pressed="false">🎤</button>
         <textarea id="text" maxlength="1200" dir="auto" data-i18n-ph="placeholder"></textarea>
@@ -433,6 +536,12 @@
         <button class="primary" type="submit" id="send" data-i18n="send"></button>
       </div>
     </form>
+    <nav id="tabs">
+      <button type="button" id="tab-story" aria-pressed="true"><span class="i">📖</span><span data-i18n="tabStory"></span></button>
+      <button type="button" id="tab-party" aria-pressed="false"><span class="i">👥</span><span data-i18n="tabParty"></span></button>
+      <button type="button" id="tab-sheet" aria-pressed="false"><span class="i">🧾</span><span data-i18n="tabSheet"></span></button>
+      <button type="button" id="tab-chat" aria-pressed="false"><span class="i">💬</span><span data-i18n="tabChat"></span><span class="badge hidden" id="tab-chat-unread"></span></button>
+    </nav>
   </div>
   <aside id="party">
     <h2 data-i18n="partyTitle"></h2>
@@ -591,6 +700,7 @@
     updateReadToggle();
     updateMusicToggle();
     fillVoiceMenus();
+    try { refreshExtras(true); } catch (e) {}     // (before the table opens: nothing yet)
   }
 
   // -------------------------------------------------------------- api ---
@@ -1398,6 +1508,8 @@
     chatUnread = n;
     $("chat-unread").textContent = String(n);
     $("chat-unread").classList.toggle("hidden", !n);
+    $("tab-chat-unread").textContent = String(n);
+    $("tab-chat-unread").classList.toggle("hidden", !n);
   }
   // Long polling: the server holds this request until a line arrives (or ~25 s),
   // so chat lands at once instead of on the next poll.
@@ -1525,6 +1637,7 @@
     if (!!info.tts !== ttsOk) { ttsOk = !!info.tts; fillVoiceMenus(); }
     progressState = info.progress || { state: "idle" };
     roundState = info.round || { open: false };
+    fightState = info.fight || null;
     setLoreTerms(info.lore_terms);
     waitingOn = info.waiting_on || [];
     updateProgress();
@@ -1542,10 +1655,36 @@
     partyLive = info.party || [];
     narrationGate = info.narration_id || 0;
     syncParty();
+    refreshExtras();
     const waiting = info.waiting_on || [];
-    if (!listening && !noticeShowing()) setStatus(waiting.length ? t("waiting") + waiting.join(", ") : "");
+    if (!listening && !noticeShowing()) setStatus(waiting.length && !me ? t("waiting") + waiting.join(", ") : "");
   }
   async function refreshInfo() { renderInfo(await api("/api/info")); }
+
+  // The panels around the story register here: redrawn when the table's state
+  // changes (uiHooks), and the clock-driven ones four times a second (tickHooks).
+  const uiHooks = [], tickHooks = [];
+  let fightState = null, aimAt = null;           // the fight (if any), and the foe I aim at
+  let mySheet = null, mySheetRev = null, mySheetLoading = false;
+  function refreshExtras(langChanged) {
+    uiHooks.forEach((h) => { try { h(langChanged); } catch (e) { console.error(e); } });
+  }
+  function tickExtras() {
+    tickHooks.forEach((h) => { try { h(); } catch (e) { console.error(e); } });
+  }
+  // My own sheet, in the version my party card shows (in step with the story).
+  async function loadMySheet() {
+    const shown = me && partyShown.get(me);
+    const rev = shown && shown.sheet_rev;
+    if (!rev || rev === mySheetRev || mySheetLoading) return;
+    if (sheetCache.has(rev)) { mySheet = sheetCache.get(rev); mySheetRev = rev; return refreshExtras(); }
+    mySheetLoading = true;
+    try {
+      const r = await api("/api/sheet?pc=" + encodeURIComponent(me) + "&rev=" + rev);
+      if (r.ok && r.sheet) { sheetCache.set(r.rev, r.sheet); mySheet = r.sheet; mySheetRev = rev; }
+    } finally { mySheetLoading = false; }
+    refreshExtras();
+  }
 
   // ---------------------------------------- the party, in step with the story ---
   // The server already holds sheet changes back during the GM's turn. Here they
@@ -1572,7 +1711,10 @@
     }));
   }
   function renderParty(list) {
-    const sig = lang + "|" + me + "|" + list.map((p) => [p.name, p.sheet_rev, p.claimed, p.lead, p.hp, p.level_up].join("/")).join("|");
+    const rnd = roundState || {};
+    const ticking = rnd.open && rnd.deadline > serverNow();
+    const sig = lang + "|" + me + "|" + (ticking ? (rnd.waiting_on || []).join(",") : "-") + "|"
+      + list.map((p) => [p.name, p.sheet_rev, p.claimed, p.lead, p.hp, p.level_up].join("/")).join("|");
     if (sig === partySig) return;
     partySig = sig;
     const box = $("party-list");
@@ -1590,7 +1732,10 @@
       const status = pc.status && pc.status !== "alive" ? pc.status.toUpperCase() : "";
       const conds = (pc.conditions || []).map((c) => tx(String(c))).join(", ");
       const from = before ? hpPct(before) : pct;
-      d.innerHTML = `<div><span class="open-sheet">${esc(t("openSheet"))}</span>` +
+      const tick = !ticking || !pc.claimed || (rnd.out_of_action || {})[pc.name] ? ""
+        : (rnd.waiting_on || []).includes(pc.name) ? `<span class="turn-tick" title="${esc(t("stillChoosing"))}">⏳</span>`
+        : `<span class="turn-tick" title="${esc(t("acted"))}">✅</span>`;
+      d.innerHTML = tick + `<div><span class="open-sheet">${esc(t("openSheet"))}</span>` +
         (pc.portrait ? `<img class="avatar" alt="" src="${esc(imageUrl(pc.portrait, 96))}">` : "") +
         `<span class="name lore" dir="auto" data-term="${esc(pc.name)}">${esc(pc.name)}</span>` +
         (pc.level_up && pc.name === me ? `<span class="lvl-ready">${esc(t("lvlBadge"))}</span>` : "") +
@@ -1604,12 +1749,84 @@
       }));
       if (before && before.hp !== pc.hp) d.classList.add(pc.hp < before.hp ? "hurt" : "healed");
       d.onclick = () => openSheet(pc.name);
+      const iLead = list.some((p) => p.name === me && p.lead);
+      if (iLead && !pc.claimed && !pc.lead && pc.name !== me) {
+        const k = document.createElement("button");
+        k.type = "button"; k.className = "kick"; k.textContent = "✕"; k.title = t("kickPc");
+        k.onclick = async (ev) => {
+          ev.stopPropagation();
+          if (!confirm(t("kickConfirm").replace("{pc}", pc.name))) return;
+          const r = await api("/api/kick", { pc: pc.name });
+          if (!r.ok) setStatus(r.error || "?", true);
+          refreshInfo();
+        };
+        d.prepend(k);
+      }
       d.onkeydown = (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); openSheet(pc.name); } };
       box.appendChild(d);
       partyShown.set(pc.name, pc);
     });
     refreshSheet();
+    loadMySheet();
+    refreshExtras();
   }
+
+  // ------------------------------------------------------------ the fight ---
+  // Who's in it and in what order, whose turn it is, how hurt each foe looks (in
+  // words), and the battlefield effects, which hit everyone. Tap a foe to aim at it.
+  const fxWords = (f) => (f.effects || []).map((e) =>
+    t(e.kind === "adv" ? "fxAdv" : "fxDis").replace("{what}",
+      (e.ability ? tx(e.ability.toUpperCase()) + " " : "") + t("fx_" + e.roll))).join(", ");
+  function renderFight() {
+    const box = $("fight"), f = fightState;
+    if (!f) { box.classList.add("hidden"); box.textContent = ""; box.dataset.sig = ""; return; }
+    const foes = f.order.filter((c) => c.foe && c.health !== "down");
+    const aim = aimAt && foes.some((c) => c.name === aimAt) ? aimAt : (foes[0] || {}).name;
+    const party = f.order.filter((c) => !c.foe).map((c) => partyLive.find((p) => p.name === c.name) || {});
+    const sig = lang + "|" + aim + "|" + JSON.stringify(f) + JSON.stringify(party.map((p) => [p.hp, p.conditions]));
+    if (box.dataset.sig === sig) return;
+    box.dataset.sig = sig;
+    box.classList.remove("hidden");
+    box.textContent = "";
+    const head = document.createElement("div");
+    head.className = "fhead";
+    head.innerHTML = `<span>${esc(t("fightTitle").replace("{n}", f.round || 1))}</span>` +
+      (f.turn ? `<span dir="auto">${esc(t("fightTurn").replace("{name}", f.turn))}</span>` : "");
+    box.appendChild(head);
+    const order = document.createElement("div");
+    order.className = "order";
+    f.order.forEach((c) => {
+      const pc = !c.foe && partyLive.find((p) => p.name === c.name);
+      const b = document.createElement(c.foe ? "button" : "div");
+      if (c.foe) b.type = "button";
+      b.className = "fc" + (c.foe ? " foe" : "") + (c.name === f.turn ? " now" : "")
+        + (c.foe && c.name === aim ? " target" : "") + (c.health === "down" ? " down" : "");
+      const bits = [];
+      if (c.foe && c.health) bits.push(t("hpw_" + c.health));
+      if (pc) bits.push(`${pc.hp}/${pc.hp_max}`);
+      const conds = (c.conditions || []).concat(pc ? (pc.conditions || []).map((x) => String(x && x.name ? x.name : x)) : []);
+      [...new Set(conds)].forEach((x) => bits.push(tx(x)));
+      if ((c.states || {}).cover) bits.push(t("cover_" + c.states.cover));
+      if ((c.states || {}).hidden) bits.push(t("hiddenState"));
+      b.innerHTML = `${c.foe ? "👹 " : ""}${esc(c.name)}<span class="h">${esc(bits.join(" · "))}</span>`;
+      b.dir = "auto";
+      if (c.foe && c.health !== "down") {
+        b.title = t("fightTarget");
+        b.onclick = () => { aimAt = c.name; refreshExtras(); };
+      }
+      order.appendChild(b);
+      if (c.name === f.turn) setTimeout(() => b.scrollIntoView({ block: "nearest", inline: "nearest" }), 0);
+    });
+    box.appendChild(order);
+    (f.fields || []).forEach((fl) => {
+      const d = document.createElement("div");
+      d.className = "fields"; d.dir = "auto";
+      d.textContent = `🌋 ${fl.name}: ${fxWords(fl)} — ${t("fxEveryone")}`
+        + (fl.unless ? " " + t("fxUnless").replace("{trait}", fl.unless) : "");
+      box.appendChild(d);
+    });
+  }
+  uiHooks.push(renderFight);
 
   // ------------------------------------------------- the character sheet ---
   let sheetFor = null, sheetShownRev = null, sheetLevelUp = null, sheetPublic = false;
@@ -1669,7 +1886,7 @@
     blinded: "עיוור", charmed: "מוקסם", deafened: "חירש", frightened: "מפוחד",
     grappled: "אחוז", incapacitated: "חסר אונים", invisible: "בלתי נראה",
     paralyzed: "משותק", petrified: "מאובן", poisoned: "מורעל", prone: "שרוע",
-    restrained: "כבול", stunned: "המום", unconscious: "מחוסר הכרה", exhaustion: "תשישות",
+    restrained: "כבול", stunned: "המום", unconscious: "מחוסר הכרה", exhaustion: "תשישות", cursed: "מקולל",
     "proficiency bonus": "בונוס התמחות", saves: "הצלות", "saving throws": "הצלות",
     speed: "מהירות", initiative: "יוזמה", languages: "שפות", proficiencies: "התמחויות",
     cantrips: "לחשי בסיס", used: "בשימוש", remaining: "נותרו", total: "סך הכול",
@@ -1961,6 +2178,74 @@
   $("sheet").addEventListener("close", () => { sheetFor = null; });
   $("sheet-toggle").onclick = () => { if (me) openSheet(me); };
 
+  // --------------------------------------- my character, always in sight ---
+  // HP, AC, spell slots and conditions, in step with the story (the party card's
+  // version), and for a few seconds what the last beat changed ("−4 HP").
+  let lastCard = null;
+  const deltas = [];                   // [{k (a word's key), n, c (a condition), cls, until}]
+  const deltaText = (d) => d.c ? (d.cls === "down" ? "+ " : "− ") + tx(d.c)
+    : t(d.k).replace("{n}", d.n == null ? "" : (d.n > 0 ? "+" : "−") + Math.abs(d.n));
+  function slotsOf(sheet) {
+    const v = sheet && sheet.spell_slots;
+    if (!v || typeof v !== "object" || Array.isArray(v)) return [];
+    return Object.entries(v).map(([lv, x]) => {
+      const n = String(lv).match(/\d+/);
+      let max = null, left = null;
+      if (typeof x === "number") { max = x; left = x; }
+      else if (x && typeof x === "object") {
+        max = x.max ?? x.total ?? x.slots ?? null;
+        left = x.remaining ?? x.current ?? x.left ?? (max != null && x.used != null ? max - x.used : max);
+      }
+      return max ? { lv: n ? n[0] : lv, max: Number(max), left: Math.max(0, Number(left ?? max)) } : null;
+    }).filter(Boolean);
+  }
+  function renderMyCard() {
+    const card = $("mycard"), pc = me && partyShown.get(me);
+    if (!pc) { card.classList.add("hidden"); return; }
+    card.classList.remove("hidden");
+    const conds = (pc.conditions || []).map((c) => String(c && c.name ? c.name : c));
+    const fresh = !!mySheet && mySheetRev === pc.sheet_rev;       // (else: this version is still loading)
+    const slots = slotsOf(mySheet);
+    const mine = lastCard && lastCard.name === me;
+    const now = { name: me, hp: pc.hp, conds,
+                  slots: fresh ? slots.map((x) => x.lv + ":" + x.left).join(",") : mine ? lastCard.slots : null };
+    if (mine) {
+      const until = Date.now() + 7000;
+      if (now.hp !== lastCard.hp && typeof now.hp === "number" && typeof lastCard.hp === "number") {
+        const d = now.hp - lastCard.hp;
+        deltas.push({ k: "dHp", n: d, cls: d > 0 ? "up" : "down", until });
+      }
+      conds.filter((c) => !lastCard.conds.includes(c)).forEach((c) => deltas.push({ c, cls: "down", until }));
+      lastCard.conds.filter((c) => !conds.includes(c)).forEach((c) => deltas.push({ c, cls: "up", until }));
+      if (lastCard.slots && now.slots && lastCard.slots !== now.slots) {
+        const used = (s) => s.split(",").reduce((a, x) => a + Number(x.split(":")[1] || 0), 0);
+        const d = used(now.slots) - used(lastCard.slots);
+        if (d) deltas.push({ k: d < 0 ? "dSlotUsed" : "dSlotBack", cls: d < 0 ? "down" : "up", until });
+      }
+    }
+    lastCard = now;
+    const live = deltas.filter((d) => d.until > Date.now());
+    deltas.length = 0; deltas.push(...live);
+    const sig = [lang, pc.hp, pc.hp_max, pc.ac, conds.join(","), slots.map((x) => x.lv + ":" + x.left + "/" + x.max).join(","),
+                 live.map(deltaText).join("|")].join("/");
+    if (card.dataset.sig === sig) return;
+    card.dataset.sig = sig;
+    const pct = hpPct(pc);
+    const color = pct <= 25 ? "var(--hp-low)" : pct <= 50 ? "var(--hp-mid)" : "var(--hp)";
+    card.innerHTML =
+      `<span>❤ ${esc(t("sheet_hp"))} <b>${esc(pc.hp)}</b>/${esc(pc.hp_max)}<span class="hpbar"><div style="width:${pct}%;background:${color}"></div></span></span>` +
+      (pc.ac != null ? `<span>🛡 ${esc(t("sheet_ac"))} <b>${esc(pc.ac)}</b></span>` : "") +
+      (slots.length ? `<span class="slots">✨ ` + slots.map((x) =>
+        `${esc(t("lvl"))} ${esc(x.lv)}: ${"●".repeat(Math.min(x.left, 9))}${"○".repeat(Math.max(0, Math.min(x.max, 9) - x.left))}`).join(" · ") + `</span>` : "") +
+      (conds.length ? `<span class="cond">⚠ ${esc(conds.map((c) => tx(c)).join(", "))}</span>` : "") +
+      live.map((d) => `<span class="delta ${d.cls}">${esc(deltaText(d))}</span>`).join("");
+    card.title = t("openSheet");
+  }
+  uiHooks.push(renderMyCard);
+  $("mycard").onclick = () => { if (me) openSheet(me); };
+  $("mycard").onkeydown = (ev) => { if ((ev.key === "Enter" || ev.key === " ") && me) { ev.preventDefault(); openSheet(me); } };
+  setInterval(() => { if (deltas.some((d) => d.until <= Date.now())) renderMyCard(); }, 1000);
+
   // ------------------------------------------ narration, revealed as told ---
   // New narration appears a few words at a time — in step with the voice when
   // it's read aloud — and one beat at a time. Tap it to see the rest at once.
@@ -2064,6 +2349,8 @@
     if (ev.type === "npc") return ev.of ? t("ev_npc_of").replace("{name}", ev.name || "").replace("{pc}", ev.of)
                                         : t("ev_npc").replace("{name}", ev.name || "");
     if (ev.type === "levelready") return s.replace("{level}", ev.level);
+    if (ev.type === "punished") return t("ev_punished_" + ev.way).replace("{pc}", m.pc || "");
+    if (ev.type === "nemesis") return s.replace("{name}", ev.of || "");
     if (ev.type === "loot") return t("ev_loot").replace("{name}", ev.name || "")
       + (ev.owner ? " — " + t("lootFor").replace("{pc}", ev.owner) : "");
     if (ev.type === "levelup") {
@@ -2130,19 +2417,26 @@
     const box = $("progress");
     if (!(left > 0)) { box.classList.remove("urgent"); return false; }
     const mine = !!me && (r.waiting_on || []).includes(me);
+    // Not acted yet: one extra minute per round, for the asking.
+    const ext = $("extend");
+    ext.classList.toggle("hidden", !(mine && !(r.extended_by || []).includes(me)));
+    ext.title = t("extendTitle");
     const urgent = mine && left <= ROUND_URGENT;
     const clock = fmtClock(Math.ceil(left));
     const out = me && (r.out_of_action || {})[me];
-    showProgress(mine ? t(urgent ? "roundHurry" : "roundYours").replace("{t}", clock)
+    const redo = mine && (r.redo || {})[me] != null;
+    showProgress(mine ? t(redo ? "roundRedo" : urgent ? "roundHurry" : "roundYours").replace("{t}", clock)
                  : out ? t("roundOut").replace("{why}", out).replace("{t}", clock)
                  : t("roundWaiting").replace("{names}", (r.waiting_on || []).join(", ")).replace("{t}", clock),
-                 "", 100 * left / Math.max(1, r.seconds));
+                 "", 100 * left / Math.max(1, r.total || r.seconds));
     box.classList.toggle("urgent", urgent);
     if (urgent && !roundChimed[r.started_at]) { roundChimed[r.started_at] = true; chime(); }
     return true;
   }
   function updateProgress() {
+    tickExtras();
     if (showRound()) return;
+    $("extend").classList.add("hidden");
     const p = progressState;
     if (p.state === "working" && lastGmId <= p.start_id) {
       const now = serverNow(), elapsed = Math.max(0, now - p.started_at);
@@ -2167,6 +2461,40 @@
     $("progress").classList.add("hidden");
   }
   setInterval(updateProgress, 250);
+  // Whose move it is: a banner above the action box.
+  function turnState() {
+    if (!me) return null;
+    const r = roundState || {}, p = progressState || {};
+    const left = r.open ? r.deadline - serverNow() : 0;
+    const waiting = r.open ? (r.waiting_on || []) : waitingOn;
+    const out = (r.out_of_action || {})[me];
+    if (out) return ["out", t("turnOut").replace("{why}", tx(String(out)))];
+    if (left > 0 && waiting.includes(me) && (r.redo || {})[me] != null) return ["redo", t("turnRedo")];
+    if (p.state === "working" && lastGmId <= p.start_id) return ["gm", t("turnGm")];
+    if (left > 0 && waiting.includes(me))
+      return ["yours", t("turnYoursClock").replace("{t}", fmtClock(Math.ceil(left)))];
+    if (left > 0 || (mySentId && lastGmId < mySentId)) {
+      const others = waiting.filter((n) => n !== me);
+      return ["sent", others.length ? t("turnSent").replace("{names}", others.join(", ")) : t("turnSentAll")];
+    }
+    return ["yours", t("turnFree")];
+  }
+  function updateTurn() {
+    const el = $("turn"), st = turnState();
+    if (!st) { el.classList.add("hidden"); return; }
+    el.classList.remove("hidden");
+    if (el.dataset.k !== st[0]) { el.className = st[0]; el.dataset.k = st[0]; }
+    if (el.textContent !== st[1]) el.textContent = st[1];
+  }
+  tickHooks.push(updateTurn);
+  $("extend").onclick = async () => {
+    $("extend").disabled = true;
+    const r = await api("/api/extend", {});
+    $("extend").disabled = false;
+    if (r.round) roundState = r.round;
+    if (!r.ok) setStatus(r.error || "?");
+    updateProgress();
+  };
 
   // Every player reads one language. A message written in another one shows its
   // translation (sent by the GM with `gm-table.sh translate`), with the original a
@@ -2191,7 +2519,19 @@
 
   function addMessage(m) {
     const d = renderMessage(m);
-    if (d) $("log").appendChild(d);
+    if (!d) return;
+    const log = $("log");
+    if (m.kind === "system" && !m.image) {            // quiet notices share one strip
+      let strip = log.lastElementChild;
+      if (!strip || !strip.classList.contains("notices")) {
+        strip = document.createElement("div");
+        strip.className = "notices";
+        log.appendChild(strip);
+      }
+      strip.appendChild(d);
+      return;
+    }
+    log.appendChild(d);
   }
   function updateMessage(m) {
     const going = reveals.find((r) => r.id === m.id);
@@ -2208,12 +2548,36 @@
     const ev = m.event || {};
     if (ev.secret) { d.textContent = t("rollSecret"); return; }
     const r = ev.roll || {};
-    const why = (ev.why_tr || {})[lang] || ev.why || "";
+    let why = (ev.why_tr || {})[lang] || ev.why || "";
+    // The referee's rolls say where every number came from: "⚖ what · why · why".
+    const sourced = /^⚖/.test(ev.why || "");
+    let reasons = [];
+    if (/^⚖/.test(why)) {
+      const parts = why.replace(/^⚖\s*/, "").split(" · ").filter(Boolean);
+      why = parts.shift() || "";
+      reasons = parts;
+    }
+    if (r.outcome) d.classList.add(r.outcome === "success" ? "success" : "failure");
     const head = document.createElement("div");
     head.className = "goal";
-    head.textContent = "🎯 " + [m.pc || t("rollBy"), why].filter(Boolean).join(" — ")
+    const what = document.createElement("span");
+    what.className = "what";
+    what.textContent = "🎯 " + [m.pc || t("rollBy"), why].filter(Boolean).join(" — ")
       + (r.target != null ? ` · ${t(r.target_label === "AC" ? "rollAC" : "rollDC")} ${r.target}` : "");
-    head.dir = dirFor(head.textContent);
+    what.dir = dirFor(what.textContent);
+    head.appendChild(what);
+    const list = document.createElement("ul");
+    list.className = "why-list hidden";
+    if (sourced) {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "why-btn"; b.textContent = "⚖"; b.title = t("rollWhy");
+      b.setAttribute("aria-expanded", "false");
+      b.onclick = () => b.setAttribute("aria-expanded", String(!list.classList.toggle("hidden")));
+      head.appendChild(b);
+      (reasons.length ? reasons : [t("rollNoEdge")]).concat(
+        r.modifier ? [t("rollMod").replace("{n}", (r.modifier > 0 ? "+" : "−") + Math.abs(r.modifier))] : [])
+        .forEach((x) => { const li = document.createElement("li"); li.textContent = x; li.dir = "auto"; list.appendChild(li); });
+    }
     // The sum is an isolated left-to-right block (math reads that way in both
     // languages); the words around it follow the reader's language, each in its
     // own isolate so Hebrew never pulls the numbers out of order.
@@ -2236,7 +2600,7 @@
     if (r.natural === 20 || r.natural === 1) word(t(r.natural === 20 ? "rollNat20" : "rollNat1"), "nat");
     if (r.outcome) word(t(r.outcome === "success" ? "rollSuccess" : "rollFailure"),
                         r.outcome === "success" ? "ok" : "bad");
-    d.append(head, line);
+    d.append(head, line, list);
   }
 
   // Your own action stays editable until the GM answers it (the server checks too).
@@ -2258,7 +2622,14 @@
     allMessages.forEach((m) => {
       const el = msgEls.get(m.id);
       if (el && el.querySelector(".edit-btn") && !canEdit(m)) { editing.delete(m.id); updateMessage(m); }
+      else if (el && m.kind === "player" && m.pc === me && (el.dataset.pend || "") !== pendState(m)) updateMessage(m);
     });
+  }
+  // My action's state: "sent" (still mine to fix) → "read" (the GM has it) → answered.
+  function pendState(m) {
+    if (m.kind !== "player" || m.pc !== me || m.redo) return "";
+    if (!m.read) return "sent";
+    return allMessages.some((x) => x.id > m.id && x.kind === "gm" && (!x.to || x.to === me)) ? "" : "read";
   }
   function openEditor(m, d) {
     editing.add(m.id);
@@ -2458,11 +2829,15 @@
     if (m.kind === "gm" && !m.to) lastGmId = Math.max(lastGmId, m.id);
     const d = document.createElement("div");
     d.className = "msg " + m.kind + (m.to ? " whisper" : "") + (m.pc === me && m.kind === "player" ? " mine" : "");
+    const redoFor = m.kind === "gm" && m.event && m.event.type === "redo" ? m.event.pc : null;
+    if (redoFor) d.classList.add("redo", ...(redoFor === me ? ["for-me"] : []), ...(m.event.warn ? ["warn"] : []));
+    if (m.kind === "player" && m.redo) d.classList.add("redone");
     if (m.kind === "roll") {
       renderRoll(m, d);
     } else if (m.kind === "system") {
       d.textContent = systemText(m);
       d.dir = dirFor(d.textContent);
+      if ((m.event || {}).type === "punished") d.classList.add("punished");
       if (m.image) {
         const img = imageEl(m.image, 800);
         const ev = m.event || {};
@@ -2480,7 +2855,9 @@
       who.className = "who";
       const label = document.createElement("span");
       if (m.kind === "gm") {
-        label.textContent = t("gm") + (m.to ? " — " + t("whisper") : "");
+        label.textContent = t("gm") + (m.to ? " — " + t("whisper") : "")
+          + (redoFor ? " — " + (m.event.warn ? (redoFor === me ? t("warnYou") : t("warnThem").replace("{pc}", redoFor))
+                       : redoFor === me ? t("redoYou") : t("redoThem").replace("{pc}", redoFor)) : "");
       } else {
         const name = document.createElement("span");      // hover: who they are
         name.textContent = m.pc || "?";
@@ -2512,6 +2889,20 @@
       body.innerHTML = md(heDice(useTr ? tr.text : (m.text || "")));
       if (m.kind === "gm") wrapLore(body);
       d.append(who, body);
+      const pend = pendState(m);
+      d.dataset.pend = pend;
+      if (pend) {
+        const note = document.createElement("div");
+        note.className = "pend " + pend;
+        note.textContent = t(pend === "sent" ? "pendSent" : "pendRead");
+        d.appendChild(note);
+      }
+      if (m.kind === "player" && m.redo) {
+        const note = document.createElement("div");
+        note.className = "redo-note";
+        note.textContent = t("redoMark");
+        d.appendChild(note);
+      }
       if (tr) {
         const note = document.createElement("div");
         note.className = "tr-note";
@@ -2544,6 +2935,35 @@
     return d;
   }
 
+  // "Previously on...": for a player sitting down (new, or back after a break
+  // of 10 minutes or more), the story so far, at the top of the log.
+  const seenKey = () => "seen." + code;
+  let recapShown = false;
+  async function maybeRecap() {
+    if (recapShown || !me) return;
+    if (Date.now() - Number(store.get(seenKey()) || 0) < 10 * 60 * 1000) return;
+    if (!allMessages.some((m) => m.kind === "gm" && shownToMe(m))) return;
+    recapShown = true;
+    const card = document.createElement("div");
+    card.id = "recap";
+    card.innerHTML = `<h3>${esc(t("recapTitle"))}</h3><div class="text pending" dir="auto">${esc(t("recapLoading"))}</div>` +
+      `<div class="row"><button type="button" class="primary">${esc(t("recapClose"))}</button></div>`;
+    card.querySelector("button").onclick = () => { card.remove(); $("log").scrollTop = $("log").scrollHeight; };
+    $("log").prepend(card);
+    $("log").scrollTop = 0;
+    for (let i = 0; i < 40 && card.isConnected; i++) {
+      const r = await api("/api/recap?lang=" + encodeURIComponent(lang));
+      if (!r.ok || !r.text) { card.remove(); return; }
+      const box = card.querySelector(".text");
+      box.textContent = r.text; box.dir = dirFor(r.text);
+      box.classList.toggle("pending", !!r.pending);
+      if (!r.pending) return;
+      await new Promise((ok) => setTimeout(ok, 3000));
+    }
+  }
+  setInterval(() => { if (me) store.set(seenKey(), String(Date.now())); }, 30000);
+  window.addEventListener("pagehide", () => { if (me) store.set(seenKey(), String(Date.now())); });
+
   function rerenderLog() {
     finishAllReveals();
     partySig = "";
@@ -2569,7 +2989,14 @@
         const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
         r.messages.forEach((m) => {
           allMessages.push(m); addMessage(m); lastId = Math.max(lastId, m.id);
+          if (historyLoaded && m.kind === "roll" && msgEls.get(m.id)) msgEls.get(m.id).classList.add("fresh");
           if (m.kind === "gm") lastNarrSeen = Math.max(lastNarrSeen, m.id);
+          // The GM ruled my action can't work: my turn to choose again, now.
+          if (historyLoaded && m.kind === "gm" && m.event && m.event.type === "redo" && m.event.pc === me
+              && shownToMe(m)) {
+            mySentId = 0; chime();
+            setTimeout(() => { try { $("text").focus(); } catch (e) {} }, 0);
+          }
           // Only NEW narration is told (revealed, and read aloud) — not the history.
           if (historyLoaded && m.kind === "gm" && shownToMe(m) && msgEls.get(m.id)) {
             const r = startReveal(m, msgEls.get(m.id));
@@ -2588,10 +3015,72 @@
                                                    || (m.kind === "gm" && !m.to)
                                                    || m.kind === "player")) refreshInfo();
       }
+      if (!historyLoaded && r.ok) { historyLoaded = true; maybeRecap(); }
       historyLoaded = true;
     } catch (e) { setStatus(t("reconnecting")); }
     setTimeout(pollMessages, 1500);
   }
+
+  // Quick actions: one tap starts an action from the sheet (it's only text: edit it, then send).
+  let chipText = null;
+  const itemName = (x) => typeof x === "string" ? x.split(/\s*[(\[]|\s+[—–-]\s+|:\s/)[0].trim()
+                                                 : String((x && x.name) || "");
+  function weaponsOf(sheet) {
+    const out = [];
+    (Array.isArray(sheet.attacks) ? sheet.attacks : []).forEach((a) => out.push(itemName(a)));
+    (Array.isArray(sheet.equipment) ? sheet.equipment : []).forEach((x) => {
+      const dice = typeof x === "string" ? /\d+d\d+/.test(x) : x && (x.damage || /\d+d\d+/.test(JSON.stringify(x)));
+      if (dice) out.push(itemName(x));
+    });
+    return [...new Set(out.filter(Boolean))].slice(0, 3);
+  }
+  function spellsOf(sheet) {
+    const out = [];
+    ["cantrips", "spells"].forEach((k) => {
+      const v = sheet[k];
+      const list = Array.isArray(v) ? v : v && typeof v === "object" ? Object.values(v).flat() : [];
+      list.forEach((x) => out.push(itemName(x)));
+    });
+    return [...new Set(out.filter((n) => n && n.length < 40))].slice(0, 4);
+  }
+  function renderChips() {
+    const box = $("chips");
+    if (!me || !partyShown.get(me)) { box.textContent = ""; box.dataset.sig = ""; return; }
+    const sheet = mySheet || {};
+    const foes = ((fightState && fightState.order) || []).filter((c) => c.foe && c.health !== "down");
+    const aim = (aimAt && foes.some((f) => f.name === aimAt) ? aimAt : (foes[0] || {}).name) || null;
+    const chips = [];
+    weaponsOf(sheet).forEach((w) => chips.push(["⚔ " + tx(w), aim
+      ? t("qa_attack").replace("{target}", aim).replace("{item}", tx(w)) : t("qa_attackAny").replace("{item}", tx(w))]));
+    spellsOf(sheet).forEach((sp) => chips.push(["✨ " + tx(sp), aim
+      ? t("qa_castAt").replace("{spell}", tx(sp)).replace("{target}", aim) : t("qa_cast").replace("{spell}", tx(sp))]));
+    if (fightState) {
+      chips.push(["🛡 " + t("chip_dodge"), t("qa_dodge")]);
+      chips.push(["💨 " + t("chip_dash"), t("qa_dash")]);
+    } else {
+      chips.push(["👁 " + t("chip_look"), t("qa_look")]);
+    }
+    chips.push(["🫥 " + t("chip_hide"), t("qa_hide")]);
+    partyLive.filter((p) => p.name !== me && p.claimed && p.status !== "dead").slice(0, 3)
+      .forEach((p) => chips.push(["🤝 " + p.name, t("qa_help").replace("{pc}", p.name)]));
+    const sig = lang + "|" + chips.map((c) => c.join("=")).join("|");
+    if (box.dataset.sig === sig) return;
+    box.dataset.sig = sig;
+    box.textContent = "";
+    chips.forEach(([label, text]) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.textContent = label; b.dir = "auto"; b.dataset.text = text;
+      b.onclick = () => {
+        const area = $("text"), cur = area.value.trim();
+        area.value = !cur || cur === chipText ? text : cur + " " + text;
+        chipText = area.value.trim();
+        fitTextDir(); area.focus();
+        try { area.setSelectionRange(area.value.length, area.value.length); } catch (e) {}
+      };
+      box.appendChild(b);
+    });
+  }
+  uiHooks.push(renderChips);
 
   async function sendAction() {
     const text = $("text").value.trim();
@@ -2687,6 +3176,33 @@
     $("chat").classList.remove("open");
     setMoreMenu(false);
   };
+  // Phone: the bottom tabs. Party and chat open as panels over the story, between
+  // the header and the tabs; the sheet opens as its dialog.
+  function syncTabs() {         // (what's open, however it was opened)
+    const which = $("sheet").open ? "sheet" : $("party").classList.contains("open") ? "party"
+      : $("chat").classList.contains("open") ? "chat" : "story";
+    ["story", "party", "sheet", "chat"].forEach((k) => {
+      const b = $("tab-" + k), on = String(k === which);
+      if (b.getAttribute("aria-pressed") !== on) b.setAttribute("aria-pressed", on);
+    });
+  }
+  tickHooks.push(syncTabs);
+  function setTab(which) {
+    const top = headerBottom() + "px";
+    document.documentElement.style.setProperty("--tabs-h", $("tabs").getBoundingClientRect().height + "px");
+    $("party").classList.toggle("open", which === "party");
+    $("chat").classList.toggle("open", which === "chat");
+    $("party").style.top = top; $("chat").style.top = top;
+    if (which === "chat") { setUnread(0); $("chat-log").scrollTop = $("chat-log").scrollHeight; }
+    if (which === "sheet" && me) openSheet(me);
+    else if ($("sheet").open) $("sheet").close();
+    setMoreMenu(false);
+    syncTabs();
+  }
+  $("tab-story").onclick = () => setTab("story");
+  $("tab-party").onclick = () => setTab($("party").classList.contains("open") ? "story" : "party");
+  $("tab-sheet").onclick = () => setTab("sheet");
+  $("tab-chat").onclick = () => setTab($("chat").classList.contains("open") ? "story" : "chat");
   // The ⋯ menu (phone only): music, reading aloud, language, leaving. It closes
   // after a choice, on a tap anywhere else, and when another drawer opens.
   function setMoreMenu(open) {

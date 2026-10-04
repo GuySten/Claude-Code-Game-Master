@@ -75,6 +75,65 @@ def table(tmp_path, monkeypatch):
     httpd.server_close()
 
 
+def test_cruelty_is_warned_once_then_punished(table):
+    from lib import party_roster
+    call, camp, state = table["call"], table["camp"], table["state"]
+    state.set_round_seconds(0)
+    made = []
+    state.music_maker = lambda kind, name, boss, look, sheet: made.append((kind, name)) or f"{kind}.ogg"
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    bram = call("/api/create", {"code": CODE, "name": "Bram", "concept": "a dwarf"})[1]["token"]
+    kara = call("/api/create", {"code": CODE, "name": "Kara", "concept": "an elf"})[1]["token"]
+    call("/api/gm/inbox", {}, host=True)
+    # Not warned: no punishment.
+    status, body = call("/api/gm/punish", {"pc": "Bram", "way": "death", "reason": "x"}, host=True)
+    assert status == 409 and "warn first" in body["error"]
+    call("/api/say", {"code": CODE, "token": bram, "text": "I kick the puppy."})
+    call("/api/gm/inbox", {}, host=True)
+    status, body = call("/api/gm/redo", {"pc": "Bram", "text": "That is cruelty. Choose again.",
+                                         "lang": "en", "warn": True}, host=True)
+    assert status == 200 and body["message"]["event"] == {"type": "redo", "pc": "Bram", "warn": True}
+    assert "Bram" in state.conduct["warnings"] and state.round_state()["waiting_on"] == ["Bram"]
+    state.music_pass()
+    assert ("judgment", "⚖ Judgment") in made                    # ready before it's needed
+    # He insists: lost to madness. His seat is freed, he becomes a villain NPC.
+    call("/api/say", {"code": CODE, "token": bram, "text": "I kick it again."})
+    call("/api/gm/inbox", {}, host=True)
+    status, body = call("/api/gm/punish", {"pc": "Bram", "way": "madness",
+                                           "reason": "The guilt broke him."}, host=True)
+    assert status == 200 and body["villain"] == "Bram"
+    assert call(f"/api/info?code={CODE}&token={bram}")[1]["me"] is None
+    npc = json.loads((camp / "npcs.json").read_text())["Bram"]
+    assert npc["villain"] and npc["former_pc"] and "guilt" in npc["description"]
+    assert json.loads(next((camp / "departed").glob("*.json")).read_text())["status"] == "lost to madness"
+    assert state.music["mood"] == "dread"                         # the judgment music
+    state.music_pass()
+    assert ("dark_anthem", "Bram") in made
+    # His player's next character: Bram is their nemesis.
+    call("/api/create", {"code": CODE, "token": bram, "name": "Tamar", "concept": "a paladin"})
+    assert json.loads((camp / "npcs.json").read_text())["Bram"]["nemesis_of"] == "Tamar"
+    seen = call(f"/api/messages?code={CODE}&token={pip}&after=0")[1]["messages"]
+    assert any((m.get("event") or {}) == {"type": "nemesis", "of": "Bram"} for m in seen)
+    assert any((m.get("event") or {}).get("type") == "punished" and m["pc"] == "Bram" for m in seen)
+    # A curse: Kara plays on, cursed (the referee's checks are at disadvantage) until she atones.
+    call("/api/gm/redo", {"pc": "Kara", "text": "No.", "warn": True}, host=True)
+    call("/api/say", {"code": CODE, "token": kara, "text": "I burn the orphanage."})
+    call("/api/gm/inbox", {}, host=True)
+    assert call("/api/gm/punish", {"pc": "Kara", "way": "curse", "reason": "The gods"}, host=True)[0] == 200
+    sheet = json.loads(party_roster.find_pc(camp, "Kara").read_text())
+    assert "cursed" in sheet["conditions"] and sheet["curse"]["lifted_by"] == "atonement"
+    assert call(f"/api/info?code={CODE}&token={kara}")[1]["me"] == "Kara"
+    from lib import referee
+    assert "cursed" in referee.CHECK_DIS
+    assert call("/api/gm/atone", {"pc": "Kara"}, host=True)[0] == 200
+    assert "cursed" not in json.loads(party_roster.find_pc(camp, "Kara").read_text())["conditions"]
+    # Death: warned, insisted, killed; the warning is spent.
+    call("/api/gm/redo", {"pc": "Tamar", "text": "No.", "warn": True}, host=True)
+    assert call("/api/gm/punish", {"pc": "Tamar", "way": "death", "reason": "Assassins"}, host=True)[0] == 200
+    assert "Tamar" not in state.conduct["warnings"] and party_roster.find_pc(camp, "Tamar") is None
+    assert [e["kind"] for e in state.conduct["log"]].count("punish") == 3
+
+
 def test_a_wrong_code_is_turned_away(table):
     status, body = table["call"]("/api/info?code=nope")
     assert status == 403 and not body["ok"]
@@ -1183,6 +1242,28 @@ def test_heroic_moments_and_bosses_without_a_composer(table, monkeypatch):
     assert state.music["track"] == "theme:Lich" and state.music["boss"] is True
 
 
+def test_the_host_removes_a_character_nobody_plays(table):
+    call, camp, state = table["call"], table["camp"], table["state"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    bram = call("/api/create", {"code": CODE, "name": "Bram", "concept": "a dwarf"})[1]["token"]
+    izrin = call("/api/create", {"code": CODE, "name": "Izrin", "concept": "an elf"})[1]["token"]
+    call("/api/leave", {"code": CODE, "token": izrin})                   # their player is gone
+    names = lambda: [p["name"] for p in call(f"/api/info?code={CODE}&token={pip}")[1]["party"]]
+    assert "Izrin" in names()
+    # Seated, or the lead: never.
+    status, body = call("/api/gm/kick", {"pc": "Bram"}, host=True)
+    assert status == 409 and "seated" in body["error"]
+    assert "lead" in call("/api/gm/kick", {"pc": "Pip"}, host=True)[1]["error"]
+    # Only the lead player may, from the page.
+    assert call("/api/kick", {"code": CODE, "token": bram, "pc": "Izrin"})[0] == 403
+    status, body = call("/api/kick", {"code": CODE, "token": pip, "pc": "izrin"})
+    assert status == 200 and body["removed"] == "Izrin" and "Izrin" not in names()
+    assert json.loads((camp / "departed" / next(p.name for p in (camp / "departed").iterdir())).read_text())["name"] == "Izrin"
+    seen = call(f"/api/messages?code={CODE}&token={bram}&after=0")[1]["messages"]
+    assert any((m.get("event") or {}).get("type") == "departed" and m.get("pc") == "Izrin" for m in seen)
+    assert call("/api/gm/kick", {"pc": "Nobody"}, host=True)[0] == 409
+
+
 def test_the_gm_waits_for_everyone_or_a_minute_after_the_first_action(table):
     import table_server
     call, state = table["call"], table["state"]
@@ -1229,6 +1310,123 @@ def test_the_gm_waits_for_everyone_or_a_minute_after_the_first_action(table):
     assert TableState(table["camp"], str(table["world"])).round_seconds == 0
 
 
+def test_a_player_who_has_not_acted_may_add_a_minute_once_a_round(table):
+    import table_server
+    call, state = table["call"], table["state"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    bram = call("/api/create", {"code": CODE, "name": "Bram", "concept": "a dwarf"})[1]["token"]
+    call("/api/gm/inbox", {}, host=True)
+    assert call("/api/extend", {"code": CODE, "token": bram})[0] == 409     # no round yet
+    call("/api/say", {"code": CODE, "token": pip, "text": "I check the door."})
+    assert call("/api/extend", {"code": CODE, "token": pip})[1]["error"].startswith("You've already acted")
+    status, body = call("/api/extend", {"code": CODE, "token": bram})
+    rnd = body["round"]
+    assert status == 200 and rnd["extended_by"] == ["Bram"] and rnd["total"] == 120
+    assert 119 <= rnd["deadline"] - time.time() <= 120
+    assert "already added a minute" in call("/api/extend", {"code": CODE, "token": bram})[1]["error"]
+    later = state.round_state(now=time.time() + table_server.ROUND_SECONDS + 1)
+    assert later["open"] and not later["timed_out"]                       # the extra minute holds
+    seen = call(f"/api/messages?code={CODE}&token={pip}&after=0")[1]["messages"]
+    assert any((m.get("event") or {}).get("type") == "extend" and m.get("pc") == "Bram" for m in seen)
+    # The next round starts with a clean slate.
+    call("/api/say", {"code": CODE, "token": bram, "text": "I guard the rear."})
+    call("/api/gm/inbox", {}, host=True)
+    call("/api/gm/say", {"text": "The door holds."}, host=True)
+    call("/api/say", {"code": CODE, "token": pip, "text": "I push."})
+    assert state.round_state()["extended_by"] == [] and state.round_state()["total"] == 60
+    assert call("/api/extend", {"code": CODE, "token": bram})[0] == 200
+
+
+def test_an_action_that_cannot_work_is_chosen_again_on_a_fresh_clock(table):
+    import table_server
+    call, state = table["call"], table["state"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    bram = call("/api/create", {"code": CODE, "name": "Bram", "concept": "a dwarf"})[1]["token"]
+    call("/api/gm/inbox", {}, host=True)
+    call("/api/say", {"code": CODE, "token": pip, "text": "I fly over the chasm."})
+    call("/api/say", {"code": CODE, "token": bram, "text": "I guard the rear."})
+    assert len(call("/api/gm/inbox", {}, host=True)[1]["messages"]) == 2
+
+    # Pip can't fly: the GM says so, and Pip alone gets a fresh round to choose again.
+    status, body = call("/api/gm/redo", {"pc": "pip", "text": "Pip, you have no wings: "
+                                         "choose another action.", "lang": "en"}, host=True)
+    assert status == 200 and body["message"]["event"] == {"type": "redo", "pc": "Pip"}
+    rnd = state.round_state()
+    assert rnd["open"] and rnd["waiting_on"] == ["Pip"] and "Pip" in rnd["redo"]
+    assert 59 <= rnd["deadline"] - time.time() <= 60
+    assert state.waiting_on() == ["Pip"]
+    seen = call(f"/api/messages?code={CODE}&token={bram}&after=0")[1]["messages"]
+    assert next(m for m in seen if m.get("text") == "I fly over the chasm.")["redo"] is True
+    assert not next(m for m in seen if m.get("text") == "I guard the rear.").get("redo")
+    # Nothing is resolved or narrated until Pip has chosen again.
+    assert call("/api/gm/inbox", {}, host=True)[1]["held"]
+    status, body = call("/api/gm/say", {"text": "Bram watches the dark."}, host=True)
+    assert status == 409 and "Pip" in body["error"]
+    # Bram acting again doesn't close it; Pip's new action does.
+    call("/api/say", {"code": CODE, "token": bram, "text": "I light a torch."})
+    assert state.round_state()["open"]
+    call("/api/say", {"code": CODE, "token": pip, "text": "I climb down the rope."})
+    assert state.round_state()["open"] is False
+    got = call("/api/gm/inbox", {}, host=True)[1]
+    assert [m["text"] for m in got["messages"] if m["kind"] == "player"] == [
+        "I light a torch.", "I climb down the rope."] and got["redo_missed"] == []
+    assert not state.redo and call("/api/gm/say", {"text": "Down you go."}, host=True)[0] == 200
+    # The mark survives a restart.
+    again = TableState(table["camp"], str(table["world"]))
+    assert next(m for m in again.messages if m.get("text") == "I fly over the chasm.")["redo"]
+
+    # Out of time: the GM is told Pip chose nothing, and resolves the round without them.
+    call("/api/say", {"code": CODE, "token": pip, "text": "I punch the dragon's soul."})
+    call("/api/say", {"code": CODE, "token": bram, "text": "I wait."})
+    call("/api/gm/inbox", {}, host=True)
+    call("/api/gm/redo", {"pc": "Pip", "text": "Souls can't be punched: choose again."}, host=True)
+    first = state.redo["Pip"]["t"]
+    call("/api/gm/redo", {"pc": "Pip", "text": "(the same, in another language)"}, host=True)
+    assert state.redo["Pip"]["t"] == first                       # one clock, not two
+    rnd = state.round_state(now=time.time() + table_server.ROUND_SECONDS + 1)
+    assert rnd["timed_out"] and not rnd["open"] and rnd["waiting_on"] == ["Pip"]
+    state.redo["Pip"]["t"] -= table_server.ROUND_SECONDS + 1    # (the minute passes)
+    got = call("/api/gm/inbox", {}, host=True)[1]
+    assert got["messages"] == [] and got["redo_missed"] == ["Pip"] and not state.redo
+    assert call("/api/gm/redo", {"pc": "Nobody", "text": "x"}, host=True)[0] == 400
+
+
+def test_the_fight_shows_order_turn_foes_in_words_and_effects_for_everyone(table):
+    call, camp, state = table["call"], table["camp"], table["state"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    assert call(f"/api/info?code={CODE}&token={pip}")[1]["fight"] is None          # no fight
+    fight = {"active": True, "round": 2, "turn_index": 1, "fields": [
+                 {"name": "Shaking floor", "effects": [{"kind": "dis", "roll": "attack", "ability": None}],
+                  "unless": "tremorsense"}],
+             "combatants": [
+                 {"name": "Pip", "side": "party", "kind": "pc", "states": {"cover": "half"}},
+                 {"name": "Grak", "side": "enemy", "kind": "enemy", "hp_current": 3, "hp_max": 7,
+                  "conditions": ["prone"], "states": {}, "block": {"secret": "its numbers"}},
+                 {"name": "Lurker", "side": "enemy", "kind": "enemy", "hp_current": 9, "hp_max": 9,
+                  "states": {"hidden": True}},
+                 {"name": "Rat", "side": "enemy", "hp_current": 0, "hp_max": 2}]}
+    (camp / "combat_state.json").write_text(json.dumps(fight))
+    got = call(f"/api/info?code={CODE}&token={pip}")[1]["fight"]
+    assert got["round"] == 2 and got["turn"] == "Grak"
+    assert [c["name"] for c in got["order"]] == ["Pip", "Grak", "Rat"]             # the hidden one isn't
+    grak = got["order"][1]
+    assert grak == {"name": "Grak", "foe": True, "states": {}, "conditions": ["prone"], "health": "bloodied"}
+    assert got["order"][2]["health"] == "down" and got["order"][0]["states"] == {"cover": "half"}
+    assert "block" not in json.dumps(got) and "hp_current" not in json.dumps(got)  # never its numbers
+    assert got["fields"][0]["name"] == "Shaking floor" and got["fields"][0]["unless"] == "tremorsense"
+    # During the GM's turn the fight waits for the story, like the sheets do.
+    call("/api/say", {"code": CODE, "token": pip, "text": "I stab Grak."})
+    call("/api/gm/inbox", {}, host=True)
+    fight["combatants"][1]["hp_current"] = 0
+    (camp / "combat_state.json").write_text(json.dumps(fight))
+    assert call(f"/api/info?code={CODE}&token={pip}")[1]["fight"]["order"][1]["health"] == "bloodied"
+    call("/api/gm/say", {"text": "Grak falls.", "lang": "en"}, host=True)
+    call("/api/gm/say", {"text": "גראק נופל.", "lang": "he"}, host=True)
+    assert call(f"/api/info?code={CODE}&token={pip}")[1]["fight"]["order"][1]["health"] == "down"
+    (camp / "combat_state.json").write_text(json.dumps({"active": False, "combatants": []}))
+    assert state.fight() is None
+
+
 def test_the_round_never_waits_for_a_pc_who_cannot_act(table):
     import table_server
     call, state, camp = table["call"], table["state"], table["camp"]
@@ -1256,6 +1454,29 @@ def test_the_round_never_waits_for_a_pc_who_cannot_act(table):
     call("/api/say", {"code": CODE, "token": pip, "text": "Get up!"})
     assert state.round_state()["waiting_on"] == ["Bram"] and state.round_state()["open"]
     assert table_server.cant_act({"conditions": ["poisoned", "prone"]}) is None
+
+
+def test_previously_on_tells_the_story_so_far_in_the_players_language(table):
+    call, state = table["call"], table["state"]
+    state.set_round_seconds(0)
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    assert call(f"/api/recap?code={CODE}&token={pip}&lang=en")[1]["text"] is None   # no story yet
+    assert call(f"/api/recap?code={CODE}&lang=en")[0] == 403                         # seated only
+    call("/api/gm/say", {"text": "Rain lashes the Rusty Tankard.", "lang": "en"}, host=True)
+    call("/api/gm/say", {"text": "גשם מכה בפונדק.", "lang": "he"}, host=True)
+    call("/api/gm/say", {"text": "Marta slides a key across the bar.", "lang": "en"}, host=True)
+    # No model: the last beats, as they were told, in the reader's language.
+    got = call(f"/api/recap?code={CODE}&token={pip}&lang=en")[1]
+    assert got["text"].startswith("Rain lashes") and "Marta" in got["text"] and "גשם" not in got["text"]
+    assert not got["pending"]
+    # With the Narrator's model: told once, kept until the story moves on.
+    asked = []
+    state.narrator_ask = lambda system, prompt: asked.append((system, prompt)) or "You sheltered from the rain."
+    first = call(f"/api/recap?code={CODE}&token={pip}&lang=he")[1]
+    assert first["pending"] and "גשם" in first["text"]
+    assert wait_for(lambda: not call(f"/api/recap?code={CODE}&token={pip}&lang=he")[1]["pending"])
+    assert call(f"/api/recap?code={CODE}&token={pip}&lang=he")[1]["text"] == "You sheltered from the rain."
+    assert "Hebrew" in asked[0][0] and "Pip is sitting down" in asked[0][1] and len(asked) == 1
 
 
 def test_a_waiting_chat_request_gets_the_line_at_once(table):

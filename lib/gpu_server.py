@@ -139,11 +139,26 @@ def run_job(kind: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         ext = payload.get("ext") if payload.get("ext") in (".ogg", ".wav", ".mp3") else ".ogg"
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / ("piece" + ext)
+            twin = ({"prompt": str(payload["twin_prompt"]), "loop": True, "out": str(Path(tmp) / ("twin" + ext))}
+                    if payload.get("twin_prompt") else None)
+            melody_from = None
+            if payload.get("melody_audio"):
+                melody_from = Path(tmp) / ("melody" + (payload.get("melody_ext") if payload.get("melody_ext")
+                                                       in (".ogg", ".wav", ".mp3") else ".ogg"))
+                melody_from.write_bytes(base64.b64decode(payload["melody_audio"]))
+            more = {**({"twin": twin} if twin else {}),
+                    **({"melody_from": str(melody_from)} if melody_from else {})}
             r = composer.compose(str(payload.get("prompt", "")), float(payload.get("seconds", 30)),
-                                 out, loop=bool(payload.get("loop")), local=True)
+                                 out, loop=bool(payload.get("loop")), local=True, **more)
             path = Path(r["path"])
-            return {"audio": base64.b64encode(path.read_bytes()).decode("ascii"), "ext": path.suffix,
-                    "seconds": r.get("seconds"), "device": r.get("device"), "elapsed": r.get("elapsed")}
+            answer = {"audio": base64.b64encode(path.read_bytes()).decode("ascii"), "ext": path.suffix,
+                      "seconds": r.get("seconds"), "device": r.get("device"), "elapsed": r.get("elapsed"),
+                      "how": r.get("how")}
+            if r.get("twin"):
+                t = Path(r["twin"]["path"])
+                answer.update(twin_audio=base64.b64encode(t.read_bytes()).decode("ascii"), twin_ext=t.suffix,
+                              twin_seconds=r["twin"].get("seconds"), twin_how=r["twin"].get("how"))
+            return answer
     raise ValueError(f"unknown job kind {kind!r}")
 
 

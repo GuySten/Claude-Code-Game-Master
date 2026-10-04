@@ -132,6 +132,24 @@ def anthem_prompt(sheet: Dict[str, Any], style: str) -> str:
             "uplifting strings, pounding timpani, glorious and inspiring")
 
 
+JUDGMENT = "⚖ Judgment"           # the music of a punishment (composed once per campaign)
+
+
+def judgment_prompt(style: str) -> str:
+    setting = f", {style}" if style else ""
+    return ("doom-laden judgment music: a tolling funeral bell, dissonant low brass, a grim choir "
+            f"chord, pounding slow drums, cold and merciless{setting}, the sound of a terrible fate")
+
+
+def dark_anthem_prompt(sheet: Dict[str, Any], style: str) -> str:
+    """A fallen hero's anthem, turned into the villain theme they now are."""
+    name = sheet.get("name", "the hero")
+    setting = f", {style}" if style else ""
+    return (f"the heroic anthem of {name} turned dark and corrupted: the same fanfare in a minor key, "
+            f"slowed and twisted, distorted brass, dissonant strings, a mournful choir{setting}, "
+            "the leitmotif of a fallen hero become a villain")
+
+
 # --- the composer process: started once, keeps the model in RAM ---
 SERVER_LOG = Path(tempfile.gettempdir()) / "gm-composer.log"
 _server: Optional[subprocess.Popen] = None
@@ -332,17 +350,29 @@ def _compose_remote(jobs: List[Dict[str, Any]], on_piece, timeout_each: int
     for i, job in enumerate(jobs):
         out = Path(job["out"])
         try:
-            r = gpu_remote.run("compose", {"prompt": job["prompt"], "seconds": job.get("seconds", 30),
-                                           "loop": bool(job.get("loop")), "ext": out.suffix or ".ogg"},
-                               timeout=timeout_each)
+            payload = {"prompt": job["prompt"], "seconds": job.get("seconds", 30),
+                       "loop": bool(job.get("loop")), "ext": out.suffix or ".ogg"}
+            if job.get("twin"):
+                payload["twin_prompt"] = job["twin"]["prompt"]
+            if job.get("melody_from"):
+                payload["melody_audio"] = base64.b64encode(Path(job["melody_from"]).read_bytes()).decode("ascii")
+                payload["melody_ext"] = Path(job["melody_from"]).suffix
+            r = gpu_remote.run("compose", payload, timeout=timeout_each)
             path = out.with_suffix(r.get("ext") or out.suffix)
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(base64.b64decode(r["audio"]))
+            twin = None
+            if job.get("twin") and r.get("twin_audio"):
+                t_out = Path(job["twin"]["out"]).with_suffix(r.get("twin_ext") or ".ogg")
+                t_out.parent.mkdir(parents=True, exist_ok=True)
+                t_out.write_bytes(base64.b64decode(r["twin_audio"]))
+                twin = {"path": str(t_out), "seconds": r.get("twin_seconds"), "how": r.get("twin_how")}
         except (gpu_remote.GpuRemoteError, KeyError, ValueError, OSError) as e:
             errors.append(str(e))
             continue
         results[i] = {"ok": True, "path": str(path), "seconds": r.get("seconds"),
-                      "device": r.get("device"), "elapsed": r.get("elapsed"), "id": i}
+                      "device": r.get("device"), "elapsed": r.get("elapsed"), "id": i,
+                      **({"twin": twin} if twin else {}), **({"how": r["how"]} if r.get("how") else {})}
         if on_piece is not None:
             on_piece(i, results[i])
     if not any(results):
@@ -351,11 +381,18 @@ def _compose_remote(jobs: List[Dict[str, Any]], on_piece, timeout_each: int
 
 
 def compose(prompt: str, seconds: float, out: Path, loop: bool = False,
-            timeout: int = 3600, local: bool = False) -> Dict[str, Any]:
+            timeout: int = 3600, local: bool = False, twin: Optional[Dict[str, Any]] = None,
+            melody_from: Optional[str] = None) -> Dict[str, Any]:
     """Compose one piece (blocking: a minute or two on a GPU, several on a CPU).
-    ``local``: on this machine's composer even when a GPU server is set."""
-    return compose_many([{"prompt": prompt, "seconds": seconds, "out": str(out), "loop": loop}],
-                        timeout_each=timeout, local=local)[0]
+    ``local``: on this machine's composer even when a GPU server is set. ``twin``
+    ({prompt, out}): also its dark twin, from the same music. ``melody_from``: this
+    piece is the dark twin of that (already composed) file."""
+    job: Dict[str, Any] = {"prompt": prompt, "seconds": seconds, "out": str(out), "loop": loop}
+    if twin:
+        job["twin"] = twin
+    if melody_from:
+        job["melody_from"] = str(melody_from)
+    return compose_many([job], timeout_each=timeout, local=local)[0]
 
 
 # --- what has been composed for this campaign ---
@@ -412,6 +449,28 @@ def anthem(campaign_dir, name: str) -> Optional[Dict[str, Any]]:
     return None
 
 
+def dark_anthem(campaign_dir, name: str) -> Optional[Path]:
+    """The dark twin of this PC's anthem, if it was composed with it."""
+    rec = anthem(campaign_dir, name) or {}
+    path = Path(campaign_dir) / "music" / "anthems" / rec.get("dark", "")
+    return path if rec.get("dark") and path.is_file() else None
+
+
+def villain_theme_from_anthem(campaign_dir, name: str) -> Optional[str]:
+    """A PC turned villain: their anthem's dark twin becomes their theme, at once."""
+    dark = dark_anthem(campaign_dir, name)
+    if dark is None:
+        return None
+    out = Path(campaign_dir) / "music" / "themes" / f"{slug(name)}-theme{dark.suffix}"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_bytes(dark.read_bytes())
+    reg = load_registry(campaign_dir)
+    key = _key(reg["themes"], name) or name
+    reg["themes"].setdefault(key, {})["normal"] = out.name
+    save_registry(campaign_dir, reg)
+    return out.name
+
+
 def compose_pieces(campaign_dir, pieces: List[Dict[str, Any]],
                    on_piece: Optional[Callable[[Dict[str, Any], str], None]] = None) -> List[Optional[str]]:
     """Compose themes ({kind: theme, name, boss, look}) and anthems ({kind: anthem,
@@ -425,23 +484,36 @@ def compose_pieces(campaign_dir, pieces: List[Dict[str, Any]],
             out = camp / "music" / "themes" / f"{slug(p['name'])}-{'boss' if p['boss'] else 'theme'}.ogg"
             jobs.append({"prompt": theme_prompt(p["name"], p.get("look", ""), style, p["boss"]),
                          "seconds": THEME_SECONDS, "out": str(out), "loop": True})
+        elif p["kind"] in ("judgment", "dark_anthem"):       # (registered as themes: they play as one)
+            out = camp / "music" / "themes" / f"{slug(p['name'])}-theme.ogg"
+            prompt = judgment_prompt(style) if p["kind"] == "judgment" else dark_anthem_prompt(p["sheet"], style)
+            job = {"prompt": prompt, "seconds": THEME_SECONDS, "out": str(out), "loop": True}
+            heroic = anthem(camp, p["name"]) if p["kind"] == "dark_anthem" else None
+            if heroic:                      # the twin of the anthem they had: the same music, dark
+                job["melody_from"] = str(camp / "music" / "anthems" / heroic["file"])
+            jobs.append(job)
         else:
             name = p["sheet"].get("name", "hero")
             out = camp / "music" / "anthems" / f"anthem-{slug(name)}.ogg"
+            # With its dark twin, from the same music: the villain theme they'd become.
             jobs.append({"prompt": anthem_prompt(p["sheet"], style), "seconds": ANTHEM_SECONDS,
-                         "out": str(out), "loop": False})
+                         "out": str(out), "loop": False,
+                         "twin": {"prompt": dark_anthem_prompt(p["sheet"], style), "loop": True,
+                                  "out": str(camp / "music" / "anthems" / f"anthem-{slug(name)}-dark.ogg")}})
     files: List[Optional[str]] = [None] * len(pieces)
 
     def landed(i: int, r: Dict[str, Any]) -> None:
         p, f = pieces[i], Path(r["path"]).name
         reg = load_registry(camp)
-        if p["kind"] == "theme":
+        if p["kind"] in ("theme", "judgment", "dark_anthem"):
             key = _key(reg["themes"], p["name"]) or p["name"]
-            reg["themes"].setdefault(key, {})["boss" if p["boss"] else "normal"] = f
+            reg["themes"].setdefault(key, {})["boss" if p.get("boss") else "normal"] = f
         else:
             name = p["sheet"].get("name", "hero")
             key = _key(reg["anthems"], name) or name
             reg["anthems"][key] = {"file": f, "seconds": r.get("seconds", ANTHEM_SECONDS)}
+            if r.get("twin"):
+                reg["anthems"][key].update(dark=Path(r["twin"]["path"]).name, dark_how=r["twin"].get("how"))
         save_registry(camp, reg)
         files[i] = f
         if on_piece is not None:
@@ -464,10 +536,15 @@ def compose_theme(campaign_dir, name: str, boss: bool, look: str = "") -> str:
 def compose_anthem(campaign_dir, sheet: Dict[str, Any]) -> Dict[str, Any]:
     name = sheet.get("name", "hero")
     out = Path(campaign_dir) / "music" / "anthems" / f"anthem-{slug(name)}.ogg"
-    got = compose(anthem_prompt(sheet, flavor(campaign_dir)), ANTHEM_SECONDS, out)
+    style = flavor(campaign_dir)
+    got = compose(anthem_prompt(sheet, style), ANTHEM_SECONDS, out,
+                  twin={"prompt": dark_anthem_prompt(sheet, style), "loop": True,
+                        "out": str(out.with_name(f"anthem-{slug(name)}-dark.ogg"))})
     reg = load_registry(campaign_dir)
     key = _key(reg["anthems"], name) or name
     reg["anthems"][key] = {"file": Path(got["path"]).name, "seconds": got.get("seconds", ANTHEM_SECONDS)}
+    if got.get("twin"):
+        reg["anthems"][key].update(dark=Path(got["twin"]["path"]).name, dark_how=got["twin"].get("how"))
     save_registry(campaign_dir, reg)
     return reg["anthems"][key]
 

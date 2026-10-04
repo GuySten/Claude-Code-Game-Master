@@ -19,9 +19,14 @@
 #   gm-table.sh say "..." --heroic "<pc>"  A PC's heroic moment: their anthem, then the scene's music
 #   gm-table.sh say "..." --loot "<item>" --loot-look "..." --loot-for "<pc>"  Important loot, painted
 #   gm-table.sh translate --stdin         Translate players' actions for the rest of the table
+#   gm-table.sh redo "<pc>" "..." --lang en  An action can't work: say why; they choose again (fresh clock)
+#   gm-table.sh warn "<pc>" "..." --lang en  Cruelty to clear innocents: warn; they choose again (once)
+#   gm-table.sh punish "<pc>" death|madness|curse --reason "..."  They insisted (judgment music)
+#   gm-table.sh atone "<pc>"              Lift a curse once they have atoned in the story
 #   gm-table.sh round 90 | round off      How long the GM waits for everyone (default 60 s)
 #   gm-table.sh alias "Marta" "מרתה"      Another spelling of a name (hover cards)
 #   gm-table.sh free "<pc>"               Free a seat (player switching devices)
+#   gm-table.sh kick "<pc>"               Remove a character nobody is playing (to departed/)
 #   gm-table.sh stop                      Close the table
 #   gm-table.sh serve [...]               Run the server in the foreground instead
 
@@ -33,7 +38,11 @@ ACTION=$1
 shift
 
 case "$ACTION" in
-    "serve"|"start"|"status"|"wait"|"inbox"|"say"|"translate"|"music"|"free"|"stop"|"round"|"alias"|"languages")
+    "serve"|"start"|"status"|"wait"|"inbox"|"say"|"redo"|"warn"|"punish"|"atone"|"translate"|"music"|"free"|"stop"|"round"|"alias"|"languages")
+        $PYTHON_CMD "$LIB_DIR/table_server.py" "$ACTION" "$@"
+        ;;
+
+    "kick")         # (its own clause: remove a character nobody plays)
         $PYTHON_CMD "$LIB_DIR/table_server.py" "$ACTION" "$@"
         ;;
 

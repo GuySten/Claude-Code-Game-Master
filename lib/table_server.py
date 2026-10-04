@@ -230,6 +230,7 @@ MAX_PENDING_ROLLS = 200
 # A round: once the first player acts, the GM waits until every seated player has
 # acted, or this many seconds (gm-table.sh round <seconds|off>).
 ROUND_SECONDS = 60
+EXTEND_SECONDS = 60          # a player who hasn't acted may add this once per round
 # Every action can be fixed for at least this long: the GM can't read it sooner.
 EDIT_GRACE = 5.0
 # The players' side chat: kept in memory only, never on disk and never in any
@@ -312,6 +313,8 @@ class TableState:
                             target.setdefault("tr", {}).update(entry["tr"])
                         if entry.get("read"):  # the GM read it: no more editing
                             target["read"] = True
+                        if entry.get("redo"):  # it couldn't work: its player chose again
+                            target["redo"] = True
                         target["rev"] = self.rev
                     continue
                 entry["rev"] = self.rev
@@ -363,6 +366,9 @@ class TableState:
         self.chat: List[Dict[str, Any]] = []           # players only; never written to disk
         # The Narrator (lib/narrator.py): each player's private questions and answers.
         self.narrator_log: Dict[str, List[Dict[str, Any]]] = {}
+        # "Previously on...": (viewer, lang) -> {n (story lines then), text, source}.
+        self.recaps: Dict[tuple, Dict[str, Any]] = {}
+        self.recap_busy: set = set()
         self.narrator_busy: set = set()
         self.narrator_slots = threading.Semaphore(2)
         self.narrator_ask = None                        # tests plug in a fake model
@@ -399,6 +405,19 @@ class TableState:
         self.visited: List[str] = [v for v in visited if isinstance(v, str)]
         # Characters rolled on the join screen, not created yet: roll id -> roll.
         self.pending_rolls: Dict[str, Dict[str, Any]] = {}
+        # Actions the GM ruled can't work: PC -> {t (the redo's clock starts), after
+        # (the last message id then), reason}. Their players choose again, on a fresh
+        # round clock; the GM resolves nothing until they have (or their time is up).
+        self.redo: Dict[str, Dict[str, Any]] = {}
+        # Cruelty to clear innocents: who was warned, punishments, and the players
+        # who owe their next character a nemesis (table/conduct.json).
+        self.conduct_path = self.dir / "conduct.json"
+        conduct = self._read_json(self.conduct_path, {})
+        self.conduct: Dict[str, Any] = conduct if isinstance(conduct, dict) else {}
+        for k in ("warnings", "nemesis_for", "log"):
+            self.conduct.setdefault(k, [] if k == "log" else {})
+        # Who added a minute to the round: {"round": its started_at, "by": [PC, ...]}.
+        self.extended: Dict[str, Any] = {"round": None, "by": []}
         try:
             self.gm_cursor = int(self.cursor_path.read_text().strip())
         except (OSError, ValueError):
@@ -527,27 +546,248 @@ class TableState:
         """The round the GM will answer next: the actions it hasn't read yet. It
         opens with the first of them (so nobody is timed while the table is on a
         break) and closes when every seated player has acted, or after
-        round_seconds. While it's open the GM can't read the actions or narrate."""
+        round_seconds. While it's open the GM can't read the actions or narrate.
+        After the GM ruled an action can't work (``ask_redo``), the round is that
+        player's choosing again: it waits on them alone, on a fresh clock."""
         now = now or time.time()
         secs = self.round_seconds
         with self.lock:
             acts = [m for m in self.messages if m["id"] > self.gm_cursor and m["kind"] == "player"]
             seated = list(dict.fromkeys(self.seats.values()))
-        if not acts:
+            redo = {pc: dict(r) for pc, r in self.redo.items()}
+        if not acts and not redo:
             return {"open": False, "seconds": secs, "settling": False}
-        acted = {party_roster.slugify(m.get("pc", "")) for m in acts}
         out = self.out_of_action()
-        waiting = [n for n in seated if party_roster.slugify(n) not in acted and n not in out]
-        started = self._sent_at(acts[0])
-        deadline = started + secs
+        if redo:
+            waiting = [pc for pc, r in redo.items() if pc not in out and not any(
+                party_roster._same_name(m.get("pc") or "", pc) and m["id"] > r["after"]
+                for m in acts)]
+            started = min(r["t"] for r in redo.values())
+        else:
+            acted = {party_roster.slugify(m.get("pc", "")) for m in acts}
+            waiting = [n for n in seated if party_roster.slugify(n) not in acted and n not in out]
+            started = self._sent_at(acts[0])
+        with self.lock:
+            by = list(self.extended["by"]) if self.extended["round"] == started else []
+        total = secs + EXTEND_SECONDS * len(by)
+        deadline = started + total
         # The newest action is a few seconds old at most: its player may still be
         # fixing a typo. The GM waits that out too (rounds on or off).
-        ready_at = max(self._sent_at(m) for m in acts) + EDIT_GRACE
-        return {"open": bool(secs and waiting and now < deadline), "seconds": secs,
-                "settling": now < ready_at, "ready_at": ready_at,
-                "out_of_action": {n: why for n, why in out.items() if n in seated},
-                "started_at": started, "deadline": deadline, "waiting_on": waiting,
-                "timed_out": bool(secs and waiting and now >= deadline)}
+        ready_at = max(self._sent_at(m) for m in acts) + EDIT_GRACE if acts else 0
+        rnd = {"open": bool(secs and waiting and now < deadline), "seconds": secs,
+               "total": total, "extended_by": by,
+               "settling": now < ready_at, "ready_at": ready_at,
+               "out_of_action": {n: why for n, why in out.items() if n in seated},
+               "started_at": started, "deadline": deadline, "waiting_on": waiting,
+               "timed_out": bool(secs and waiting and now >= deadline)}
+        if redo:
+            rnd["redo"] = {pc: r["reason"] for pc, r in redo.items()}
+        return rnd
+
+    # --- conduct: cruelty to clear innocents is warned once, then punished ---
+    def _save_conduct(self) -> None:
+        tmp = self.conduct_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(self.conduct, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(self.conduct_path)
+
+    def warn(self, pc: str, text: str, lang: Optional[str] = None) -> Dict[str, Any]:
+        """The GM warns a player whose action is cruelty to clear innocents: the
+        action is taken back and they choose again (once, on a fresh clock). The
+        warning is recorded: only a warned player can be punished. The judgment
+        music is composed now, so it's ready if they insist."""
+        msg = self.ask_redo(pc, text, lang, warn=True)
+        with self.lock:
+            if pc not in self.conduct["warnings"]:
+                self.conduct["warnings"][pc] = {"t": _now(), "warning": text}
+                self.conduct["log"].append({"t": _now(), "pc": pc, "kind": "warn", "text": text})
+                self._save_conduct()
+        if (self.music_maker is not None or composer.available()) and not composer.has_theme(
+                self.campaign_dir, composer.JUDGMENT, False) and not any(
+                j["kind"] == "judgment" for j in self.music_jobs):
+            self.music_jobs.append({"kind": "judgment", "name": composer.JUDGMENT, "boss": False, "look": ""})
+            self.portrait_wake.set()
+        return msg
+
+    def judgment_music(self) -> Optional[Dict[str, Any]]:
+        """The punishment's music: the composed judgment piece, else the darkest mood."""
+        track = composer.theme_file(self.campaign_dir, composer.JUDGMENT, False)
+        if track:
+            music = self.set_music(track, 0.8, True, composer.JUDGMENT, mood="dread", theme=composer.JUDGMENT)
+        else:
+            music = self.apply_mood("dread", force=True)
+        if music:
+            self.announce_music(music)
+        return music
+
+    def _write_sheet(self, path: Path, sheet: Dict[str, Any]) -> None:
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(sheet, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(path)
+
+    def punish(self, pc: str, way: str, reason: str) -> Dict[str, Any]:
+        """A warned player insisted. Three punishments, with the judgment music:
+        death (the character is killed; the player rolls a new one), madness (the
+        character is lost to the GM as a villain; the player's next character is
+        their nemesis, and the old anthem turns dark as the villain's theme), or a
+        curse (they play on, at disadvantage on every ability check, until they
+        atone). The GM narrates it, with the reason it invented."""
+        if way not in ("death", "madness", "curse"):
+            return {"ok": False, "error": "the punishment is death, madness or curse"}
+        path = party_roster.find_pc(self.campaign_dir, pc)
+        if path is None:
+            return {"ok": False, "error": f"no player character named {pc}"}
+        sheet = to_flat(party_roster._read(path) or {})
+        real = sheet.get("name") or pc
+        with self.lock:
+            warned = next((n for n in self.conduct["warnings"] if party_roster._same_name(n, real)), None)
+        if warned is None:
+            return {"ok": False, "error": f"{real} was never warned: warn first "
+                                          f"(gm-table.sh warn \"{real}\" \"…\"); punish only if they insist"}
+        reason = " ".join(str(reason).split())[:400]
+        music = self.judgment_music()
+        out: Dict[str, Any] = {"ok": True, "pc": real, "way": way, "music": music}
+        if way == "curse":
+            conds = [c for c in (sheet.get("conditions") or [])]
+            if "cursed" not in [str(c).lower() for c in conds]:
+                conds.append("cursed")
+            sheet["conditions"] = conds
+            sheet["curse"] = {"reason": reason, "since": _now(),
+                              "effect": "disadvantage on every ability check", "lifted_by": "atonement"}
+            self._write_sheet(path, sheet)
+        else:
+            with self.lock:
+                tokens = [t for t, n in self.seats.items() if party_roster._same_name(n, real)]
+                if way == "madness":
+                    for t in tokens:
+                        self.conduct["nemesis_for"][t] = real
+            self.free(real)
+            sheet["status"] = "dead" if way == "death" else "lost to madness"
+            sheet["fate"] = {"punished": way, "reason": reason, "at": _now()}
+            if way == "death":
+                sheet.setdefault("hp", {})["current"] = 0
+            if path.name == party_roster.LEAD_FILE:
+                self._write_sheet(path, sheet)          # (the lead stays on the record, out of play)
+            else:
+                departed = self.campaign_dir / "departed"
+                departed.mkdir(parents=True, exist_ok=True)
+                self._write_sheet(departed / path.name, sheet)
+                path.unlink()
+            if way == "madness":
+                self._villain_from(sheet, reason)
+                out["villain"] = real
+        with self.lock:
+            self.conduct["warnings"].pop(warned, None)
+            self.conduct["log"].append({"t": _now(), "pc": real, "kind": "punish", "way": way, "reason": reason})
+            self._save_conduct()
+        self.append("system", f"⚖ Judgment falls on {real}.", pc=real,
+                    event={"type": "punished", "way": way})
+        return out
+
+    def _villain_from(self, sheet: Dict[str, Any], reason: str) -> None:
+        """A PC lost to madness joins the NPCs as a villain, with their anthem turned dark."""
+        name = sheet.get("name")
+        path = self.campaign_dir / "npcs.json"
+        data = self._read_json(path, {})
+        data = data if isinstance(data, dict) else {}
+        npcs = data["npcs"] if isinstance(data.get("npcs"), dict) else data
+        npcs[name] = {**(npcs.get(name) or {}),
+                      "description": f"Once one of the party. {reason}".strip(),
+                      "attitude": "hostile", "villain": True, "former_pc": True, "nemesis_of": None,
+                      "created": _now(), "events": [], "tags": {"locations": [], "quests": []},
+                      "visual_appearance": sheet.get("visual_appearance") or {},
+                      "portrait": sheet.get("portrait")}
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(path)
+        if composer.villain_theme_from_anthem(self.campaign_dir, name):
+            return                          # the anthem's dark twin was ready: their theme now
+        if self.music_maker is not None or composer.available():
+            self.music_jobs.append({"kind": "dark_anthem", "name": name, "boss": False, "look": "",
+                                    "sheet": sheet})
+            self.portrait_wake.set()
+
+    def link_nemesis(self, token: str, new_pc: str) -> Optional[str]:
+        """The player of a character lost to madness made a new one: the old one is
+        the new one's nemesis now (the GM invents why)."""
+        with self.lock:
+            old = self.conduct["nemesis_for"].pop(token, None) if token else None
+            if old:
+                self._save_conduct()
+        if not old:
+            return None
+        path = self.campaign_dir / "npcs.json"
+        data = self._read_json(path, {})
+        npcs = data.get("npcs") if isinstance(data.get("npcs"), dict) else data
+        if isinstance(npcs, dict) and isinstance(npcs.get(old), dict):
+            npcs[old]["nemesis_of"] = new_pc
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+            tmp.replace(path)
+        self.append("system", f"⚔ {new_pc}'s nemesis: {old}.", pc=new_pc, event={"type": "nemesis", "of": old})
+        return old
+
+    def atone(self, pc: str) -> Dict[str, Any]:
+        """The curse is lifted (the atonement was made, in the story)."""
+        path = party_roster.find_pc(self.campaign_dir, pc)
+        if path is None:
+            return {"ok": False, "error": f"no player character named {pc}"}
+        sheet = to_flat(party_roster._read(path) or {})
+        conds = [c for c in (sheet.get("conditions") or []) if str(c).lower() != "cursed"]
+        if len(conds) == len(sheet.get("conditions") or []) and not sheet.get("curse"):
+            return {"ok": False, "error": f"{sheet.get('name', pc)} isn't cursed"}
+        sheet["conditions"] = conds
+        sheet.pop("curse", None)
+        self._write_sheet(path, sheet)
+        with self.lock:
+            self.conduct["log"].append({"t": _now(), "pc": sheet.get("name", pc), "kind": "atone"})
+            self._save_conduct()
+        self.append("system", f"✨ {sheet.get('name', pc)}'s curse is lifted.", pc=sheet.get("name", pc),
+                    event={"type": "atoned"})
+        return {"ok": True, "pc": sheet.get("name", pc)}
+
+    def extend_round(self, pc: str) -> Dict[str, Any]:
+        """A player who hasn't acted yet asks for more time: the round's clock gets
+        EXTEND_SECONDS more. Once per player per round."""
+        rnd = self.round_state()
+        if not rnd.get("open"):
+            return {"ok": False, "error": "No round is running."}
+        if pc not in rnd["waiting_on"]:
+            return {"ok": False, "error": "You've already acted this round."}
+        with self.lock:
+            if self.extended["round"] != rnd["started_at"]:
+                self.extended = {"round": rnd["started_at"], "by": []}
+            if pc in self.extended["by"]:
+                return {"ok": False, "error": "You've already added a minute this round."}
+            self.extended["by"].append(pc)
+        self.append("system", f"{pc} asks for one more minute.", pc=pc, event={"type": "extend"})
+        return {"ok": True, "round": self.round_state()}
+
+    def ask_redo(self, pc: str, text: str, lang: Optional[str] = None, warn: bool = False) -> Dict[str, Any]:
+        """The GM rules a player's action can't work: it tells them why (``text``,
+        a GM beat everyone sees), marks the action, and gives its player a fresh
+        round clock to choose another. Called once per table language, the clock
+        starts once."""
+        with self.lock:
+            acted = [m for m in self.messages if m["kind"] == "player" and not m.get("to")
+                     and party_roster._same_name(m.get("pc") or "", pc)]
+            last = acted[-1] if acted else None
+            if last is not None and not last.get("redo"):
+                last["redo"] = True
+                self.rev += 1
+                last["rev"] = self.rev
+                with open(self.log_path, "a", encoding="utf-8") as f:
+                    f.write(json.dumps({"patch": last["id"], "redo": True}) + "\n")
+            pending = self.redo.get(pc)
+            again = pending is not None and not any(
+                m["id"] > pending["after"] and m["kind"] == "player"
+                and party_roster._same_name(m.get("pc") or "", pc) for m in self.messages)
+        msg = self.append("gm", text, lang=lang, event={"type": "redo", "pc": pc, **({"warn": True} if warn else {})})
+        with self.lock:
+            if again:
+                pending["after"] = msg["id"]      # (the same ruling in another language)
+            else:
+                self.redo[pc] = {"t": _stamp(), "after": msg["id"], "reason": text}
+        return msg
 
     def out_of_action(self) -> Dict[str, str]:
         """Seated PCs who can't act (dead, unconscious...): name -> why. Read from
@@ -584,6 +824,39 @@ class TableState:
                 self.chat_changed.wait(left)
 
     # --- the Narrator: reminds a player of the story so far (private, read-only) ---
+    def recap(self, viewer: str, lang: str) -> Dict[str, Any]:
+        """"Previously on...": the story so far for this player, in their language.
+        Told by the Narrator's model in the background (kept until the story moves
+        on); until then, and without a model, the last beats as they were told."""
+        import narrator
+        lines = narrator.story_lines(self.since(0, viewer), viewer, lang)
+        if not any(l.startswith("[GM] ") for l in lines):
+            return {"ok": True, "text": None, "pending": False}
+        key = (viewer, lang)
+        with self.lock:
+            have = self.recaps.get(key)
+            fresh = have is not None and have["n"] == len(lines)
+            pending = not fresh and (self.narrator_ask is not None or narrator.backend() != "off")
+            if pending and key not in self.recap_busy:
+                self.recap_busy.add(key)
+                threading.Thread(target=self._make_recap, args=(key, lines), daemon=True).start()
+        if fresh:
+            return {"ok": True, "text": have["text"], "pending": False, "source": have["source"]}
+        return {"ok": True, "text": narrator.recap_fallback(lines), "pending": pending, "source": "story"}
+
+    def _make_recap(self, key: tuple, lines: List[str]) -> None:
+        import narrator
+        viewer, lang = key
+        try:
+            got = narrator.answer("What happened so far?", lines[-60:],
+                                  narrator.recap_prompt(lines[-60:], viewer), lang, ask=self.narrator_ask)
+            text = got["answer"] if got["source"] != "recall" else narrator.recap_fallback(lines)
+            with self.lock:
+                self.recaps[key] = {"n": len(lines), "text": text, "source": got["source"]}
+        finally:
+            with self.lock:
+                self.recap_busy.discard(key)
+
     def narrator_question(self, pc: str, question: str) -> Dict[str, Any]:
         import narrator
         with self.lock:
@@ -1458,6 +1731,7 @@ class TableState:
                             f.write(json.dumps({"patch": m["id"], "read": True}) + "\n")
                 self.gm_cursor = self.messages[-1]["id"]
                 self.cursor_path.write_text(str(self.gm_cursor))
+                self.redo.clear()               # their new actions are in (or their time is up)
                 if any(m["kind"] == "player" for m in unread):
                     self._start_turn()
             return unread
@@ -1486,7 +1760,7 @@ class TableState:
                      # The sheets as the players last saw them. The GM records
                      # every change BEFORE narrating it, so without this the HP
                      # bars would give the outcome away before the story does.
-                     "party": self.party(sheets=True)}
+                     "party": self.party(sheets=True), "fight": self.fight()}
 
     def set_stage(self, stage: str) -> bool:
         with self.lock:
@@ -1529,7 +1803,10 @@ class TableState:
             return {"state": "queued" if queued else "idle"}
 
     def waiting_on(self) -> List[str]:
-        """Seated PCs who have not acted since the GM last spoke."""
+        """Seated PCs who have not acted since the GM last spoke (while a player
+        chooses again after an action that couldn't work: just them)."""
+        if self.redo:
+            return self.round_state().get("waiting_on", [])
         with self.lock:
             last_gm = max((m["id"] for m in self.messages if m["kind"] == "gm"), default=0)
             acted = {party_roster.slugify(m.get("pc", "")) for m in self.messages
@@ -1547,6 +1824,26 @@ class TableState:
         if name and party_roster.find_pc(self.campaign_dir, name) is None:
             return None  # the PC left the table (or died and was replaced)
         return name
+
+    def remove_pc(self, name: str) -> Dict[str, Any]:
+        """Take a character nobody is playing out of the party: its sheet is archived
+        to the campaign's departed/ (as gm-player.sh leave does) and the table is
+        told. Never a seated character (free the seat first), never the lead."""
+        path = party_roster.find_pc(self.campaign_dir, name)
+        if path is None:
+            return {"ok": False, "error": f"no player character named {name}"}
+        sheet = party_roster._read(path) or {}
+        real = sheet.get("name") or name
+        if path.name == party_roster.LEAD_FILE:
+            return {"ok": False, "error": f"{real} is the lead character and can't be removed"}
+        if self.claimed_by_anyone(real):
+            return {"ok": False, "error": f"{real} is seated: free the seat first (gm-table.sh free)"}
+        departed = self.campaign_dir / "departed"
+        departed.mkdir(parents=True, exist_ok=True)
+        (departed / path.name).write_text(json.dumps(sheet, indent=2, ensure_ascii=False), encoding="utf-8")
+        path.unlink()
+        self.append("system", f"{real} has left the party.", pc=real, event={"type": "departed"})
+        return {"ok": True, "removed": real}
 
     def claimed_by_anyone(self, name: str) -> bool:
         return any(party_roster._same_name(n, name) for n in self.seats.values())
@@ -1603,6 +1900,56 @@ class TableState:
                 out.append({**{k: v for k, v in before.items() if k != "sheet"},
                             "claimed": pc["claimed"], "lead": pc["lead"]})
         return out
+
+    def fight(self) -> Optional[Dict[str, Any]]:
+        """The fight as the players may see it: the order, whose turn it is, how
+        hurt each foe looks (in words, never its numbers), recorded conditions and
+        states, and the battlefield effects (which hit everyone). A hidden foe isn't
+        listed. None when there is no fight."""
+        data = self._read_json(self.campaign_dir / "combat_state.json", {})
+        combatants = data.get("combatants") if isinstance(data, dict) else None
+        if not combatants or data.get("active") is False:
+            return None
+        order, turn = [], None
+        for i, c in enumerate(combatants):
+            if not isinstance(c, dict) or not c.get("name"):
+                continue
+            states = c.get("states") or {}
+            foe = c.get("kind") == "enemy" or "block" in c or str(c.get("side", "")).lower() in (
+                "enemy", "enemies", "foe", "foes", "hostile", "monster")
+            if foe and states.get("hidden"):
+                continue                        # (the players don't know where it is)
+            entry = {"name": c["name"], "foe": foe,
+                     "states": {k: v for k, v in states.items() if k in ("hidden", "cover") and v},
+                     "conditions": [str(x.get("name") if isinstance(x, dict) else x)
+                                    for x in c.get("conditions") or []]}
+            if foe:
+                try:
+                    ratio = max(0.0, float(c.get("hp_current"))) / float(c.get("hp_max"))
+                except (TypeError, ValueError, ZeroDivisionError):
+                    ratio = None
+                entry["health"] = (None if ratio is None else "down" if ratio <= 0
+                                   else "critical" if ratio <= .25 else "bloodied" if ratio <= .5
+                                   else "wounded" if ratio < 1 else "unhurt")
+            order.append(entry)
+            if i == data.get("turn_index", 0):
+                turn = c["name"]
+        if not order:
+            return None
+        fields = [{"name": f.get("name"), "effects": f.get("effects") or [], "unless": f.get("unless")}
+                  for f in data.get("fields") or [] if isinstance(f, dict) and f.get("name")]
+        return {"round": data.get("round", 1), "turn": turn if any(e["name"] == turn for e in order)
+                else None, "order": order, "fields": fields}
+
+    def fight_for(self, viewer: Optional[str]) -> Optional[Dict[str, Any]]:
+        """The fight, held back like the party's sheets during the GM's turn: a foe
+        falls when the story says so, not when the GM records it."""
+        with self.lock:
+            turn = self.turn
+            if (turn and time.time() - turn["started_at"] < STALE_TURN_SECONDS and "fight" in turn
+                    and not (viewer and self.langs.get(viewer, "en") in turn["langs_done"])):
+                return turn["fight"]
+        return self.fight()
 
     def last_narration(self, viewer: Optional[str]) -> int:
         """Id of the newest GM message this viewer can see. The page holds sheet
@@ -1790,6 +2137,7 @@ class TableState:
                 "race": c.get("race", ""), "class": c.get("class", ""),
                 "concept": c.get("concept", ""),
                 "hp": hp.get("current", 0), "hp_max": hp.get("max", 0),
+                "ac": c.get("ac", c.get("armor_class")),
                 "status": c.get("status", "alive"),
                 "conditions": c.get("conditions", []),
                 "claimed": self.claimed_by_anyone(c.get("name", "")),
@@ -2398,6 +2746,10 @@ def sheet_strings(sheet: Dict[str, Any], lang: str = "he") -> List[str]:
 
 def _held_note(rnd: Dict[str, Any]) -> str:
     """Why the GM can't read or narrate yet, for the GM."""
+    if rnd.get("open") and rnd.get("redo"):
+        left = max(0, int(rnd["deadline"] - time.time()))
+        return (f"{', '.join(rnd['waiting_on'])} is choosing a new action (the action couldn't "
+                f"work) — {left} s left")
     if rnd.get("open"):
         left = max(0, int(rnd["deadline"] - time.time()))
         return (f"The players are still acting — waiting for {', '.join(rnd['waiting_on'])} "
@@ -2508,10 +2860,16 @@ def make_handler(state: TableState, code: str, host_key: str):
                                    "places": state.places(), **state.gallery(),
                                    "round": state.round_state(),
                                    "lore_terms": state.lore_terms(me, q.get("lang")),
+                                   "fight": state.fight_for(me),
                                    "languages": languages.describe(state.languages),
                                    "lang": state.lang_for(me),
                                    "narration_id": state.last_narration(me),
                                    **state.overview()})
+            if url.path == "/api/recap":
+                if not me:
+                    return self._err("Take a seat first.", 403)
+                lang = q.get("lang") if q.get("lang") in state.table_langs() else state.lang_for(me)
+                return self._json(state.recap(me, lang))
             if url.path == "/api/messages":
                 try:
                     after = int(q.get("after", 0))
@@ -2612,6 +2970,7 @@ def make_handler(state: TableState, code: str, host_key: str):
                                             f"pick them in the list above to play them.")
                         created["existing"] = name
                     return self._json(created, 409)
+                state.link_nemesis(str(data.get("token") or ""), created["pc"])
                 rolled = state.apply_roll(created["pc"], data.get("roll_id"))
                 result = state.claim(created["pc"])
                 if result["ok"]:
@@ -2632,6 +2991,11 @@ def make_handler(state: TableState, code: str, host_key: str):
                 return self._json(result, 200 if result["ok"] else 409)
 
             me = state.pc_for(data.get("token"))
+            if url.path == "/api/extend":
+                if not me:
+                    return self._err("Take a seat first.", 403)
+                r = state.extend_round(me)
+                return self._json(r, 200 if r["ok"] else 409)
             if url.path == "/api/say":
                 if not me:
                     return self._err("Take a seat first.", 403)
@@ -2689,6 +3053,13 @@ def make_handler(state: TableState, code: str, host_key: str):
                 state.set_lang(me, data.get("lang"))
                 return self._json({"ok": True})
 
+            if url.path == "/api/kick":
+                # The lead player (the host's own seat) may clear out characters nobody plays.
+                lead = me and party_roster.find_pc(state.campaign_dir, me)
+                if not lead or lead.name != party_roster.LEAD_FILE:
+                    return self._err("Only the lead player can remove a character.", 403)
+                r = state.remove_pc(str(data.get("pc", "")))
+                return self._json(r, 200 if r["ok"] else 409)
             if url.path == "/api/leave":
                 name = state.release(str(data.get("token", "")))
                 if name:
@@ -2707,8 +3078,9 @@ def make_handler(state: TableState, code: str, host_key: str):
                                        "waiting_on": rnd["waiting_on"], "langs": state.seated_langs(),
                                        "languages": state.languages,
                                        "music": state.music, "auto_music": state.auto_music})
+                redo_missed = rnd["waiting_on"] if rnd.get("redo") else []
                 unread = state.gm_unread(mark=True)
-                return self._json({"ok": True, "messages": unread,
+                return self._json({"ok": True, "messages": unread, "redo_missed": redo_missed,
                                    "waiting_on": state.waiting_on(),
                                    "langs": state.seated_langs(),
                                    "languages": state.languages,
@@ -2789,6 +3161,36 @@ def make_handler(state: TableState, code: str, host_key: str):
                     f"{lang_name(l)} (say --lang {l})" for l in missing) + ".") if missing else None
                 return self._json({"ok": True, "message": msg, "music": music,
                                    "warning": warning, "reminder": reminder})
+            if path == "/api/gm/redo":
+                text = str(data.get("text", "")).strip()
+                if not text:
+                    return self._err("say why the action can't work, and that they choose again")
+                if len(text) > MAX_TEXT * 2:
+                    return self._err("too long: one or two sentences")
+                path_ = party_roster.find_pc(state.campaign_dir, str(data.get("pc", "")))
+                if path_ is None:
+                    return self._err(f"no player character named {data.get('pc')}")
+                pc = (party_roster._read(path_) or {}).get("name") or str(data.get("pc"))
+                seated = next((n for n in state.seats.values() if party_roster._same_name(n, pc)), None)
+                if seated is None:
+                    return self._err(f"{pc} isn't at the table: nobody can choose again for them")
+                lang = data.get("lang")
+                if lang and lang not in state.table_langs():
+                    return self._err(f"this adventure isn't played in {lang} (its languages: "
+                                     f"{', '.join(state.languages)})")
+                msg = (state.warn if data.get("warn") else state.ask_redo)(seated, text, lang)
+                missing = state.missing_versions() if lang else {}
+                reminder = ("Now the same ruling in " + ", ".join(
+                    f"{lang_name(l)} (redo \"{seated}\" \"…\" --lang {l})" for l in missing)
+                    + ".") if missing else None
+                return self._json({"ok": True, "message": msg, "round": state.round_state(),
+                                   "reminder": reminder})
+            if path == "/api/gm/punish":
+                r = state.punish(str(data.get("pc", "")), str(data.get("way", "")), str(data.get("reason", "")))
+                return self._json({k: v for k, v in r.items() if k != "music"}, 200 if r["ok"] else 409)
+            if path == "/api/gm/atone":
+                r = state.atone(str(data.get("pc", "")))
+                return self._json(r, 200 if r["ok"] else 409)
             if path == "/api/gm/music":
                 if "auto" in data:
                     state.set_auto_music(bool(data["auto"]))
@@ -2882,6 +3284,9 @@ def make_handler(state: TableState, code: str, host_key: str):
                     return self._err("give a name and its other spelling")
                 state.set_alias(name, alias)
                 return self._json({"ok": True, "aliases": state.aliases()})
+            if path == "/api/gm/kick":
+                r = state.remove_pc(str(data.get("pc", "")))
+                return self._json(r, 200 if r["ok"] else 409)
             if path == "/api/gm/free":
                 freed = state.free(str(data.get("pc", "")))
                 return self._json({"ok": True, "freed": freed})
@@ -3225,6 +3630,12 @@ def _call(campaign_dir: Path, method: str, path: str, data: Optional[dict] = Non
         sys.exit(f"[ERROR] Could not reach the table server: {e.reason}")
 
 
+def _print_redo_missed(r: dict) -> None:
+    if r.get("redo_missed"):
+        print(f"TIME UP: {', '.join(r['redo_missed'])} chose no new action — they hesitate and "
+              f"lose the moment. Resolve the round (the actions read before) without them.")
+
+
 def _print_translate_request(needed: List[dict]) -> None:
     """Tell the GM exactly what to translate, as a ready-to-fill command."""
     if not needed:
@@ -3384,6 +3795,26 @@ def main() -> None:
     f = sub.add_parser("free", help="Free a player's seat so they can rejoin from another device")
     f.add_argument("pc")
 
+    kk = sub.add_parser("kick", help="Remove a character nobody is playing (archived to departed/)")
+    kk.add_argument("pc")
+
+    rd = sub.add_parser("redo", help="An action can't work: tell its player why; they choose "
+                                     "another on a fresh round clock")
+    rd.add_argument("pc")
+    rd.add_argument("text", help="Why it can't work, and that they choose again (one or two sentences)")
+    rd.add_argument("--lang", help="The language it's written in (once per table language)")
+
+    wn = sub.add_parser("warn", help="Cruelty to clear innocents: warn the player; they choose again (once)")
+    wn.add_argument("pc")
+    wn.add_argument("text", help="The warning, and that they choose another action")
+    wn.add_argument("--lang", help="The language it's written in (once per table language)")
+    pu = sub.add_parser("punish", help="A warned player insisted: death | madness | curse (judgment music)")
+    pu.add_argument("pc")
+    pu.add_argument("way", choices=["death", "madness", "curse"])
+    pu.add_argument("--reason", required=True, help="The reason you invented (the avengers, the guilt...)")
+    at = sub.add_parser("atone", help="Lift a curse (the atonement was made in the story)")
+    at.add_argument("pc")
+
     al = sub.add_parser("alias", help="Another spelling of a name (e.g. its Hebrew form), for hover cards")
     al.add_argument("name", help="The name as the campaign knows it (NPC, place, faction)")
     al.add_argument("alias", help="The other spelling, as it appears in the narration")
@@ -3481,6 +3912,7 @@ def main() -> None:
         if r.get("held"):
             print(f"({_held_note(r['round'])} — run wait)")
             return
+        _print_redo_missed(r)
         return _print_messages(r.get("messages", []), r.get("waiting_on", []), r.get("langs"),
                                r.get("music"), r.get("auto_music", True),
                                r.get("translate"), r.get("languages"), r.get("missing"))
@@ -3495,6 +3927,8 @@ def main() -> None:
             if rnd.get("settling"):                 # a player may still be fixing a typo
                 time.sleep(max(0.2, min(1.0, rnd["ready_at"] - time.time() + 0.05)))
                 continue
+            if rnd.get("redo") and rnd.get("timed_out"):
+                break                               # chose nothing new in time
             if r.get("unread") and rnd.get("seconds"):
                 # Rounds: every seated player has acted, or the round's time is up.
                 if not rnd.get("open") and (not args.all or not r.get("waiting_on")):
@@ -3512,10 +3946,12 @@ def main() -> None:
         if r.get("held"):
             print(f"(the players are still acting — run wait again)")
             return
+        _print_redo_missed(r)
         if not r.get("messages"):
-            print(f"(no player messages after {args.timeout}s — run wait again)")
+            if not r.get("redo_missed"):
+                print(f"(no player messages after {args.timeout}s — run wait again)")
             return
-        if rnd.get("timed_out"):
+        if rnd.get("timed_out") and not rnd.get("redo"):
             print(f"ROUND CLOSED after {rnd['seconds']} s: {', '.join(rnd['waiting_on'])} didn't act "
                   f"— narrate for those who did; the others act in the next beat.")
         if rnd.get("out_of_action"):
@@ -3640,6 +4076,42 @@ def main() -> None:
         m = r["music"]
         print(f"MUSIC {m['title']} ({m['track']}, volume {m['volume']})" if m.get("track")
               else "MUSIC stopped")
+        return
+
+    if args.action == "punish":
+        r = _call(campaign_dir, "POST", "/api/gm/punish", {"pc": args.pc, "way": args.way, "reason": args.reason})
+        if not r.get("ok"):
+            sys.exit(f"[ERROR] {r.get('error')}")
+        print({"death": f"{r['pc']} is dead; their player rolls a new character. Narrate it now, with the judgment music.",
+               "madness": f"{r['pc']} is lost to madness and is a villain NPC now (its anthem turns dark as its "
+                          f"theme). When their player's new character arrives, invent why the two are nemeses.",
+               "curse": f"{r['pc']} is cursed: disadvantage on every ability check until they atone "
+                        f"(set the atonement quest; then gm-table.sh atone \"{r['pc']}\")."}[r["way"]])
+        return
+
+    if args.action == "atone":
+        r = _call(campaign_dir, "POST", "/api/gm/atone", {"pc": args.pc})
+        print(f"{r['pc']}'s curse is lifted." if r.get("ok") else f"[ERROR] {r.get('error')}")
+        return
+
+    if args.action in ("redo", "warn"):
+        r = _call(campaign_dir, "POST", "/api/gm/redo",
+                  {"pc": args.pc, "text": args.text, "lang": args.lang, "warn": args.action == "warn"})
+        if not r.get("ok"):
+            sys.exit(f"[ERROR] {r.get('error')}")
+        rnd = r.get("round") or {}
+        clock = f"{rnd['seconds']} s" if rnd.get("seconds") else "no time limit (rounds are off)"
+        print(f"Told {', '.join(rnd.get('waiting_on') or [args.pc])} to choose again ({clock}). "
+              f"Resolve and narrate nothing of this round yet: run wait.")
+        if r.get("reminder"):
+            print(r["reminder"])
+        return
+
+    if args.action == "kick":
+        r = _call(campaign_dir, "POST", "/api/gm/kick", {"pc": args.pc})
+        if not r.get("ok"):
+            sys.exit(f"[ERROR] {r.get('error')}")
+        print(f"{r['removed']} has left the party (their sheet is in departed/).")
         return
 
     if args.action == "free":

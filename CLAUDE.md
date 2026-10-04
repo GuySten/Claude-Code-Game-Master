@@ -47,14 +47,14 @@ default, and `languages` alone shows them). Every player then switches between t
 moment and finds everything in their language. While the table is open:
 1. `bash tools/gm-table.sh wait` (≈9 min max; rerun on timeout) — blocks until the ROUND
    closes and prints the actions (`[#12 Bram] I kick the door`), joins, and who hasn't acted.
-   A round opens when the first player acts and closes when every seated player has acted,
-   or 60 s later (the players see a countdown). Until then the table holds the actions back
-   and refuses a public `say`: you can't answer early (whispers, rolls and music still work).
-   `ROUND CLOSED … didn't act` → narrate for those who acted; the others act next beat.
-   A PC who can't act (dead, dying, unconscious, stunned, paralyzed… or at 0 HP, per their
-   sheet) isn't waited for, so record those conditions (`gm-player.sh condition`) as they happen.
-   `inbox` checks without waiting. The host sets the time: `gm-table.sh round 90` / `round off`.
-2. Run the normal core loop for those actions (roll, persist with the PC's name).
+   A round opens when the first player acts and closes when every seated player has acted, or
+   60 s later (a countdown; each player who hasn't acted may add 1 min, once). Until then the table
+   holds actions back and refuses a public `say` (whispers, rolls work). `ROUND CLOSED … didn't act`
+   → narrate for those who acted. A PC who can't act (dead, unconscious, stunned, 0 HP per the sheet)
+   isn't waited for: record conditions as they happen. `inbox` checks without waiting; `round 90`/`off`.
+2. **First check each action CAN work** (abilities, gear, position, the rules). If not, before any
+   roll or narration: `gm-table.sh redo "<PC>" "<why; choose again>" --lang <each>`, then `wait` (a
+   fresh clock; `TIME UP` → they hesitate). Then the core loop for the round (roll, persist by PC name).
 3. Post the narration with `bash tools/gm-table.sh say --stdin <<'EOF' … EOF` — it is the
    ONLY way players see anything; your terminal reply is for the host. Markdown works.
    `--to "<pc>"` whispers (secret perception results, private notes); a player's
@@ -295,7 +295,7 @@ only for operational lessons that fit nowhere else.
 - **Architecture:** bash wrappers (`tools/`) → Python managers (`lib/`) → per-campaign `world-state/campaigns/<name>/*.json`. The generic core is `game_core.py`; the per-book ruleset is `world_kit.py` (`ruleset.json`).
 
 ## The Golden Rules
-1. Fun > Rules. 2. Persist before narrating. 3. Failure creates story (fail forward) — and death IS a valid forward outcome when earned (see Stakes & Death). 4. Players write the story; you set the stage. 5. The world is alive — it goes on without any one hero.
+1. Fun > Rules. 2. Persist before narrating. 3. Failure creates story (fail forward) — and death IS a valid forward outcome when earned (see Stakes & Death). 4. Players write the story; you set the stage. 5. The world is alive — it goes on without any one hero. 6. Cruelty to clear innocents (people, animals): warn once (`gm-table.sh warn`), punish if they insist (`gm-social` → Conduct).
 
 ## Deep dives (load on demand)
 Mechanics: the `gm-*` Skills. Craft: `gm-craft`. **Everything else: `docs/index.md`** —

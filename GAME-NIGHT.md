@@ -29,7 +29,8 @@ setup step on the host's computer, and the game plays fine without them.
 - **Voice.** Speak your actions; hear the story read aloud (Hebrew in a natural voice).
 - **A fair, shared table.** Every die roll is public, with the DC set before the dice land.
   Rounds: the GM answers when everyone has acted, or a minute after the first player did, with
-  a countdown for the rest. Mistyped? Fix your action until the GM reads it (always at least 5 seconds).
+  a countdown for the rest (anyone who hasn't acted can add a minute, once a round). An action
+  that can't work comes back to its player to choose again, on a fresh clock. Mistyped? Fix your action until the GM reads it (always at least 5 seconds).
 - **The story, told as it happens.** Narration appears in step with the voice, and HP changes
   land when the story reaches you.
 - **Characters.** Roll one at the table; open your full character sheet, in your own language;
@@ -301,7 +302,9 @@ every other occasion comes from the library and the built-in sounds as before.
 - **Main villains** get their own composed theme (the GM marks them).
 - **Bosses** get a composed battle theme: thundering drums, brass, choir.
 - **Every player character** gets a heroic anthem. When they do something truly heroic,
-  it plays for everyone, and then the scene's music comes back.
+  it plays for everyone, and then the scene's music comes back. Each anthem is composed with
+  its **dark twin**, the same music made ominous: if that character ever falls (lost to
+  madness, see the GM's judgment), it becomes their villain theme.
 
 Everything is composed in the background while you play: a theme takes a minute or two on
 a GPU. Until it's ready, the built-in theme plays, and then the composed one takes over.
@@ -319,6 +322,14 @@ computer took and a link to listen. That tells you what to expect: if a 30-secon
 
 - **No NVIDIA card?** `setup --cpu` works on any computer, but each piece takes several
   minutes. The music still arrives, just later.
+- **Dark twins that keep the tune:** without it, a twin is the anthem's own recording made
+  dark (slower, lower, muffled, echoing). `bash tools/gm-music-compose.sh setup --melody`
+  adds MusicGen-Melody (about 3.3 GB more): with a GPU it re-composes each twin on the
+  anthem's melody, in a minor, menacing arrangement. If it ever fails, the darkened recording
+  is used instead.
+- **One bigger composer for everything:** `COMPOSE_MODEL=facebook/musicgen-melody` in `.env`
+  makes the melody model compose all the music (richer, but slower, and about 3 GB of RAM
+  instead of 0.6). Time it first: `COMPOSE_MODEL=facebook/musicgen-melody bash tools/gm-music-compose.sh test`.
 - **Pictures and music take turns on the GPU; both models stay in RAM.** When the table
   starts, it loads both into RAM in the background, one after the other: first Forge's
   picture model (Forge paints one tiny throwaway picture), then the music model. After
@@ -405,6 +416,9 @@ story to every screen. Talk to Claude in the terminal only for out-of-game thing
 "take it slower", "let's end at the next rest"). Want longer rounds tonight?
 `bash tools/gm-table.sh round 120` (or `round off`). A player who's away for a while holds up
 nobody for more than a minute, but you can free their seat: `bash tools/gm-table.sh free "Name"`.
+A character nobody plays any more can leave the party: `bash tools/gm-table.sh kick "Name"`
+(its sheet is kept in the campaign's `departed/`), or, from the lead player's page, the ✕ on
+that character's card. A seated character can't be removed: free the seat first.
 
 > **Tip:** Claude Code asks permission before running commands. When it asks to run
 > `bash tools/...` during the game, choose the option to allow it without asking again, or
@@ -463,7 +477,17 @@ Copy, fill in the link and code, and send:
    The GM answers once everyone has acted, or when the minute is up. In the last 15 seconds
    it turns red and chimes for whoever hasn't acted yet. Nothing ticks while the table is on a
    break: the countdown starts only with the first action. A character who can't act
-   (unconscious, stunned, dead…) isn't waited for.
+   (unconscious, stunned, dead…) isn't waited for. Need more time? If you haven't acted yet,
+   **+1 min** next to the countdown adds a minute to the round (once per player per round;
+   everyone sees who asked).
+   **An action that can't work** (you have no wings to fly with, the door you'd open is
+   behind you...) is crossed out: the GM tells you why, before rolling anything, and you choose
+   another on a fresh countdown. Nothing of that round is played out until you have, or your
+   time is up (then your character hesitates).
+   **Cruelty to the clearly innocent** (people or animals) gets a ⚠ warning and one chance to
+   choose again. Insist, and judgment music plays and the GM punishes the character: death (roll
+   a new one), madness (the old character becomes the new one's villainous nemesis, to a dark
+   version of their own anthem), or a curse (disadvantage on every ability check until they atone).
 5. **While the GM works**, the bar above the text box shows what it's doing (reading your
    actions, rolling dice, updating the sheets, writing the story) and roughly how long is
    left. It learns this table's pace, so it gets more accurate as you play.
