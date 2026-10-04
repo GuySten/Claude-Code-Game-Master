@@ -48,3 +48,8 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   it, and use brass only underneath, for weight and punctuation. Windowed ratings
   (8-second windows) showed the same dip at both climaxes - use them to find a sagging
   passage (a drop of 0.5 or more; their noise is about 0.2), never to rank fixes.
+- **Better instruments (a blind A/B, the same brass-led climax, only the brass
+  samples differing):** Virtual Playing Orchestra's horn and trombone sections beat
+  MuseScore_General's horns and trombones ("A is better") - "but I want more
+  quality". The sound set itself limits the music: better free samples are worth
+  their setup.
