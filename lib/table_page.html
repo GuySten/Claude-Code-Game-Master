@@ -146,6 +146,11 @@
   .say-row label { margin: 0; display: flex; align-items: center; gap: 6px; }
   .say-row input[type=checkbox] { width: auto; }
   .say-row .opts { display: flex; gap: 6px 14px; flex-wrap: wrap; }
+  /* One-tap starters for an action, from the character sheet. */
+  .chips { display: flex; gap: 6px; overflow-x: auto; padding: 0 0 8px; scrollbar-width: thin; }
+  .chips:empty { display: none; }
+  .chips button { flex: 0 0 auto; padding: 4px 10px; font-size: .85rem; border-radius: 16px; }
+  @media (max-width: 760px) { .chips button { min-height: 36px; } }
 
   aside { border-inline-start: 1px solid var(--line); overflow-y: auto; padding: 12px 14px; }
   aside h2 { font-size: .95rem; margin: 4px 0 10px; color: var(--muted); font-weight: normal;
@@ -436,6 +441,7 @@
     </div>
     <div id="status"></div>
     <form id="say">
+      <div id="chips" class="chips"></div>
       <div class="input-row">
         <button id="mic" type="button" aria-pressed="false">🎤</button>
         <textarea id="text" maxlength="1200" dir="auto" data-i18n-ph="placeholder"></textarea>
@@ -2701,6 +2707,67 @@
     } catch (e) { setStatus(t("reconnecting")); }
     setTimeout(pollMessages, 1500);
   }
+
+  // Quick actions: one tap starts an action from the sheet (it's only text: edit it, then send).
+  let chipText = null;
+  const itemName = (x) => typeof x === "string" ? x.split(/\s*[(\[]|\s+[—–-]\s+|:\s/)[0].trim()
+                                                 : String((x && x.name) || "");
+  function weaponsOf(sheet) {
+    const out = [];
+    (Array.isArray(sheet.attacks) ? sheet.attacks : []).forEach((a) => out.push(itemName(a)));
+    (Array.isArray(sheet.equipment) ? sheet.equipment : []).forEach((x) => {
+      const dice = typeof x === "string" ? /\d+d\d+/.test(x) : x && (x.damage || /\d+d\d+/.test(JSON.stringify(x)));
+      if (dice) out.push(itemName(x));
+    });
+    return [...new Set(out.filter(Boolean))].slice(0, 3);
+  }
+  function spellsOf(sheet) {
+    const out = [];
+    ["cantrips", "spells"].forEach((k) => {
+      const v = sheet[k];
+      const list = Array.isArray(v) ? v : v && typeof v === "object" ? Object.values(v).flat() : [];
+      list.forEach((x) => out.push(itemName(x)));
+    });
+    return [...new Set(out.filter((n) => n && n.length < 40))].slice(0, 4);
+  }
+  function renderChips() {
+    const box = $("chips");
+    if (!me || !partyShown.get(me)) { box.textContent = ""; box.dataset.sig = ""; return; }
+    const sheet = mySheet || {};
+    const foes = ((fightState && fightState.order) || []).filter((c) => c.foe && c.health !== "down");
+    const aim = (aimAt && foes.some((f) => f.name === aimAt) ? aimAt : (foes[0] || {}).name) || null;
+    const chips = [];
+    weaponsOf(sheet).forEach((w) => chips.push(["⚔ " + tx(w), aim
+      ? t("qa_attack").replace("{target}", aim).replace("{item}", tx(w)) : t("qa_attackAny").replace("{item}", tx(w))]));
+    spellsOf(sheet).forEach((sp) => chips.push(["✨ " + tx(sp), aim
+      ? t("qa_castAt").replace("{spell}", tx(sp)).replace("{target}", aim) : t("qa_cast").replace("{spell}", tx(sp))]));
+    if (fightState) {
+      chips.push(["🛡 " + t("chip_dodge"), t("qa_dodge")]);
+      chips.push(["💨 " + t("chip_dash"), t("qa_dash")]);
+    } else {
+      chips.push(["👁 " + t("chip_look"), t("qa_look")]);
+    }
+    chips.push(["🫥 " + t("chip_hide"), t("qa_hide")]);
+    partyLive.filter((p) => p.name !== me && p.claimed && p.status !== "dead").slice(0, 3)
+      .forEach((p) => chips.push(["🤝 " + p.name, t("qa_help").replace("{pc}", p.name)]));
+    const sig = lang + "|" + chips.map((c) => c.join("=")).join("|");
+    if (box.dataset.sig === sig) return;
+    box.dataset.sig = sig;
+    box.textContent = "";
+    chips.forEach(([label, text]) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.textContent = label; b.dir = "auto"; b.dataset.text = text;
+      b.onclick = () => {
+        const area = $("text"), cur = area.value.trim();
+        area.value = !cur || cur === chipText ? text : cur + " " + text;
+        chipText = area.value.trim();
+        fitTextDir(); area.focus();
+        try { area.setSelectionRange(area.value.length, area.value.length); } catch (e) {}
+      };
+      box.appendChild(b);
+    });
+  }
+  uiHooks.push(renderChips);
 
   async function sendAction() {
     const text = $("text").value.trim();
