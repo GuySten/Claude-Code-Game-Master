@@ -499,16 +499,17 @@ def compose_pieces(campaign_dir, pieces: List[Dict[str, Any]],
             if heroic:                      # the twin of the anthem they had: the same music, dark
                 job["melody_from"] = str(camp / "music" / "anthems" / heroic["file"])
             if p["kind"] == "dark_anthem":  # (with the melody model: their own tune, in the minor)
-                job["leitmotif"] = {"seed": p["name"], "mode": "minor"}
+                job["leitmotif"] = {"seed": p["name"], "mode": "minor", "cls": str((p.get("sheet") or {}).get("class") or "")}
             jobs.append(job)
         else:
             name = p["sheet"].get("name", "hero")
             out = camp / "music" / "anthems" / f"anthem-{slug(name)}.ogg"
+            cls = str(p["sheet"].get("class") or "")       # (the class picks the kind of theme)
             # With its dark twin, from the same music: the villain theme they'd become.
             jobs.append({"prompt": anthem_prompt(p["sheet"], style), "seconds": ANTHEM_SECONDS,
-                         "out": str(out), "loop": False, "leitmotif": {"seed": name, "mode": "major"},
+                         "out": str(out), "loop": False, "leitmotif": {"seed": name, "mode": "major", "cls": cls},
                          "twin": {"prompt": dark_anthem_prompt(p["sheet"], style), "loop": True,
-                                  "leitmotif": {"seed": name, "mode": "minor"},
+                                  "leitmotif": {"seed": name, "mode": "minor", "cls": cls},
                                   "out": str(camp / "music" / "anthems" / f"anthem-{slug(name)}-dark.ogg")}})
     files: List[Optional[str]] = [None] * len(pieces)
 
@@ -549,9 +550,9 @@ def compose_anthem(campaign_dir, sheet: Dict[str, Any]) -> Dict[str, Any]:
     style = flavor(campaign_dir)
     got = compose(anthem_prompt(sheet, style), ANTHEM_SECONDS, out,
                   twin={"prompt": dark_anthem_prompt(sheet, style), "loop": True,
-                        "leitmotif": {"seed": name, "mode": "minor"},
+                        "leitmotif": {"seed": name, "mode": "minor", "cls": str(sheet.get("class") or "")},
                         "out": str(out.with_name(f"anthem-{slug(name)}-dark.ogg"))},
-                  leitmotif={"seed": name, "mode": "major"})
+                  leitmotif={"seed": name, "mode": "major", "cls": str(sheet.get("class") or "")})
     reg = load_registry(campaign_dir)
     key = _key(reg["anthems"], name) or name
     reg["anthems"][key] = {"file": Path(got["path"]).name, "seconds": got.get("seconds", ANTHEM_SECONDS)}
@@ -595,8 +596,18 @@ def main() -> None:
     a = sub.add_parser("anthem", help="Compose a player character's heroic anthem")
     a.add_argument("name")
     sub.add_parser("normalize", help="Bring this campaign's composed music up to the standard loudness")
+    cl = sub.add_parser("class-of", help="A player character's class (prints nothing if none)")
+    cl.add_argument("name")
     sub.add_parser("status", help="Is the composer set up? What has been composed?")
     args = ap.parse_args()
+    if args.action == "class-of":
+        import party_roster
+        from character_schema import to_flat
+        from campaign_manager import CampaignManager
+        camp = CampaignManager().get_active_campaign_dir()
+        path = party_roster.find_pc(camp, args.name) if camp else None
+        print(str(to_flat(json.loads(path.read_text(encoding="utf-8"))).get("class") or "") if path else "")
+        return
 
     camp = CampaignManager(os.environ.get("GM_WORLD_STATE_BASE", "world-state")).get_active_campaign_dir()
     if args.action == "status":

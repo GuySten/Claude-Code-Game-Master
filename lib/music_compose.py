@@ -207,26 +207,146 @@ def generate(prompt: str, seconds: float, device: str):
 
 # --- a character's leitmotif: a tune of their own, for the melody model to follow ---
 # MusicGen left to itself tends to loop one short phrase. Given a melody line, the
-# melody model arranges THAT. So each character gets a motif (from their name:
-# always the same), built the way film heroes' themes are, and laid out as a
-# phrase that goes somewhere. Their dark twin is the same tune turned villainous.
+# melody model arranges THAT. So each character gets a motif from their name (always
+# the same) and their class, built the way film themes are, laid out as a phrase
+# that goes somewhere; their dark twin is the same tune turned villainous.
 #
-# The hero (Star Wars, Superman, Indiana Jones, Jurassic Park...): a pickup into a
-# strong-beat leap up a fifth or an octave; then gap-fill, stepping back down in a
-# fanfare rhythm (dotted or triplet); the motif again a step higher; a climb to the
-# climax (the highest note, held) about two-thirds of the way in; the motif once
-# more, home to the tonic, held. A singable range: about an octave and a half.
+# Heroes' themes come in kinds, with a meter and a mode, as film composers use them:
+#   fanfare  - a pickup into a leap up (a 5th, 6th or octave), stepping back down
+#              in a fanfare rhythm (Star Wars, Superman)
+#   ostinato - a driving repeated note, then the leap (Pirates, Avengers)
+#   soaring  - a stepwise rise to a long high note and a turn above it (E.T.)
+#   bugle    - a call up the chord (Indiana Jones, Jurassic Park)
+#   hymn     - a noble stepwise line (a paladin's or a cleric's)
+# in 4/4 (a march), 3/4 or 6/8 (lilting), and major, Lydian (wonder, magic: a
+# raised 4th), Mixolydian (folk, roguish: a flat 7th) or Dorian (earthy). Each
+# phrase: the motif; the motif again (a step or a third higher, or answered); a
+# climb to the climax (a held chord tone, the highest note) about two-thirds in;
+# the motif's head home to the tonic, held to the bar line.
 #
-# The villain (the Imperial March, Jaws, Mordor...): the same tune in the minor,
-# its pickup a dotted march of repeated notes, each phrase ending on a half-step
-# sigh (minor 6th to 5th), a tritone before the climax, and the last phrase
-# falling home through the minor 2nd (the dark, "Phrygian" cadence).
-MAJOR = [0, 2, 4, 5, 7, 9, 11]
-MINOR = [0, 2, 3, 5, 7, 8, 10]          # natural minor: the same degrees, darkened
-T = 1 / 3                               # a triplet's share of a beat
+# Villains' (the Imperial March, Jaws, Mordor): the same tune in the minor (or
+# Phrygian, or harmonic minor), its pickup a march of repeated notes, each phrase
+# ending on a half-step sigh (minor 6th to 5th), a tritone before the climax, and
+# the last phrase falling home through the minor 2nd.
+import math  # noqa: E402
+
+T = 1 / 3                                                   # a triplet's share of a beat
+MODES = {"ionian": [0, 2, 4, 5, 7, 9, 11], "lydian": [0, 2, 4, 6, 7, 9, 11],
+         "mixolydian": [0, 2, 4, 5, 7, 9, 10], "dorian": [0, 2, 3, 5, 7, 9, 10]}
+DARK = {"aeolian": [0, 2, 3, 5, 7, 8, 10], "phrygian": [0, 1, 3, 5, 7, 8, 10],
+        "harmonic": [0, 2, 3, 5, 7, 8, 11]}
+METERS = {"4/4": 4, "3/4": 3, "6/8": 6}                     # a bar, in units (6/8: eighths)
+FIGS = {"4/4": [[.75, .25], [T, T, T], [.5, .5]], "3/4": [[.75, .25], [.5, .5], [T, T, T]],
+        "6/8": [[2, 1], [1, 1, 1], [1.5, .5, 1]]}
+LONG = {"4/4": [2, 1.5, 3], "3/4": [2, 1.5], "6/8": [3, 4, 5]}
+KINDS = ["fanfare", "ostinato", "soaring", "bugle", "hymn"]
+STYLES = {                                                   # class -> (kinds, meters, modes)
+    "fighter": (["fanfare", "bugle"], ["4/4"], ["ionian"]),
+    "paladin": (["fanfare", "hymn"], ["4/4", "3/4"], ["ionian"]),
+    "barbarian": (["ostinato"], ["4/4", "6/8"], ["dorian", "mixolydian"]),
+    "rogue": (["ostinato", "soaring"], ["6/8"], ["mixolydian", "dorian"]),
+    "bard": (["soaring", "bugle"], ["6/8", "3/4"], ["mixolydian", "ionian"]),
+    "wizard": (["soaring", "bugle"], ["3/4", "4/4"], ["lydian"]),
+    "sorcerer": (["soaring", "fanfare"], ["3/4", "6/8"], ["lydian"]),
+    "warlock": (["ostinato", "soaring"], ["3/4", "4/4"], ["dorian"]),
+    "cleric": (["hymn", "bugle"], ["3/4", "4/4"], ["ionian"]),
+    "druid": (["soaring", "hymn"], ["6/8", "3/4"], ["dorian", "lydian"]),
+    "ranger": (["bugle", "soaring"], ["6/8", "4/4"], ["dorian", "mixolydian"]),
+    "monk": (["ostinato", "hymn"], ["4/4", "3/4"], ["dorian", "ionian"]),
+    "artificer": (["ostinato", "bugle"], ["4/4", "6/8"], ["lydian", "mixolydian"]),
+}
 
 
-import math  # noqa: E402  (the tune generator's only need)
+def _style(cls) -> tuple:
+    c = str(cls or "").lower()
+    return next((v for k, v in STYLES.items() if k in c), (KINDS, list(METERS), list(MODES)))
+
+
+def _close(notes: list, degree: int, bar: float, at_least: float) -> list:
+    """End a phrase on ``degree``, held to the next bar line (at least ``at_least``)."""
+    used = sum(d for _, d in notes)
+    return notes + [(degree, round(math.ceil((used + at_least) / bar - 1e-9) * bar - used, 6))]
+
+
+def _opening(rng, kind: str, meter: str) -> tuple:
+    """(pickup, motif): the theme's first phrase, in scale degrees and units."""
+    bar, fig, long_ = METERS[meter], rng.choice(FIGS[meter]), rng.choice(LONG[meter])
+    one = 1 if meter != "6/8" else rng.choice([1, 2])
+    pickup = []
+    if kind == "fanfare":
+        leap = rng.choice([4, 5, 7, 7])                                    # a 5th, a 6th, an octave
+        pickup = rng.choice([[(0, T), (0, T), (0, T)], [(0, .75), (0, .25)], [(4 if leap == 7 else -3, 1)]])
+        head = [(0, rng.choice([one, 1.5 * one])), (leap, long_)]
+        fill = [(leap - 1 - i, d) for i, d in enumerate(fig)]
+    elif kind == "ostinato":
+        leap = rng.choice([3, 4, 5])                                       # a 4th, a 5th, a 6th
+        cell = rng.choice(FIGS[meter])
+        head = [(0, d) for d in cell] + [(0, d) for d in cell[:2]] + [(leap, long_)]
+        fill = [(leap - 1, one), (leap - 2, one)]
+    elif kind == "soaring":
+        leap = rng.choice([4, 5, 7])
+        head = [(d, one) for d in range(rng.choice([2, 3]))] + [(leap, long_ + one)]
+        fill = [(leap + 1, fig[0]), (leap, fig[-1]), (leap - 1, one)]     # a turn above, then down
+    elif kind == "bugle":
+        arp = [0, 2, 4, 7] if rng.random() < .6 else [0, 2, 4]
+        durs = (fig * 4)[:len(arp) - 1] + [long_]
+        head = list(zip(arp, durs))
+        leap = arp[-1]
+        fill = [(leap - 1, one), (leap - 3, one)]
+    else:                                                                  # hymn: a noble stepwise rise
+        line = rng.choice([[0, 1, 2, 3, 4], [0, 2, 1, 3, 4], [0, 0, 1, 2, 4], [0, 1, 2, 4, 5], [0, 2, 3, 4, 5]])
+        durs = rng.choice([[1, 1, 2, 1], [2, 1, 1, 1], [1.5, .5, 1, 1], [1, .5, .5, 2]])
+        head = [(d, b * one) for d, b in zip(line[:-1], durs)] + [(line[-1], long_)]
+        leap = line[-1]
+        fill = rng.choice([[(leap - 1, one), (leap - 2, one)], [(leap + 1, one), (leap - 1, one)]])
+    motif = head + fill + [(fill[-1][0] - 1, one)]
+    landing = rng.choice([1, 2, 4]) if fill[-1][0] - 1 != 4 else rng.choice([2, 5])
+    return pickup, _close(motif, landing, bar, one), len(head)
+
+
+def _hero(rng, cls) -> dict:
+    kinds, meters, modes = _style(cls)
+    kind, meter, mode = rng.choice(kinds), rng.choice(meters), rng.choice(modes)
+    bar = METERS[meter]
+    one = 1 if meter != "6/8" else 2
+    pickup, motif, n_head = _opening(rng, kind, meter)
+    low = min(d for d, _ in pickup + motif)
+    scale = MODES[mode]
+    st = lambda d: _semitones(d, scale)                                    # noqa: E731
+    # The motif again: a step or a third higher, or the same head answered lower.
+    for dev in rng.sample(["step", "third", "answer"], 3):
+        if dev == "answer":
+            again = motif[:-2] + [(motif[-2][0] - 1, motif[-2][1])]
+            again = _close(again, rng.choice([0, 2]) if motif[-1][0] != 0 else 2, bar, one)
+        else:
+            up = 1 if dev == "step" else 2
+            again = [(d + up, b) for d, b in motif]
+        peak = max(d for d, _ in motif + again)
+        top = next((c for c in (7, 9, 11) if c > peak), None)
+        if top is not None and st(top) - st(low) <= 19:
+            break
+    else:                                                                  # (always found in practice)
+        again, top = motif, max(d for d, _ in motif) + 1
+    # The climb to the climax: a run, an arpeggio, or a leap from the 5th.
+    fig = rng.choice(FIGS[meter])
+    approach = rng.choice(["run", "arpeggio", "leap"])
+    if approach == "run":
+        steps = [top - 3, top - 2, top - 1]
+    elif approach == "arpeggio":
+        steps = [d for d in (0, 2, 4, 7, 9) if d < top][-3:]
+    else:
+        steps = [4, 4]
+    durs = (fig * 3)[:len(steps)]
+    climb = list(zip(steps, durs)) + [(top, 2.5 * one), (top - 1, one), (top - 3, one)]
+    climb = _close(climb, 4, bar, one)
+    # Home: the motif's head, then stepping to the tonic (the high one if it rose to it).
+    head = motif[:n_head]
+    last = head[-1][0]
+    tonic = 7 if last >= 5 else 0
+    path = range(last + 1, tonic) if tonic > last else range(last - 1, tonic, -1)
+    home = _close(head + [(d, one) for d in path], tonic, bar, 2 * one if meter != "6/8" else 3)
+    return {"kind": kind, "meter": meter, "mode": mode, "pickup": pickup, "motif": motif,
+            "again": again, "climb": climb, "home": home}
 
 
 def _semitones(degree: int, scale) -> int:
@@ -234,69 +354,54 @@ def _semitones(degree: int, scale) -> int:
     return 12 * octave + scale[idx]
 
 
-def _hero(rng) -> dict:
-    """The heroic phrase, in scale degrees: {sections: {name: [(degree, beats)]}}."""
-    leap = rng.choice([4, 7, 7])                                  # a fifth, or (mostly) an octave
-    start = 0
-    if leap == 7:                                                 # (the range stays singable)
-        pickup = rng.choice([[(0, T), (0, T), (0, T)], [(0, .75), (0, .25)], [(4, 1)]])
-    else:
-        pickup = rng.choice([[(-3, 1)], [(-3, .75), (-3, .25)], [(0, T), (0, T), (0, T)]])
-    d0 = rng.choice([1, 1.5])
-    figure = rng.choice([[.75, .25], [T, T, T]])                 # the fanfare: dotted, or a triplet
-    fill = [leap - 1 - i for i in range(len(figure))]             # gap-fill: stepping back down
-    nxt = fill[-1] - 1
-    landing = nxt + (rng.choice([1, 2]) if leap == 7 else 1)      # a half cadence, lifting
-    motif = [(start, d0), (leap, 2)] + list(zip(fill, figure)) + [(nxt, 1)]
-    motif.append((landing, 8 - sum(b for _, b in motif)))
-    up = [(d + 1, b) for d, b in motif]                           # the motif again, a step higher
-    top = 9 if leap == 7 else 7                                   # the climax: the highest note, on a chord tone
-    climb = [(top - 3, .75), (top - 2, .25), (top - 1, 1), (top, 2.5), (top - 1, 1), (top - 3, 1)]
-    climb.append((4, 8 - sum(b for _, b in climb)))
-    head = motif[:2 + len(figure)]                                # the motif, then home
-    last = head[-1][0]
-    if leap == 7:                                                 # stepping up to the high tonic
-        home, tonic = head + [(d, 1) for d in range(last + 1, 7)], 7
-    else:                                                         # stepping down to the tonic
-        home, tonic = head + [(d, 1) for d in range(last - 1, 0, -1)], 0
-    used = sum(b for _, b in home)
-    home.append((tonic, math.ceil((used + 3) / 4) * 4 - used))    # held to the bar line (3+ beats)
-    return {"pickup": pickup, "motif": motif, "up": up, "climb": climb, "home": home}
-
-
-def _villain(hero: dict) -> list:
-    """The same tune, turned villainous: [(semitones from the tonic, beats)]."""
-    st = lambda d: _semitones(d, MINOR)                           # noqa: E731
-    sigh = lambda b: [(8, b / 2), (7, b / 2)]                     # noqa: E731  minor 6th -> 5th
-    out = [(0, .75), (0, .25), (0, .75), (0, .25)]               # a march of repeated notes
-    for name in ("motif", "up"):
-        sec = hero[name]
-        out += [(st(d), b) for d, b in sec[:-1]] + sigh(sec[-1][1])
+def _villain(rng, hero: dict) -> tuple:
+    """The same tune, turned villainous: ([(semitones from the tonic, units)], scale name)."""
+    name = rng.choice(list(DARK))
+    st = lambda d: _semitones(d, DARK[name])                               # noqa: E731
+    sigh = lambda b: [(8, b / 2), (7, b / 2)]                              # noqa: E731  minor 6th -> 5th
+    meter = hero["meter"]
+    bar, one = METERS[meter], (1 if meter != "6/8" else 2)
+    march = [(0, 2), (0, 1), (0, 2), (0, 1)] if meter == "6/8" else [(0, .75), (0, .25), (0, .75), (0, .25)]
+    out = list(march)
+    for sec in ("motif", "again"):
+        s = hero[sec]
+        out += [(st(d), b) for d, b in s[:-1]] + sigh(s[-1][1])
     climb = [(st(d), b) for d, b in hero["climb"]]
     peak = max(range(len(climb)), key=lambda i: climb[i][0])
-    climb[peak - 1] = (6, climb[peak - 1][1])                     # the tritone, before the peak
+    tritone = 18 if climb[peak][0] - 6 > 12 else 6                         # (in the climax's octave)
+    climb[peak - 1] = (tritone, climb[peak - 1][1])                        # the tritone, before the peak
     out += climb[:-1] + sigh(climb[-1][1])
-    head = [(st(d), b) for d, b in hero["home"][:len(hero["motif"]) - 2]]   # its opening
-    out += head + [(3, 1), (1, 1), (0, 3)]                        # falling home through the minor 2nd
-    return out
+    n_head = len(hero["home"]) - 1
+    head = [(st(d), b) for d, b in hero["home"][:n_head]]
+    while len(head) > 2 and head[-1][0] < 3:                               # (the fall starts above)
+        head.pop()
+    tail = head + [(3, one), (1, one)]                                     # falling home through the minor 2nd
+    used = sum(b for _, b in out + tail)
+    out += tail + [(0, round(math.ceil((used + 2 * one) / bar - 1e-9) * bar - used, 6))]
+    return out, name
 
 
-def leitmotif(seed: str, mode: str = "major") -> dict:
-    """The tune: {key (MIDI tonic), notes [(semitones from the tonic, beats)],
-    motif (its first statement)}. Same seed, same tune; "minor" is the villain."""
+def leitmotif(seed: str, mode: str = "major", cls: str = "") -> dict:
+    """The tune: {key (MIDI tonic), notes [(semitones from the tonic, units)], motif
+    (its first statement), kind, meter, scale}. Same seed and class, same tune;
+    "minor" is the villain."""
     import hashlib
     import random
     rng = random.Random(hashlib.sha256(seed.strip().lower().encode("utf-8")).hexdigest())
-    key = 60 + rng.choice([0, 2, 3, 5, 7])                        # C, D, Eb, F or G
-    hero = _hero(rng)
+    key = 57 + rng.randrange(10)                                           # A3 .. F#4
+    hero = _hero(rng, cls)
     if mode == "minor":
-        notes = _villain(hero)
-        motif = notes[:4 + len(hero["motif"]) + 1]
+        notes, scale = _villain(rng, hero)
+        motif = notes[4:4 + len(hero["motif"])]
     else:
-        notes = [(_semitones(d, MAJOR), b)
-                 for name in ("pickup", "motif", "up", "climb", "home") for d, b in hero[name]]
+        scale = hero["mode"]
+        notes = [(_semitones(d, MODES[scale]), b)
+                 for sec in ("pickup", "motif", "again", "climb", "home") for d, b in hero[sec]]
         motif = notes[:len(hero["pickup"]) + len(hero["motif"])]
-    return {"seed": seed, "mode": mode, "key": key, "motif": motif, "notes": notes}
+    return {"seed": seed, "mode": mode, "key": key, "motif": motif, "notes": notes,
+            "kind": hero["kind"], "meter": hero["meter"], "scale": scale,
+            "shape": [d for d, _ in hero["motif"]], "bar": METERS[hero["meter"]],
+            "pickup": sum(b for _, b in hero["pickup"]) if mode != "minor" else 0}
 
 
 def theme_traits(tune: dict) -> dict:
@@ -306,44 +411,49 @@ def theme_traits(tune: dict) -> dict:
     beats = [b for _, b in notes]
     steps = [b - a for a, b in zip(pitch, pitch[1:])]
     total = sum(beats)
-    leap_at = next((i for i, s in enumerate(steps[:6]) if s >= 7), None)
+    opening = pitch[:8]
+    hi = opening.index(max(opening))
     top = pitch.index(max(pitch))
+    pcs = {p % 12 for p in pitch}
     return {
-        "leap": steps[leap_at] if leap_at is not None else 0,
-        "gap_fill": leap_at is not None and leap_at + 1 < len(steps) and steps[leap_at + 1] < 0,
+        "rise": max(opening) - opening[0],
+        "gap_fill": hi + 1 < len(pitch) and pitch[hi + 1] < pitch[hi],
         "fanfare": any(abs(b - .75) < 1e-6 or abs(b - T) < 1e-6 for b in beats),
         "climax_at": sum(beats[:top]) / total,
         "climax_held": beats[top] >= 2,
         "range": max(pitch) - min(pitch),
         "biggest_jump": max(abs(s) for s in steps),
-        "ends_home": pitch[-1] % 12 == 0 and beats[-1] >= 3,
-        "minor": 3 in {p % 12 for p in pitch} and 4 not in {p % 12 for p in pitch},
+        "ends_home": pitch[-1] % 12 == 0 and beats[-1] >= 2,
+        "whole_bars": abs(((total - tune.get("pickup", 0)) / tune["bar"]) % 1) < 1e-6
+                      or abs(((total - tune.get("pickup", 0)) / tune["bar"]) % 1 - 1) < 1e-6,
+        "minor": 3 in pcs and 4 not in pcs,
         "sighs": sum(1 for s in steps if s == -1),
         "repeated": any(s == 0 for s in steps),
-        "tritone": 6 in {p % 12 for p in pitch},
+        "tritone": 6 in pcs,
         "falls_home": steps[-1] < 0,
     }
 
 
-def render_leitmotif(seed: str, mode: str = "major", seconds: float = 20, rate: int = 32000):
+def render_leitmotif(seed: str, mode: str = "major", seconds: float = 20, rate: int = 32000,
+                     cls: str = ""):
     """The tune as a plain synthesized melody line (what the melody model hears):
     stretched to ``seconds``; the villain is also an octave lower."""
     import numpy as np
-    tune = leitmotif(seed, mode)
-    beats = sum(b for _, b in tune["notes"])
-    beat_s = seconds / beats
+    tune = leitmotif(seed, mode, cls)
+    units = sum(b for _, b in tune["notes"])
+    unit_s = seconds / units
     out = np.zeros(int(seconds * rate) + rate, dtype="float64")
     t0 = 0.0
     for st, b in tune["notes"]:
         note = tune["key"] + st - (12 if mode == "minor" else 0)
         hz = 440.0 * 2 ** ((note - 69) / 12)
-        n = int(b * beat_s * rate)
+        n = int(b * unit_s * rate)
         t = np.arange(n) / rate
-        env = np.minimum(1.0, t / 0.02) * np.exp(-t / max(0.25, b * beat_s * 0.9))
+        env = np.minimum(1.0, t / 0.02) * np.exp(-t / max(0.25, b * unit_s * 0.9))
         tone = sum(a * np.sin(2 * np.pi * hz * k * t) for k, a in ((1, 1.0), (2, .35), (3, .15)))
         i = int(t0 * rate)
         out[i:i + n] += 0.3 * env * tone
-        t0 += b * beat_s
+        t0 += b * unit_s
     return out[: int(seconds * rate)].astype("float32")
 
 
@@ -444,7 +554,7 @@ def _leitmotif_piece(job: dict, device: str):
         return None
     try:
         seconds = max(1.0, min(float(job.get("seconds", 30)), MAX_SECONDS))
-        score = render_leitmotif(lm["seed"], lm.get("mode", "major"), seconds)
+        score = render_leitmotif(lm["seed"], lm.get("mode", "major"), seconds, cls=lm.get("cls") or "")
         return melody_generate(score, 32000, job["prompt"], seconds, device)
     except Exception as e:
         print(f"[compose] the leitmotif piece failed ({type(e).__name__}: {e}); composing freely",
@@ -518,6 +628,7 @@ def main() -> None:
                     help="Bring already-composed pieces to the standard loudness, in place")
     ap.add_argument("--check", action="store_true", help="Print the hardware that would be used")
     ap.add_argument("--benchmark", action="store_true", help="Time one 30-second piece")
+    ap.add_argument("--class", dest="cls", default="", help="With --leitmotif: the character's class")
     ap.add_argument("--leitmotif", metavar="NAME",
                     help="Write NAME's leitmotif (and its dark twin) as plain melody files to --out's folder")
     ap.add_argument("--fetch-melody", action="store_true",
@@ -542,10 +653,11 @@ def main() -> None:
         out = Path(args.out or ".")
         out.mkdir(parents=True, exist_ok=True)
         for mode, s in (("major", 20), ("minor", 30)):
-            path = write(render_leitmotif(args.leitmotif, mode, s), 32000,
+            path = write(render_leitmotif(args.leitmotif, mode, s, cls=args.cls), 32000,
                          out / f"motif-{args.leitmotif.strip().lower().replace(' ', '-')}-{mode}.ogg")
             print(json.dumps({"ok": True, "path": str(path), "mode": mode,
-                              "motif": leitmotif(args.leitmotif, mode)["motif"]}, ensure_ascii=False))
+                              **{k: v for k, v in leitmotif(args.leitmotif, mode, args.cls).items()
+                                 if k in ("kind", "meter", "scale", "motif")}}, ensure_ascii=False))
         return
 
     if args.fetch_melody:

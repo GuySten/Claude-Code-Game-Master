@@ -91,7 +91,8 @@ print(f\"A villain theme (30 s) takes about {d['elapsed']/60:.1f} min; a hero's 
     motif)
         PY="$(compose_py)"
         [ -z "$PY" ] && { error "Not set up yet: bash tools/gm-music-compose.sh setup"; exit 1; }
-        "$PY" "$LIB_DIR/music_compose.py" --leitmotif "$1" --out "$(get_campaign_dir 2>/dev/null || echo .)/music/anthems"
+        CLS="$($PYTHON_CMD "$LIB_DIR/composer.py" class-of "$1" 2>/dev/null)"
+        "$PY" "$LIB_DIR/music_compose.py" --leitmotif "$1" --class "$CLS" --out "$(get_campaign_dir 2>/dev/null || echo .)/music/anthems"
         ;;
     theme|anthem|normalize|status)
         $PYTHON_CMD "$LIB_DIR/composer.py" "$ACTION" "$@"

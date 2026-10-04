@@ -323,39 +323,70 @@ def test_twins_use_the_melody_model_only_when_its_there_and_on_a_gpu(monkeypatch
     assert mc.twin_mode("cpu") == "melody"                              # asked for: always tried
 
 
-NAMES = ["Pip", "Bram", "רן", "ג'ון סמיט", "Izrin", "Kara", "Grimaldi the Grey", "Zoë", "קסטרל"] + \
-    [f"Hero {i}" for i in range(300)]
+CLASSES = ["Fighter", "Paladin", "Barbarian", "Rogue", "Bard", "Wizard", "Sorcerer", "Warlock",
+           "Cleric", "Druid", "Ranger", "Monk", "Artificer", ""]
+PEOPLE = [("Pip", "Rogue"), ("Bram", "Fighter"), ("רן", "Warlock"), ("ג'ון סמיט", ""), ("Zoë", "Bard"),
+          ("קסטרל", "Ranger")] + [(f"Hero {i}", CLASSES[i % len(CLASSES)]) for i in range(400)]
 
 
 def test_every_heroes_tune_is_built_like_a_film_heroes_theme():
-    """A pickup into a big leap, gap-fill, a fanfare rhythm, a held climax about
-    two-thirds in, a singable range, home to the tonic: for every name."""
+    """A rise of a 5th or more to the opening's peak, gap-fill after it, a held
+    climax around two-thirds in, a singable range, home to the tonic on a bar line."""
     from lib import music_compose as mc
-    for name in NAMES:
-        tune = mc.leitmotif(name)
-        t = mc.theme_traits(tune)
-        assert t["leap"] in (7, 12) and t["gap_fill"] and t["fanfare"], (name, t)
-        assert 0.45 <= t["climax_at"] <= 0.75 and t["climax_held"], (name, t)
-        assert t["range"] <= 19 and t["biggest_jump"] <= 12 and t["ends_home"], (name, t)
-        body = sum(b for _, b in tune["notes"]) - sum(b for _, b in tune["motif"]) + 8   # (after the pickup)
-        assert abs(body / 4 - round(body / 4)) < 1e-6, (name, body)                  # whole bars
-    assert mc.leitmotif("Pip")["notes"] == mc.leitmotif(" pip ")["notes"]           # always the same tune
-    motifs = {tuple(mc.leitmotif(n)["motif"]) for n in NAMES}
-    assert len(motifs) >= 12                                                     # and not everyone's
+    for name, cls in PEOPLE:
+        t = mc.theme_traits(mc.leitmotif(name, "major", cls))
+        assert t["rise"] >= 5 and t["gap_fill"], (name, cls, t)
+        assert 0.4 <= t["climax_at"] <= 0.75 and t["climax_held"], (name, cls, t)
+        assert t["range"] <= 19 and t["biggest_jump"] <= 12, (name, cls, t)
+        assert t["ends_home"] and t["whole_bars"], (name, cls, t)
+    assert mc.leitmotif("Pip", "major", "Rogue")["notes"] == mc.leitmotif(" pip ", "major", "Rogue")["notes"]
 
 
 def test_every_villains_tune_is_the_same_tune_turned_menacing():
     """Minor, a march of repeated notes, half-step sighs, a tritone, falling home
-    through the minor 2nd; and still recognisably the hero's tune."""
+    through the minor 2nd; and still the hero's tune: the same motif, key and meter."""
     from lib import music_compose as mc
-    for name in NAMES:
-        hero, dark = mc.leitmotif(name), mc.leitmotif(name, "minor")
-        t, h = mc.theme_traits(dark), mc.theme_traits(hero)
-        assert t["minor"] and t["repeated"] and t["tritone"] and t["sighs"] >= 3, (name, t)
-        assert t["falls_home"] and t["ends_home"] and dark["notes"][-2][0] == 1, (name, t)
-        assert t["range"] <= 19 and t["biggest_jump"] <= 12, (name, t)
-        assert t["leap"] == h["leap"] and dark["key"] == hero["key"]             # the same opening leap
-        assert 0.45 <= t["climax_at"] <= 0.75, (name, t)
+    for name, cls in PEOPLE:
+        hero, dark = mc.leitmotif(name, "major", cls), mc.leitmotif(name, "minor", cls)
+        t = mc.theme_traits(dark)
+        assert t["minor"] and t["repeated"] and t["tritone"] and t["sighs"] >= 3, (name, cls, t)
+        assert t["falls_home"] and t["ends_home"] and dark["notes"][-2][0] == 1, (name, cls, t)
+        assert t["range"] <= 19 and t["biggest_jump"] <= 12 and t["whole_bars"], (name, cls, t)
+        assert 0.4 <= t["climax_at"] <= 0.75, (name, cls, t)
+        assert dark["shape"] == hero["shape"] and (dark["key"], dark["meter"]) == (hero["key"], hero["meter"])
+
+
+def test_no_two_characters_share_a_tune():
+    """Different kinds, meters and modes: the tunes of different characters differ in
+    their shape and their rhythm (the first version gave 60 names 18 shapes)."""
+    import difflib
+    import itertools
+    from lib import music_compose as mc
+
+    def shape(name, cls):
+        notes = mc.leitmotif(name, "major", cls)["notes"]
+        p = [x for x, _ in notes]
+        contour = tuple("U" if b - a > 2 else "u" if b > a else "=" if b == a else "d" if a - b <= 2 else "D"
+                        for a, b in zip(p, p[1:]))
+        return contour, tuple(round(b, 2) for _, b in notes)
+    people = PEOPLE[:60]
+    shapes = [shape(*p) for p in people]
+    assert len(set(shapes)) == len(people)                                    # no two the same tune
+    assert len({c for c, _ in shapes}) >= 50                                  # nor mostly the same shape
+    alike = [(difflib.SequenceMatcher(None, a[0], b[0]).ratio(), difflib.SequenceMatcher(None, a[1], b[1]).ratio())
+             for a, b in itertools.combinations(shapes, 2)]
+    assert sum(c for c, _ in alike) / len(alike) < 0.6 and sum(r for _, r in alike) / len(alike) < 0.5
+
+
+def test_the_class_picks_the_kind_of_theme():
+    from lib import music_compose as mc
+    wizards = [mc.leitmotif(f"Mage {i}", "major", "Wizard") for i in range(30)]
+    assert all(w["scale"] == "lydian" for w in wizards)                 # wonder: the raised 4th
+    assert any(6 in {p % 12 for p, _ in w["notes"]} for w in wizards)
+    assert all(mc.leitmotif(f"Rogue {i}", "major", "Rogue")["meter"] == "6/8" for i in range(30))
+    assert {mc.leitmotif(f"Knight {i}", "major", "Fighter")["kind"] for i in range(30)} <= {"fanfare", "bugle"}
+    kinds = {mc.leitmotif(f"Someone {i}")["kind"] for i in range(60)}          # no class: any kind
+    assert kinds == set(mc.KINDS)
 
 
 def test_a_tune_renders_as_a_melody_line():
@@ -373,11 +404,11 @@ def test_anthems_are_composed_on_the_leitmotif_with_the_melody_model(tmp_path, f
     real = composer.compose_many
     composer.compose_many = lambda jobs, *a, **k: seen.extend(jobs) or real(jobs, *a, **k)
     try:
-        composer.compose_pieces(camp, [{"kind": "anthem", "sheet": {"name": "Pip"}}])
+        composer.compose_pieces(camp, [{"kind": "anthem", "sheet": {"name": "Pip", "class": "Rogue"}}])
     finally:
         composer.compose_many = real
-    assert seen[0]["leitmotif"] == {"seed": "Pip", "mode": "major"}
-    assert seen[0]["twin"]["leitmotif"] == {"seed": "Pip", "mode": "minor"}
+    assert seen[0]["leitmotif"] == {"seed": "Pip", "mode": "major", "cls": "Rogue"}
+    assert seen[0]["twin"]["leitmotif"] == {"seed": "Pip", "mode": "minor", "cls": "Rogue"}
     assert "memorable melody" in seen[0]["prompt"]
 
 
