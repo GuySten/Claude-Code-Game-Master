@@ -151,6 +151,14 @@ def index(campaign_dir) -> List[Dict[str, Any]]:
     return found
 
 
+def has_score(campaign_dir, kind: str, who: str, version: Optional[str] = None) -> bool:
+    """Has the GM written this piece (a score in use, not one set aside)?"""
+    want = {"as": kind, "who": who, **({"version": version} if version else {})}
+    if kind == "place":
+        want = {"as": "place", "place": who}
+    return any(not it["problem"] and _key(it["use"]) == _key(want) for it in index(campaign_dir))
+
+
 # --- where the rendered music goes, and the registry the table reads ---
 def target(campaign_dir, use: Dict[str, Any], how: str = "score") -> Path:
     music = Path(campaign_dir) / "music"
@@ -215,8 +223,6 @@ def register(campaign_dir, use: Dict[str, Any], path: Path, seconds: float, how:
         rec = reg["anthems"].setdefault(key, {})
         if use["as"] == "dark":
             rec.update(dark=f, dark_how=how, dark_hash=fp)
-            if not rec.get("file"):         # (a dark twin alone isn't an anthem)
-                rec.pop("dark", None) if False else None
         else:
             rec.setdefault("versions", {})[use["version"]] = {"file": f, "seconds": seconds, **extra}
             if not rec.get("file") or not (Path(campaign_dir) / "music" / "anthems" / rec["file"]).is_file():
@@ -604,14 +610,14 @@ def place_sketch(campaign_dir, name: str, rec: Optional[Dict[str, Any]] = None,
         "tune": {"seed": tune["seed"], "stage": 1, "written": tune},
         "tempo": c["tempo"], "start": -32, "length": end - 32, "loop": True, "role": "place", "lead": 2,
         "statements": [{"at": 0}, {"at": 48, "from": 0, "to": sum(b for _, b in sig)}],
-        "dynamics": [[-32, 52], [0, 60], [20, 64], [32, 58], [56, 54], [64, 52], [96, 52]],
-        "melody": [{"from": 0, "to": 24, "parts": {lead: fit(lead, sig + answer)}, "vel": -4},
-                   {"from": 48, "to": 56, "parts": {second: fit(second, sig)}, "vel": -8}],
+        "dynamics": [[-32, 46], [-30, 52], [0, 60], [20, 64], [32, 58], [56, 54], [64, 52], [96, 52]],
+        "melody": [{"from": 0, "to": 24, "parts": {lead: fit(lead, sig + answer)}, "vel": -2, "gain": 5},
+                   {"from": 48, "to": 56, "parts": {second: fit(second, sig)}, "vel": -4, "gain": 5}],
         "chords": [[a - 32, b - 32, ch] for a, b, ch in chords],
         "harmony": [
             {"part": c["pad"], "from": -32, "to": end - 32, "play": "chord",
-             "range": [f"{NAMES[(key - 12) % 12]}3", f"{NAMES[(key + 5) % 12]}4"], "vel": -22},
-            {"part": "basses", "from": -32, "to": end - 32, "play": "bass", "range": ["E1", "D#2"], "vel": -18},
+             "range": [f"{NAMES[(key - 12) % 12]}3", f"{NAMES[(key + 5) % 12]}4"], "vel": -28},
+            {"part": "basses", "from": -32, "to": end - 32, "play": "bass", "range": ["E1", "D#2"], "vel": -22},
         ],
         "lines": [],
         "patterns": [],
@@ -622,15 +628,15 @@ def place_sketch(campaign_dir, name: str, rec: Optional[Dict[str, Any]] = None,
     if c["motion"] == "harp":
         spec["harmony"].append({"part": "harp", "from": -32, "to": end - 32, "play": "chord",
                                 "range": [f"{NAMES[key % 12]}3", f"{NAMES[(key + 7) % 12]}4"],
-                                "pattern": "o o o o ", "step": 0.5, "vel": -16})
+                                "pattern": "o o o o ", "step": 0.5, "vel": -22})
     else:
         spec["harmony"].append({"part": "pizzicato", "from": -32, "to": end - 32, "play": "root",
-                                "range": [lo3, hi3], "pattern": "x o ", "vel": -14})
+                                "range": [lo3, hi3], "pattern": " o o", "vel": -20})
     spec["harmony"].append({"part": "cellos", "from": 24, "to": 48, "play": "third",
-                            "range": ["C3", "B3"], "pattern": "o---", "vel": -18})
+                            "range": ["C3", "B3"], "pattern": "o---", "vel": -22})
     if c["choir"]:
         spec["harmony"].append({"part": "choir", "from": -16, "to": 24, "play": "chord",
-                                "range": [f"{NAMES[key % 12]}3", f"{NAMES[(key + 4) % 12]}4"], "vel": -16})
+                                "range": [f"{NAMES[key % 12]}3", f"{NAMES[(key + 4) % 12]}4"], "vel": -20})
     return spec
 
 

@@ -35,6 +35,7 @@ def set_languages(camp, codes):
 @pytest.fixture
 def table(tmp_path, monkeypatch):
     monkeypatch.setenv("NARRATOR_BACKEND", "off")      # never the host's real model in tests
+    monkeypatch.setenv("MUSIC_ORCHESTRA", "off")       # (its own tests: test_score_music.py)
     import lib.table_server
     monkeypatch.setattr(lib.table_server, "EDIT_GRACE", 0)   # (the typo window: its own test)
     world = tmp_path / "world-state"

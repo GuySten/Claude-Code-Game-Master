@@ -78,6 +78,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import character_arcs
 import composer
+import score_music
 import languages
 import party_roster
 import table_tts
@@ -186,6 +187,9 @@ TURN_HISTORY = 12              # turns the estimate is based on
 STALE_TURN_SECONDS = 20 * 60   # a turn the GM never answered stops counting
 # While an enemy's theme plays, these moods mean "still the same encounter".
 THEME_HOLDS_THROUGH = {"combat", "boss", "dread"}
+# The quiet moods: in a place with its own music, that plays instead (an encounter,
+# grief, a storm or a victory keep their own music).
+PLACE_MOODS = {"calm", "tavern", "travel", "mystery", "dungeon"}
 NAME_STOPWORDS = {"the", "of", "a", "an", "and", "lord", "lady", "sir"}
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CODE_WORDS = ["ember", "raven", "lantern", "goblin", "dragon", "tavern", "rune",
@@ -399,11 +403,21 @@ class TableState:
         # composed in the background (lib/composer.py) when the composer is set up.
         self.music_jobs: List[Dict[str, Any]] = []
         self.music_maker = None              # tests: (kind, name, boss, look, sheet) -> file
+        self.orchestra_maker = None          # tests: (a score_music job) -> the rendered file
         self.music_revert: Optional[Dict[str, Any]] = None   # a heroic anthem, then back
         # Places the party has been (only their pictures are shown: no spoilers).
         self.places_path = self.dir / "places.json"
-        visited = self._read_json(self.places_path, {}).get("visited", [])
+        places = self._read_json(self.places_path, {})
+        places = places if isinstance(places, dict) else {}
+        visited = places.get("visited", [])
         self.visited: List[str] = [v for v in visited if isinstance(v, str)]
+        # Time played at each place and returns to it: a place earns its own music
+        # (lib/score_music.py: earns_music); the places that have, with why.
+        self.place_seconds: Dict[str, float] = dict(places.get("seconds") or {})
+        self.place_visits: Dict[str, int] = dict(places.get("visits") or {})
+        self.place_music: Dict[str, str] = dict(places.get("music") or {})
+        self.place_here: Optional[str] = None
+        self.place_seen = 0.0
         # Characters rolled on the join screen, not created yet: roll id -> roll.
         self.pending_rolls: Dict[str, Dict[str, Any]] = {}
         # Actions the GM ruled can't work: PC -> {t (the redo's clock starts), after
@@ -1324,9 +1338,12 @@ class TableState:
 
     # --- composed music (lib/composer.py): villains, bosses, heroes ---
     def queue_theme(self, name: str, boss: bool, look: str = "") -> None:
+        name = " ".join(str(name).split())
+        score_music.request(self.campaign_dir, "boss" if boss else "theme", name)   # (for the GM to write)
         if self.music_maker is None and not composer.available():
             return
-        name = " ".join(str(name).split())
+        if self.orchestra_on() and score_music.has_score(self.campaign_dir, "boss" if boss else "theme", name):
+            return                                       # (written: the orchestra plays it)
         if composer.has_theme(self.campaign_dir, name, boss) or any(
                 j["kind"] == "theme" and j["name"] == name and j["boss"] == boss for j in self.music_jobs):
             return
@@ -1334,14 +1351,83 @@ class TableState:
                                 "look": look or self.enemy_looks.get(name, "")})
         self.portrait_wake.set()
 
+    def orchestra_on(self) -> bool:
+        return self.orchestra_maker is not None or score_music.available()
+
+    def orchestra_pass(self) -> List[str]:
+        """Written music first (lib/score_music.py): every new or changed score the
+        GM wrote, each PC's anthem in the version their story has reached (and the
+        next growth's, to be ready) arranged by rule from their tune until the GM
+        writes it, and the sketch of each place that earned its music. Each piece
+        takes over at once when it's for what is playing."""
+        if not self.orchestra_on():
+            return []
+        camp = self.campaign_dir
+        extra = []
+        for path, raw in party_roster.all_pcs(camp):
+            sheet = to_flat(raw)
+            name = sheet.get("name") or path.stem
+            arc = character_arcs.spec(character_arcs.state_of(camp, name))
+            for a in (arc, character_arcs.next_growth(arc)):
+                if not a or not score_music.needs_orchestra(camp, name, a) or score_music.has_score(
+                        camp, "anthem", name, character_arcs.version(a)):
+                    continue
+                tried = f"orchestra:{name}:{character_arcs.version(a)}"
+                if time.time() - self.portrait_tried.get(tried, -PORTRAIT_RETRY) < PORTRAIT_RETRY:
+                    continue
+                self.portrait_tried[tried] = time.time()
+                extra.append(score_music.anthem_job(camp, name, a, str(sheet.get("class") or "")))
+        for place in list(self.place_music):
+            try:
+                import image_gen
+                found = image_gen.find_location(place, camp)
+            except (OSError, ValueError):
+                found = None
+            score_music.ensure_sketch(camp, place, found[2] if found else None)
+        done: List[str] = []
+
+        def landed(use: Dict[str, Any], f: str) -> None:
+            done.append(use.get("who") or use.get("place"))
+            playing = self.music
+            if use["as"] == "place":
+                music = self.place_music_follow()
+            elif use["as"] in ("theme", "boss") and party_roster._same_name(playing.get("theme"), use["who"]) \
+                    and bool(playing.get("boss")) == (use["as"] == "boss") and playing.get("track") != f:
+                music = self.set_music(f, playing.get("volume", 0.6), True, playing.get("title"),
+                                       mood=playing.get("mood"), theme=use["who"], boss=use["as"] == "boss")
+            else:
+                music = None
+            if music is not None:
+                self.announce_music(music)
+
+        try:
+            if self.orchestra_maker is not None:          # (tests)
+                for job in score_music.stale(camp):
+                    use = job["use"]
+                    f = self.orchestra_maker(job)
+                    score_music.register(camp, use, Path(f), 30.0, "score", job["hash"], job["file"].name)
+                    landed(use, Path(f).name)
+                for job in extra:
+                    f = self.orchestra_maker(job)
+                    score_music.register(camp, job["use"], Path(f), 30.0, "orchestra")
+                    landed(job["use"], Path(f).name)
+            else:
+                score_music.sync(camp, extra, landed)
+        except Exception as e:
+            print(f"[orchestra] {e}", flush=True)
+        return done
+
     def music_pass(self) -> List[str]:
         """Compose what's queued (villain/boss themes) and the missing PC anthems, all
         in one go: the model loads once per batch, not once per piece (it's the slow,
         memory-hungry part). When a theme lands while its foe's music is playing, it
-        takes over at once, while the rest are still being composed."""
+        takes over at once, while the rest are still being composed. The orchestra
+        goes first (orchestra_pass): with it, the AI composes only villains' and
+        bosses' music nobody has written yet."""
+        orchestrated = self.orchestra_pass()
         if self.music_maker is None and not composer.available():
             self.music_jobs.clear()
-            return []
+            return orchestrated
         pieces = []
         while self.music_jobs:
             pieces.append(self.music_jobs.pop(0))
@@ -1354,6 +1440,8 @@ class TableState:
                 character_arcs.save(self.campaign_dir, {**character_arcs.load(self.campaign_dir),
                                                         name: {"stage": 1, "milestones": []}})
             arc = character_arcs.spec(character_arcs.state_of(self.campaign_dir, name))
+            if self.orchestra_on():
+                continue                                 # (the orchestra plays their anthems)
             wanted = ([("anthem", arc)] if not base else
                       [("anthem_version", a) for a in (arc, character_arcs.next_growth(arc))
                        if a and not composer.has_version(self.campaign_dir, name, a)])
@@ -1364,8 +1452,8 @@ class TableState:
                 self.portrait_tried[tried] = time.time()
                 pieces.append({"kind": kind, "name": name, "boss": False, "look": "", "sheet": sheet, "spec": a})
         if not pieces:
-            return []
-        done: List[str] = []
+            return orchestrated
+        done: List[str] = list(orchestrated)
 
         def landed(job: Dict[str, Any], f: str) -> None:
             done.append(job["name"])
@@ -1452,9 +1540,11 @@ class TableState:
         keywords |= {k + "s" for k in keywords}
         return [f["track"] for f in self.list_music() if self._tokens(f["track"]) & keywords]
 
-    def apply_mood(self, mood: str, force: bool = False) -> Optional[Dict[str, Any]]:
+    def apply_mood(self, mood: str, force: bool = False, leaving: bool = False) -> Optional[Dict[str, Any]]:
         """Switch the table's music to fit a scene mood. Returns the new music
-        state, or None when nothing changed (same mood, or auto music is off)."""
+        state, or None when nothing changed (same mood, or auto music is off). In
+        a place with its own music, the quiet moods play that (``leaving``: the
+        party left it - the mood's own music now)."""
         if not force and not self.auto_music:
             return None
         current = self.music if self.music.get("track") or self.music.get("mood") else {}
@@ -1463,7 +1553,13 @@ class TableState:
                 # The fight escalates: same enemy, their theme's boss version.
                 return self.apply_theme(current["theme"], boss=True)
             return None    # the enemy's theme carries the rest of the encounter
-        if current.get("mood") == mood and not current.get("theme"):
+        here = self.overview().get("location") if mood in PLACE_MOODS and self.place_music_on else None
+        place = self.place_track(here) if here and not leaving else None
+        if place:
+            if current.get("track") == place and not current.get("theme"):
+                return None
+            return self.set_music(place, MOODS[mood]["volume"], True, here, mood=mood, place=here)
+        if current.get("mood") == mood and not current.get("theme") and not current.get("place"):
             return None
         if mood == SILENCE:
             return self.set_music(None, mood=SILENCE)
@@ -1479,7 +1575,7 @@ class TableState:
     def set_music(self, track: Optional[str], volume: float = 0.5,
                   loop: bool = True, title: Optional[str] = None,
                   mood: Optional[str] = None, theme: Optional[str] = None,
-                  boss: bool = False, keep_revert: bool = False) -> Dict[str, Any]:
+                  boss: bool = False, keep_revert: bool = False, place: Optional[str] = None) -> Dict[str, Any]:
         """Point every browser at one track (None = silence). Returns the state."""
         with self.lock:
             if not keep_revert:
@@ -1507,6 +1603,8 @@ class TableState:
                     self.music["theme"] = theme
                 if boss:
                     self.music["boss"] = True
+                if place:
+                    self.music["place"] = place
                 if kind == "file":
                     from music_library import credit_for
                     credit = credit_for(src, PROJECT_ROOT / "music" / "library.json")
@@ -2379,26 +2477,113 @@ class TableState:
         except Exception:
             return False
 
-    def _note_visit(self) -> Optional[str]:
-        """The party's current location, remembered as visited."""
+    def _save_places(self) -> None:
+        with self.lock:
+            data = {"visited": self.visited, "seconds": {k: round(v) for k, v in self.place_seconds.items()},
+                    "visits": self.place_visits, "music": self.place_music}
+            tmp = self.places_path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+            tmp.replace(self.places_path)
+
+    def _note_visit(self, now: Optional[float] = None) -> Optional[str]:
+        """The party's current location, remembered as visited, and the time played
+        there (only while the table is in play: a message in the last 15 minutes)."""
+        now = now or time.time()
         here = self.overview().get("location")
+        changed = False
         if here and here not in self.visited:
+            self.visited.append(here)
+            changed = True
+        if here and here != self.place_here:
+            self.place_visits[here] = self.place_visits.get(here, 0) + 1
+            self.place_here, self.place_seen = here, now
+            changed = True
+        elif here:
             with self.lock:
-                self.visited.append(here)
-                tmp = self.places_path.with_suffix(".tmp")
-                tmp.write_text(json.dumps({"visited": self.visited}, indent=2, ensure_ascii=False),
-                               encoding="utf-8")
-                tmp.replace(self.places_path)
+                last = self._sent_at(self.messages[-1]) if self.messages else 0
+            if now - last < 15 * 60:
+                self.place_seconds[here] = self.place_seconds.get(here, 0.0) + min(60.0, now - self.place_seen)
+                changed = True
+            self.place_seen = now
+        if here:
+            changed = self._place_earns_music(here) or changed
+        if changed:
+            self._save_places()
         return here
+
+    @property
+    def place_music_on(self) -> bool:
+        return self.settings.get("place_music", True) is not False
+
+    def _place_earns_music(self, here: str) -> bool:
+        """Has this place earned its own music now? (Then its sketch is written, and
+        the orchestra plays it from the next music pass.)"""
+        if not self.place_music_on or any(score_music._same(p, here) for p in self.place_music):
+            return False
+        try:
+            import image_gen
+            found = image_gen.find_location(here, self.campaign_dir)
+        except (OSError, ValueError):
+            found = None
+        rec = found[2] if found else {}
+        if found and not image_gen.location_is_important(rec) and not rec.get("music"):
+            return False
+        story = " ".join(json.dumps(self._read_json(self.campaign_dir / f, {}), ensure_ascii=False)
+                         for f in ("plots.json", "quests.json")).casefold()
+        opening = bool(self.visited and score_music._same(self.visited[0], here)) or \
+            "opening" in str(rec.get("position") or "").lower()
+        try:
+            minutes = float(self.settings.get("place_music_minutes", score_music.PLACE_MINUTES))
+        except (TypeError, ValueError):
+            minutes = score_music.PLACE_MINUTES
+        why = score_music.earns_music(here, rec, self.place_seconds.get(here, 0.0), self.place_visits.get(here, 0),
+                                      opening, here.casefold() in story, minutes)
+        if not why:
+            return False
+        key = found[1] if found else here
+        self.place_music[key] = why
+        print(f"[music] {key} earned its music: {why}", flush=True)
+        try:
+            score_music.ensure_sketch(self.campaign_dir, key, rec)   # (played once the orchestra renders it)
+        except OSError as e:
+            print(f"[music] {key}: {e}", flush=True)
+        self.portrait_wake.set()
+        return True
+
+    def place_track(self, place: Optional[str] = None) -> Optional[str]:
+        """The music of this place (default: where the party is), if it has some."""
+        place = place or self.overview().get("location")
+        return score_music.place_file(self.campaign_dir, place) if place else None
+
+    def place_music_follow(self) -> Optional[Dict[str, Any]]:
+        """The party moved (or a place's music landed): its music takes over the
+        scene's, or the scene's comes back when they leave it. Never during an
+        encounter, an anthem, or a silence the GM asked for."""
+        if not self.auto_music or not self.place_music_on:
+            return None
+        cur = dict(self.music)
+        if cur.get("theme") or self.music_revert or cur.get("mood") not in PLACE_MOODS | {None}:
+            return None
+        here = self.overview().get("location")
+        track = self.place_track(here)
+        if track and (cur.get("track") != track):
+            return self.set_music(track, MOODS.get(cur.get("mood") or "calm", MOODS["calm"])["volume"], True, here,
+                                  mood=cur.get("mood") or "calm", place=here)
+        if not track and cur.get("place"):
+            return self.apply_mood(cur.get("mood") or "calm", force=True, leaving=True)
+        return None
 
     def place_pass(self, now: Optional[float] = None) -> Optional[str]:
         """Paint the party's current location if it's an important place (the GM
         has written about it) with no picture yet, and show it to the table."""
         import image_gen
         now = now or time.time()
-        here = self._note_visit()
+        here = self._note_visit(now)
         if not here:
             return None
+        music = self.place_music_follow()
+        if music is not None:
+            self.announce_music(music)
         try:
             found = image_gen.find_location(here, self.campaign_dir)
         except (OSError, ValueError):
