@@ -555,7 +555,8 @@ def compose_anthem(campaign_dir, sheet: Dict[str, Any]) -> Dict[str, Any]:
                   leitmotif={"seed": name, "mode": "major", "cls": str(sheet.get("class") or "")})
     reg = load_registry(campaign_dir)
     key = _key(reg["anthems"], name) or name
-    reg["anthems"][key] = {"file": Path(got["path"]).name, "seconds": got.get("seconds", ANTHEM_SECONDS)}
+    reg["anthems"][key] = {"file": Path(got["path"]).name, "seconds": got.get("seconds", ANTHEM_SECONDS),
+                           **({"how": got["how"]} if got.get("how") else {})}
     if got.get("twin"):
         reg["anthems"][key].update(dark=Path(got["twin"]["path"]).name, dark_how=got["twin"].get("how"))
     save_registry(campaign_dir, reg)
@@ -644,7 +645,12 @@ def main() -> None:
                          f"({camp.name}, in {camp.parent.parent}). Its player characters: {names}. "
                          f"(Campaigns kept elsewhere? Set GM_WORLD_STATE_BASE in .env.)")
             rec = compose_anthem(camp, to_flat(json.loads(path.read_text(encoding="utf-8"))))
-            print(f"[SUCCESS] {args.name}'s anthem: music/anthems/{rec['file']} ({rec['seconds']} s)")
+            how = {"leitmotif": "on their own tune", "melody": "on their own tune", "darkened": "the anthem darkened"}
+            print(f"[SUCCESS] {args.name}'s anthem: music/anthems/{rec['file']} ({rec['seconds']} s, "
+                  f"{how.get(rec.get('how'), 'composed freely (no melody model)')})")
+            if rec.get("dark"):
+                print(f"[SUCCESS] its dark twin: music/anthems/{rec['dark']} "
+                      f"({how.get(rec.get('dark_how'), rec.get('dark_how') or '')})")
     except ComposeError as e:
         sys.exit(f"[ERROR] {e}")
 
