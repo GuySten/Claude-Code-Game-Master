@@ -84,6 +84,28 @@ one PC was whispered to another; and the credit for the victory went to one PC.
   Look for imbalances that persist and that the story doesn't explain - not for equal
   numbers.
 
+## Decisions need information
+A choice the players can't read is a coin toss, not a decision (host's verdict: "we need
+a way to judge an enemy's strength before we decide to attack or not"). Before any real
+choice - fight or not, press or retreat, trust or not, take the risky path - give them
+what their characters could reasonably know:
+- **Show the threat** in the description: size, armour, weapons, scars, how they move,
+  and above all how others react to them (the guards step aside for him; the crowd goes
+  quiet when he passes). Every enemy, not only the deadly ones.
+- **Let them size it up.** A PC who looks (or asks) gets an honest read in plain words:
+  "beyond any of you alone", "a match for one of you", "the three of you could take
+  them", "they're hurt and scared". Their kind of expertise sharpens the read (a fighter
+  reads a fighter, a ranger a beast, a scholar or priest recalls a creature's lore); a
+  roll decides how much they learn, never whether they learn anything.
+- **Say the stakes before a risky action.** "If you attack now, the four guards on the
+  stairs will be on you too." Then ask "Do you still do it?" - the decision is theirs,
+  made knowing the cost.
+- **Show the state of a fight** as it goes (the health labels: Healthy, Wounded, Bloodied,
+  Critical), and how the enemy's nerve holds - so pressing on or getting out is a real
+  choice each round.
+- **Leave a way out.** Retreat, parley, surrender, bluff, a price to pay. If fighting is
+  the only option, there was no decision.
+
 ## Narration
 - **Match narration length to drama.** A nat 20 gets a cinematic moment; a routine check gets a sentence.
 - **When the player flavors their action — heroic, comical, cold, theatrical, reckless — LEAN INTO IT HARD.** This is the payoff moment players came for; cherish it. They didn't just "open the door," they kicked it off the hinges with a one-liner — so give that the full cinematic treatment: amplify their chosen tone, let the world react in kind, make their flourish *land*. Don't flatten a styled action back into a neutral beat. This is core gameplay, not garnish.
