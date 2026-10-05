@@ -35,6 +35,9 @@ player's PC is `players/<name>.json`. `gm-session.sh context` lists them all und
   own roll; give every player a beat before the scene moves on; when actions arrive together,
   resolve them in a sensible order inside one narration. The action menu (when ON) may be
   addressed to the whole party or to a named PC.
+- **Tie the party together before the first scene** (gm-craft, *Openings*): every PC gets
+  at least one bond with another PC, the party shares one stake, and the opening puts them
+  all in one scene facing one problem - never separate introductions that converge later.
 - **A PC dies:** Death Protocol for THAT player — `gm-player.sh become "<party member>" --for
   "<fallen PC>"` or a fresh `join`. The rest of the table plays on.
 

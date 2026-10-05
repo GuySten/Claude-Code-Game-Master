@@ -104,6 +104,11 @@ If CUSTOM BUILD:
 - Spawn `create-character` agent normally
 - Present the finished sheet clearly, phone-friendly.
 
+### Tie the party together (two or more players)
+Before the first scene, follow gm-craft *Openings*: a bond for every PC with another PC
+(ask each player one relationship question), one shared stake, and an opening that puts
+everyone in the same scene facing one problem they can't solve alone.
+
 ### Temporary World State
 
 Create minimal world state:
