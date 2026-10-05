@@ -2472,6 +2472,17 @@
     if (ev.type === "punished") return t("ev_punished_" + ev.way).replace("{pc}", m.pc || "");
     if (ev.type === "grew") return s.replace("{what}", (ev.what_tr || {})[lang] || ev.what || "");
     if (ev.type === "nemesis") return s.replace("{name}", ev.of || "");
+    if (ev.type === "purse") {
+      // A PC's money and belongings changed (told privately to its player).
+      const parts = [];
+      const coin = (c) => (STRINGS.en["coin_" + c] ? t("coin_" + c) : tx(c));
+      (ev.money || []).forEach((c) => parts.push(
+        `💰 \u2066${c.delta > 0 ? "+" : ""}${c.delta}\u2069 ${coin(c.cur)} (${t("purseNow")} \u2066${c.now}\u2069)`));
+      if ((ev.gained || []).length) parts.push("🎒 " + t("purseGot") + ": " + ev.gained.map(tx).join(", "));
+      if ((ev.lost || []).length) parts.push("🎒 " + t("purseLost") + ": " + ev.lost.map(tx).join(", "));
+      (ev.changed || []).forEach(([a, b]) => parts.push("🎒 " + tx(a) + " → " + tx(b)));
+      return s + " " + parts.join(" · ");
+    }
     if (ev.type === "loot") return t("ev_loot").replace("{name}", ev.name || "")
       + (ev.owner ? " — " + t("lootFor").replace("{pc}", ev.owner) : "");
     if (ev.type === "levelup") {

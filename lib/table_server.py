@@ -405,6 +405,11 @@ class TableState:
         self.music_maker = None              # tests: (kind, name, boss, look, sheet) -> file
         self.orchestra_maker = None          # tests: (a score_music job) -> the rendered file
         self.music_revert: Optional[Dict[str, Any]] = None   # a heroic anthem, then back
+        # Each PC's money and belongings as last told to their player: a change
+        # (a purse handed over, arrows spent) is told to them with the narration.
+        self.purses_path = self.dir / "purses.json"
+        purses = self._read_json(self.purses_path, None)
+        self.purses: Optional[Dict[str, Any]] = purses if isinstance(purses, dict) else None
         # Places the party has been (only their pictures are shown: no spoilers).
         self.places_path = self.dir / "places.json"
         places = self._read_json(self.places_path, {})
@@ -2822,6 +2827,77 @@ class TableState:
         except (OSError, ValueError):
             return []
 
+    @staticmethod
+    def _purse(sheet: Dict[str, Any]) -> Dict[str, Any]:
+        """A sheet's money ({currency: amount}) and belongings (a list of names)."""
+        money: Dict[str, float] = {}
+        for key in ("gold", "money", "currency", "coins"):
+            v = sheet.get(key)
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                money["gold" if key == "gold" else key] = v
+            elif isinstance(v, dict):
+                money.update({str(k): n for k, n in v.items()
+                              if isinstance(n, (int, float)) and not isinstance(n, bool)})
+        items: List[str] = []
+        for key in ("equipment", "inventory", "items"):
+            for it in sheet.get(key) or []:
+                if isinstance(it, dict):
+                    name = str(it.get("name") or it.get("item") or "").strip()
+                    qty = it.get("quantity", it.get("qty"))
+                    if name:
+                        items.append(f"{name} ×{qty}" if isinstance(qty, (int, float)) and qty != 1 else name)
+                elif str(it).strip():
+                    items.append(str(it).strip())
+        return {"money": money, "items": items}
+
+    @staticmethod
+    def _purse_change(old: Dict[str, Any], new: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """What changed between two purses: money deltas, items gained, lost, or
+        changed in place ("Quiver with 20 arrows" -> "...18 arrows"). None if nothing."""
+        import collections
+        import difflib
+        money = []
+        for cur in sorted(set(old["money"]) | set(new["money"])):
+            a, b = old["money"].get(cur, 0), new["money"].get(cur, 0)
+            if a != b:
+                money.append({"cur": cur, "delta": b - a, "now": b})
+        before, after = collections.Counter(old["items"]), collections.Counter(new["items"])
+        gained, lost = list((after - before).elements()), list((before - after).elements())
+        changed = []
+        for g in list(gained):
+            best = max(lost, key=lambda l: difflib.SequenceMatcher(None, l.lower(), g.lower()).ratio(), default=None)
+            if best is not None and difflib.SequenceMatcher(None, best.lower(), g.lower()).ratio() >= 0.6:
+                changed.append([best, g])
+                lost.remove(best)
+                gained.remove(g)
+        if not (money or gained or lost or changed):
+            return None
+        return {"money": money, "gained": gained, "lost": lost, "changed": changed}
+
+    def purse_pass(self) -> List[Dict[str, Any]]:
+        """Tell each player, privately, how their money and belongings changed since
+        they were last told (a bribe stays a secret, but its owner knows what they got).
+        The first pass only remembers."""
+        now = {p["name"]: self._purse(p.get("sheet") or {}) for p in self.party(sheets=True)}
+        with self.lock:
+            before, self.purses = self.purses, now
+        try:
+            self.purses_path.write_text(json.dumps(now, ensure_ascii=False), encoding="utf-8")
+        except OSError:
+            pass
+        out = []
+        for name, purse in now.items():
+            old = (before or {}).get(name)
+            change = self._purse_change(old, purse) if old else None
+            if not change:
+                continue
+            bits = [f"{m['delta']:+g} {m['cur']} ({m['now']:g})" for m in change["money"]]
+            bits += [f"+ {g}" for g in change["gained"]] + [f"- {l}" for l in change["lost"]]
+            bits += [f"{a} -> {b}" for a, b in change["changed"]]
+            out.append(self.append("system", f"{name}: " + "; ".join(bits), pc=name, to=name,
+                                   event={"type": "purse", **change}))
+        return out
+
     def map_graph(self) -> Dict[str, Any]:
         """The party's map: the places they have been, the ways out they have seen
         from there (a connection the GM recorded from or to a visited place), and how
@@ -3372,6 +3448,8 @@ def make_handler(state: TableState, code: str, host_key: str):
                                        "music": state.music, "auto_music": state.auto_music})
                 redo_missed = rnd["waiting_on"] if rnd.get("redo") else []
                 unread = state.gm_unread(mark=True)
+                if state.purses is None:            # remember the purses before the GM's turn
+                    state.purse_pass()
                 return self._json({"ok": True, "messages": unread, "redo_missed": redo_missed,
                                    "waiting_on": state.waiting_on(),
                                    "langs": state.seated_langs(),
@@ -3450,6 +3528,8 @@ def make_handler(state: TableState, code: str, host_key: str):
                                f"{', '.join(others)} readers get it in {lang_name(wrote)}. Post one "
                                f"version per language: say --lang " + " / say --lang ".join(state.languages))
                 missing = state.missing_versions() if lang and not to else {}
+                if not to and not missing:          # the beat is out in every language
+                    state.purse_pass()
                 reminder = ("Now the same beat in " + ", ".join(
                     f"{lang_name(l)} (say --lang {l})" for l in missing) + ".") if missing else None
                 return self._json({"ok": True, "message": msg, "music": music,

@@ -107,6 +107,10 @@ what their characters could reasonably know:
   the only option, there was no decision.
 
 ## Narration
+- **Say what changes hands, with the numbers.** When a PC gains or loses money or an item,
+  the narration says it outright: "The purse is heavy: 98 gold. You now have 108." A
+  player should never discover a change by reading their sheet. (The table also tells each
+  player, privately, how their money and belongings changed after every narration.)
 - **Match narration length to drama.** A nat 20 gets a cinematic moment; a routine check gets a sentence.
 - **When the player flavors their action — heroic, comical, cold, theatrical, reckless — LEAN INTO IT HARD.** This is the payoff moment players came for; cherish it. They didn't just "open the door," they kicked it off the hinges with a one-liner — so give that the full cinematic treatment: amplify their chosen tone, let the world react in kind, make their flourish *land*. Don't flatten a styled action back into a neutral beat. This is core gameplay, not garnish.
 - **Use silence.** "The old woman just... looks at you. Says nothing." beats a paragraph.

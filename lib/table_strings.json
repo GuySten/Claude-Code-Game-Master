@@ -293,7 +293,12 @@
   "mapShow": "Map",
   "mapHere": "you are here",
   "mapSeen": "seen, not yet visited",
-  "mapKey": "Solid: where you've been. Dashed: ways you've seen but not taken."
+  "mapKey": "Solid: where you've been. Dashed: ways you've seen but not taken.",
+  "ev_purse": "{pc}:",
+  "purseNow": "now",
+  "purseGot": "received",
+  "purseLost": "no longer has",
+  "coin_gold": "gold"
  },
  "he": {
   "title": "השולחן",
@@ -589,6 +594,11 @@
   "mapShow": "מפה",
   "mapHere": "אתם כאן",
   "mapSeen": "ראיתם, עוד לא הייתם שם",
-  "mapKey": "קו מלא: איפה שהייתם. קו מקווקו: דרכים שראיתם ועוד לא הלכתם בהן."
+  "mapKey": "קו מלא: איפה שהייתם. קו מקווקו: דרכים שראיתם ועוד לא הלכתם בהן.",
+  "ev_purse": "{pc}:",
+  "purseNow": "עכשיו",
+  "purseGot": "קיבל/ה",
+  "purseLost": "כבר אין",
+  "coin_gold": "זהב"
  }
 }

@@ -1992,3 +1992,32 @@ def test_the_map_shows_where_the_party_has_been_and_the_ways_seen_from_there(tab
     edges = {(e["a"], e["b"]): e["walked"] for e in m["edges"]}
     assert edges == {("The Market", "The Rusty Tankard"): True, ("The Old Well", "The Rusty Tankard"): False,
                      ("The Back Alley", "The Market"): False}
+
+
+def test_a_players_money_and_belongings_changes_are_told_to_them_with_the_narration(table):
+    call, state, camp = table["call"], table["state"], table["camp"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    sheet_path = camp / "character.json"
+    sheet = json.loads(sheet_path.read_text())
+    sheet.update({"gold": 10, "equipment": ["Shortsword", "Quiver with 20 arrows", "Rope"]})
+    sheet_path.write_text(json.dumps(sheet))
+    call("/api/gm/inbox", {}, host=True)          # the GM's turn: purses remembered
+    # The GM records a bribe (a purse of 98 gold), two arrows spent and the rope given away.
+    sheet.update({"gold": 108, "equipment": ["Shortsword", "Quiver with 18 arrows", "Silk purse"]})
+    sheet_path.write_text(json.dumps(sheet))
+    call("/api/gm/say", {"text": "The merchant presses a heavy purse into your hand."}, host=True)
+
+    mine = [m for m in call(f"/api/messages?code={CODE}&token={pip}&after=0")[1]["messages"]
+            if (m.get("event") or {}).get("type") == "purse"]
+    assert len(mine) == 1 and mine[0]["to"] == "Pip"
+    ev = mine[0]["event"]
+    assert ev["money"] == [{"cur": "gold", "delta": 98, "now": 108}]
+    assert ev["gained"] == ["Silk purse"] and ev["lost"] == ["Rope"]
+    assert ev["changed"] == [["Quiver with 20 arrows", "Quiver with 18 arrows"]]
+    # Told to its owner only (a bribe can be a secret), and only once.
+    others = call(f"/api/messages?code={CODE}&after=0")[1]["messages"]
+    assert not any((m.get("event") or {}).get("type") == "purse" for m in others)
+    call("/api/gm/say", {"text": "He bows and is gone."}, host=True)
+    again = [m for m in call(f"/api/messages?code={CODE}&token={pip}&after=0")[1]["messages"]
+             if (m.get("event") or {}).get("type") == "purse"]
+    assert len(again) == 1

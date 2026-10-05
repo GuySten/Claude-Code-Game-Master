@@ -285,6 +285,11 @@ bash tools/gm-image.sh chronicler --name "Astreus" --style "ink-and-watercolor f
 Players find all of it in the **🖼** gallery next to the location name: *Places*, *People*,
 *Foes* and *Treasures*, listing only what they've already seen.
 
+**Your money and belongings.** When the GM narrates a beat in which your gold or your
+belongings changed, the table tells you privately right after it: 💰 *+98 gold (now 108)*,
+🎒 *received: Silk purse*, 🎒 *Quiver with 20 arrows → Quiver with 18 arrows*. A secret
+payment stays secret: only its owner is told.
+
 **The map.** The **🗺** next to the location name opens the party's map: the places they've
 been (solid paths), the ways out they've seen but not taken (dashed), and a 📍 where they are
 now; tap a place for its picture. It draws itself from what the GM records (places and their
