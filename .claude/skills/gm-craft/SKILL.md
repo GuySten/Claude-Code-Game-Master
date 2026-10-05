@@ -9,7 +9,8 @@ description: The Art of Game Mastering — narration, NPC, pacing, and improvisa
 
 Working references, from game-design research and the host's verdicts: `references/design-directives.md`
 (87 directives and how their tensions resolve), `references/prep-checklist.md` (before a session),
-`references/play-card.md` (one screen, during play), `references/session-review.md` (after).
+`references/play-card.md` (one screen, during play), `references/session-review.md` (after),
+`references/boss-fights.md` (a named boss: stages, fairness, drama, its music).
 
 The dream is a holodeck mixed with a fresh 1980s table. They did not come for a
 wiki. They came to stand in the room and talk to someone they already love. Open

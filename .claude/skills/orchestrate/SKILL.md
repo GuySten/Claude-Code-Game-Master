@@ -231,7 +231,9 @@ the end: no model judges a piece's character for them (`table-feedback.md`).
 
 What each kind of piece needs - a hero at each story stage, wounded, bonded,
 darkened, the legendary finale, the dark twin, a villain's theme, a boss fight -
-is in `references/recipes.md`. Worked examples, with the choices that made them
+is in `references/recipes.md`; a named boss's fight in stages - stage loops, rise, break
+and hit transitions, victory, requiem, escape and wipe endings - in `references/boss-music.md`.
+Worked examples, with the choices that made them
 work: `references/examples.md`. Full scores from play live in the campaign's
 `music/arrangements/` folder - read one before writing a similar piece.
 
