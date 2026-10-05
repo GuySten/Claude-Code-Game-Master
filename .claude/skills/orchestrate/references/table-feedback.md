@@ -221,3 +221,18 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   the fix came from round 1's verdict on this same character, so the test of
   generality is characters the library was not tuned on (concept recognition; new
   characters).
+- **Concept recognition, pairwise** (8 concepts; each a ~24 s sketch from the lexicon's
+  entry alone, set against a sketch for its nearest neighbour; "which fits <concept>
+  better?"): 4 of 8. Told apart: the uncanny (vs madness), grief (vs memory and
+  nostalgia), holiness (vs peace), menace (vs dread). Went to the neighbour: nature and
+  wildness (the pastoral sketch chosen), nobility (the heroic brass sketch), mischief
+  (the comic sketch), wonder (the magic sketch). The host's reading: "maybe the concepts
+  overlap?" - for nature/pastoral (Tagg's listeners tag nature music pastoral) and
+  wonder/magic (shared celesta, harp, choir, I - bVI) the research agrees; mischief is a
+  kind of comedy, but its sketch also leaned sinister (diminished and augmented chords).
+  Nobility was a real miss: the entry was built on the galant minuet (topic theory),
+  while the host hears nobility as grandeur in brass - the same gap as the Margrave's
+  missing grandeur. Fixes: a **Tell apart** line on each overlapping pair (R14); film
+  idiom before period topic (R15, nobility rewritten); mischief is play, not malice;
+  wonder needs time to swell. Flaw: the correct clip was B in 7 of 8 questions; a
+  retest balances the order.
