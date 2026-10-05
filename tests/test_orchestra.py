@@ -96,3 +96,17 @@ def test_the_real_choirs_fall_back_to_the_sound_sets_choir_when_they_cant_be_had
     sc.note(part, 57, 0.0, 2.0, 100)
     out = orchestra.play(sc, 2.5)
     assert float(abs(out).max()) > 0.001                                # heard, not silent
+
+
+def test_mastering_keeps_a_climax_above_what_led_to_it():
+    np = pytest.importorskip("numpy")
+    rate = 8000
+    t = np.arange(rate * 8) / rate
+    quiet = 0.05 * np.sin(2 * np.pi * 220 * t[: rate * 6])
+    loud = 0.4 * np.sin(2 * np.pi * 220 * t[: rate * 2])             # 18 dB above: the climax
+    x = np.concatenate([quiet, loud]).astype("float32")
+    out = orchestra.master(np.stack([x, x], 1), rate, loop=True)
+    level = lambda a: 20 * np.log10(np.sqrt(np.mean(a ** 2)))
+    q, l = level(out[rate: rate * 5, 0]), level(out[rate * 6 + 400:, 0])
+    assert l - q > 16.5                                             # the limiter took at most ~1.5 dB
+    assert np.abs(out).max() <= 0.9

@@ -713,12 +713,21 @@ def hall(dry, rate: int = RATE, rt60: float = 2.3, wet: float = 0.28, seed: int 
     return mix[:end].astype("float32")
 
 
+LIMIT_DB = 1.5         # the most the limiter may take off a piece's loudest moment
+
+
 def master(x, rate: int = RATE, loop: bool = False):
     """Loudness like the rest of the table's music, no clipped peaks, a soft fade."""
     import numpy as np
     mono = x.mean(axis=1)
     now = music_compose.loudness_db(mono, rate)
-    gain = 10 ** (min(music_compose.LOUDNESS_DB - now, music_compose.MAX_GAIN_DB) / 20)
+    # Never raise a piece so far that the limiter must flatten its loudest moment by more
+    # than LIMIT_DB: a climax written 6 dB above what led to it came out 1 dB above it,
+    # the limiter taking 5 dB from that one bar (the host: "a climax without the climax").
+    # A dynamic piece is quieter overall; its peak keeps its size.
+    peak = float(np.abs(x).max()) or 1e-9
+    room = 20 * math.log10(music_compose.CEILING / peak) + LIMIT_DB
+    gain = 10 ** (min(music_compose.LOUDNESS_DB - now, music_compose.MAX_GAIN_DB, room) / 20)
     x = x * np.float32(gain)
     peak = np.abs(x).max(axis=1)
     limited = music_compose.limit(peak, rate)
