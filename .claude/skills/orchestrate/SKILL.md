@@ -33,7 +33,10 @@ So the loop below is not optional ceremony; it's how you hear.
      the host isn't asked to choose (host: "a workflow that is similar to the players
      but without me picking from two").
    Do it when they're introduced, in prep - never compose a boss's fight before its
-   tune exists. A boss's fight carries that tune in every stage (`"motifs"`):
+   tune exists. A boss's finals are arranged as **their theme** - the piece the table
+   hears when they appear, before any fight - so the players know the tune before the
+   fight varies it (stage 1 is where they learn a boss; a leitmotif is recognised in
+   a reprise, not a variation); the stages are built from the winner after. A boss's fight carries that tune in every stage (`"motifs"`):
    the host couldn't tell whether the Ashen Saint's second stage had the first
    stage's tune, because her improvised one (scored 4.0-5.0) was unmemorable.
    Everyone else gets the generator's (gen 2).
