@@ -18,6 +18,8 @@ except in "hits" and "rolls", where it is the velocity itself (1-127).
 
 {
   "tune": {"seed": "Kestrel", "mode": "major", "cls": "Barbarian", "stage": 3, "dark": 0},
+                         # "key": "C4" / "meter": "4/4" set the key the chords are read in
+                         # and the bars (a sketch with no tune - "statements": [] - sets both)
                          # mode "minor": the villain's version of the seed's tune; "gen": 2
                          # the generator's second version; "written": a hand-written tune
                          # (music_compose.written_tune: its sections in scale degrees)
@@ -270,6 +272,10 @@ def _build(spec: Dict[str, Any]) -> Dict[str, Any]:
     tune = music_compose.leitmotif(t["seed"], t.get("mode", "major"), t.get("cls", ""),
                                    stage=int(t.get("stage", 1)), dark=int(t.get("dark", 0)),
                                    gen=int(t.get("gen", 1)), written=t.get("written"))
+    if t.get("key"):                    # a set key (a sketch with no tune: chords read in it)
+        tune = {**tune, "key": pitch(t["key"])}
+    if t.get("meter") in ("4/4", "3/4", "2/4", "6/8"):    # ...and a set meter (bars, beats)
+        tune = {**tune, "meter": t["meter"]}
     key = tune["key"]
     notes, u = [], 0.0
     for st, b in tune["notes"]:
