@@ -179,6 +179,30 @@ end's dynamics and texture must meet the start's (the critic measures the seam).
 Start and end on a vamp or ostinato over the tonic so the wrap is invisible; put
 the intro's material at the end of the cycle too.
 
+## From concepts to a brief (the translator)
+
+A character, place or moment stands for concepts (holiness, nobility, cunning, decay,
+the sea, a farewell...); `references/concepts.md` translates each into music, from the
+research and the documented conventions (189 concepts, each with Cues, Melody, Harmony,
+Colours and devices, With / against, Intensity, Not). Before composing, write the
+composer's brief this way - the same for every character, so nothing is tuned to one:
+1. **Concepts.** From the description (npcs.json, the world bible, their deeds, how the
+   host defines them), list the concepts and weigh each: the one that *carries* the piece,
+   the *strong* ones, the *colours*. Always decide **stature** (how much they weigh in the
+   story: a king or archvillain gets one grand climax, a minor figure stays small).
+   Find them in `references/concepts-index.md` (keywords per concept).
+2. **Read only those entries** in `concepts.md` (search "#### <name>"), and its section 1
+   (how concepts combine: agreeing cues add up; conflicting ones go on different layers
+   or moments, never averaged; a short piece carries one or two ideas, layered).
+3. **The brief:** at most ~200 words, in musical terms - tempo and pulse, register,
+   colours, articulation, harmony, dynamics and how big it gets, texture, the melody's
+   shape, the devices and how they relate, what to avoid. Name the concepts used (so a
+   weak result can be traced to an entry). No section-by-section plan: that's the
+   composer's.
+4. The composer writes from the brief, the tune and the format; the critic checks; the
+   host listens. A verdict on character goes into `table-feedback.md` and, if it shows an
+   entry is wrong, into that entry - never as a patch for one character.
+
 ## Characters: a portrait in devices
 
 A character's music is a portrait, not a mood: read who they are in the campaign
