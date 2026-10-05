@@ -83,7 +83,8 @@ What the tools can make - each sound serves many characters and moods, none is a
 - a drone or pedal under moving music: "bass" held with "-", tremolo, organ, basses;
 - held chords that swell: strings; choir (a lament, a sacred or ominous chant, a
   victorious chorus); men_choir (real men's voices, low: monks, a chant in unison or
-  open fifths, doom, an ancient power); organ; low brass for weight;
+  open fifths, doom, an ancient power); choir_oo / choir_oh (a soft mixed choir on "oo" or
+  "oh": the ethereal, the holy, wonder, a hushed lament); organ; low brass for weight;
 - a written voice: a countermelody, a fanfare (trumpets, horns), an answering second
   voice, a lone solo (solo_violin, oboe, english_horn, flute), a run - "lines";
 - bells tolling, a music box (celesta, glockenspiel), a birdlike flute figure;
@@ -101,7 +102,7 @@ What the tools can make - each sound serves many characters and moods, none is a
 Parts: violins, violins2, solo_violin (one player: exposed, quick), strings (sustained),
 tremolo, pizzicato, cellos, basses,
 flutes, piccolo, oboe, english_horn, clarinets, bassoons, horns, trumpets,
-trombones, tuba, brass, choir, men_choir (E2-A4), harp, celesta, glockenspiel, bells, organ,
+trombones, tuba, brass, choir, men_choir (E2-A4), choir_oo, choir_oh (A2-D#6), harp, celesta, glockenspiel, bells, organ,
 timpani, taiko, toms, reverse_cymbal, kit (bd, snare, cymbals): as many as wanted.
 """
 
@@ -715,8 +716,8 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
         return orchestra.play(part, ctx["seconds"], rate=rate, mix=mix).mean(axis=1)
 
     lead = layer(lambda n: ":" in n)
-    choir = layer(lambda n: n in ("choir", "men_choir"))
-    rest = layer(lambda n: ":" not in n and n not in ("choir", "men_choir"))
+    choir = layer(lambda n: n in ("choir", "men_choir", "choir_oo", "choir_oh"))
+    rest = layer(lambda n: ":" not in n and n not in ("choir", "men_choir", "choir_oo", "choir_oh"))
 
     def db(x) -> float:
         return float(20 * np.log10(np.sqrt(np.mean(x ** 2)) + 1e-12)) if len(x) else -240.0

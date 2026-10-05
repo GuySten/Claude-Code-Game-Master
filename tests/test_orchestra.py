@@ -83,15 +83,16 @@ def test_an_instrument_built_from_recordings_plays_at_its_pitch(tmp_path):
     assert abs(np.argmax(spectrum) * rate / len(out) - 440.0) < 3
 
 
-def test_the_mens_choir_falls_back_to_the_sound_sets_choir_when_it_cant_be_had(monkeypatch):
+@pytest.mark.parametrize("part", ["men_choir", "choir_oo", "choir_oh"])
+def test_the_real_choirs_fall_back_to_the_sound_sets_choir_when_they_cant_be_had(monkeypatch, part):
     pytest.importorskip("numpy")
     pytest.importorskip("tinysoundfont")
     if not orchestra.SF2.is_file():
         pytest.skip("the SoundFont isn't downloaded here")
     def offline(**_):
         raise OSError("offline")
-    monkeypatch.setattr(orchestra, "fetch_choir", offline)
+    monkeypatch.setattr(orchestra, "EXTRA_FONTS", {k: offline for k in orchestra.EXTRA_FONTS})
     sc = orchestra.Score()
-    sc.note("men_choir", 50, 0.0, 2.0, 100)
+    sc.note(part, 57, 0.0, 2.0, 100)
     out = orchestra.play(sc, 2.5)
     assert float(abs(out).max()) > 0.001                                # heard, not silent

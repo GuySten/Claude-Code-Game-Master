@@ -103,7 +103,8 @@ This lexicon turns what a character, place or moment stands for into the musical
 | sleigh bells, tambourine, shaker, sistrum | metallic jingle | triangle with glockenspiel; a soft snare pattern for a shaker |
 | anvils, metal plates, chains | struck metal in a work rhythm | bells struck low, triangle, taiko; "hits" on bells and gong |
 | male choir, bass choir, monks, chant | low men's voices | `men_choir` (a real men's chorus, "ah", E2-A4): unison or open fifths for chant |
-| "oo", humming, solo voice, children's choir, whisper | soft or single voices | not yet usable (the host heard the sound set's "oo" and solo voice as instruments): `choir` kept soft, or a flute or clarinet line for a lone voice |
+| "oo", "oh", ethereal or wordless choir, humming | soft voices | `choir_oo` (a real mixed choir on "oo") or `choir_oh` (on "oh"); for humming, `choir_oo` kept pp |
+| solo voice, children's choir, whisper | a single, young or breathy voice | not yet usable (the host heard the sound set's solo voice as an instrument): a flute or clarinet line for a lone voice, `choir_oo` high and soft for the young |
 | wooden percussion, hand drums, bodhrán, tom-tom | dry skin or wood | toms; hard timpani strokes; pizzicato basses |
 | theremin, ondes Martenot, electronic glides | a voice-like pitch that slides and wavers | solo violin or flute with `slide` and wide `wobble` (*The other-worldly glide*) |
 | synthesizer, ring modulation, sequencer | inhuman regularity, metallic shimmer | celesta and high tremolo with `unhinge`; machine-like pizzicato ostinati |

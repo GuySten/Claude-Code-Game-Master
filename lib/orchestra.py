@@ -34,6 +34,12 @@ RATE = 44100
 # Built once from the recordings into its own SoundFont (fetch_choir); parts naming it
 # play from it, or from the sound set's choir if it can't be had.
 CHOIR_SF2 = Path(os.environ.get("ORCHESTRA_CHOIR_SF2") or SF2.parent / "sso-chorus.sf2")
+# Soft vowels: Mihai Sorohan's Vowel Ensemble (a mixed choir, a recording on every white
+# note C3-C6; renders free for any music, the recordings not to be passed on - so they
+# are fetched here, never kept in the repo). Its "oo" and "oh" were heard as people
+# where the sound set's "oo", stretched between few recordings, was heard as instruments.
+VOWEL_SF2 = Path(os.environ.get("ORCHESTRA_VOWEL_SF2") or SF2.parent / "vowel-choir.sf2")
+VOWEL_URL = "https://www.mediafire.com/file/bhdzds4tgtsocdp/Vowel_Choir_SFZ.zip"
 SSO = "https://raw.githubusercontent.com/peastman/sso/32bbdb169aef636b8216029a2e056424ba7c2abb/Sonatina%20Symphonic%20Orchestra/"
 
 # channel: (bank, preset, pan 0..127, volume 0..127)   (General MIDI numbering)
@@ -70,8 +76,10 @@ PARTS = {
     "reverse_cymbal": (0, 119, 64, 96),
     "solo_violin": (0, 40, 70, 110),  # one violin, alone: exposed, quick, edgy
     "men_choir": (0, 0, 60, 100, "chorus"),   # a real men's chorus, "ah": chant, monks, doom
+    "choir_oo": (0, 0, 66, 100, "vowels"),    # a soft mixed choir on "oo": ethereal, holy, wonder
+    "choir_oh": (0, 1, 62, 100, "vowels"),    # the same on "oh": warmer, rounder, a lament
 }
-FALLBACK = {"men_choir": (0, 52)}     # (the sound set's choir, if the chorus can't be had)
+FALLBACK = {"men_choir": (0, 52), "choir_oo": (0, 52), "choir_oh": (0, 52)}   # (the sound set's choir)
 DRUMS = {"kit"}
 LEAD_DB = 4.0          # the tune's notes, mixed this much over the rest
 BASS_DRUM, CRASH = 35, 49
@@ -439,6 +447,58 @@ def fetch_choir(dest: Path = None, quiet: bool = False) -> Path:
     return dest
 
 
+def fetch_vowels(dest: Path = None, quiet: bool = False) -> Path:
+    """The vowel choir: its zip (160 MB, once), the "oo" (U) and "oh" recordings built into a
+    SoundFont - preset 0 "oo", 1 "oh" - with long crossfaded loops (the files have none)."""
+    dest = dest or VOWEL_SF2
+    if dest.is_file() and dest.stat().st_size > 1_000_000:
+        return dest
+    import re
+    import tempfile
+    import zipfile
+    import soundfile
+    import sf2write
+    if not quiet:
+        print("[orchestra] downloading the vowel choir (160 MB, once)", file=sys.stderr, flush=True)
+    names = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
+    with tempfile.TemporaryDirectory() as tmp:
+        zpath = Path(tmp) / "vowels.zip"
+        with urllib.request.urlopen(VOWEL_URL, timeout=120) as r, open(zpath, "wb") as f:
+            while True:
+                chunk = r.read(1 << 20)
+                if not chunk:
+                    break
+                f.write(chunk)
+        presets = []
+        with zipfile.ZipFile(zpath) as z:
+            for label, vowel in (("Oo", "U"), ("Oh", "Oh")):
+                zones = []
+                for n in z.namelist():
+                    m = re.search(rf"choir {vowel} samples/{vowel}_([A-G])(\d)_[^/]*\.wav$", n)
+                    if not m:
+                        continue
+                    z.extract(n, tmp)
+                    audio, rate = soundfile.read(str(Path(tmp) / n), dtype="float32", always_2d=True)
+                    audio, ls, le = sf2write.crossfade_loop(sf2write.to_int16(audio), rate, 0.8, 0.8, 0.3)
+                    zones.append({"audio": audio, "rate": rate, "ls": ls, "le": le, "release_s": 0.5,
+                                  "key": 12 * (int(m.group(2)) + 1) + names[m.group(1)]})
+                zones.sort(key=lambda r: r["key"])
+                for i, r in enumerate(zones):          # each recording covers the notes nearest it
+                    r["lo"] = r["key"] - 3 if i == 0 else (zones[i - 1]["key"] + r["key"]) // 2 + 1
+                    r["hi"] = r["key"] + 3 if i == len(zones) - 1 else (r["key"] + zones[i + 1]["key"]) // 2
+                if not zones:
+                    raise OSError(f"no {vowel} recordings in the vowel choir's zip")
+                presets.append((label, zones))
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    part = dest.with_suffix(".part")
+    sf2write.write(part, presets, "Mihai Sorohan Vowel Ensemble (for renders only)")
+    part.replace(dest)
+    return dest
+
+
+EXTRA_FONTS = {"chorus": fetch_choir, "vowels": fetch_vowels}
+
+
 def available() -> bool:
     try:
         import tinysoundfont  # noqa: F401
@@ -458,11 +518,11 @@ LOUDNESS = {
     "organ": -2.6, "toms": -2.6, "violins": -0.8, "bells": 0.0, "basses": 0.0, "kit": 0.2,
     "harp": 0.2, "oboe": 0.4, "bassoons": 1.9, "english_horn": 2.7, "reverse_cymbal": 5.4,
     "taiko": 5.5, "trumpets": 5.7, "brass": 6.6, "timpani": 6.9, "tuba": 8.2, "cellos": 8.6,
-    "trombones": 9.7, "horns": 11.8, "solo_violin": 2.9, "men_choir": 5.5,
+    "trombones": 9.7, "horns": 11.8, "solo_violin": 2.9, "men_choir": 5.5, "choir_oo": 11.5, "choir_oh": 11.6,
 }
 # How long each instrument's recording takes to speak (seconds to half its level), and
 # where it plays (MIDI, its practical range): for the score critic (arrangement.check).
-SPEAKS = {"choir": 0.18, "men_choir": 0.1, "strings": 0.48, "violins": 0.50, "violins2": 0.26, "english_horn": 0.42,
+SPEAKS = {"choir": 0.18, "men_choir": 0.1, "choir_oo": 0.05, "choir_oh": 0.08, "strings": 0.48, "violins": 0.50, "violins2": 0.26, "english_horn": 0.42,
           "cellos": 0.24, "tremolo": 0.16, "organ": 0.10, "oboe": 0.12, "brass": 0.08, "horns": 0.06}
 RANGES = {
     "violins": (55, 100), "violins2": (55, 96), "strings": (36, 96), "tremolo": (36, 96),
@@ -471,7 +531,7 @@ RANGES = {
     "bassoons": (34, 72), "horns": (41, 77), "trumpets": (54, 82), "trombones": (40, 72),
     "tuba": (28, 58), "brass": (36, 84), "choir": (40, 81), "harp": (24, 103),
     "celesta": (60, 108), "glockenspiel": (79, 108), "bells": (60, 77), "organ": (24, 96),
-    "timpani": (38, 55), "solo_violin": (55, 100), "men_choir": (40, 69),
+    "timpani": (38, 55), "solo_violin": (55, 100), "men_choir": (40, 69), "choir_oo": (45, 87), "choir_oh": (45, 87),
 }
 # How late each instrument's recording is heard after its note starts (seconds to come
 # within 9 dB of its full level, measured from MuseScore_General, less the ~20 ms a
@@ -481,7 +541,7 @@ RANGES = {
 # beat; the string pad, which holds chords, is moved at most 250 ms. The host, on a
 # tune they knew (Ode to Joy): "clearly better". (Another sound set's instruments need
 # their own measurement.)
-ADVANCE = {"violins": 0.15, "violins2": 0.18, "cellos": 0.09, "tremolo": 0.115, "choir": 0.13, "men_choir": 0.06,
+ADVANCE = {"violins": 0.15, "violins2": 0.18, "cellos": 0.09, "tremolo": 0.115, "choir": 0.13, "men_choir": 0.06, "choir_oo": 0.02, "choir_oh": 0.06,
            "strings": 0.25, "trombones": 0.02, "organ": 0.015, "flutes": 0.012, "piccolo": 0.01,
            "solo_violin": 0.032}
 # How much room each recording carries already (dB: its energy after a short note is
@@ -507,7 +567,7 @@ def send_db(room: Optional[float]) -> float:
 
 BALANCE = {
     "horns": 2, "trumpets": 3, "trombones": 2, "brass": 3, "violins": 1, "strings": -3,
-    "tremolo": -2, "choir": 3, "men_choir": 3, "timpani": 2, "taiko": 3, "glockenspiel": -2, "piccolo": -2,
+    "tremolo": -2, "choir": 3, "men_choir": 3, "choir_oo": 3, "choir_oh": 3, "timpani": 2, "taiko": 3, "glockenspiel": -2, "piccolo": -2,
     "reverse_cymbal": -2,
 }
 
@@ -542,12 +602,12 @@ def play(score: Score, seconds: float, sf2: Path = SF2, rate: int = RATE,
     import tinysoundfont
     syn = tinysoundfont.Synth(gain=-12, samplerate=rate)
     sfid = syn.sfload(str(sf2))
-    chorus = None
-    if any(len(PARTS[e[2].partition(":")[0]]) > 4 for e in score.events):
+    fonts = {}                                  # the extra sound sets a piece needs, loaded once
+    for font in {PARTS[e[2].partition(":")[0]][4] for e in score.events if len(PARTS[e[2].partition(":")[0]]) > 4}:
         try:
-            chorus = syn.sfload(str(fetch_choir(quiet=True)))
+            fonts[font] = syn.sfload(str(EXTRA_FONTS[font](quiet=True)))
         except Exception as e:                                  # offline: the sound set's choir
-            print(f"[orchestra] no chorus ({e}): the sound set's choir plays", file=sys.stderr)
+            print(f"[orchestra] no {font} ({e}): the sound set's choir plays", file=sys.stderr)
     total = int((seconds + 0.5) * rate)
     out = np.zeros((total, 2), dtype="float32").view(_dry_type())
     out.send = np.zeros((total, 2), dtype="float32")      # what goes to the hall (see ROOM)
@@ -564,10 +624,10 @@ def play(score: Score, seconds: float, sf2: Path = SF2, rate: int = RATE,
         bank, preset, pan, vol = PARTS[part][:4]
         font = sfid
         if len(PARTS[part]) > 4:
-            if chorus is None:
-                bank, preset = FALLBACK[part]
+            if PARTS[part][4] in fonts:
+                font = fonts[PARTS[part][4]]
             else:
-                font = chorus
+                bank, preset = FALLBACK[part]
         ch = 9 if part in DRUMS else 0
         syn.program_select(ch, font, bank, preset, part in DRUMS)
         syn.control_change(ch, 7, vol)
