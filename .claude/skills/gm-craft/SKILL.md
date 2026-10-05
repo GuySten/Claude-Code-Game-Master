@@ -32,6 +32,23 @@ or more PCs:
 - **In play, keep the glue:** problems that need more than one PC, NPCs who treat the
   party as a group, and a beat for a bond when a PC drifts off on their own.
 
+## Clues: many, free, and spread across the party
+A mystery the table can't solve, or that only one player solves, is a design failure, not
+bad luck (host's verdict: clues came in a trickle, to one player only).
+- **Three clues per conclusion.** Every conclusion the party must reach gets at least
+  three clues by different routes (a thing, a person, a place; a skill, a question, a
+  search). Missing one never stalls the story.
+- **Core clues are free.** A clue the story needs is never behind a roll: a character who
+  looks in the right place with a fitting skill finds it. Rolls decide what *more* they
+  learn, how fast, and at what cost.
+- **Spread them across the PCs.** Give each PC a route that suits them - their skills,
+  senses, background, contacts, faith, magic - so every player holds a piece and the party
+  solves it together. Note which PC has had none yet, and give them the next one.
+- **Tell the whole table.** A clue one PC finds is narrated to everyone (`say`), with the
+  finder in the spotlight. Whisper (`--to`) only when the secret itself is the point - what
+  only that character could know or would hide - and then make sure the shared picture
+  still moves forward.
+
 ## Narration
 - **Match narration length to drama.** A nat 20 gets a cinematic moment; a routine check gets a sentence.
 - **When the player flavors their action — heroic, comical, cold, theatrical, reckless — LEAN INTO IT HARD.** This is the payoff moment players came for; cherish it. They didn't just "open the door," they kicked it off the hinges with a one-liner — so give that the full cinematic treatment: amplify their chosen tone, let the world react in kind, make their flourish *land*. Don't flatten a styled action back into a neutral beat. This is core gameplay, not garnish.
