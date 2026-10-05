@@ -24,6 +24,29 @@ goes, and most of it is a line or two of notes.
       within minutes. (3, 55) V1
 - [ ] Starting place described and its ways out connected, so the map has something on it. (72) V5
 
+## One player (solo)
+
+Most of this file assumes a party; with one PC the numbers and the safety nets change.
+[SRD 5.2 encounter budget per PC; Angry GM and Sly Flourish on solos; Laws on a haven]
+
+- [ ] **Budget per PC.** Size every fight with the SRD budget for one character of that
+      level (and the Lazy GM check: total CR above about 0.75 of one PC's level is deadly).
+      Write the check in the prep. Stage hit points: the PC's damage a round (a level-3 PC
+      deals about 5 against AC 13-15) times two or three rounds.
+- [ ] **No extra boss actions for an action economy that isn't there.** Legendary or villain
+      actions exist to answer five PCs; against one, at most one villain action a fight
+      (or one per stage) and Legendary Resistance only with a visible price, never against
+      a spell the PC paid extra for.
+- [ ] **Control is the whole side.** Prone, grappled, charmed or stunned takes the only
+      PC's turn: one control effect at a time, each lasting one turn, each escapable.
+- [ ] **A companion who acts.** An ally NPC with a turn (or a meaningful once-a-round help)
+      who can move with the PC; someone who can stabilise or carry a downed PC.
+- [ ] **Downed is not dead by default.** Plan what happens at 0 hit points that keeps the
+      story going (captured, claimed, carried off, a price) unless the stakes said aloud
+      were death. Retreat stays real.
+- [ ] **Every track and clock shown.** A solo player has nobody to compare notes with:
+      say every track's value when it changes and offer each rise before it lands.
+
 ## Before each session
 
 **Look back**

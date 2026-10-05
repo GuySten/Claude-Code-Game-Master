@@ -38,7 +38,7 @@ Modifiers: unreasonable request +5 DC; good rapport -2 DC.
 Positive (NPC helps later) / negative (NPC hinders) → `bash tools/gm-consequence.sh add "[event]" "[trigger]" [--trigger-type on_npc --match "[name]"]`. **Mandatory** whenever the interaction leaves ongoing fallout — a failed ask that changes how this NPC treats you later is exactly that.
 
 ## Failure — the ask is DENIED and it costs (see `gm-skills → Failure consequences`)
-Decide before rolling what refusal COSTS (never tell the player). On a failed social check:
+Decide before rolling what refusal COSTS, and tell the player the **kind** of cost before they roll (who will hear of it, what it risks); the exact twist may stay unsaid (gm-craft T3). On a failed social check:
 - **The ask does not happen.** Don't refund the stake by ending on a softer re-ask that costs nothing. If the NPC leaves a door open, that's escalation the fiction has to price — new leverage, new information, or something the player gives up.
 - **Whatever was on the table is spent.** If the player was bargaining for lives, cargo, passage, or mercy, the failure is where that thing is lost — not deferred. The NPC responds from their own goals and power; sometimes that's ugly.
 - **Persist the shift** so refusals compound like wins do: `bash tools/gm-npc.sh mood "[name]" "[new mood]"` + `gm-npc.sh set-inner` (goal/attitude), and `gm-npc.sh update "[name]" "[what happened]"`.

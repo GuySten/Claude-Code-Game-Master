@@ -28,7 +28,10 @@ none of this. Numbers refer to `design-directives.md`; sources at the end.
 
 ## The action economy
 
-6. **A lone boss loses to the party's five turns to one, and to a single stun.** Fix
+6. **A lone boss loses to the party's five turns to one, and to a single stun** - with a
+   party. With ONE player there is no such imbalance: drop the fixes below to at most one
+   villain action and one priced Legendary Resistance, and size each stage to the PC's
+   damage a round (`prep-checklist.md`, "One player"). Fix
    it in prep: legendary actions (SRD: usually three, regained at the start of its
    turn, one after another creature's turn, none while Incapacitated), Legendary
    Resistance, or villain actions (three per fight, at most one a round, at the end

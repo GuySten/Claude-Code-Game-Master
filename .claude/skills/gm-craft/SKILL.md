@@ -45,7 +45,10 @@ bad luck (host's verdict: clues came in a trickle, to one player only).
   search). Missing one never stalls the story.
 - **Core clues are free.** A clue the story needs is never behind a roll: a character who
   looks in the right place with a fitting skill finds it. Rolls decide what *more* they
-  learn, how fast, and at what cost.
+  learn, how fast, and at what cost. That holds for **reaction rolls** too (an NPC's mood,
+  a faction's welcome): they set the price and the tone of the help - a slip, a bribe, a
+  grudging half-answer, a friend - never whether a core clue reaches the PC. [GUMSHOE;
+  Laws: progress never hangs on one roll]
 - **Spread them across the PCs.** Give each PC a route that suits them - their skills,
   senses, background, contacts, faith, magic - so every player holds a piece and the party
   solves it together. Note which PC has had none yet, and give them the next one.
