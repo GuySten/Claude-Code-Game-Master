@@ -285,6 +285,11 @@ bash tools/gm-image.sh chronicler --name "Astreus" --style "ink-and-watercolor f
 Players find all of it in the **🖼** gallery next to the location name: *Places*, *People*,
 *Foes* and *Treasures*, listing only what they've already seen.
 
+**The map.** The **🗺** next to the location name opens the party's map: the places they've
+been (solid paths), the ways out they've seen but not taken (dashed), and a 📍 where they are
+now; tap a place for its picture. It draws itself from what the GM records (places and their
+connections, `gm-location.sh connect`), and shows nothing the party hasn't seen.
+
 The picture model is only ever told how things *look*, never their names (a name's words get
 drawn literally: a snake called "Old Mother Coil" came out as a woman). Scene pictures also get
 the stored description of the place the party is in, so places described when the party
@@ -545,7 +550,8 @@ Copy, fill in the link and code, and send:
     NPC you keep meeting. A familiar, pet or mount is painted as soon as you get it, and
     appears under *Companions* on your sheet. ⚔ marks a foe, 💀 a boss (bigger, glowing red), 💎 a treasure. Tap
     **🖼** next to the location at the top for the gallery: *Places*, *People*, *Foes*,
-    *Treasures*.
+    *Treasures*. Tap **🗺** for the map: where you've been, the ways you've seen, and where you
+    are now (📍).
 
 **Between the players**
 
@@ -625,7 +631,8 @@ Copy, fill in the link and code, and send:
     אותם, לכל דמות יש דיוקן, וגם לדמות משנה שחוזרת שוב ושוב. בן לוויה (חיית מחמד קסומה, חיה,
     סוס) מצויר ברגע שהוא מצטרף אליכם, ומופיע תחת *בני לוויה* בדף שלכם. ⚔ מסמן אויב, 💀 בוס (גדול יותר,
     עם זוהר אדום), 💎 אוצר. לחצו **🖼** ליד שם המקום למעלה כדי לפתוח את הגלריה: *מקומות*,
-    *דמויות*, *אויבים*, *אוצרות*.
+    *דמויות*, *אויבים*, *אוצרות*. לחצו **🗺** בשביל המפה: איפה שהייתם, הדרכים
+    שראיתם, ואיפה אתם עכשיו (📍).
 
 **בין השחקנים**
 

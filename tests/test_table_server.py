@@ -1956,3 +1956,39 @@ def test_the_host_wrapper_knows_every_table_command():
     cases = re.findall(r'^\s*("[a-z-]+"(?:\|"[a-z-]+")*)\)', (root / "tools" / "gm-table.sh").read_text(encoding="utf-8"), re.M)
     allowed = {c for case in cases for c in re.findall(r'"([a-z-]+)"', case)}
     assert commands <= allowed, commands - allowed
+
+
+def test_the_map_shows_where_the_party_has_been_and_the_ways_seen_from_there(table):
+    call, state, camp = table["call"], table["state"], table["camp"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    (camp / "images").mkdir(exist_ok=True)
+    (camp / "images" / "tankard.png").write_bytes(b"png")
+    locs = {
+        "The Rusty Tankard": {"image": "tankard.png", "connections": [
+            {"to": "The Market", "path": "traveled"}, {"to": "The Old Well", "path": "visible from here"}]},
+        "The Market": {"connections": [{"to": "The Rusty Tankard", "path": "traveled"}]},
+        "The Old Well": {"connections": []},
+        "The Back Alley": {"connections": [{"to": "the market", "path": "a gap in the fence"}]},
+        "Dragon's Lair": {"image": "tankard.png", "connections": [{"to": "The Lost Pass"}]},   # prepared ahead
+        "The Lost Pass": {"connections": [{"to": "Dragon's Lair"}]},
+    }
+    (camp / "locations.json").write_text(json.dumps(locs))
+    overview = json.loads((camp / "campaign-overview.json").read_text())
+    for place in ("The Rusty Tankard", "The Market"):
+        overview["player_position"]["current_location"] = place
+        (camp / "campaign-overview.json").write_text(json.dumps(overview))
+        state._note_visit(now=1000)
+
+    _, info = call(f"/api/info?code={CODE}&token={pip}")
+    m = info["map"]
+    names = [n["name"] for n in m["nodes"]]
+    # Where they've been, the way seen from the tavern, and a way the GM recorded into the
+    # market; never the lair nobody has heard of.
+    assert names == ["The Rusty Tankard", "The Market", "The Old Well", "The Back Alley"]
+    assert m["here"] == "The Market"
+    nodes = {n["name"]: n for n in m["nodes"]}
+    assert nodes["The Rusty Tankard"] == {"name": "The Rusty Tankard", "image": "tankard.png", "visited": True}
+    assert nodes["The Old Well"]["visited"] is False and nodes["The Old Well"]["image"] is None
+    edges = {(e["a"], e["b"]): e["walked"] for e in m["edges"]}
+    assert edges == {("The Market", "The Rusty Tankard"): True, ("The Old Well", "The Rusty Tankard"): False,
+                     ("The Back Alley", "The Market"): False}

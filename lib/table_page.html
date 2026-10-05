@@ -242,6 +242,16 @@
   #place-list img { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; display: block; }
   #place-list span { display: block; font-size: .8rem; padding: 3px 6px; }
   #place-list button[aria-current="true"] { border-color: var(--accent); }
+  /* The map: where the party has been (solid), the ways seen from there (dashed). */
+  #map-box { display: none; }
+  #map-box.on { display: block; }
+  #map-box svg { width: 100%; height: auto; max-height: 62vh; display: block;
+                 background: var(--bg); border-radius: 8px; }
+  #map-box .node { cursor: pointer; }
+  #map-box .node:focus { outline: none; }
+  #map-box .node:focus circle.ring { stroke: var(--accent); }
+  #map-box text { fill: var(--ink); text-anchor: middle; }
+  #map-key { font-size: .8rem; opacity: .75; margin-top: 6px; }
   .bar > div { transition: width .9s ease; }
   /* A PC's card changes the moment the story reaches them. */
   .pc.hurt { animation: hurt 1.6s ease-out; }
@@ -597,6 +607,7 @@
   </div>
   <div class="places-body">
     <div class="gallery-tabs" id="gallery-tabs"></div>
+    <div id="map-box"></div>
     <img id="place-big" alt="">
     <div id="place-name" dir="auto"></div>
     <div id="place-list"></div>
@@ -1646,7 +1657,13 @@
     document.title = info.campaign || t("title");
     $("where").textContent = [info.location, info.time].filter(Boolean).join(" · ");
     gallery = { places: info.places || [], people: info.people || [], foes: info.foes || [],
-                treasures: info.treasures || [] };
+                treasures: info.treasures || [], map: info.map || { nodes: [], edges: [] } };
+    if (gallery.map.nodes.length > 1) {
+      const m = document.createElement("button");
+      m.type = "button"; m.textContent = "🗺"; m.title = t("mapShow");
+      m.onclick = () => openGallery("map");
+      $("where").appendChild(m);
+    }
     if (gallery.places.length || gallery.people.length || gallery.foes.length || gallery.treasures.length) {
       const b = document.createElement("button");
       b.type = "button"; b.textContent = "🖼"; b.title = t("placeShow");
@@ -2139,9 +2156,24 @@
   // lists only what the players have already seen, so nothing is spoiled).
   let gallery = { places: [], people: [], foes: [], treasures: [] };
   function openGallery(tab, name) {
-    const tabs = ["places", "people", "foes", "treasures"].filter((k) => gallery[k].length);
+    const has = (k) => k === "map" ? gallery.map.nodes.length > 1 : gallery[k].length;
+    const tabs = ["map", "places", "people", "foes", "treasures"].filter(has);
     if (!tabs.length) return;
-    tab = tabs.includes(tab) ? tab : tabs[0];
+    tab = tabs.includes(tab) ? tab : tabs.find((k) => k !== "map") || tabs[0];
+    $("map-box").className = tab === "map" ? "on" : "";
+    $("place-list").hidden = tab === "map";
+    $("place-big").hidden = false;
+    if (tab === "map") {
+      $("place-big").hidden = true; $("place-name").textContent = "";
+      drawMap(gallery.map, (p) => {
+        $("place-big").hidden = !p.image;
+        if (p.image) { $("place-big").src = imageUrl(p.image); $("place-big").className = ""; }
+        $("place-name").textContent = p.name + (p.name === gallery.map.here ? " · 📍 " + t("mapHere")
+                                                : p.visited ? "" : " · " + t("mapSeen"));
+      });
+    }
+    renderGalleryTabs(tabs, tab);
+    if (tab === "map") { showGalleryDialog(); return; }
     const items = gallery[tab];
     const label = (p) => p.name + (p.owner ? " — " + t("lootFor").replace("{pc}", p.owner) : "")
                          + (p.boss ? " 💀" : "");
@@ -2151,15 +2183,6 @@
       $("place-name").textContent = label(p);
       [...$("place-list").children].forEach((b) => b.setAttribute("aria-current", String(b.dataset.name === p.name)));
     };
-    $("gallery-tabs").textContent = "";
-    if (tabs.length > 1) tabs.forEach((k) => {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.textContent = t({ places: "galPlaces", people: "galPeople", foes: "galFoes", treasures: "galTreasures" }[k]);
-      b.setAttribute("aria-pressed", String(k === tab));
-      b.onclick = () => openGallery(k);
-      $("gallery-tabs").appendChild(b);
-    });
     $("place-list").textContent = "";
     if (items.length > 1) items.forEach((p) => {
       const b = document.createElement("button");
@@ -2169,8 +2192,104 @@
       $("place-list").appendChild(b);
     });
     show(items.find((p) => p.name === name) || items[0]);
+    showGalleryDialog();
+  }
+  function renderGalleryTabs(tabs, tab) {
+    $("gallery-tabs").textContent = "";
+    if (tabs.length > 1) tabs.forEach((k) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = t({ map: "galMap", places: "galPlaces", people: "galPeople", foes: "galFoes",
+                          treasures: "galTreasures" }[k]);
+      b.setAttribute("aria-pressed", String(k === tab));
+      b.onclick = () => openGallery(k);
+      $("gallery-tabs").appendChild(b);
+    });
+  }
+  function showGalleryDialog() {
     const dlg = $("places");
     if (!dlg.open) { if (dlg.showModal) dlg.showModal(); else dlg.setAttribute("open", ""); }
+  }
+  // The map's layout: a small force layout (places push apart, paths pull together),
+  // the same every time for the same places, with "here" held in the middle.
+  function layoutMap(m) {
+    const n = m.nodes.length, idx = new Map(m.nodes.map((p, i) => [p.name, i]));
+    const pos = m.nodes.map((p, i) => [Math.cos(2 * Math.PI * i / n) * 200, Math.sin(2 * Math.PI * i / n) * 200]);
+    const hi = idx.has(m.here) ? idx.get(m.here) : -1;
+    if (hi >= 0) pos[hi] = [0, 0];
+    const E = m.edges.map((e) => [idx.get(e.a), idx.get(e.b)]).filter(([a, b]) => a !== undefined && b !== undefined);
+    const N = 400;
+    for (let it = 0; it < N; it++) {
+      const f = pos.map(() => [0, 0]);
+      for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+        const dx = pos[i][0] - pos[j][0], dy = pos[i][1] - pos[j][1];
+        const d2 = Math.max(dx * dx + dy * dy, 1), d = Math.sqrt(d2), r = 18000 / d2;
+        f[i][0] += dx / d * r; f[i][1] += dy / d * r; f[j][0] -= dx / d * r; f[j][1] -= dy / d * r;
+      }
+      for (const [a, b] of E) {
+        const dx = pos[b][0] - pos[a][0], dy = pos[b][1] - pos[a][1], d = Math.max(Math.hypot(dx, dy), 1);
+        const k = (d - 140) * 0.05;
+        f[a][0] += dx / d * k; f[a][1] += dy / d * k; f[b][0] -= dx / d * k; f[b][1] -= dy / d * k;
+      }
+      const step = 1 - it / N;
+      for (let i = 0; i < n; i++) if (i !== hi) {
+        pos[i][0] += Math.max(-20, Math.min(20, f[i][0])) * step;
+        pos[i][1] += Math.max(-20, Math.min(20, f[i][1])) * step;
+      }
+    }
+    return pos;
+  }
+  function drawMap(m, onPick) {
+    const NS = "http://www.w3.org/2000/svg", R = 30;
+    const el = (tag, attrs, parent) => {
+      const e = document.createElementNS(NS, tag);
+      for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+      if (parent) parent.appendChild(e);
+      return e;
+    };
+    const pos = layoutMap(m), idx = new Map(m.nodes.map((p, i) => [p.name, i]));
+    const xs = pos.map((p) => p[0]), ys = pos.map((p) => p[1]), pad = R + 60;
+    const x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad;
+    const W = Math.max(...xs) - x0 + pad, H = Math.max(...ys) - y0 + pad;
+    const fs = Math.max(13, W / 30);           // labels stay readable when a phone shrinks the map
+    const svg = el("svg", { viewBox: `${x0} ${y0} ${W} ${H}`, role: "img", "aria-label": t("galMap") });
+    for (const e of m.edges) {
+      const a = pos[idx.get(e.a)], b = pos[idx.get(e.b)];
+      if (!a || !b) continue;
+      el("line", { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: "var(--line)",
+                   "stroke-width": e.walked ? 3 : 2, "stroke-dasharray": e.walked ? "" : "6 6" }, svg);
+    }
+    m.nodes.forEach((p, i) => {
+      const [x, y] = pos[i], here = p.name === m.here;
+      const g = el("g", { class: "node", tabindex: "0", role: "button", "aria-label": p.name,
+                          opacity: p.visited ? 1 : 0.6 }, svg);
+      el("circle", { cx: x, cy: y, r: R, fill: "var(--panel)" }, g);
+      if (p.image) {
+        const clip = el("clipPath", { id: "map-c" + i }, g);
+        el("circle", { cx: x, cy: y, r: R }, clip);
+        el("image", { href: imageUrl(p.image, 200), x: x - R * 1.5, y: y - R, width: R * 3, height: R * 2,
+                      preserveAspectRatio: "xMidYMid slice", "clip-path": `url(#map-c${i})` }, g);
+      } else {
+        el("text", { x, y: y + 6, "font-size": 18 }, g).textContent = "?";
+      }
+      el("circle", { class: "ring", cx: x, cy: y, r: R, fill: "none",
+                     stroke: here ? "var(--accent)" : "var(--line)", "stroke-width": here ? 4 : 2,
+                     "stroke-dasharray": p.visited ? "" : "5 4" }, g);
+      if (here) el("text", { x, y: y - R - 8, "font-size": 18 }, g).textContent = "📍";
+      const label = p.name.length > 24 ? p.name.slice(0, 23) + "…" : p.name;
+      el("text", { x, y: y + R + fs + 2, dir: "auto", "font-size": fs }, g).textContent = label;
+      const pick = () => onPick(p);
+      g.addEventListener("click", pick);
+      g.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); pick(); } });
+    });
+    const box = $("map-box");
+    box.textContent = "";
+    box.appendChild(svg);
+    const key = document.createElement("div");
+    key.id = "map-key"; key.textContent = t("mapKey");
+    box.appendChild(key);
+    const start = m.nodes.find((p) => p.name === m.here) || m.nodes[0];
+    if (start) onPick(start);
   }
   $("places-close").onclick = () => $("places").close();
   $("places").addEventListener("click", (ev) => { if (ev.target === $("places")) $("places").close(); });

@@ -288,7 +288,12 @@
   "roundRedo": "⟲ {t} to choose a new action",
   "extend": "+1 min",
   "extendTitle": "Ask for one more minute (once a round)",
-  "ev_extend": "⏳ {pc} asks for one more minute"
+  "ev_extend": "⏳ {pc} asks for one more minute",
+  "galMap": "🗺 Map",
+  "mapShow": "Map",
+  "mapHere": "you are here",
+  "mapSeen": "seen, not yet visited",
+  "mapKey": "Solid: where you've been. Dashed: ways you've seen but not taken."
  },
  "he": {
   "title": "השולחן",
@@ -579,6 +584,11 @@
   "roundRedo": "⟲ נותרו {t} לבחור פעולה חדשה",
   "extend": "עוד דקה",
   "extendTitle": "בקשו עוד דקה (פעם אחת בסבב)",
-  "ev_extend": "⏳ {pc} מבקש/ת עוד דקה"
+  "ev_extend": "⏳ {pc} מבקש/ת עוד דקה",
+  "galMap": "🗺 מפה",
+  "mapShow": "מפה",
+  "mapHere": "אתם כאן",
+  "mapSeen": "ראיתם, עוד לא הייתם שם",
+  "mapKey": "קו מלא: איפה שהייתם. קו מקווקו: דרכים שראיתם ועוד לא הלכתם בהן."
  }
 }
