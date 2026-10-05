@@ -294,6 +294,12 @@ def _build(spec: Dict[str, Any]) -> Dict[str, Any]:
             if lo - 1e-9 <= u0 < hi - 1e-9:
                 played.append((at + u0 - lo, min(b, hi - u0), key + st + int(s.get("shift", 0))))
     start = float(spec.get("start", 0))
+    if not played:                     # a sketch with no tune ends with its last written note
+        ends = [float(x[1]) for x in spec.get("chords", [])]
+        ends += [float(x.get("to", 0)) for k in ("harmony", "patterns", "rolls") for x in spec.get(k, [])]
+        ends += [float(n[0]) + float(n[2]) for x in spec.get("lines", []) for n in x.get("notes", [])]
+        ends += [float(x.get("at", 0)) + float(x.get("len", 0)) for x in spec.get("hits", [])]
+        tune_len = max(ends, default=tune_len)
     length = float(spec.get("length") or max((p[0] + p[1] for p in played), default=tune_len))
     loop = bool(spec.get("loop"))
     tempo = float(spec.get("tempo") or 66)

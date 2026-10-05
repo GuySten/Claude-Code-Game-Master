@@ -236,3 +236,6 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   idiom before period topic (R15, nobility rewritten); mischief is play, not malice;
   wonder needs time to swell. Flaw: the correct clip was B in 7 of 8 questions; a
   retest balances the order.
+  The host is not a native English speaker: a concept word alone ("mischief", "wonder",
+  "nobility") may not carry the nuance meant. Recognition tests give each concept a
+  one-line plain description and a Hebrew equivalent.
