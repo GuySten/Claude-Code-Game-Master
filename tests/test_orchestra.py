@@ -83,7 +83,7 @@ def test_an_instrument_built_from_recordings_plays_at_its_pitch(tmp_path):
     assert abs(np.argmax(spectrum) * rate / len(out) - 440.0) < 3
 
 
-@pytest.mark.parametrize("part", ["men_choir", "choir_oo", "choir_oh"])
+@pytest.mark.parametrize("part", ["men_choir", "chorus", "choir_oo", "choir_oh"])
 def test_the_real_choirs_fall_back_to_the_sound_sets_choir_when_they_cant_be_had(monkeypatch, part):
     pytest.importorskip("numpy")
     pytest.importorskip("tinysoundfont")
