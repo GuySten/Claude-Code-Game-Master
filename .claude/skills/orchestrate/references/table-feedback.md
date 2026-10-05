@@ -286,3 +286,14 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   index had sent "adventurer", "protagonist" and "the party's theme" to Heroism. Now a
   portrait takes only distinctive concepts; a situation's concept is a moment, played as
   the character's own theme in that form.
+- **The Ashen Saint, rebuilt on a real tune** (three written candidates, blind tune
+  judge, finals as finished pieces, decided without the host). Her old improvised tune
+  (scored 4.0-5.0) was "so unmemorable I could not figure if the second stage had the
+  same tune as the first". The new one: a tapped C-C-C up to G (scored 8.8; won the
+  finals 0.68-0.32). Then stage 2 "does not develop into anything... like a climax
+  without the climax": it played 16-19 parts from bar 1 and 20 at its "climax", having
+  jumped straight past stage 1's peak (13 parts). The host: "maybe the problem is that
+  stage 1 started too strong" - stage 1 was moderate (6-13 parts), but the fight's arc
+  across stages was missing. Now: boss-music rule 6 (plan the arc across stages, each
+  stage builds to its own peak, something held back) and a critic warning when a climax
+  has nothing left to arrive.

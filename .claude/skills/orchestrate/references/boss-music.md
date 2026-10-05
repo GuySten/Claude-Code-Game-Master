@@ -28,32 +28,41 @@ Ordinary fights share one campaign battle cue and get none of this.
 5. **A stage may reveal rather than escalate.** When the second stage shows the boss's
    grief, madness or former self, its cue may be sparser, slower or sacred. Mark it
    `reveal` so the GM knows the drop is meant.
-6. **Long loops with change inside.** A table stage lasts 10 to 40 minutes: stage
+6. **Plan the fight's arc across its stages, and give each stage its own.** Stage 1
+   leaves headroom (about half the orchestra, mp to f); each later stage starts near
+   the last one's peak - not far above it - and climbs to a peak of its own; the fight's
+   single biggest moment is the last stage's climax. Inside every stage loop: begin
+   below its peak, add layers in waves, and hold something back for the peak (the
+   chorus or men's choir, full brass, the top register, the tune's full form), then
+   fall back for the seam. The host on a stage that started at its full texture (18
+   parts from bar 1, 20 at its peak): "it does not develop into anything... like a
+   climax without the climax" (the critic now flags this).
+7. **Long loops with change inside.** A table stage lasts 10 to 40 minutes: stage
    loops of 1 to 3 minutes with something new every 8 to 16 bars, so the loop doesn't
    show (`"loop": true`, `"role": "battle"`).
 
 ## Transitions and accents (short one-shots, in the next stage's key)
 
-7. **rise** - a one- or two-bar build (timpani roll, cymbal swell, tremolo crescendo)
+8. **rise** - a one- or two-bar build (timpani roll, cymbal swell, tremolo crescendo)
    landing on the new stage's first chord: for a stage that grows out of the last
    (bloodied, reinforcements).
-8. **break** - an impact (tutti hit, low brass and bass drum, choir) dying away into
+9. **break** - an impact (tutti hit, low brass and bass drum, choir) dying away into
    3 to 6 seconds of quiet: for a transformation or a reveal. The new stage starts
    after it, while the GM narrates.
-9. **hit** - a one- to three-second accent over any stage loop, on the shared tonic and
+10. **hit** - a one- to three-second accent over any stage loop, on the shared tonic and
    fifth so it fits every loop: a shield broken, a decisive blow. At most one a round.
 
 ## Endings (one-shots, in the last stage's key)
 
-10. **victory** - a 4 to 10 second cadential tag sized to the boss's rank; then 3 to 10
+11. **victory** - a 4 to 10 second cadential tag sized to the boss's rank; then 3 to 10
     seconds of silence; then quiet aftermath music. Never loop the fight into the
     looting.
-11. **requiem** - 30 to 90 seconds, through-composed: the boss's motif slowed on a solo
+12. **requiem** - 30 to 90 seconds, through-composed: the boss's motif slowed on a solo
     voice or instrument, modal or minor, ending in silence. For a tragic or pitiable
     boss, instead of the victory tag; the motif never resolves in triumph.
-12. **escape** - 4 to 8 seconds: the motif broken off on an unresolved chord. The story
+13. **escape** - 4 to 8 seconds: the motif broken off on an unresolved chord. The story
     isn't over.
-13. **wipe** - 2 to 5 seconds: a low hit, a falling cluster, then silence. Never back to
+14. **wipe** - 2 to 5 seconds: a low hit, a falling cluster, then silence. Never back to
     the battle loop.
 
 ## Files and playing them
@@ -65,11 +74,11 @@ a file stem: `ashen-saint-stage2.ogg`, `ashen-saint-break.ogg`). The GM plays th
 fades, and the new loop starts exactly as the sting ends, in step on every player's page.
 
 
-14. **Switch on the narration of the trigger**, not on the dice. A stage that grows
+15. **Switch on the narration of the trigger**, not on the dice. A stage that grows
     out of the last: **rise** into the new loop. A transformation: **break**, the
     pause under the GM's words, then the new loop. A turn the party caused: switch at
     once.
-15. **No silence while the boss can act**, except inside a break.
-16. **The same names and grammar for every boss** (`stage1`, `stage2`, `stage3`,
+16. **No silence while the boss can act**, except inside a break.
+17. **The same names and grammar for every boss** (`stage1`, `stage2`, `stage3`,
     `pre_end`, `rise`, `break`, `hit`, `victory`, `requiem`, `escape`, `wipe`), stage
     loops level-matched, accents a little louder: the table learns to read them.

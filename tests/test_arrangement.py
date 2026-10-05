@@ -291,3 +291,21 @@ def pitch_ok(rng):
     import arrangement, orchestra
     lo, hi = orchestra.RANGES["basses"]
     return lo <= arrangement.pitch(rng[0]) <= arrangement.pitch(rng[1]) <= hi
+
+
+def test_a_climax_with_nothing_left_to_arrive_is_flagged_and_a_built_one_is_not():
+    import arrangement
+    def piece(opening_parts):
+        parts = ["violins", "violins2", "cellos", "basses", "horns", "trombones", "flutes", "clarinets",
+                 "bassoons", "trumpets", "tuba", "oboe"]
+        lines = []
+        for i, part in enumerate(parts):
+            lo, _ = __import__("orchestra").RANGES[part]
+            start = 0 if i < opening_parts else 12          # the rest enter at the climax
+            lines.append({"part": part, "notes": [[u, lo + 7, 1] for u in range(start, 16)]})
+        return {"tune": {"seed": "sketch", "key": "D4", "meter": "4/4"}, "statements": [], "length": 64,
+                "chords": [[0, 64, "i"]], "dynamics": [[0, 70], [44, 90], [48, 120], [60, 80]],
+                "lines": [{**l, "notes": [[n[0] * 4, n[1], 4] for n in l["notes"]]} for l in lines]}
+    flat = [m for _, m in arrangement.check(piece(12), listen=False) if "nothing left to arrive" in m]
+    built = [m for _, m in arrangement.check(piece(5), listen=False) if "nothing left to arrive" in m]
+    assert flat and not built

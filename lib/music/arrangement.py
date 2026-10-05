@@ -391,7 +391,7 @@ def _build(spec: Dict[str, Any]) -> Dict[str, Any]:
     if t.get("key"):                    # a set key (a sketch with no tune: chords read in it)
         tune = {**tune, "key": pitch(t["key"])}
     if t.get("meter") in ("4/4", "3/4", "2/4", "6/8"):    # ...and a set meter (bars, beats)
-        tune = {**tune, "meter": t["meter"]}
+        tune = {**tune, "meter": t["meter"], "bar": music_compose.METERS[t["meter"]]}
     key = tune["key"]
     notes, u = [], 0.0
     for st, b in tune["notes"]:
@@ -745,7 +745,7 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
     while u < ctx["length"] - 1e-9:
         bounds.append((u, T(u), T(min(u + bar, ctx["length"]))))
         u += bar
-    moving = []
+    moving, layers = [], []
     for u0, a, b in bounds:
         onsets: Dict[str, Dict[float, int]] = {}
         for t, is_on, name, *_ in sc.events:
@@ -758,6 +758,7 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
                    and len(at) >= 2 and min(at.values()) == 1}
         tune_moves = any(a - 1e-6 <= T(x) < b - 1e-6 for x, _, _ in ctx["played"])
         moving.append((u0, len(pitched), len(parts & DRUMS), tune_moves))
+        layers.append((u0, len(parts), len(sum((list(at.values()) for at in onsets.values()), []))))
     run = []
     for u0, n, _, tm in moving + [(None, 9, 0, True)]:
         if u0 is not None and tm and n == 0:
@@ -775,6 +776,30 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
             add("note", f"battle or loop texture: {avg:.1f} lines move per bar besides the tune "
                         "(pitched parts): big music keeps three or more going - an ostinato, a "
                         "countermelody or answer, a moving bass or inner line - under the tune")
+    # A climax needs something to arrive: if the piece already plays at nearly its full
+    # texture from the start, its peak adds nothing (the host, of the Ashen Saint's second
+    # stage - 16-19 parts from bar 1, 20 at the "climax": "a climax without the climax").
+    if len(layers) >= 8:
+        pts = ctx["dyn_pts"]
+
+        def dyn(u: float) -> float:                    # the dynamics curve at u
+            if u <= pts[0][0]:
+                return pts[0][1]
+            for (x0, v0), (x1, v1) in zip(pts, pts[1:]):
+                if x0 <= u <= x1:
+                    return v0 + (v1 - v0) * (u - x0) / max(x1 - x0, 1e-9)
+            return pts[-1][1]
+        peak_i = max(range(len(layers)), key=lambda i: (dyn(layers[i][0] + bar / 2), layers[i][1]))
+        before = [n for _, n, _ in layers[:peak_i]]
+        if len(before) >= 4:
+            opening = [n for _, n, _ in layers[:max(2, len(layers) // 4)]]
+            full = layers[peak_i][1]
+            if min(opening) >= 0.8 * full and sorted(before)[len(before) // 2] >= 0.85 * full:
+                add("warn", f"the climax ({_where(ctx, layers[peak_i][0])}, {full} parts) has nothing left to "
+                            f"arrive: the piece already plays {min(opening)}-{max(opening)} parts from the start. "
+                            "Begin thinner and add layers in waves; hold something back for the peak (the choir, "
+                            "the brass, the top register, the tune's full form) - the host: \"a climax without "
+                            "the climax\"")
     # Seams: a section that drops what was playing and starts a new set of instruments
     # at one moment sounds like another piece glued on (the host, of a climax where the
     # harp, the countermelody and the tune's carriers all stopped as six new parts
