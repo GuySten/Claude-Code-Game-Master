@@ -299,8 +299,16 @@
   "purseGot": "received",
   "purseLost": "no longer has",
   "coin_gold": "gold",
-  "stopSignal": "Stop (X): pause the scene, no reason needed",
-  "stopSent": "✋ The GM has been asked to stop. No reason needed."
+  "stopSignal": "✋ Stop: pause the scene, no reason needed",
+  "stopSent": "✋ Sent. The GM will pause the scene. No reason needed.",
+  "newStory": "New in the story ↓",
+  "stopSoon": "✋ Stopping in 3 s - tap ✋ again to cancel",
+  "stopUndone": "✋ Cancelled - nothing was sent",
+  "pausedNote": "⏸ Someone asked to pause. The GM will check in before going on.",
+  "rollNat1Check": "(a 1: success, with a complication)",
+  "rollNat20Check": "(a 20: so close - with a flourish)",
+  "rollNearMiss": "(a near miss - the GM may offer it at a cost)",
+  "turnMissed": "⏳ Time's up - you hold this round. What you write now is for the next one."
  },
  "he": {
   "title": "השולחן",
@@ -602,7 +610,15 @@
   "purseGot": "קיבל/ה",
   "purseLost": "כבר אין",
   "coin_gold": "זהב",
-  "stopSignal": "עצירה (X): לעצור את הסצנה, בלי צורך להסביר",
-  "stopSent": "✋ ביקשת מהשה\"מ לעצור. אין צורך להסביר."
+  "stopSignal": "✋ עצירה: לעצור את הסצנה, בלי צורך להסביר",
+  "stopSent": "✋ נשלח. מנהל המשחק יעצור את הסצנה. אין צורך להסביר.",
+  "newStory": "חדש בסיפור ↓",
+  "stopSoon": "✋ עוצרים בעוד 3 שניות - הקישו ✋ שוב כדי לבטל",
+  "stopUndone": "✋ בוטל - שום דבר לא נשלח",
+  "pausedNote": "⏸ מישהו ביקש לעצור. מנהל המשחק יבדוק לפני שממשיכים.",
+  "rollNat1Check": "(1: הצלחה, עם סיבוך)",
+  "rollNat20Check": "(20: כמעט - ובסטייל)",
+  "rollNearMiss": "(כמעט - מנהל המשחק עשוי להציע זאת במחיר)",
+  "turnMissed": "⏳ הזמן נגמר - הסבב הזה עובר בלעדיך. מה שתכתבו עכשיו ייחשב לסבב הבא."
  }
 }

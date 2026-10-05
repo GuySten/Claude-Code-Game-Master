@@ -250,6 +250,10 @@ composer's brief this way - the same for every character, so nothing is tuned to
    host listens. A verdict on character goes into `table-feedback.md` and, if it shows an
    entry is wrong, into that entry - never as a patch for one character.
 
+**Name only the orchestra's own parts** (the parts list in `lib/music/arrangement.py`'s
+docstring): there is no viola section - a viola line is `violins2` in the viola register
+(a Countess brief asked for violas, and the composer had to translate it).
+
 ## Characters: a portrait in devices
 
 A character's music is a portrait, not a mood: read who they are in the campaign

@@ -2095,6 +2095,15 @@ def test_tracks_are_shown_to_the_table(table):
     assert [t["name"] for t in info["tracks"]] == ["Ravel (Pip)"]
     code, _ = call("/api/gm/track", {"name": "Midnight", "value": 1})                    # the GM's alone
     assert code in (401, 403)
+    # during the GM's turn the page still sees the old value, until the narration lands
+    call("/api/say", {"code": CODE, "token": pip, "text": "I wait for the clock."})
+    call("/api/gm/inbox", {}, host=True)                                                # the GM's turn starts
+    call("/api/gm/track", {"name": "Ravel (Pip)", "value": 2}, host=True)
+    _, info = call(f"/api/info?code={CODE}&token={pip}")
+    assert [t["value"] for t in info["tracks"]] == [5]
+    call("/api/gm/say", {"text": "The clock ticks."}, host=True)
+    _, info = call(f"/api/info?code={CODE}&token={pip}")
+    assert [t["value"] for t in info["tracks"]] == [2]
 
 
 def test_the_stop_signal_reaches_the_gm_at_once_past_the_round(table):

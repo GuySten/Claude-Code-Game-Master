@@ -6,9 +6,9 @@
 <title>The Table</title>
 <style>
   :root {
-    --bg: #f6f1e7; --panel: #fffaf0; --ink: #2b2620; --muted: #7a6f60;
+    --bg: #f6f1e7; --panel: #fffaf0; --ink: #2b2620; --muted: #645a4c;
     --line: #e2d8c6; --accent: #8a3b12; --accent-ink: #fff;
-    --gm: #fffdf8; --me: #efe6d4; --sys: #8a7f70; --whisper: #f3e8ff;
+    --gm: #fffdf8; --me: #efe6d4; --sys: #675d4f; --whisper: #f3e8ff;
     --hp: #3f8f4f; --hp-low: #c0392b; --hp-mid: #d68910; --live: #c0392b;
   }
   @media (prefers-color-scheme: dark) {
@@ -69,6 +69,9 @@
   header .tools button { padding: 6px 10px; }
   .lang-pick { padding: 5px 8px; width: auto; max-width: 11em; }
   #log { flex: 1; overflow-y: auto; padding: 16px; }
+  #log-new { position: relative; align-self: center; margin: -44px auto 8px; z-index: 5; border-radius: 999px;
+             padding: 6px 14px; border: 1px solid var(--accent, #8a4b1f); background: var(--card, #fff);
+             box-shadow: 0 2px 8px rgba(0,0,0,.25); font-size: .9rem; cursor: pointer; }
   .msg { max-width: 760px; margin: 0 auto 14px; padding: 10px 14px; border-radius: 10px; position: relative; }
   /* The story is the page: narration reads like a book; actions are compact. */
   .msg.gm { background: var(--gm); border: 1px solid var(--line); font-size: 1.07rem; line-height: 1.7;
@@ -139,7 +142,7 @@
           border: 2px solid var(--line); background: var(--panel); text-align: center; }
   #turn.yours { border-color: var(--accent); color: var(--accent); }
   #turn.redo { border-color: var(--hp-low); color: var(--hp-low); animation: pulse 1.2s ease-in-out infinite; }
-  #turn.sent, #turn.gm, #turn.out { color: var(--muted); font-weight: normal; }
+  #turn.sent, #turn.gm, #turn.out, #turn.missed { color: var(--muted); font-weight: normal; }
   .pc .turn-tick { float: inline-end; margin-inline-end: 8px; font-size: .85rem; }
   @media (max-width: 760px) { #turn { margin: 0 8px; padding: 6px 10px; font-size: .95rem; } }
   /* The GM's turn: what it's doing and roughly how long is left. */
@@ -313,6 +316,8 @@
   #now-playing { margin-bottom: 6px; }
   #party-toggle { display: none; }
   /* The fight: order, whose turn, how the foes look, what's on the battlefield. */
+  #paused { margin: 6px 16px 0; padding: 6px 10px; border-radius: 10px; border: 2px solid var(--accent);
+            font-weight: bold; text-align: center; }
   #tracks { margin: 6px 16px 0; display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .85rem; }
   #tracks .tk { display: flex; align-items: center; gap: 6px; }
   #tracks .pips { letter-spacing: 1px; color: var(--hp-low); }
@@ -332,6 +337,13 @@
   #fight .fc.down { opacity: .5; text-decoration: line-through; }
   #fight .fields { margin-top: 4px; }
   @media (max-width: 760px) { #fight { margin: 4px 8px 0; } }
+  /* A phone keeps the story on screen: the tracks one scrolling line, the composer's
+     two options side by side. */
+  @media (max-width: 760px) {
+    #tracks { margin: 4px 8px 0; flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; scrollbar-width: none; }
+    #paused { margin: 4px 8px 0; padding: 4px 8px; font-size: .9rem; }
+    .say-row .opts { display: flex; flex-wrap: wrap; gap: 0 12px; font-size: .8rem; }
+  }
 
   /* The players' side chat (the GM never sees it): a third column on wide screens,
      a drawer from the side on narrower ones. */
@@ -528,9 +540,11 @@
                 data-i18n-label="menu">⋯</button>
       </div>
     </header>
+    <div id="paused" class="hidden" role="status" data-i18n="pausedNote"></div>
     <div id="tracks" class="hidden" aria-live="polite"></div>
     <div id="fight" class="hidden" aria-live="polite"></div>
     <div id="log" aria-live="polite"></div>
+    <button id="log-new" type="button" class="hidden" data-i18n="newStory"></button>
     <div id="turn" class="hidden" aria-live="polite"></div>
     <div id="progress" class="hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100"
          aria-live="polite">
@@ -714,7 +728,10 @@
     document.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t(el.dataset.i18n); });
     updateEdgeHint();
     document.querySelectorAll("[data-i18n-ph]").forEach((el) => { el.placeholder = t(el.dataset.i18nPh); });
-    document.querySelectorAll("[data-i18n-label]").forEach((el) => { el.setAttribute("aria-label", t(el.dataset.i18nLabel)); });
+    document.querySelectorAll("[data-i18n-label]").forEach((el) => {
+      el.setAttribute("aria-label", t(el.dataset.i18nLabel));
+      if (el.tagName === "BUTTON") el.title = t(el.dataset.i18nLabel);     // (a tooltip: what it does)
+    });
     fillLangPickers();
     $("me").textContent = me ? `${t("playingAs")} ${me}` : "";
     updateReadToggle();
@@ -783,8 +800,10 @@
                                                    '"': "&quot;", "'": "&#39;" }[c]));
   }
   // Dice in Hebrew: 2d6 → 2ק6 (ק for קובייה). Only how it's shown; English stays 2d6.
-  const heDice = (s) => lang === "he"
-    ? String(s).replace(/(^|[^A-Za-z0-9])(\d*)d(\d+)(?![A-Za-z0-9])/g, "$1$2ק$3") : String(s);
+  // Hebrew dice ("2ק6"), only inside Hebrew text, each in a left-to-right isolate: a Hebrew
+  // letter dropped into English text ("1d6+3, 80/320 ft") reordered it into nonsense.
+  const heDice = (s) => lang === "he" && /[\u0590-\u05FF]/.test(String(s))
+    ? String(s).replace(/(^|[^A-Za-z0-9])(\d*)d(\d+)(?![A-Za-z0-9])/g, "$1\u2066$2ק$3\u2069") : String(s);
   function md(text) {
     return String(text).trim().split(/\n{2,}/).map((block) => {
       let h = esc(block)
@@ -1051,7 +1070,11 @@
     if (!m) return "";
     if (m.theme) return t(m.boss ? "bossThemeOf" : "themeOf").replace("{name}", m.theme);
     if (m.kind === "ambient" && STRINGS.en["amb_" + m.src]) return t("amb_" + m.src);
-    return m.title || "";
+    // A library file is named "<mood> <title>": the players hear the mood; they don't
+    // read the GM's label for it.
+    const title = String(m.title || "");
+    return m.mood && title.toLowerCase().startsWith(String(m.mood).toLowerCase() + " ")
+      ? title.slice(String(m.mood).length + 1) : title;
   }
   function musicLevel() {
     if (!musicOn || !musicState || !musicState.track) return 0;
@@ -1754,6 +1777,7 @@
     roundState = info.round || { open: false };
     fightState = info.fight || null;
     renderTracks(info.tracks || []);
+    showPaused(!!info.paused);
     setLoreTerms(info.lore_terms);
     waitingOn = info.waiting_on || [];
     updateProgress();
@@ -1935,7 +1959,8 @@
     const head = document.createElement("div");
     head.className = "fhead";
     head.innerHTML = `<span>${esc(t("fightTitle").replace("{n}", f.round || 1))}</span>` +
-      (f.turn ? `<span dir="auto">${esc(t("fightTurn").replace("{name}", f.turn))}</span>` : "");
+      (f.turn ? `<span dir="auto">${esc(t("fightTurn").replace("{name}",
+        (f.order.find((c) => c.name === f.turn) || {}).label || tx(f.turn)))}</span>` : "");
     box.appendChild(head);
     const order = document.createElement("div");
     order.className = "order";
@@ -1952,7 +1977,7 @@
       [...new Set(conds)].forEach((x) => bits.push(tx(x)));
       if ((c.states || {}).cover) bits.push(t("cover_" + c.states.cover));
       if ((c.states || {}).hidden) bits.push(t("hiddenState"));
-      b.innerHTML = `${c.foe ? "👹 " : ""}${esc(c.name)}<span class="h">${esc(bits.join(" · "))}</span>`;
+      b.innerHTML = `${c.foe ? "👹 " : ""}${esc(c.label || tx(c.name))}<span class="h">${esc(bits.join(" · "))}</span>`;
       b.dir = "auto";
       if (c.foe && c.health !== "down") {
         b.title = t("fightTarget");
@@ -1965,8 +1990,8 @@
     (f.fields || []).forEach((fl) => {
       const d = document.createElement("div");
       d.className = "fields"; d.dir = "auto";
-      d.textContent = `🌋 ${fl.name}: ${fxWords(fl)} — ${t("fxEveryone")}`
-        + (fl.unless ? " " + t("fxUnless").replace("{trait}", fl.unless) : "");
+      d.textContent = `🌋 ${tx(fl.name)}: ${fxWords(fl)} — ${t("fxEveryone")}`
+        + (fl.unless ? " " + t("fxUnless").replace("{trait}", tx(fl.unless)) : "");
       box.appendChild(d);
     });
   }
@@ -2554,7 +2579,7 @@
     // Read aloud, but the voice never started (sound blocked?): type it out instead.
     if (r.spoken && !r.started && now - r.headAt > 4000) r.spoken = false;
     const log = $("log");
-    const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
+    const atBottom = logPinned;
     if (r.spoken) {
       if (r.target === null) return;
       r.pos = Math.min(r.target, r.pos + r.cps * dt);
@@ -2576,10 +2601,33 @@
     r.el.classList.remove("revealing", "queued");
     wrapLore(r.el.querySelector(".body"));        // names learned while it was being told
     r.el.removeAttribute("aria-busy");
-    const log = $("log");
-    if (log.scrollHeight - log.scrollTop - log.clientHeight < 200) log.scrollTop = log.scrollHeight;
+    if (logPinned) followLog();
     syncParty();
   }
+  // The story follows the newest line unless the player scrolled up to read: only their
+  // own scrolling unpins it. Panels growing above it (a fight, tracks, the turn banner)
+  // shrink the log without moving it, so a resize keeps a pinned log at the bottom.
+  let logPinned = true;
+  function followLog() {
+    const log = $("log");
+    log.scrollTop = log.scrollHeight;
+    logPinned = true;
+    $("log-new").classList.add("hidden");
+  }
+  (function watchLog() {
+    const log = $("log");
+    let byUser = false;
+    ["wheel", "touchmove", "keydown", "pointerdown"].forEach((ev) =>
+      log.addEventListener(ev, () => { byUser = true; }, { passive: true }));
+    log.addEventListener("scroll", () => {
+      if (!byUser) return;
+      byUser = false;
+      logPinned = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
+      if (logPinned) $("log-new").classList.add("hidden");
+    }, { passive: true });
+    if (window.ResizeObserver) new ResizeObserver(() => { if (logPinned) log.scrollTop = log.scrollHeight; }).observe(log);
+    $("log-new").onclick = followLog;
+  })();
   function finishAllReveals() { reveals.slice().forEach(finishReveal); }
 
   // A GM beat posted for one language only is shown to players of that language.
@@ -2735,6 +2783,10 @@
       const others = waiting.filter((n) => n !== me);
       return ["sent", others.length ? t("turnSent").replace("{names}", others.join(", ")) : t("turnSentAll")];
     }
+    // The round closed without my action: I hold this round (never "your move" now -
+    // what I type goes to the next round).
+    if (r.timed_out && (r.waiting_on || []).includes(me)) return ["missed", t("turnMissed")];
+    if (p.state === "queued" || (p.state === "working" && lastGmId <= p.start_id)) return ["gm", t("turnGm")];
     return ["yours", t("turnFree")];
   }
   function updateTurn() {
@@ -2855,7 +2907,14 @@
       line.append("  ", w);
     };
     if ((r.discarded || []).length) word(`(${t("rollDropped")} ${r.discarded.join(", ")})`, "goal");
-    if (r.natural === 20 || r.natural === 1) word(t(r.natural === 20 ? "rollNat20" : "rollNat1"), "nat");
+    // Natural 1/20 decide only attack rolls (vs AC). On a check or save the total decides:
+    // a 1 that succeeds adds a complication, a 20 that falls short is a near thing - and a
+    // miss by 1-4 may be offered as success at a cost (CLAUDE.md, Dice).
+    if (r.target_label === "AC" && (r.natural === 20 || r.natural === 1)) word(t(r.natural === 20 ? "rollNat20" : "rollNat1"), "nat");
+    else if (r.natural === 1 && r.outcome === "success") word(t("rollNat1Check"), "nat");
+    else if (r.natural === 20 && r.outcome === "failure") word(t("rollNat20Check"), "nat");
+    else if (r.outcome === "failure" && r.target_label !== "AC" && r.target != null
+             && r.target - r.total >= 1 && r.target - r.total <= 4) word(t("rollNearMiss"), "nat");
     if (r.outcome) word(t(r.outcome === "success" ? "rollSuccess" : "rollFailure"),
                         r.outcome === "success" ? "ok" : "bad");
     d.append(head, line, list);
@@ -3245,7 +3304,7 @@
       if (r.ok) r.messages = r.messages.filter((m) => m.id > lastId);
       if (r.ok && r.messages.length) {
         const log = $("log");
-        const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
+        const atBottom = logPinned;
         r.messages.forEach((m) => {
           allMessages.push(m); addMessage(m); lastId = Math.max(lastId, m.id);
           if (historyLoaded && m.kind === "roll" && msgEls.get(m.id)) msgEls.get(m.id).classList.add("fresh");
@@ -3262,8 +3321,12 @@
             if (readAloud && m.text && speak(m.text, r ? revealHooks(r) : null) && r) r.spoken = true;
           }
         });
-        if (atBottom || !historyLoaded) log.scrollTop = log.scrollHeight;
-        if (r.messages.some((m) => m.kind === "gm" || m.kind === "roll" || m.read)) refreshEditable();
+        if (atBottom || !historyLoaded) followLog();
+        else if (r.messages.some((m) => m.kind === "gm" || m.kind === "roll")) $("log-new").classList.remove("hidden");
+        if (r.messages.some((m) => m.kind === "gm" || m.kind === "roll" || m.read)) {
+          refreshEditable();
+          refreshInfo();                    // (the banner and the round follow at once, not in 4 s)
+        }
         const last = r.messages[r.messages.length - 1];
         updateProgress();
         // The music changed: fetch it now instead of on the next 4-second refresh,
@@ -3424,11 +3487,36 @@
     if (!me && code && !$("seat-cards").classList.contains("hidden")) refreshSeats();
   }, 4000);
   // The stop signal (the X): it reaches the GM at once, past the round; no reason needed.
-  $("stop-signal").onclick = async () => {
-    stopSpeaking();
-    const r = await api("/api/stop", {});
-    setStatus(r && r.ok ? t("stopSent") : (r && r.error) || "✗", !(r && r.ok));
+  // A 3-second undo (it sits next to the menu on a phone); then the voice stops, and every
+  // page shows the pause until the GM speaks again (it never says who asked).
+  let stopTimer = null;
+  $("stop-signal").onclick = () => {
+    const b = $("stop-signal");
+    if (stopTimer) {                                   // tapped again: undo
+      clearTimeout(stopTimer); stopTimer = null;
+      b.setAttribute("aria-pressed", "false"); b.textContent = "✋";
+      setStatus(t("stopUndone"));
+      return;
+    }
+    b.setAttribute("aria-pressed", "true"); b.textContent = "✋ 3";
+    setStatus(t("stopSoon"));
+    let n = 3;
+    const tick = () => {
+      n -= 1;
+      if (n > 0) { b.textContent = "✋ " + n; stopTimer = setTimeout(tick, 1000); return; }
+      stopTimer = null; b.textContent = "✋";
+      stopSpeaking();
+      api("/api/stop", {}).then((r) => {
+        setStatus(r && r.ok ? t("stopSent") : (r && r.error) || "✗", !(r && r.ok));
+        if (r && r.ok) showPaused(true);
+      });
+    };
+    stopTimer = setTimeout(tick, 1000);
   };
+  function showPaused(on) {
+    $("paused").classList.toggle("hidden", !on);
+    if (!stopTimer) $("stop-signal").setAttribute("aria-pressed", on ? "true" : "false");
+  }
   $("leave").onclick = async () => {
     if (!confirm(t("leaveConfirm"))) return;
     await api("/api/leave", {});

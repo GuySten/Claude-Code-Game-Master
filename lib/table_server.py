@@ -390,6 +390,7 @@ class TableState:
         self.tracks: List[Dict[str, Any]] = tracks if isinstance(tracks, list) else []
         # The stop signal (the X): it reaches the GM at once, past any round.
         self.stop_signal: Optional[Dict[str, Any]] = None
+        self.paused_at: Optional[float] = None    # (every page shows the pause - not who asked)
         self.settings_path = self.dir / "settings.json"
         self.settings: Dict[str, Any] = self._read_json(self.settings_path, {})
         self.turn_times_path = self.dir / "turn-times.json"
@@ -2081,7 +2082,8 @@ class TableState:
                      # The sheets as the players last saw them. The GM records
                      # every change BEFORE narrating it, so without this the HP
                      # bars would give the outcome away before the story does.
-                     "party": self.party(sheets=True), "fight": self.fight()}
+                     "party": self.party(sheets=True), "fight": self.fight(),
+                     "tracks": [dict(t) for t in self.tracks]}
 
     def set_stage(self, stage: str) -> bool:
         with self.lock:
@@ -2093,6 +2095,7 @@ class TableState:
     def _gm_spoke(self, lang: Optional[str]) -> None:
         """Narration went out (caller holds the lock). The turn ends once every
         language at the table has its version of the beat."""
+        self.paused_at = None                     # the GM has spoken after a stop
         if not self.turn:
             return
         done = set(self.turn["langs_done"])
@@ -2264,13 +2267,33 @@ class TableState:
 
     def fight_for(self, viewer: Optional[str]) -> Optional[Dict[str, Any]]:
         """The fight, held back like the party's sheets during the GM's turn: a foe
-        falls when the story says so, not when the GM records it."""
+        falls when the story says so, not when the GM records it. Each name carries its
+        spelling in the viewer's language (``label``: a `gm-table.sh alias`), so the
+        panel says what the narration says."""
         with self.lock:
             turn = self.turn
             if (turn and time.time() - turn["started_at"] < STALE_TURN_SECONDS and "fight" in turn
                     and not (viewer and self.langs.get(viewer, "en") in turn["langs_done"])):
-                return turn["fight"]
-        return self.fight()
+                f = turn["fight"]
+            else:
+                f = None
+        f = f if f is not None else self.fight()
+        if not f or self.lang_for(viewer) != "he":
+            return f
+        hebrew = {name.lower(): alias for alias, name in self.aliases().items()
+                  if any("\u0590" <= ch <= "\u05ff" for ch in alias)}
+        return {**f, "order": [{**c, "label": hebrew[c["name"].lower()]} if c.get("name", "").lower() in hebrew else c
+                               for c in f.get("order", [])]}
+
+    def tracks_for(self, viewer: Optional[str]) -> List[Dict[str, Any]]:
+        """The tracks, held back like the fight during the GM's turn: the clock strikes
+        when the story says so, not when the GM records it."""
+        with self.lock:
+            turn = self.turn
+            if (turn and time.time() - turn["started_at"] < STALE_TURN_SECONDS and "tracks" in turn
+                    and not (viewer and self.langs.get(viewer, "en") in turn["langs_done"])):
+                return turn["tracks"]
+            return [dict(t) for t in self.tracks]
 
     def last_narration(self, viewer: Optional[str]) -> int:
         """Id of the newest GM message this viewer can see. The page holds sheet
@@ -3385,7 +3408,8 @@ def make_handler(state: TableState, code: str, host_key: str):
                                    "round": state.round_state(),
                                    "lore_terms": state.lore_terms(me, q.get("lang")),
                                    "fight": state.fight_for(me),
-                                   "tracks": state.tracks,
+                                   "tracks": state.tracks_for(me),
+                                   "paused": bool(state.paused_at),
                                    "languages": languages.describe(state.languages),
                                    "lang": state.lang_for(me),
                                    "narration_id": state.last_narration(me),
@@ -3542,6 +3566,7 @@ def make_handler(state: TableState, code: str, host_key: str):
                     return self._err("Take a seat first.", 403)
                 state.stop_signal = {"pc": me, "at": time.time(),
                                      "note": " ".join(str(data.get("note", "")).split())[:200]}
+                state.paused_at = time.time()
                 return self._json({"ok": True})
 
             if url.path == "/api/edit":
@@ -4406,7 +4431,8 @@ def main() -> None:
                                       "(say every change aloud too)")
     tk.add_argument("name", nargs="?", help="The track's name ('list' to see them)")
     tk.add_argument("value", nargs="?", help="<value>[/<max>] (e.g. 2/6), or 'off' to hide it")
-    tk.add_argument("--note", help="A short line under it (e.g. 'ten o'clock')")
+    tk.add_argument("--note", help="A short line under it: what it is now, or what happens when it fills "
+                                   "(e.g. 'ten o'clock - at twelve the Last Waltz')")
 
     ro = sub.add_parser("round", help="How long the GM waits for everyone once the first player acts")
     ro.add_argument("value", nargs="?", help="Seconds (default 60), or 'off'. Omit to show it.")
