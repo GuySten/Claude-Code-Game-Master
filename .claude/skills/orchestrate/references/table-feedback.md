@@ -247,3 +247,12 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   With the first round's four, all eight concepts were told from their nearest neighbour.
   Caveats: one listener, one clip per concept, and two things changed at once (the
   entries and the plain descriptions), so the retest can't say which mattered more.
+- **Choir sounds** (11 candidates, the same chords; then again with no added room): the
+  sound set's "oo" choir and solo voice, and another set's, are "unusable" - heard as
+  instruments, not people (measured: one recording per half-octave or octave, 17-28 kHz,
+  loops of 0.2-0.8 s; the choir stretched 13 semitones down for a men's choir). Good: the
+  sound set's "ah" choir, and a real chorus's mixed and men's sections (a recording per
+  note, 3.7 s loops) - now the `men_choir` part. Its women's section, high: "a bit like
+  instruments". A public-domain "oo" works "only from midway". A lesson on testing: the
+  first comparison added an artificial room on top of recordings that carry their own -
+  the host asked "maybe you have a problem with the acoustics?", and it was so.

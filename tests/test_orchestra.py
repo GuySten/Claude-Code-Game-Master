@@ -59,3 +59,39 @@ def test_it_sounds_when_the_instruments_are_here(tmp_path):
     samples, rate = orchestra.render("Kestrel", "Barbarian", 1)
     assert samples.ndim == 2 and samples.shape[1] == 2 and len(samples) > 10 * rate
     assert 0.1 < float(abs(samples).max()) <= 0.9
+
+
+def test_an_instrument_built_from_recordings_plays_at_its_pitch(tmp_path):
+    np = pytest.importorskip("numpy")
+    tsf = pytest.importorskip("tinysoundfont")
+    import sf2write
+    rate = 44100
+    t = np.arange(rate * 2) / rate
+    tone = (np.sin(2 * np.pi * 220.0 * t) * 12000).astype("int16")      # A3, two seconds
+    audio, ls, le = sf2write.crossfade_loop(np.stack([tone, tone], 1), rate, start_s=0.5, fade_s=0.2)
+    zone = dict(audio=audio, rate=rate, key=57, lo=40, hi=70, ls=ls, le=le)
+    sf2write.write(tmp_path / "t.sf2", [("A", [zone]), ("B", [zone])], "test")
+    assert sf2write.read_samples(tmp_path / "t.sf2")[0][3] == 57
+    assert len(sf2write.read_samples(tmp_path / "t.sf2")) == 2           # shared, stored once (L, R)
+    syn = tsf.Synth(samplerate=rate)
+    sid = syn.sfload(str(tmp_path / "t.sf2"))
+    syn.program_select(0, sid, 0, 1)
+    syn.noteon(0, 69, 100)                                              # A4: an octave up
+    out = np.frombuffer(syn.generate(rate * 4), dtype="float32").reshape(-1, 2)[rate * 3:, 0]
+    assert float(abs(out).max()) > 0.01                                 # still sounding, looped
+    spectrum = np.abs(np.fft.rfft(out * np.hanning(len(out))))
+    assert abs(np.argmax(spectrum) * rate / len(out) - 440.0) < 3
+
+
+def test_the_mens_choir_falls_back_to_the_sound_sets_choir_when_it_cant_be_had(monkeypatch):
+    pytest.importorskip("numpy")
+    pytest.importorskip("tinysoundfont")
+    if not orchestra.SF2.is_file():
+        pytest.skip("the SoundFont isn't downloaded here")
+    def offline(**_):
+        raise OSError("offline")
+    monkeypatch.setattr(orchestra, "fetch_choir", offline)
+    sc = orchestra.Score()
+    sc.note("men_choir", 50, 0.0, 2.0, 100)
+    out = orchestra.play(sc, 2.5)
+    assert float(abs(out).max()) > 0.001                                # heard, not silent

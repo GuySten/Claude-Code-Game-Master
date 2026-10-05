@@ -28,6 +28,13 @@ import music_compose  # noqa: E402
 SF2_URL = "https://ftp.osuosl.org/pub/musescore/soundfont/MuseScore_General/MuseScore_General.sf2"
 SF2 = Path(os.environ.get("ORCHESTRA_SF2") or Path.home() / ".cache" / "gm-orchestra" / "MuseScore_General.sf2")
 RATE = 44100
+# A real chorus (the Sonatina Symphonic Orchestra's men's and women's sections, CC
+# Sampling Plus 1.0): a recording for every note, long natural loops - the host heard
+# its men as people where the sound set's choir, stretched low, read as an organ.
+# Built once from the recordings into its own SoundFont (fetch_choir); parts naming it
+# play from it, or from the sound set's choir if it can't be had.
+CHOIR_SF2 = Path(os.environ.get("ORCHESTRA_CHOIR_SF2") or SF2.parent / "sso-chorus.sf2")
+SSO = "https://raw.githubusercontent.com/peastman/sso/32bbdb169aef636b8216029a2e056424ba7c2abb/Sonatina%20Symphonic%20Orchestra/"
 
 # channel: (bank, preset, pan 0..127, volume 0..127)   (General MIDI numbering)
 PARTS = {
@@ -62,7 +69,9 @@ PARTS = {
     "toms": (0, 117, 58, 104),        # Melodic Tom
     "reverse_cymbal": (0, 119, 64, 96),
     "solo_violin": (0, 40, 70, 110),  # one violin, alone: exposed, quick, edgy
+    "men_choir": (0, 0, 60, 100, "chorus"),   # a real men's chorus, "ah": chant, monks, doom
 }
+FALLBACK = {"men_choir": (0, 52)}     # (the sound set's choir, if the chorus can't be had)
 DRUMS = {"kit"}
 LEAD_DB = 4.0          # the tune's notes, mixed this much over the rest
 BASS_DRUM, CRASH = 35, 49
@@ -375,6 +384,60 @@ def fetch(dest: Path = SF2, quiet: bool = False) -> Path:
     return dest
 
 
+def fetch_choir(dest: Path = None, quiet: bool = False) -> Path:
+    """The real chorus: its 42 recordings (56 MB, once) built into a SoundFont of three
+    presets - 0 men (G2-F#4), 1 women (G4-C6), 2 both - with the loops, tuning and
+    levels from its own SFZ."""
+    dest = dest or CHOIR_SF2
+    if dest.is_file() and dest.stat().st_size > 1_000_000:
+        return dest
+    import re
+    import tempfile
+    import urllib.parse
+    import numpy as np
+    import soundfile
+    import sf2write
+    if not quiet:
+        print("[orchestra] downloading the chorus (56 MB, once)", file=sys.stderr, flush=True)
+    def get(rel):
+        with urllib.request.urlopen(SSO + urllib.parse.quote(rel), timeout=60) as r:
+            return r.read()
+    sfz = get("Chorus - Performance/includes/mixed-chorus.sfz").decode()
+    names = {"c": 0, "d": 2, "e": 4, "f": 5, "g": 7, "a": 9, "b": 11}
+    def midi(n):
+        m = re.fullmatch(r"([a-g])(#?)(-?\d)", n.lower())
+        return 12 * (int(m.group(3)) + 1) + names[m.group(1)] + (1 if m.group(2) else 0)
+    regions = []
+    with tempfile.TemporaryDirectory() as tmp:
+        for block in sfz.split("<region>")[1:]:
+            kv = dict(re.findall(r"(\w+)=(\S+)", block))
+            name = Path(kv["sample"]).name
+            wav = Path(tmp) / name
+            wav.write_bytes(get(f"Samples-looped/Chorus/{name}"))
+            audio, rate = soundfile.read(str(wav), dtype="int16", always_2d=True)
+            regions.append({"audio": audio, "rate": rate, "key": midi(kv.get("pitch_keycenter") or kv["lokey"]),
+                            "ls": int(kv["loop_start"]), "le": int(kv["loop_end"]), "tune": int(kv.get("tune", 0)),
+                            "vol": float(kv.get("volume", 0)), "men": "-male-" in name})
+    regions.sort(key=lambda r: r["key"])
+    loudest = max(r["vol"] for r in regions)
+    def zones(rs, lo_ext, hi_ext):
+        out = []
+        for i, r in enumerate(rs):
+            lo = r["key"] if i else min(r["key"], lo_ext)
+            hi = r["key"] if i < len(rs) - 1 else max(r["key"], hi_ext)
+            out.append({**r, "lo": lo, "hi": hi, "att_cb": round((loudest - r["vol"]) * 10), "release_s": 0.6})
+        return out
+    men = [r for r in regions if r["men"]]
+    women = [r for r in regions if not r["men"]]
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    part = dest.with_suffix(".part")
+    sf2write.write(part, [("Men", zones(men, 40, 69)), ("Women", zones(women, 62, 88)),
+                          ("Mixed", zones(men, 40, men[-1]["key"]) + zones(women, women[0]["key"], 88))],
+                   "Sonatina Symphonic Orchestra chorus (CC Sampling Plus 1.0)")
+    part.replace(dest)
+    return dest
+
+
 def available() -> bool:
     try:
         import tinysoundfont  # noqa: F401
@@ -394,11 +457,11 @@ LOUDNESS = {
     "organ": -2.6, "toms": -2.6, "violins": -0.8, "bells": 0.0, "basses": 0.0, "kit": 0.2,
     "harp": 0.2, "oboe": 0.4, "bassoons": 1.9, "english_horn": 2.7, "reverse_cymbal": 5.4,
     "taiko": 5.5, "trumpets": 5.7, "brass": 6.6, "timpani": 6.9, "tuba": 8.2, "cellos": 8.6,
-    "trombones": 9.7, "horns": 11.8, "solo_violin": 2.9,
+    "trombones": 9.7, "horns": 11.8, "solo_violin": 2.9, "men_choir": 5.5,
 }
 # How long each instrument's recording takes to speak (seconds to half its level), and
 # where it plays (MIDI, its practical range): for the score critic (arrangement.check).
-SPEAKS = {"choir": 0.18, "strings": 0.48, "violins": 0.50, "violins2": 0.26, "english_horn": 0.42,
+SPEAKS = {"choir": 0.18, "men_choir": 0.1, "strings": 0.48, "violins": 0.50, "violins2": 0.26, "english_horn": 0.42,
           "cellos": 0.24, "tremolo": 0.16, "organ": 0.10, "oboe": 0.12, "brass": 0.08, "horns": 0.06}
 RANGES = {
     "violins": (55, 100), "violins2": (55, 96), "strings": (36, 96), "tremolo": (36, 96),
@@ -407,7 +470,7 @@ RANGES = {
     "bassoons": (34, 72), "horns": (41, 77), "trumpets": (54, 82), "trombones": (40, 72),
     "tuba": (28, 58), "brass": (36, 84), "choir": (40, 81), "harp": (24, 103),
     "celesta": (60, 108), "glockenspiel": (79, 108), "bells": (60, 77), "organ": (24, 96),
-    "timpani": (38, 55), "solo_violin": (55, 100),
+    "timpani": (38, 55), "solo_violin": (55, 100), "men_choir": (40, 69),
 }
 # How late each instrument's recording is heard after its note starts (seconds to come
 # within 9 dB of its full level, measured from MuseScore_General, less the ~20 ms a
@@ -417,7 +480,7 @@ RANGES = {
 # beat; the string pad, which holds chords, is moved at most 250 ms. The host, on a
 # tune they knew (Ode to Joy): "clearly better". (Another sound set's instruments need
 # their own measurement.)
-ADVANCE = {"violins": 0.15, "violins2": 0.18, "cellos": 0.09, "tremolo": 0.115, "choir": 0.13,
+ADVANCE = {"violins": 0.15, "violins2": 0.18, "cellos": 0.09, "tremolo": 0.115, "choir": 0.13, "men_choir": 0.06,
            "strings": 0.25, "trombones": 0.02, "organ": 0.015, "flutes": 0.012, "piccolo": 0.01,
            "solo_violin": 0.032}
 # How much room each recording carries already (dB: its energy after a short note is
@@ -443,7 +506,7 @@ def send_db(room: Optional[float]) -> float:
 
 BALANCE = {
     "horns": 2, "trumpets": 3, "trombones": 2, "brass": 3, "violins": 1, "strings": -3,
-    "tremolo": -2, "choir": 3, "timpani": 2, "taiko": 3, "glockenspiel": -2, "piccolo": -2,
+    "tremolo": -2, "choir": 3, "men_choir": 3, "timpani": 2, "taiko": 3, "glockenspiel": -2, "piccolo": -2,
     "reverse_cymbal": -2,
 }
 
@@ -478,6 +541,12 @@ def play(score: Score, seconds: float, sf2: Path = SF2, rate: int = RATE,
     import tinysoundfont
     syn = tinysoundfont.Synth(gain=-12, samplerate=rate)
     sfid = syn.sfload(str(sf2))
+    chorus = None
+    if any(len(PARTS[e[2].partition(":")[0]]) > 4 for e in score.events):
+        try:
+            chorus = syn.sfload(str(fetch_choir(quiet=True)))
+        except Exception as e:                                  # offline: the sound set's choir
+            print(f"[orchestra] no chorus ({e}): the sound set's choir plays", file=sys.stderr)
     total = int((seconds + 0.5) * rate)
     out = np.zeros((total, 2), dtype="float32").view(_dry_type())
     out.send = np.zeros((total, 2), dtype="float32")      # what goes to the hall (see ROOM)
@@ -491,9 +560,15 @@ def play(score: Score, seconds: float, sf2: Path = SF2, rate: int = RATE,
         early = ADVANCE.get(part, 0.0) if align else 0.0
         if early:                                           # (heard on the beat: see ADVANCE)
             events = [(max(0.0, t - early), *rest) for t, *rest in events]
-        bank, preset, pan, vol = PARTS[part]
+        bank, preset, pan, vol = PARTS[part][:4]
+        font = sfid
+        if len(PARTS[part]) > 4:
+            if chorus is None:
+                bank, preset = FALLBACK[part]
+            else:
+                font = chorus
         ch = 9 if part in DRUMS else 0
-        syn.program_select(ch, sfid, bank, preset, part in DRUMS)
+        syn.program_select(ch, font, bank, preset, part in DRUMS)
         syn.control_change(ch, 7, vol)
         syn.control_change(ch, 10, pan)
         if bends:
