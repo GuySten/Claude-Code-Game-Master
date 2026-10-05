@@ -147,3 +147,14 @@ def test_a_free_roll_is_logged_as_one(world, monkeypatch):
     free = [e for e in read_log(world["camp"]) if e["kind"] == "free"]
     assert free and free[0]["notation"] == "1d20+9" and free[0]["who"] == "Grak"
     assert "free rolls (GM, outside the referee)" in report(read_log(world["camp"]))
+
+
+def test_a_natural_one_or_twenty_is_automatic_only_on_an_attack():
+    import dice
+    one = {"notation": "1d20+15", "total": 16, "rolls": [1]}   # a natural 1 with +15
+    twenty = {"notation": "1d20+2", "total": 22, "rolls": [20]}
+    assert dice.judge(one, 15, "AC") == "failure"         # an attack: a 1 misses
+    assert dice.judge(one, 15, "DC") == "success"         # a check: its total (with a complication)
+    assert dice.judge(one, 15) == "success"
+    assert dice.judge(twenty, 25, "AC") == "success"      # an attack: a 20 hits
+    assert dice.judge(twenty, 25, "DC") == "failure"      # a check: still short

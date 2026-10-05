@@ -37,7 +37,7 @@ table); each use is logged as a free roll.
 `very-easy` 5 · `easy` 10 · `medium` 15 · `hard` 20 · `very-hard` 25 · `nearly-impossible` 30 (the `--dc` words).
 
 ## Narrate by margin
-Nat 20 = exceptional flourish · beat by 10+ = looks easy, extra benefit · success = clean · fail by 1-4 = goal still denied, something small but visible is spent · fail by 5+ = clear fail + complication · nat 1 = mishap. **No band is free** — a near-miss costs less, never nothing.
+Beat by 10+ (or a natural 20 that succeeds) = looks easy, extra benefit · success = clean (a natural 1 that still succeeds: success with a complication) · fail by 1-4 = **success at a cost** offered (a price named now: time, noise, a resource, position - the player takes it or lets it fail) · fail by 5+ = clear fail + complication. Only attack rolls auto-hit on 20 and auto-miss on 1. **No band is free** — a near-miss costs less, never nothing. Don't roll at all when nothing rides on it (CLAUDE.md, Dice).
 
 ## Reward a great success (award spectacle XP)
 A clever/effective/unique solve EARNS progress, not just a kill. On a strong success (nat 20, beat-by-10+, or an inventive approach), grant it before narrating: `bash tools/gm-player.sh award --tier minor|major|legendary --reason "..."` (kit-aware, level-scaled, co-awards followers in DCC). See `gm-craft → Reward the spectacle`.
@@ -56,7 +56,7 @@ Framework: (1) what did they try? (2) what was the intent? (3) what goes sideway
 **Don't hand the stake back for free.** A failed check's goal is denied, and a failed ask is not an invitation to re-ask the same way. If the fiction leaves a door open — an NPC who could still be swayed, a lock that could still be forced — opening it should cost something new. The check reopens when the situation MATERIALLY changes: new leverage, new information, a different approach, or a price paid.
 
 ## Failure consequences (by margin below DC)
-Every band costs. Name the thing that was spent — never "you fail, nothing changes".
+Every band costs. Name the thing that was spent — never "you fail, nothing changes". A miss by 1-4 first offers success at a cost (above); these are what failure costs when it stands.
 
 - Physical: 1-2 goal denied + a named cost (position lost, footing, noise made, a tool or supply spent) · 3-5 resource spent AND attention drawn · 6-9 minor harm per the active kit's harm model · 10+ real harm. For lethal/telegraphed stakes, a catastrophic margin can mean a death-gate hit (drop to 0 → dying), not just harm. Reserve this for earned, signposted danger.
 - Social: 1-2 refused AND their attitude/standing toward you shifts, or a bystander notices · 3-5 refused, attitude turns negative, and a concrete price is paid (a favor burned, a term worsened, something taken) · 6-9 acts against you · 10+ hostile/spreads word. What "acts against you" looks like comes from the NPC's own goals and power — sometimes that's ugly.

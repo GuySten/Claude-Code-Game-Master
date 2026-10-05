@@ -179,18 +179,25 @@ a Dune import ships its own combat/progression, not 5e. Resolution + harm +
 conditions + the three progression models live in `lib/game_core.py`.
 
 ## Dice
-**ROLL FOR ANYTHING THAT CAN FAIL.** If an action has a variable or failable
-outcome — a shove, a leap, a lie, a lock, a strike, a stealthy step, anything
-where a competent person could still come up short — you MUST roll before you
-narrate the result. Do not decide the outcome yourself and do not auto-succeed
-because it fits the source or flatters the player. Only skip the roll when the
-outcome is genuinely certain (trivial, or literally impossible).
+**ROLL WHEN FAILURE MATTERS.** Roll when the outcome is uncertain AND failing would
+change something - a cost, a danger, a lost chance (a shove in a fight, a leap over
+the chasm, a lie to the guard, a lock with the patrol coming). Then you MUST roll before
+you narrate the result: never decide it yourself, never auto-succeed because it fits
+the source or flatters the player. Don't roll when nothing rides on it: a competent
+character just does it (opening an unguarded door, a lock with all night and no one
+coming), and the impossible just doesn't happen. Show the characters as capable.
+[SRD 5.2 "D20 Tests"; the host chose this, 2026-10-05]
 - **How:** pick the governing stat, set a DC by difficulty (easy 10 · moderate
   15 · hard 20 · brutal 25), roll `d20 + stat mod + any relevant bonus`
   (proficiency, gear, advantage from good positioning/flavor), compare to DC.
-- **Nat 20 = fantastic success** (more than they hoped — a bonus, a flourish, a
-  window opens). **Nat 1 = horrible failure** (it goes wrong in a way that costs
-  them — even a strong character fumbles). These override the raw total.
+- **Attack rolls: a natural 20 always hits (a critical), a natural 1 always misses.**
+  **Checks and saves are their total** (5e's rule): a natural 20 that still falls short
+  is a near thing with a flourish; a natural 1 that still succeeds succeeds **with a
+  complication** (noise, a dropped tool, a bad look) - never an automatic failure.
+- **A near miss can be a success at a cost.** Missing by 1-4 on a check: offer the goal
+  at a price named on the spot (it takes longer, makes noise, costs a resource, worsens
+  their position) - the player may take it or let it fail. [SRD 5.2 "progress with a
+  setback"; Laws; Blades]
 - **Be true to the roll.** A failure means it failed; narrate the real
   consequence (fail forward — the situation changes, sometimes for the worse,
   sometimes to death per Stakes & Death). Never quietly fudge a bad roll into a
@@ -218,8 +225,9 @@ roll; you still run the dice. Stop at the decision point and present it as a men
 Spell out the stat, every applicable bonus, and the target DC. Do NOT ask the player
 to report a number — their choice is to COMMIT to the roll. Once they do: (1) narrate
 the START of the attempt, (2) run `uv run python lib/dice.py "1d20+<total>" --dc <Z> --for <PC>` and show
-the result line clearly, (3) narrate the outcome true to the roll (nat 20 fantastic,
-nat 1 horrible, meet/beat target = success). You roll hidden/NPC dice the same way. Player toggles
+the result line clearly, (3) narrate the outcome true to the roll (meet/beat target =
+success; a near miss may be success at a cost; on an attack a nat 20 crits and a nat 1
+misses; on a check a nat 1 adds a complication). You roll hidden/NPC dice the same way. Player toggles
 anytime via `bash tools/gm-session.sh dice on|off|toggle` or natural language
 ("let me roll my own dice" / "you roll for me") — persist the change, then continue.
 

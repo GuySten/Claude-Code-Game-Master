@@ -1948,7 +1948,7 @@ class TableState:
                 "discarded": result.get("discarded") or [],
                 "modifier": result.get("modifier", 0), "total": result["total"],
                 "natural": dice.natural(result), "target": target, "target_label": label,
-                "outcome": dice.judge(result, target)}
+                "outcome": dice.judge(result, target, label)}
         why = " ".join(str(spec.get("why") or "").split())[:120] or None
         why_tr = {l: " ".join(str(t).split())[:120] for l, t in (spec.get("why_tr") or {}).items()
                   if languages.valid(l) and str(t).strip()}

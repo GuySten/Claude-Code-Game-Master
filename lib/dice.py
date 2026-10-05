@@ -193,15 +193,17 @@ def natural(result: Dict) -> Optional[int]:
     return dice[0] if dice[0] in (1, 20) else None
 
 
-def judge(result: Dict, target: Optional[int]) -> Optional[str]:
+def judge(result: Dict, target: Optional[int], label: str = "DC") -> Optional[str]:
     """'success' / 'failure' against a DC or AC set BEFORE the roll (meet or beat it).
-    A natural 20 always succeeds and a natural 1 always fails."""
+    Against an AC (an attack roll) a natural 20 always hits and a natural 1 always misses;
+    an ability check or a save (a DC) is its total - 5e's rule: a natural 1 on a check is
+    the GM's complication, not an automatic failure (CLAUDE.md, Dice)."""
     if target is None:
         return None
     nat = natural(result)
-    if nat == 20:
+    if label == "AC" and nat == 20:
         return "success"
-    if nat == 1:
+    if label == "AC" and nat == 1:
         return "failure"
     return "success" if result["total"] >= target else "failure"
 
@@ -211,7 +213,7 @@ def describe(result: Dict, target: Optional[int], label: str = "DC") -> str:
     line = DiceRoller().format_result(result)
     if result.get("type") in ("advantage", "disadvantage") and natural(result):
         line += " ⚔️ NATURAL 20!" if natural(result) == 20 else " 💀 NATURAL 1!"
-    verdict = judge(result, target)
+    verdict = judge(result, target, label)
     if target is not None:
         line += f"  vs {label} {target} — " + ("✓ SUCCESS" if verdict == "success" else "✗ FAILURE")
     return line
@@ -288,7 +290,7 @@ def _log_free(args, result: Dict, goal, label) -> None:
     audit(active_campaign_dir(), {"kind": "free", "who": args.pc, "notation": args.notation,
                                   "why": args.why, "target": goal, "label": label,
                                   "secret": bool(args.secret), "total": result.get("total"),
-                                  "natural": natural(result), "outcome": judge(result, goal)})
+                                  "natural": natural(result), "outcome": judge(result, goal, label)})
 
 
 def _utf8_console() -> None:

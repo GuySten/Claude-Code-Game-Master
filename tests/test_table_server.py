@@ -622,8 +622,11 @@ def test_dice_natural_and_judge():
                          "rolls": [1, 1]}) == 1
     assert dice.natural({"notation": "2d6", "type": "standard", "rolls": [1, 1]}) is None
     assert dice.natural({"notation": "1d200", "type": "standard", "rolls": [20]}) is None
-    assert dice.judge({"notation": "1d20+9", "type": "standard", "rolls": [1], "total": 10}, 5) == "failure"
-    assert dice.judge({"notation": "1d20", "type": "standard", "rolls": [20], "total": 20}, 30) == "success"
+    # an attack (vs AC): a natural 1 misses, a natural 20 hits; a check or save: its total
+    assert dice.judge({"notation": "1d20+9", "type": "standard", "rolls": [1], "total": 10}, 5, "AC") == "failure"
+    assert dice.judge({"notation": "1d20", "type": "standard", "rolls": [20], "total": 20}, 30, "AC") == "success"
+    assert dice.judge({"notation": "1d20+9", "type": "standard", "rolls": [1], "total": 10}, 5) == "success"
+    assert dice.judge({"notation": "1d20", "type": "standard", "rolls": [20], "total": 20}, 30) == "failure"
     assert dice.judge({"notation": "1d20+2", "type": "standard", "rolls": [13], "total": 15}, 15) == "success"
     assert dice.judge({"notation": "2d6", "type": "standard", "rolls": [3, 4], "total": 7}, None) is None
 

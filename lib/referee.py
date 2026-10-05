@@ -724,7 +724,7 @@ def table_roll(notation: Optional[str], target: Optional[int], label: Optional[s
     else:
         r = dice.DiceRoller().roll(notation)
         kept = r.get("kept") or r.get("rolls") or []
-        out = {"total": r["total"], "natural": dice.natural(r), "outcome": dice.judge(r, target),
+        out = {"total": r["total"], "natural": dice.natural(r), "outcome": dice.judge(r, target, label or "DC"),
                "d20": kept[0] if "d20" in notation and len(kept) == 1 else None}
     print(f"{why}: {notation} = {out['total']}"
           + (f" vs {label or 'DC'} {target} — {'✓' if out['outcome'] == 'success' else '✗'} {out['outcome']}"

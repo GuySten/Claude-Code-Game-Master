@@ -668,8 +668,9 @@ class SessionManager(EntityManager):
                          "START of the attempt (a sentence or two, no outcome yet), (2) run "
                          "the dice tool `uv run python lib/dice.py \"1d20+<total bonus>\"` and "
                          "show the result line CLEARLY, (3) narrate what happens as a result — "
-                         "true to the roll (nat 20 fantastic, nat 1 horrible, meet/beat the "
-                         "target = success, below = failure with a real cost). GM still rolls "
+                         "true to the roll (meet/beat the target = success; a miss by 1-4 may be "
+                         "success at a cost; attacks: nat 20 crits, nat 1 misses; checks: a nat 1 "
+                         "adds a complication, never an automatic failure; below = failure with a real cost). GM still rolls "
                          "hidden/NPC dice the same way.")
 
         # Informing, not adjudicating — caps and judgment live in skills / gm-craft.
