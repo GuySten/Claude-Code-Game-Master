@@ -33,13 +33,9 @@ player's PC is `players/<name>.json`. `gm-session.sh context` lists them all und
   guessed. XP/loot are per PC: award each one that earned it.
 - **Spotlight:** address players by character name; resolve each player's action with their
   own roll; give every player a beat before the scene moves on; when actions arrive together,
-  resolve them in a sensible order inside one narration. The action menu (when ON) may be
-  addressed to the whole party or to a named PC.
-- **Tie the party together before the first scene** (gm-craft, *Openings*): every PC gets
-  at least one bond with another PC, the party shares one stake, and the opening puts them
-  all in one scene facing one problem - never separate introductions that converge later.
-- **A PC dies:** Death Protocol for THAT player — `gm-player.sh become "<party member>" --for
-  "<fallen PC>"` or a fresh `join`. The rest of the table plays on.
+  resolve them in a sensible order inside one narration. The action menu (when ON) may address the party or one PC.
+- **Tie the party together first** (gm-craft, *Openings*): a bond per PC, one shared stake, one opening scene.
+- **A PC dies:** Death Protocol for THAT player — `gm-player.sh become "<party member>" --for "<fallen PC>"` or a fresh `join`; the rest play on.
 
 ## Online table (players on their own computers)
 `bash tools/gm-table.sh start` opens a browser table (prints links + a table code). Players
@@ -60,10 +56,8 @@ moment and finds everything in their language. While the table is open:
    fresh clock; `TIME UP` → they hesitate). Then the core loop for the round (roll, persist by PC name).
 3. Post the narration with `bash tools/gm-table.sh say --stdin <<'EOF' … EOF` — it is the
    ONLY way players see anything; your terminal reply is for the host. Markdown works.
-   `--to "<pc>"` whispers (secret perception results, private notes) - but clues go to the
-   whole table, three per conclusion, spread across the PCs (gm-craft, *Clues*); the same
-   task under the same conditions gets the same DC, rolls are open, what concerns a PC goes
-   to that PC, and the spotlight balances over the session, not per scene (gm-craft, *Fairness*); a player's
+   `--to "<pc>"` whispers (secret perception, private notes); clues go to the whole table
+   (gm-craft, *Clues*); same task, same DC, open rolls, balance over time (*Fairness*); a player's
    "only the GM sees this" aside arrives marked `(private, to GM only)` — answer it with
    `--to`. Players can fix a typo in an action until you read it (they always get at least
    5 seconds; the inbox waits that out): what you read is final.
@@ -150,8 +144,7 @@ Every interaction: **CONTEXT → DECIDE → EXECUTE → PERSIST → NARRATE.**
 ## Stakes & Death (this is a loseable game)
 The PC CAN die. This is not a guaranteed power-fantasy. Fail-forward does NOT mean immortal — it means failure changes the situation, and sometimes the change is death.
 - **Some plot armor is fine, lethal stakes are mandatory.** Never kill on one unlucky roll in a trivial moment. DO let death land from: reckless play against over-leveled threats, ignored warnings, or a string of bad outcomes that has visibly tightened.
-- **Decisions need information** (gm-craft): every enemy and every risky choice is readable before the players commit - its strength in plain words, the stakes said out loud, a way out.
-- **Telegraph lethality.** Before a beat can kill, the danger must be readable — name the threat's weight ("this is far beyond you"), let bad odds show, give an out. Death is earned, never ambush-by-GM-fiat.
+- **Decisions need information; telegraph lethality** (gm-craft). Every enemy and risky choice is readable before the players commit (its strength in plain words, the stakes aloud, a way out). Before a beat can kill, the danger must be readable — name the threat's weight ("this is far beyond you"), let bad odds show, give an out. Death is earned, never ambush-by-GM-fiat.
 - **0 HP is the dying gate, not auto-death.** On 0 HP run the active kit's dying rules (D&D: death saves — `gm-combat`). Instant death only on the kit's stated trigger (D&D: damage ≥ max HP) or when the fiction makes survival absurd (fall into lava, executed while helpless). The kit's lethality is machine-readable: `game_core.classify_harm(hp, max, dmg, WorldKit.lethality())` returns `ok`/`dying`/`dead` — the default `death-saves` model is 5e-faithful; a grim kit sets `lethality: "gritty"` (0 HP is death) or a lower `massive_damage_at` so single blows kill sooner.
 - **When the PC dies → run the Death Protocol** (below). Do not just end the session.
 

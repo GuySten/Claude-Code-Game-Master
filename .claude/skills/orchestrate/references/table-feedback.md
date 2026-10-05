@@ -239,3 +239,11 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   The host is not a native English speaker: a concept word alone ("mischief", "wonder",
   "nobility") may not carry the nuance meant. Recognition tests give each concept a
   one-line plain description and a Hebrew equivalent.
+- **Concept recognition, the retest** (the four misses, re-composed from the fixed entries
+  and set against the same neighbour clips; A/B balanced; each concept given a one-line
+  description and a Hebrew word): 4 of 4 - wildness over pastoral, nobility (a stately
+  horn chorale with firm cadences) over heroic brass, wonder (a slow swell to an arrival)
+  over magic shimmer, mischief (a tiptoe with a wink, no sinister chords) over the comic.
+  With the first round's four, all eight concepts were told from their nearest neighbour.
+  Caveats: one listener, one clip per concept, and two things changed at once (the
+  entries and the plain descriptions), so the retest can't say which mattered more.

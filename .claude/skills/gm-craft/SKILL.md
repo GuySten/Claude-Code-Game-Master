@@ -7,6 +7,10 @@ description: The Art of Game Mastering — narration, NPC, pacing, and improvisa
 
 *Wisdom, not rules. Internalize, then forget — the best moments happen when you stop thinking about technique and just play.*
 
+Working references, from game-design research and the host's verdicts: `references/design-directives.md`
+(87 directives and how their tensions resolve), `references/prep-checklist.md` (before a session),
+`references/play-card.md` (one screen, during play), `references/session-review.md` (after).
+
 The dream is a holodeck mixed with a fresh 1980s table. They did not come for a
 wiki. They came to stand in the room and talk to someone they already love. Open
 on a face and a problem, not on a map of the continent. The book is on your
@@ -80,7 +84,8 @@ one PC was whispered to another; and the credit for the victory went to one PC.
   names each contribution that actually mattered, so no one's part disappears.
 - **Rule in public.** When a player privately questions a ruling or another PC's action,
   answer honestly; if it raises a rule, rule it for the whole table.
-- **Check yourself after a session:** clues, openings, DCs, whispers and credit per PC.
+- **Check yourself after a session:** clues, openings, DCs, whispers and credit per PC
+  (`references/session-review.md`: the ledger, and how a finding becomes a rule change).
   Look for imbalances that persist and that the story doesn't explain - not for equal
   numbers.
 
@@ -99,12 +104,20 @@ what their characters could reasonably know:
   roll decides how much they learn, never whether they learn anything.
 - **Say the stakes before a risky action.** "If you attack now, the four guards on the
   stairs will be on you too." Then ask "Do you still do it?" - the decision is theirs,
-  made knowing the cost.
+  made knowing the cost. Say the danger and the *kind* of cost a failure risks (who hears,
+  what breaks); the exact twist can stay unsaid.
 - **Show the state of a fight** as it goes (the health labels: Healthy, Wounded, Bloodied,
   Critical), and how the enemy's nerve holds - so pressing on or getting out is a real
   choice each round.
 - **Leave a way out.** Retreat, parley, surrender, bluff, a price to pay. If fighting is
   the only option, there was no decision.
+
+## Map: places that stay put
+- Describe each place's ways out and record every one (`gm-location.sh connect "<here>"
+  "<there>" "<path>"`): the players' map shows them. Describe the places that matter on
+  arrival (`gm-location.sh describe`), each with a landmark.
+- In a fight or chase, name two to four zones, give distances in feet, state cover once
+  and keep it consistent; restate positions when they change.
 
 ## Narration
 - **Say what changes hands, with the numbers.** When a PC gains or loses money or an item,
@@ -150,7 +163,7 @@ A clever, effective, unique, daring, or punishing-but-cool beat EARNS progress �
 
 ## NPCs
 - **NPCs have their own agendas** — not quest dispensers. Every NPC is the hero of their own story.
-- **Don't over-share.** Secrets revealed slowly are 10x more interesting. Surface `goal`, `current_mood`, and the EXISTENCE of a `secret` — never the secret's text.
+- **Don't over-share.** Secrets revealed slowly are 10x more interesting - an NPC's own secret, never a core clue or what the players need to decide. Surface `goal`, `current_mood`, and the EXISTENCE of a `secret` — never the secret's text.
 - **Give NPCs contradictions.** The gentle priest who collects weapons.
 - **NPCs can say no, lie, or give bad advice.**
 - **Reactions compound.** Insult the merchant last session, he remembers. Use `gm-npc.sh mood` + `update`.
@@ -162,10 +175,15 @@ A clever, effective, unique, daring, or punishing-but-cool beat EARNS progress �
 - **Read the energy** and mirror the player's investment.
 
 ## Improvisation
-- **"Yes, and..." not "no, but..."** If the player wants to swing from the chandelier, there IS a chandelier.
+- **"Yes, and..." not "no, but..."** If the player wants to swing from the chandelier, there IS a chandelier - unless the scene already said otherwise; build within what is established and the agreed tone.
 - **You don't need everything planned.** The world discovers itself as you narrate.
 - **If stuck, describe the environment** to buy time and add atmosphere.
 - **Fail forward.** Every failed roll is a NEW situation, not a dead end.
+
+## Safety
+- At session zero ask for lines (never in the game) and veils (off-screen only), privately if a
+  player prefers; record them without names (`gm-note.sh rules "Table line: ..."`); the strictest binds.
+- An "X" in an action or a private aside stops that content at once, no reason asked: cut or rewind.
 
 ## The Golden Rules
 1. **Fun > Rules.** 2. **Persist before narrating.** 3. **Failure creates story.** 4. **Players write the story; you set the stage.** 5. **The world is alive** — things happen when players aren't looking (threat clocks tick, consequences fire, NPCs pursue goals).

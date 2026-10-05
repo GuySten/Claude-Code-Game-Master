@@ -1842,7 +1842,8 @@ def test_a_player_sitting_down_finds_their_recent_cards_ready(table):
     state.narrator_ask = lambda system, prompt: asked.append(prompt) or "A card."
     pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
     call(f"/api/info?code={CODE}&token={pip}")              # sits down
-    assert wait_for(lambda: len(state.lore_store) >= ts.WARM_CARDS and not state.card_jobs)
+    assert wait_for(lambda: len(state.lore_store) >= ts.WARM_CARDS and not state.card_jobs
+                    and not state.card_workers)          # (the last jobs finished, not just taken)
     ready = {k.split("|")[1] for k in state.lore_store}
     assert "npc14" in ready and "npc0" not in ready         # the most recent names, not all
     n = len(asked)

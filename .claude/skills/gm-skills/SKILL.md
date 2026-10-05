@@ -51,7 +51,7 @@ Framework: (1) what did they try? (2) what was the intent? (3) what goes sideway
 
 **Fail-forward ≠ immortal.** "Something different happens" can include death when the stakes were lethal and telegraphed (over-matched threat, ignored warning, a tightening string of failures). Don't soften a self-inflicted lethal outcome into a free pass. On PC death → Death Protocol (CLAUDE.md).
 
-**Fail-forward ≠ free.** Decide what the check COSTS before rolling (never tell the player). On a failure the stated goal does NOT happen and that cost lands in the same beat. "Something DIFFERENT happens" means different-and-poorer, not different-and-equally-good.
+**Fail-forward ≠ free.** Decide what the check COSTS before rolling, and tell the player the danger and the kind of cost (gm-craft *Decisions need information*); the exact twist can stay unsaid. On a failure the stated goal does NOT happen and that cost lands in the same beat. "Something DIFFERENT happens" means different-and-poorer, not different-and-equally-good.
 
 **Don't hand the stake back for free.** A failed check's goal is denied, and a failed ask is not an invitation to re-ask the same way. If the fiction leaves a door open — an NPC who could still be swayed, a lock that could still be forced — opening it should cost something new. The check reopens when the situation MATERIALLY changes: new leverage, new information, a different approach, or a price paid.
 
@@ -60,7 +60,7 @@ Every band costs. Name the thing that was spent — never "you fail, nothing cha
 
 - Physical: 1-2 goal denied + a named cost (position lost, footing, noise made, a tool or supply spent) · 3-5 resource spent AND attention drawn · 6-9 minor harm per the active kit's harm model · 10+ real harm. For lethal/telegraphed stakes, a catastrophic margin can mean a death-gate hit (drop to 0 → dying), not just harm. Reserve this for earned, signposted danger.
 - Social: 1-2 refused AND their attitude/standing toward you shifts, or a bystander notices · 3-5 refused, attitude turns negative, and a concrete price is paid (a favor burned, a term worsened, something taken) · 6-9 acts against you · 10+ hostile/spreads word. What "acts against you" looks like comes from the NPC's own goals and power — sometimes that's ugly.
-- Information: 1-2 partial AND misleading in a way that matters · 3-5 nothing usable, and the asking costs — time burned, a lead gone cold, an opportunity closed while you dug · 6-9 a wrong conclusion believed true · 10+ triggers a ward or alerts whoever owns the secret.
+- Information: 1-2 partial, and the asking costs · 3-5 nothing more than the core clue, and the asking costs — time burned, a lead gone cold, an opportunity closed while you dug · 6-9 a false lead from an in-world source the PCs can later check (an NPC's lie, a forged letter) · 10+ triggers a ward or alerts whoever owns the secret. Core clues are never withheld or falsified by a roll, and the narrator never lies (gm-craft *Clues*).
 
 Whenever a failure creates ongoing fallout: `bash tools/gm-consequence.sh add "[what happens]" "[when]" [--trigger-type ...]`. Persist the cost (mood, HP, inventory, death) BEFORE narrating it.
 
