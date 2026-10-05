@@ -179,3 +179,19 @@ def test_the_surprise_budget_pairs_a_tune_with_its_setting(monkeypatch, tmp_path
         monkeypatch.setattr(tune_score, "score", lambda mel, p=pct: {"surprise": (0, p)})
         got = A.surprise_budget(A._build(s), s)
         assert got[3] == verdict, (pct, got)
+
+
+def test_a_falling_bend_on_brass_is_flagged_as_comic_and_a_sliding_part_with_chords_as_sagging():
+    import arrangement
+    spec = {"tune": {"seed": "sketch", "key": "D4", "meter": "4/4"}, "statements": [], "length": 8,
+            "chords": [[0, 8, "i"]],
+            "harmony": [{"part": "trombones", "from": 0, "to": 8, "play": "chord", "range": ["D3", "A4"]}],
+            "lines": [{"part": "trumpets", "notes": [[0, "D5", 2, 0, {"slide": -7}]]},
+                      {"part": "trombones", "notes": [[4, "A3", 2, 0, {"slide": -3}]]},
+                      {"part": "violins", "notes": [[4, "A5", 2, 0, {"slide": -2}]]}]}
+    found = [m for _, m in arrangement.check(spec, listen=False)]
+    assert any(m.startswith("trumpets:") and "comic" in m for m in found)
+    assert any(m.startswith("trombones:") and "sag" in m for m in found)
+    assert not any(m.startswith("violins:") for m in found)          # a string slide is fine
+    spec["role"] = "comic"
+    assert not any("comic" in m for _, m in arrangement.check(spec, listen=False))

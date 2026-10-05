@@ -263,3 +263,11 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   writer refuses a near-silent recording, and test renders are refused, never boosted,
   when near-silent, harsh (much energy above 8 kHz) or clicking; files sent to the host
   are checked for loudness and peak first, no louder than ones heard safely before.
+- **A boss fight, automatic** (a corrupted champion: concepts -> translator -> brief ->
+  composer, no help): "It sounds like he farts." The brief, following the Corruption
+  entry's evil overlay ("growling trombones with slide") and asking for "sfz stabs with
+  falling tails", gave 21 trumpet stabs falling a fifth and a trombone/men's-choir call
+  sliding down - and a slide bends the whole part, so the trombones' chords sagged too.
+  Loud falling bends on brass are the comic raspberry. Fixed in the lexicon (R16,
+  Corruption, Combat), the format guide, and the critic (warns on falling brass bends,
+  and on a sliding line in a part that also plays chords).

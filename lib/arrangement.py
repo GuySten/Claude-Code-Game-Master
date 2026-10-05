@@ -97,7 +97,8 @@ What the tools can make - each sound serves many characters and moods, none is a
 - pitch that is not steady: a note that slides (a sigh, a slash, a siren, a lurch), an
   uneven vibrato (a warped music box, a ghostly or frail voice, a heat shimmer), parts
   drifting apart and back (unease, illusion, a dream, sickness, a curse, a mind
-  breaking) - "slide"/"wobble" on "lines" notes, "unhinge" for parts;
+  breaking) - "slide"/"wobble" on "lines" notes, "unhinge" for parts. A falling slide on
+  brass or low reeds is comic (a raspberry): bend strings and soft voices, not trumpets;
 - growth and shape: "dynamics", parts entering in waves, a "ritard", a "loop".
 
 Parts: violins, violins2, solo_violin (one player: exposed, quick), strings (sustained),
@@ -531,6 +532,21 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
     bar = tune["bar"]
     out: List[Tuple[str, str]] = []
     add = lambda level, msg: out.append((level, msg))          # noqa: E731
+    # A falling bend on brass or low reeds is a raspberry: the host, on a corrupted
+    # champion's boss fight whose trumpet stabs fell a fifth and whose trombone call slid
+    # down: "it sounds like he farts". And a slide bends the whole part, chords and all.
+    blown = {"trumpets", "trombones", "tuba", "horns", "brass", "bassoons"}
+    chorded = {h.get("part") for h in spec.get("harmony", [])}
+    for line in spec.get("lines", []):
+        bent = [n for n in line.get("notes", []) if len(n) > 4 and isinstance(n[-1], dict) and n[-1].get("slide")]
+        falls = [n for n in bent if float(n[-1]["slide"]) <= -2]
+        if line.get("part") in blown and falls and spec.get("role") != "comic":
+            add("warn", f"{line['part']}: {len(falls)} note(s) bend down on brass or low reeds - heard as comic "
+                        f"(a raspberry; the host: \"it sounds like he farts\"): keep falling slides for strings or "
+                        f"soft voices, or set \"role\": \"comic\" if that's the joke")
+        if bent and line.get("part") in chorded:
+            add("warn", f"{line['part']}: a slide bends the whole part, and it also plays chords here - they sag "
+                        f"with it; give the sliding line a part of its own")
     # Every note in its instrument's range; and long enough to speak.
     notes: Dict[str, list] = {}
     on_at: Dict[Tuple[str, int], list] = {}
