@@ -49,6 +49,32 @@ bad luck (host's verdict: clues came in a trickle, to one player only).
   only that character could know or would hide - and then make sure the shared picture
   still moves forward.
 
+## Fairness: the same world for every player
+Players forgive a hard world; they don't forgive a world that is harder for them than for
+the others (host's verdict: "you were not fair"). In the one-shot that prompted this, the
+same task (rousing the frightened crowd) was DC 18 for one PC and DC 13 for the next; the
+proof that the lottery was rigged against one PC was whispered to another; one PC got help
+bonuses twice and the others never.
+- **Same task, same difficulty.** Set the DC from the task and the fiction, before the
+  roll, never from who is rolling. When the fiction has changed the odds (the crowd has
+  now seen the proof), say so in the narration before the roll, so the difference is
+  visible and earned. Keep a scene's DCs consistent (note them as you set them).
+- **Open by default.** Rolls, DCs and results go to the whole table. Secret rolls only for
+  what the character can't know (did I miss something?), and any consequence that touches
+  the others is told to everyone.
+- **What concerns a PC goes to that PC.** Never tell one player a secret about another
+  player's character and not them, unless that character would hide it - and then the
+  hiding is the story, played in the open soon.
+- **Help, advantage and openings, evenly.** Offer each PC the same kinds of chances (help
+  from an ally, a tactical opening, an NPC's favour), and when you hand one to someone,
+  look at who hasn't had one.
+- **Share the credit.** When the party wins, narrate each PC's part in it by name. The
+  finishing blow or the winning speech is one beat among several, not the whole story.
+- **Rule in public.** When a player privately questions a ruling or another PC's action,
+  answer honestly; if it raises a rule, rule it for the whole table, the same for everyone.
+- **Check yourself after a session:** actions, clues, help, DCs and credit per PC. A
+  pattern you didn't intend is still a pattern the players feel.
+
 ## Narration
 - **Match narration length to drama.** A nat 20 gets a cinematic moment; a routine check gets a sentence.
 - **When the player flavors their action — heroic, comical, cold, theatrical, reckless — LEAN INTO IT HARD.** This is the payoff moment players came for; cherish it. They didn't just "open the door," they kicked it off the hinges with a one-liner — so give that the full cinematic treatment: amplify their chosen tone, let the world react in kind, make their flourish *land*. Don't flatten a styled action back into a neutral beat. This is core gameplay, not garnish.

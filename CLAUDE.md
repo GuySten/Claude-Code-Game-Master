@@ -61,7 +61,9 @@ moment and finds everything in their language. While the table is open:
 3. Post the narration with `bash tools/gm-table.sh say --stdin <<'EOF' … EOF` — it is the
    ONLY way players see anything; your terminal reply is for the host. Markdown works.
    `--to "<pc>"` whispers (secret perception results, private notes) - but clues go to the
-   whole table, three per conclusion, spread across the PCs (gm-craft, *Clues*); a player's
+   whole table, three per conclusion, spread across the PCs (gm-craft, *Clues*); the same
+   task gets the same DC for every PC, rolls are open, and what concerns a PC goes to that
+   PC (gm-craft, *Fairness*); a player's
    "only the GM sees this" aside arrives marked `(private, to GM only)` — answer it with
    `--to`. Players can fix a typo in an action until you read it (they always get at least
    5 seconds; the inbox waits that out): what you read is final.
