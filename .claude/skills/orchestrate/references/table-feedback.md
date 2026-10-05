@@ -297,3 +297,11 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   across stages was missing. Now: boss-music rule 6 (plan the arc across stages, each
   stage builds to its own peak, something held back) and a critic warning when a climax
   has nothing left to arrive.
+- **The Ashen Saint's stage 2, its concept**: "I think the concept for stage 1 is good
+  but I suspect the concept for stage 2 is not." The translator had kept stage 1's
+  concepts and added Fire and Transformation; the Fire entry's "ring of fire" (harp and
+  flute arpeggios, glockenspiel sparks, celesta) and the hexatonic melting are the
+  palette of magic and wonder - stage 2 said "enchantment", not "the flame consumes her
+  and she becomes inhuman". Asked what stage 2 should feel like, the host: "The GM
+  should decide not me." Now: a stage's own event carries it; Fire tells light from
+  destruction. Creative choices about NPCs are the GM's; the host judges the result.
