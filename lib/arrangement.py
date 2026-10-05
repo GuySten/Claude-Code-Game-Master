@@ -43,7 +43,8 @@ except in "hits" and "rolls", where it is the velocity itself (1-127).
   ],
   "chords": [            # roman numerals in the tune's key, [from, to, chord]
     [0, 6, "I"], [6, 9, "IVadd9"], [9, 12, "I/E#"], [12, 18, "bVII"], [24, 27, "vi7"]
-  ],                     # I ii iii IV V vi vii, b/# before, ° or + after; then 7 maj7 add9
+  ],                     # I ii iii IV V vi vii, b/# before, ° ø or + after (vii°7 the diminished
+                         # seventh, iiø7 the half-diminished); then 7 maj7 add9
                          # sus4 sus2 6 5 (a power chord); a bass note after a slash: "I/E#"
   "harmony": [           # parts playing the chords
     {"part": "strings", "from": 0, "to": 96, "play": "chord", "range": ["G3", "A#4"], "vel": -20},
@@ -159,7 +160,7 @@ def chord(symbol: str, key: int) -> Dict[str, Any]:
     {root, bass, pcs (root first), third, fifth}: pitch classes."""
     s = symbol.strip()
     body, _, slash = s.partition("/")
-    m = re.match(r"([b#]?)(VII|VI|V|IV|III|II|I|vii|vi|v|iv|iii|ii|i)([°o+]|dim|aug)?", body)
+    m = re.match(r"([b#]?)(VII|VI|V|IV|III|II|I|vii|vi|v|iv|iii|ii|i)([°o+ø]|dim|aug)?", body)
     if not m:
         raise ArrangementError(f"not a chord: {symbol!r} (roman numerals: I, bVII, vi7, IVadd9, I/E#)")
     acc, numeral, quality = m.group(1), m.group(2), m.group(3) or ""
@@ -167,7 +168,7 @@ def chord(symbol: str, key: int) -> Dict[str, Any]:
     root = (key + DEGREES[numeral.upper()] + (1 if acc == "#" else -1 if acc == "b" else 0)) % 12
     minor = numeral.islower()
     third, fifth = (3 if minor else 4), 7
-    if quality in ("°", "o", "dim"):
+    if quality in ("°", "o", "dim", "ø"):
         third, fifth = 3, 6
     elif quality in ("+", "aug"):
         third, fifth = 4, 8
@@ -179,8 +180,8 @@ def chord(symbol: str, key: int) -> Dict[str, Any]:
         rest = rest[len(suf):]
         if suf == "maj7":
             extra.append(11)
-        elif suf == "7":
-            extra.append(10)
+        elif suf == "7":                 # °7 is the diminished seventh; ø7 (and 7) the minor one
+            extra.append(9 if quality in ("°", "o", "dim") else 10)
         elif suf == "9":
             extra += [10, 2]
         elif suf == "add9":
@@ -193,6 +194,8 @@ def chord(symbol: str, key: int) -> Dict[str, Any]:
             third = 2
         elif suf == "5":
             third = None
+    if quality == "ø" and 10 not in extra:          # half-diminished: "iiø" = "iiø7"
+        extra.append(10)
     tones = [0] + ([third] if third is not None else []) + [fifth] + extra
     pcs = []
     for t in tones:
