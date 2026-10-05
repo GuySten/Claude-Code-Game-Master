@@ -256,3 +256,10 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   instruments". A public-domain "oo" works "only from midway". A lesson on testing: the
   first comparison added an artificial room on top of recordings that carry their own -
   the host asked "maybe you have a problem with the acoustics?", and it was so.
+- **An ear-safety failure** (a vowel choir's "oo" and "oh"): "these files break my
+  headphones". Its recordings were 32-bit float WAVs read straight as 16-bit - almost
+  all zeros and +-1 - and the comparison's loudness match then raised that near-silence
+  into loud digital noise. Now: recordings are scaled on reading (sf2write.to_int16), the
+  writer refuses a near-silent recording, and test renders are refused, never boosted,
+  when near-silent, harsh (much energy above 8 kHz) or clicking; files sent to the host
+  are checked for loudness and peak first, no louder than ones heard safely before.

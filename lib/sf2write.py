@@ -25,6 +25,16 @@ def crossfade_loop(x, rate, start_s, fade_s=0.5, tail_s=0.15):
     return np.clip(x, -32768, 32767).astype("int16"), ls, le
 
 
+def to_int16(audio):
+    """Any recording (float or integer, as read) as 16-bit samples, scaled - never truncated
+    (a float file read straight as int16 comes out as 0 and +-1: silence that a loudness
+    match then blows up into harsh noise)."""
+    a = np.asarray(audio)
+    if a.dtype.kind == "f":
+        a = np.clip(a, -1.0, 1.0) * 32767
+    return a.astype("int16")
+
+
 def write(path, presets, title):
     """presets: [(name, [zone, ...])], zone = dict(audio=int16 (n, ch), rate, key, lo, hi,
     ls, le, tune=0, att_cb=0, release_s=0.6)."""
@@ -37,6 +47,10 @@ def write(path, presets, title):
         inst.append((pname, len(ibag)))
         for z in zones:
             a = z["audio"]
+            if a.dtype != np.int16:
+                raise ValueError("recordings must be 16-bit samples: use to_int16")
+            if np.abs(a).max() < 64:
+                raise ValueError(f"recording {z['key']} is near-silent: read with the wrong format?")
             chans = a.shape[1]
             ids = stored.get(id(a), [])
             for c in range(chans if not ids else 0):

@@ -414,7 +414,8 @@ def fetch_choir(dest: Path = None, quiet: bool = False) -> Path:
             name = Path(kv["sample"]).name
             wav = Path(tmp) / name
             wav.write_bytes(get(f"Samples-looped/Chorus/{name}"))
-            audio, rate = soundfile.read(str(wav), dtype="int16", always_2d=True)
+            audio, rate = soundfile.read(str(wav), dtype="float32", always_2d=True)   # (any format,
+            audio = (np.clip(audio, -1, 1) * 32767).astype("int16")                 # scaled to 16-bit)
             regions.append({"audio": audio, "rate": rate, "key": midi(kv.get("pitch_keycenter") or kv["lokey"]),
                             "ls": int(kv["loop_start"]), "le": int(kv["loop_end"]), "tune": int(kv.get("tune", 0)),
                             "vol": float(kv.get("volume", 0)), "men": "-male-" in name})
