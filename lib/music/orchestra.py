@@ -662,12 +662,13 @@ def play(score: Score, seconds: float, sf2: Path = SF2, rate: int = RATE,
 
 
 def hall(dry, rate: int = RATE, rt60: float = 2.3, wet: float = 0.28, seed: int = 7,
-         loop_at: Optional[int] = None):
+         loop_at: Optional[int] = None, loop_from: int = 0):
     """A concert hall: the dry orchestra (its hall send, when play() made it: see
     ROOM) convolved with a synthetic hall response
     (early reflections, then a diffuse tail that darkens as it decays); the tail
     is left to ring after the last chord, or, for a loop (``loop_at``: its length
-    in samples), rings on over its start, so the seam can't be heard."""
+    in samples), rings on over its start - or over ``loop_from``, where a loop with an
+    entry loops back to - so the seam can't be heard."""
     import numpy as np
     rng = np.random.default_rng(seed)
     n = int(rt60 * 1.3 * rate)
@@ -704,10 +705,10 @@ def hall(dry, rate: int = RATE, rt60: float = 2.3, wet: float = 0.28, seed: int 
     mix = out * wet
     mix[:len(dry)] += dry * (1 - wet * 0.5)
     if loop_at:                                            # a loop: what rings past its end
-        n = loop_at                                        # sounds over its start
-        for at in range(n, len(mix), n):
-            seg = mix[at:at + n]
-            mix[:len(seg)] += seg
+        n, m = loop_at, max(0, min(int(loop_from), loop_at - 1))   # sounds over where it loops to
+        for at in range(n, len(mix), n - m):
+            seg = mix[at:at + n - m]
+            mix[m:m + len(seg)] += seg
         return mix[:n].astype("float32")
     end = len(dry) + int(rt60 * rate)                      # ring out for one decay, then stop
     return mix[:end].astype("float32")

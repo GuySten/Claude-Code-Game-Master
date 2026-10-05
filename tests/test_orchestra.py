@@ -110,3 +110,15 @@ def test_mastering_keeps_a_climax_above_what_led_to_it():
     q, l = level(out[rate: rate * 5, 0]), level(out[rate * 6 + 400:, 0])
     assert l - q > 16.5                                             # the limiter took at most ~1.5 dB
     assert np.abs(out).max() <= 0.9
+
+
+def test_a_loop_with_an_entry_rings_over_its_loop_point_not_its_first_sample():
+    np = pytest.importorskip("numpy")
+    rate = 8000
+    dry = np.zeros((rate * 3, 2), dtype="float32")
+    dry[int(rate * 1.9):int(rate * 2.0)] = 0.5                   # a hit just before the end
+    wet = orchestra.hall(dry, rate, rt60=1.0, loop_at=rate * 2, loop_from=rate)
+    assert len(wet) == rate * 2
+    head = float(np.abs(wet[:rate // 4]).max())                  # the entry: untouched
+    at_loop = float(np.abs(wet[rate:rate + rate // 4]).max())    # the tail rings on here
+    assert head < 1e-6 < at_loop

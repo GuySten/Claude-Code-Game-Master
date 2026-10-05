@@ -27,6 +27,9 @@ except in "hits" and "rolls", where it is the velocity itself (1-127).
   "start": -12,          # where the piece starts (an intro before the tune): default 0
   "length": 96,          # where it ends (default: the end of the last statement)
   "loop": false,         # true: a seamless loop of [start, length) (battle music)
+  "loop_from": 0,        # a loop with an entry: [start, loop_from) plays once (a boss stage's
+                         # strong opening), then [loop_from, length) loops; the file says where
+                         # (a LOOPSTART tag) and the table plays it so. Default: start
   "role": "theme",       # what it's for: theme, villain, battle, lament, ... ("battle": the
                          # critic checks it keeps several lines moving)
   "ritard": {"from": 84, "amount": 0.4},     # slowing to the end (40% slower at the last note)
@@ -415,6 +418,9 @@ def _build(spec: Dict[str, Any]) -> Dict[str, Any]:
         tune_len = max(ends, default=tune_len)
     length = float(spec.get("length") or max((p[0] + p[1] for p in played), default=tune_len))
     loop = bool(spec.get("loop"))
+    loop_from = float(spec.get("loop_from", start)) if loop else start
+    if not start <= loop_from < length:
+        raise ArrangementError(f"loop_from {loop_from:g} is outside the piece ({start:g} to {length:g})")
     tempo = float(spec.get("tempo") or 66)
     beat = 3 if tune["meter"] == "6/8" else 1
     unit = 60.0 / tempo / beat
@@ -603,17 +609,28 @@ def _build(spec: Dict[str, Any]) -> Dict[str, Any]:
 
     seconds = T(length)
     return {"score": sc, "seconds": seconds, "loop": seconds if loop else None, "tune": tune,
+            "loop_from": T(loop_from) if loop else None, "loop_from_u": loop_from,
             "played": played, "prog": prog, "T": T, "unit": unit, "beat": beat, "start": start,
             "length": length, "dyn_pts": dyn_pts, "chord_at": chord_at}
 
 
+def loop_start(spec: Dict[str, Any], rate: int = orchestra.RATE) -> Optional[int]:
+    """Where a loop with an entry loops back to, in samples (None: from the top, or no loop)."""
+    if not spec.get("loop") or "loop_from" not in spec:
+        return None
+    at = _build(spec)["loop_from"]
+    return int(round(at * rate)) or None
+
+
 def render(spec: Dict[str, Any], rate: int = orchestra.RATE, sf2: Path = orchestra.SF2):
-    """An arrangement played by the orchestra -> (stereo float32 samples, rate)."""
+    """An arrangement played by the orchestra -> (stereo float32 samples, rate). A loop with
+    an entry ("loop_from") loops back to loop_start(spec), not to its first sample."""
     score, seconds, loop = build(spec)
     mix = spec.get("mix") or {}
     if loop:
         dry = orchestra.play(score, seconds + 3.0, sf2, rate, mix)  # (what rings past the end)
-        wet = orchestra.hall(dry, rate, loop_at=int(round(seconds * rate)))
+        wet = orchestra.hall(dry, rate, loop_at=int(round(seconds * rate)),
+                             loop_from=loop_start(spec, rate) or 0)
         return orchestra.master(wet, rate, loop=True), rate
     dry = orchestra.play(score, seconds, sf2, rate, mix)
     return orchestra.master(orchestra.hall(dry, rate), rate), rate
@@ -776,6 +793,22 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
             add("note", f"battle or loop texture: {avg:.1f} lines move per bar besides the tune "
                         "(pitched parts): big music keeps three or more going - an ostinato, a "
                         "countermelody or answer, a moving bass or inner line - under the tune")
+    # A loop with an entry (a boss stage's opening, played once): the stage change is itself
+    # a climax - "after stage change the music should start strong" (the host); the research:
+    # a transformation restarts the music in its new form, opening with a signature attack.
+    # The checks below of how the piece grows look at the loop body only.
+    entry_u = ctx["loop_from_u"] if ctx.get("loop_from") else None
+    if entry_u is not None:
+        entry = [n for u, n, _ in layers if u < entry_u - 1e-9]
+        layers = [x for x in layers if x[0] >= entry_u - 1e-9]
+        body_peak = max((n for _, n, _ in layers), default=0)
+        if entry and max(entry) < 0.75 * body_peak:
+            add("warn", f"the entry (before loop_from) peaks at {max(entry)} parts, the loop at {body_peak}: "
+                        "a stage's entry is the stage change's climax - start strong (most of the stage's "
+                        "forces, its signature figure), then drop back for the loop to build")
+        if entry and len(entry) > 4:
+            add("note", f"the entry is {len(entry)} bars: it plays once, under the GM's narration of the "
+                        "change - 1 to 4 bars is usual")
     # A climax needs something to arrive: if the piece already plays at nearly its full
     # texture from the start, its peak adds nothing (the host, of the Ashen Saint's second
     # stage - 16-19 parts from bar 1, 20 at the "climax": "a climax without the climax").
@@ -900,10 +933,11 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
         full = (lead + choir + rest)
         n = int(ctx["seconds"] * rate)
         tail = full[n:]
+        m = int((ctx.get("loop_from") or 0) * rate)         # where it loops back to
         body = full[:n].copy()
-        body[:len(tail)] += tail[:n]
+        body[m:m + len(tail[:n - m])] += tail[:n - m]
         q = rate // 2
-        step = db(body[:q]) - db(body[-q:])
+        step = db(body[m:m + q]) - db(body[-q:])
         if abs(step) > 3:
             add("warn", f"the loop's seam steps {step:+.0f} dB (end -> start): bring the ends' dynamics together")
     peak_level = db(lead + choir + rest)
@@ -1154,7 +1188,7 @@ def main() -> None:
         samples, rate = render(spec)
     except (ArrangementError, KeyError, TypeError, ValueError) as e:
         sys.exit(f"[arrangement] {a.file}: {e}")
-    path = music_compose.write(samples, rate, Path(a.out))
+    path = music_compose.write(samples, rate, Path(a.out), loop_start=loop_start(spec, rate))
     print(f"{path} ({len(samples) / rate:.1f}s{', a loop' if spec.get('loop') else ''})")
 
 

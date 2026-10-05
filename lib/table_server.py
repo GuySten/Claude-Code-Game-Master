@@ -230,6 +230,27 @@ def audio_seconds(path: Path) -> Optional[float]:
         return None
 
 
+def loop_start(path: Path) -> Optional[float]:
+    """Where a loop with an entry loops back to, in seconds (its LOOPSTART=<sample> tag,
+    written by music_compose.write), or None: a plain loop, from the top."""
+    try:
+        with open(path, "rb") as f:
+            head = f.read(1 << 16)
+        i = head.find(b"LOOPSTART=")
+        if i < 0:
+            return None
+        digits = head[i + 10:i + 22]
+        n = int(digits[:len(digits) - len(digits.lstrip(b"0123456789"))] or 0)
+        if path.suffix.lower() == ".wav":
+            rate = int.from_bytes(head[24:28], "little")
+        else:
+            v = head.find(b"\x01vorbis")
+            rate = int.from_bytes(head[v + 12:v + 16], "little") if v >= 0 else 48000
+        return n / rate if n > 0 and rate else None
+    except (OSError, ValueError):
+        return None
+
+
 def _now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%S")
 
@@ -1716,6 +1737,11 @@ class TableState:
                     self.music["boss"] = True
                 if place:
                     self.music["place"] = place
+                if kind == "file" and loop:
+                    found = self.find_music(Path(src).stem)
+                    at = loop_start(found) if found is not None and found.name == src else None
+                    if at:
+                        self.music["loop_from"] = round(at, 4)   # its entry plays once
                 if kind == "file":
                     from music_library import credit_for
                     credit = credit_for(src, PROJECT_ROOT / "music" / "library.json")

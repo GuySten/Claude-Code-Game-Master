@@ -1403,6 +1403,63 @@
       },
     };
   }
+  // A loop with an entry (a boss stage's strong opening): the entry plays once, then the
+  // rest loops without a gap - Web Audio's loop points; an <audio> element can only loop
+  // the whole file. In step with the table: the file's position is the same function of
+  // the time since it started on every page.
+  function entryTrack(m) {
+    const ctx = audioCtx();
+    const gain = ctx.createGain();
+    gain.gain.value = 0;
+    gain.connect(ctx.destination);
+    let level = musicLevel(), live = true, buf = null, src = null, mark = null, resync = null;
+    const elapsed = () => (Date.now() + skew) / 1000 - (m.started_at || 0);
+    const where = (e, dur) => e < dur ? e : m.loop_from + (e - m.loop_from) % (dur - m.loop_from);
+    const begin = () => {
+      if (!live || !buf) return;
+      if (ctx.state === "suspended") { pendingPlay = begin; setStatus(t("tapForMusic"), true); return; }
+      if (src) { try { src.stop(); } catch (e) {} }
+      src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      src.loopStart = Math.min(m.loop_from, buf.duration - 0.05);
+      src.loopEnd = buf.duration;
+      src.connect(gain);
+      const e = elapsed();
+      if (e < 0) src.start(ctx.currentTime - e, 0);          // it starts later (as a sting ends)
+      else src.start(0, where(e, buf.duration));
+      mark = { ctx: ctx.currentTime, e };
+      gain.gain.cancelScheduledValues(ctx.currentTime);
+      gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(level, ctx.currentTime + (e < 0 ? 0.05 : 1.5));
+    };
+    fetch("/music/" + encodeURIComponent(m.src) + "?code=" + encodeURIComponent(code))
+      .then((r) => r.arrayBuffer())
+      .then((a) => new Promise((ok, bad) => ctx.decodeAudioData(a, ok, bad)))
+      .then((b) => { buf = b; begin(); })
+      .catch(() => setStatus("🎵 " + (m.title || "") + " ✗", true));
+    // The audio clock and the table's can drift apart; a big gap restarts in place.
+    resync = setInterval(() => {
+      if (!live || !src || !mark || ctx.state !== "running") return;
+      const e = elapsed();
+      if (e < 0) return;
+      if (Math.abs(mark.e + (ctx.currentTime - mark.ctx) - e) > 0.4) begin();
+    }, 5000);
+    return {
+      setLevel(v) {
+        level = v;
+        gain.gain.cancelScheduledValues(ctx.currentTime);
+        gain.gain.setTargetAtTime(v, ctx.currentTime, 0.1);
+      },
+      stop() {
+        live = false; clearInterval(resync);
+        gain.gain.cancelScheduledValues(ctx.currentTime);
+        gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.2);
+        setTimeout(() => { try { src && src.stop(); } catch (e) {} gain.disconnect(); }, 1400);
+      },
+    };
+  }
   // A boss fight's sting (a rise, a break, a hit): played once over the music, in step
   // with the table; a late joiner hears it only if it's still sounding.
   let stingId = null;
@@ -1431,6 +1488,7 @@
     if (!m || !m.track || !musicOn) return;
     track = m.kind === "ambient" ? ambientTrack(m)
           : m.kind === "theme" ? ambientTrack(m, themeBuilder(m.src, !!m.boss))
+          : m.loop && m.loop_from > 0 && audioCtx() ? entryTrack(m)
           : fileTrack(m);
   }
 

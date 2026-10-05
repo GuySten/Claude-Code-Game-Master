@@ -2048,6 +2048,22 @@ def test_a_boss_fight_moves_through_its_stages_with_stings_and_ends_with_its_own
     assert code == 400
 
 
+def test_a_stage_with_an_entry_tells_the_pages_where_it_loops_back_to(table):
+    import wave
+    call, camp = table["call"], table["camp"]
+    (camp / "music").mkdir(exist_ok=True)
+    with wave.open(str(camp / "music" / "ashen-saint-stage2.wav"), "wb") as w:
+        w.setnchannels(1); w.setsampwidth(2); w.setframerate(8000); w.writeframes(b"\0\0" * 80000)
+    path = camp / "music" / "ashen-saint-stage2.wav"
+    head = path.read_bytes()                                    # its LOOPSTART tag (sample 16000)
+    path.write_bytes(head[:36] + b"LOOPSTART=16000" + head[36:])
+    _, body = call("/api/gm/music", {"boss_fight": "Ashen Saint", "stage": 2}, host=True)
+    assert body["music"]["loop_from"] == pytest.approx(2.0)
+    _touch_music(camp, "ashen-saint-stage1.ogg")
+    _, body = call("/api/gm/music", {"boss_fight": "Ashen Saint", "stage": 1}, host=True)
+    assert "loop_from" not in body["music"]                     # a plain loop
+
+
 def test_a_boss_hit_matches_the_stage_it_is_played_over(table):
     call, camp = table["call"], table["camp"]
     _touch_music(camp, "ashen-saint-stage1.ogg", "ashen-saint-stage2.ogg", "ashen-saint-hit.ogg",

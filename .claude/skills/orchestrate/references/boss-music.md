@@ -28,15 +28,24 @@ Ordinary fights share one campaign battle cue and get none of this.
 5. **A stage may reveal rather than escalate.** When the second stage shows the boss's
    grief, madness or former self, its cue may be sparser, slower or sacred. Mark it
    `reveal` so the GM knows the drop is meant.
-6. **Plan the fight's arc across its stages, and give each stage its own.** Stage 1
-   leaves headroom (about half the orchestra, mp to f); each later stage starts near
-   the last one's peak - not far above it - and climbs to a peak of its own; the fight's
-   single biggest moment is the last stage's climax. Inside every stage loop: begin
-   below its peak, add layers in waves, and hold something back for the peak (the
-   chorus or men's choir, full brass, the top register, the tune's full form), then
-   fall back for the seam. The host on a stage that started at its full texture (18
-   parts from bar 1, 20 at its peak): "it does not develop into anything... like a
-   climax without the climax" (the critic now flags this).
+6. **Every stage opens strong, then builds again.** A stage change is itself a climax
+   (the host: "after stage change the music should start strong - there is a kind of
+   climax when the boss transforms"; the games: the music restarts in its new form,
+   opening with the boss's signature attack - Malenia, FFXIV). So a stage cue is an
+   **entry** played once and a **loop body** after it (`"start"` negative, `"loop":
+   true, "loop_from": 0`: the table plays the entry, then loops the body without a gap):
+   - **the entry**, 1 to 4 bars: most of the stage's forces at once on its new key and
+     tempo, the new form's signature figure (stage 2: the motif in its new shape, the
+     choir's first entrance), ff. Stage 1's entry is the boss's arrival, at stage 1's size.
+   - **the loop body** drops back to the drive (about half the forces) and climbs in
+     waves to a peak of its own, holding something back for it (the tune's full form, the
+     top register, full brass), then falls back for the seam - not to the entry's level,
+     which never comes back. The host on a stage that sat at its full texture throughout:
+     "it does not develop into anything... like a climax without the climax".
+   - **across the fight**: stage 1 leaves headroom (its peak about f, half to two thirds
+     of the orchestra); each later stage's entry lands at or above the last stage's peak,
+     and the fight's single biggest moment is the last stage's (its entry or its peak).
+   The critic checks a stage's entry is strong and judges the climax on the body alone.
 7. **Long loops with change inside.** A table stage lasts 10 to 40 minutes: stage
    loops of 1 to 3 minutes with something new every 8 to 16 bars, so the loop doesn't
    show (`"loop": true`, `"role": "battle"`).
@@ -55,11 +64,11 @@ workflow - you cannot override on a whim").
 ## Transitions and accents (short one-shots, in the next stage's key)
 
 8. **rise** - a one- or two-bar build (timpani roll, cymbal swell, tremolo crescendo)
-   landing on the new stage's first chord: for a stage that grows out of the last
+   landing on the new stage's entry: for a stage that grows out of the last
    (bloodied, reinforcements).
 9. **break** - an impact (tutti hit, low brass and bass drum, choir) dying away into
-   3 to 6 seconds of quiet: for a transformation or a reveal. The new stage starts
-   after it, while the GM narrates.
+   3 to 6 seconds of quiet: for a transformation or a reveal, under the GM's narration;
+   then the new stage's entry lands - the transformation's climax - and its loop runs on.
 10. **hit** - a one- to three-second accent over a stage loop, on that stage's tonic and
    fifth (one per stage key): a shield broken, a decisive blow. At most one a round.
 

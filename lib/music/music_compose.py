@@ -35,6 +35,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+from typing import Optional
 
 MODEL = os.environ.get("COMPOSE_MODEL", "facebook/musicgen-small")
 MELODY_MODEL = os.environ.get("COMPOSE_MELODY_MODEL", "facebook/musicgen-melody")
@@ -879,20 +880,27 @@ def run_job(job: dict, device: str) -> dict:
         return {"ok": False, "error": f"{type(e).__name__}: {e}"}
 
 
-def write(samples, rate: int, out: Path) -> Path:
-    """OGG when this soundfile build can (small files), else WAV."""
+def write(samples, rate: int, out: Path, loop_start: Optional[int] = None) -> Path:
+    """OGG when this soundfile build can (small files), else WAV. ``loop_start``: a loop
+    with an entry - the sample it loops back to, kept in the file's comment as
+    LOOPSTART=n (the table reads it: table_server.loop_start)."""
     import soundfile as sf
     out.parent.mkdir(parents=True, exist_ok=True)
     try:
         # In blocks: libsndfile's OGG encoder can crash on one very long write.
         channels = 1 if getattr(samples, "ndim", 1) == 1 else samples.shape[1]
         with sf.SoundFile(str(out), "w", samplerate=rate, channels=channels) as f:
+            if loop_start:
+                f.comment = f"LOOPSTART={int(loop_start)}"
             for i in range(0, len(samples), 1 << 16):
                 f.write(samples[i:i + (1 << 16)])
         return out
     except Exception:
         wav = out.with_suffix(".wav")
-        sf.write(str(wav), samples, rate)
+        with sf.SoundFile(str(wav), "w", samplerate=rate, channels=channels) as f:
+            if loop_start:
+                f.comment = f"LOOPSTART={int(loop_start)}"
+            f.write(samples)
         return wav
 
 

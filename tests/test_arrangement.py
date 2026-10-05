@@ -90,6 +90,45 @@ def test_a_loop_stops_at_its_length_and_slows_for_nothing():
     assert first == pytest.approx(4 * 60 / 80)                  # the tune, after a 4-beat intro
 
 
+def test_a_loop_with_an_entry_plays_it_once_and_loops_back_to_the_body(tmp_path):
+    # A boss stage opens strong once (the stage change's climax), then loops its body.
+    sp = spec(loop=True, length=16, start=-4, loop_from=0)
+    assert A.loop_start(sp) == round(4 * 60 / 80 * orchestra.RATE)    # after the 4-beat entry
+    assert A.loop_start(spec(loop=True, length=16)) is None             # a plain loop: from the top
+    with pytest.raises(A.ArrangementError):
+        A.build(spec(loop=True, length=16, loop_from=20))
+    np = pytest.importorskip("numpy")
+    pytest.importorskip("soundfile")
+    out = music_compose.write(np.zeros((4800, 2), dtype="float32"), 48000, tmp_path / "s.ogg", loop_start=1234)
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
+    import table_server
+    assert table_server.loop_start(out) == pytest.approx(1234 / 48000)
+    plain = music_compose.write(np.zeros((4800, 2), dtype="float32"), 48000, tmp_path / "p.ogg")
+    assert table_server.loop_start(plain) is None
+
+
+def test_the_critic_wants_a_stage_entry_strong_and_judges_the_climax_on_the_body():
+    import arrangement
+    parts = ["violins", "violins2", "cellos", "basses", "horns", "trombones", "flutes", "clarinets",
+             "bassoons", "trumpets", "tuba", "oboe"]
+
+    def piece(entry_parts):
+        lines = []
+        for i, part in enumerate(parts):
+            lo, _ = orchestra.RANGES[part]
+            notes = [[u, lo + 7, 4] for u in range(-8, 0, 4)] if i < entry_parts else []   # the entry
+            notes += [[u, lo + 7, 4] for u in range(0, 64, 4) if i < 5 or u >= 48]      # the body builds
+            lines.append({"part": part, "notes": notes})
+        return {"tune": {"seed": "sketch", "key": "D4", "meter": "4/4"}, "statements": [], "start": -8,
+                "length": 64, "loop": True, "loop_from": 0, "role": "battle", "chords": [[-8, 64, "i"]],
+                "dynamics": [[-8, 118], [0, 80], [44, 90], [48, 120], [60, 80]], "lines": lines}
+    strong = [m for _, m in arrangement.check(piece(12), listen=False)]
+    weak = [m for _, m in arrangement.check(piece(3), listen=False)]
+    assert not [m for m in strong if "entry" in m and "parts" in m]
+    assert not [m for m in strong if "nothing left to arrive" in m]        # (the entry isn't the body)
+    assert [m for m in weak if "start strong" in m]
+
+
 def test_the_tune_listing_shows_every_note():
     text = A.describe("Test Hero", cls="Fighter")
     tune = music_compose.leitmotif("Test Hero", "major", "Fighter")

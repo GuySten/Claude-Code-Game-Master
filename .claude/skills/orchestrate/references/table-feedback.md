@@ -312,3 +312,12 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   Rerun with the translator's brief as written; the workflow now plans every stage's key
   first and writes transitions, endings and one hit per key after (boss-music.md, "The
   order of work"); the table plays the current stage's hit.
+- **A stage change starts strong**: "Did you use established guides to create stage 1 and
+  stage 2? Usually after stage change the music should start strong. There is a kind of
+  climax when the boss transforms." The rule written from "a climax without the climax"
+  (begin every stage loop below its peak) had over-reached: it made stage 2 open at mf.
+  The research said otherwise (a transformation restarts the music in its new form,
+  opening with a signature attack). Now: every stage cue is a strong entry played once,
+  then a loop body that drops back and builds to its own peak (`boss-music.md` rule 6,
+  `"loop_from"`). Lesson: a rule drawn from one verdict is checked against the research
+  before it is written broadly.
