@@ -2062,6 +2062,17 @@ def test_a_stage_with_an_entry_tells_the_pages_where_it_loops_back_to(table):
     _touch_music(camp, "ashen-saint-stage1.ogg")
     _, body = call("/api/gm/music", {"boss_fight": "Ashen Saint", "stage": 1}, host=True)
     assert "loop_from" not in body["music"]                     # a plain loop
+    # a rise lands where its written music ends (its LANDING tag), not after its reverb
+    with wave.open(str(camp / "music" / "ashen-saint-rise.wav"), "wb") as w:   # 3 s, lands at 2 s
+        w.setnchannels(1); w.setsampwidth(2); w.setframerate(8000); w.writeframes(b"\0\0" * 24000)
+    rise = camp / "music" / "ashen-saint-rise.wav"
+    head = rise.read_bytes()
+    rise.write_bytes(head[:36] + b"LANDING=16000" + head[36:])
+    _touch_music(camp, "ashen-saint-pre_end.ogg")
+    _, body = call("/api/gm/music", {"boss_fight": "Ashen Saint", "stage": "pre_end", "via": "rise"}, host=True)
+    m = body["music"]
+    assert m["src"] == "ashen-saint-pre_end.ogg" and m["stage"] == "pre_end" and m["via"] == "rise"
+    assert 1.9 < m["started_at"] - m["sting"]["started_at"] < 2.1
 
 
 def test_a_boss_hit_matches_the_stage_it_is_played_over(table):

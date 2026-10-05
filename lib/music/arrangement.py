@@ -403,6 +403,7 @@ def _build(spec: Dict[str, Any]) -> Dict[str, Any]:
     tune_len = u
     # (an explicit empty list: no tune at all - a sketch whose melody is written in "lines")
     statements = spec["statements"] if isinstance(spec.get("statements"), list) else [{"at": 0}]
+    written_len = tune_len
     played = []                                                 # (time, units, MIDI as written)
     for s in statements:
         at, lo, hi = float(s.get("at", 0)), float(s.get("from", 0)), float(s.get("to", tune_len))
@@ -610,6 +611,7 @@ def _build(spec: Dict[str, Any]) -> Dict[str, Any]:
     seconds = T(length)
     return {"score": sc, "seconds": seconds, "loop": seconds if loop else None, "tune": tune,
             "loop_from": T(loop_from) if loop else None, "loop_from_u": loop_from,
+            "statements": statements, "tune_len": written_len,
             "played": played, "prog": prog, "T": T, "unit": unit, "beat": beat, "start": start,
             "length": length, "dyn_pts": dyn_pts, "chord_at": chord_at}
 
@@ -809,6 +811,24 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
         if entry and len(entry) > 4:
             add("note", f"the entry is {len(entry)} bars: it plays once, under the GM's narration of the "
                         "change - 1 to 4 bars is usual")
+    # A boss stage's loop (an entry, then a body that loops; "role": "battle"): a table stage
+    # runs 10 to 40 minutes, so the body is long - the research: 3-5 minutes, something new
+    # every 8-16 bars - and the boss's tune is heard whole, as written, so the table knows
+    # it (a leitmotif is recognised in a reprise far more easily than in a variation; the
+    # host could not tell whether a stage 2 had stage 1's tune).
+    if entry_u is not None and spec.get("role") == "battle":
+        body_s = ctx["seconds"] - ctx["loop_from"]
+        if body_s < 150:
+            add("warn", f"the loop body is {body_s:.0f} s: a stage plays 10-40 minutes - 150 s at least "
+                        "(3-5 min is the research's length), with something new every 8-16 bars")
+        if ctx["played"]:
+            whole = [x for x in ctx["statements"] if float(x.get("from", 0)) <= 1e-9 and
+                     float(x.get("at", 0)) >= entry_u - 1e-9 and
+                     float(x.get("to", ctx["tune_len"])) >= ctx["tune_len"] - 1e-9]
+            if not whole:
+                add("warn", "the loop body never states the boss's tune whole, as written (a statement from "
+                            "its start to its end; a new key or register is fine): the table can't learn it "
+                            "from fragments and variants alone")
     # A climax needs something to arrive: if the piece already plays at nearly its full
     # texture from the start, its peak adds nothing (the host, of the Ashen Saint's second
     # stage - 16-19 parts from bar 1, 20 at the "climax": "a climax without the climax").
@@ -1188,7 +1208,8 @@ def main() -> None:
         samples, rate = render(spec)
     except (ArrangementError, KeyError, TypeError, ValueError) as e:
         sys.exit(f"[arrangement] {a.file}: {e}")
-    path = music_compose.write(samples, rate, Path(a.out), loop_start=loop_start(spec, rate))
+    landing = None if spec.get("loop") else int(round(build(spec)[1] * rate))   # (a sting: where it lands)
+    path = music_compose.write(samples, rate, Path(a.out), loop_start=loop_start(spec, rate), landing=landing)
     print(f"{path} ({len(samples) / rate:.1f}s{', a loop' if spec.get('loop') else ''})")
 
 

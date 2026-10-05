@@ -114,7 +114,10 @@ did no better than a coin flip on our music):
 ## What makes it good
 
 **The tune is sacred; everything else is yours.** Never change its notes - that
-is what makes it recognizable across a campaign. Vary the instrument carrying it,
+is what makes it recognizable across a campaign (a leitmotif is recognised in a reprise
+far more easily than in a variation). A boss's stages state it whole at least once a
+loop (`references/boss-music.md` rule 4); `invert`, `retro` and `alter` are for a story
+reason, after the tune has been heard straight. Vary the instrument carrying it,
 its octave, the harmony under it, the tempo, the texture. A theme heard as a lone
 horn, then soaring violins, then the whole orchestra is one theme growing up.
 
@@ -147,7 +150,8 @@ breakdown to almost nothing and a rebuild, a countermelody that later becomes th
 main line. In side-by-side tests the more developed versions (a modulated second
 statement, a breakdown) were rated higher than compact ones. Let the piece be as
 long as its development needs: themes ~40-60 s, legendary ~50-75 s, battle loops
-~75-120 s - not padding, but more happening.
+2.5-4 minutes (a fight runs 10-40 minutes; a boss stage's loop body, `boss-music.md`
+rule 7) - not padding, but more happening.
 
 **Keep several lines moving.** Think in layers: the tune; an answer or
 countermelody; a rhythmic engine (an ostinato, a walking or pulsing bass,
@@ -159,8 +163,8 @@ in motion at once besides the tune; the critic counts them (give a battle score
 ones.
 
 **Write a theme once, as a motif.** Put each recurring idea in `"motifs"` and place
-it in `"lines"` transformed (`shift`/`octave`, `stretch`, `invert`, `retro`, `take`,
-`alter`, `repeat`/`every`) instead of writing its notes again: the corrupted call is
+it in `"lines"` transformed (`shift`/`octave`, `stretch`, `take`, `repeat`/`every`; for
+a story reason `invert`, `retro`, `alter`) instead of writing its notes again: the corrupted call is
 the hero's call with `"alter": {"2": -1}`, the phase-2 vow is the vow with
 `"stretch": 2`. It is faster to write, keeps every return true to the original, and
 shows the development at a glance (writing every note by hand took a composer 8-12 minutes
@@ -206,7 +210,9 @@ pads - and by "gain" on a melody entry, before reaching for "mix".
 **Loops (villain themes, battles) have no ends.** No ritard, no final stroke; the
 end's dynamics and texture must meet the start's (the critic measures the seam).
 Start and end on a vamp or ostinato over the tonic so the wrap is invisible; put
-the intro's material at the end of the cycle too.
+the intro's material at the end of the cycle too. A loop with an entry (a boss stage:
+`"loop_from"`) wraps to the body's start, not the entry: the body's end meets the body's
+start, and the entry never comes back.
 
 ## From concepts to a brief (the translator)
 
@@ -223,8 +229,10 @@ composer's brief this way - the same for every character, so nothing is tuned to
    where the fighting is the subject (a war, a siege, a defining duel). Identity, not
    moment: heroism is in a paladin's or a champion's portrait, not every adventurer's; a
    bard battling a dragon gets the bard's theme turned heroic for that scene. For a boss in
-   stages, decide the concepts **per stage**: what changed in the story carries that stage
-   (concepts.md section 1, "A stage... is its own moment"). Always decide **stature** (how much they weigh in the
+   stages, decide the concepts **per stage**: what changed in the story is that stage's
+   **strong** concept - its own layer or moment and two or three dials - while the boss's
+   identity keeps carrying; it carries only when the boss becomes someone or something
+   else (concepts.md section 1, "A stage... is its own moment"). Always decide **stature** (how much they weigh in the
    story: a king or archvillain gets one grand climax, a minor figure stays small).
    Find them in `references/concepts-index.md` (keywords per concept).
 2. **Read only those entries** in `concepts.md` (search "#### <name>"), and its section 1

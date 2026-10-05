@@ -99,10 +99,12 @@ def test_a_loop_with_an_entry_plays_it_once_and_loops_back_to_the_body(tmp_path)
         A.build(spec(loop=True, length=16, loop_from=20))
     np = pytest.importorskip("numpy")
     pytest.importorskip("soundfile")
-    out = music_compose.write(np.zeros((4800, 2), dtype="float32"), 48000, tmp_path / "s.ogg", loop_start=1234)
+    out = music_compose.write(np.zeros((4800, 2), dtype="float32"), 48000, tmp_path / "s.ogg", loop_start=1234,
+                              landing=2400)
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
     import table_server
     assert table_server.loop_start(out) == pytest.approx(1234 / 48000)
+    assert table_server.loop_start(out, "LANDING") == pytest.approx(0.05)     # where a sting lands
     plain = music_compose.write(np.zeros((4800, 2), dtype="float32"), 48000, tmp_path / "p.ogg")
     assert table_server.loop_start(plain) is None
 
@@ -127,6 +129,20 @@ def test_the_critic_wants_a_stage_entry_strong_and_judges_the_climax_on_the_body
     assert not [m for m in strong if "entry" in m and "parts" in m]
     assert not [m for m in strong if "nothing left to arrive" in m]        # (the entry isn't the body)
     assert [m for m in weak if "start strong" in m]
+    assert [m for m in strong if "loop body is" in m]                     # 64 beats: far too short
+    long = piece(12)
+    long.update(length=320, lines=[{**l, "notes": l["notes"] + [[u, l["notes"][-1][1], 4] for u in range(64, 320, 4)]}
+                                   for l in long["lines"] if l["notes"]])
+    assert not [m for _, m in arrangement.check(long, listen=False) if "loop body is" in m]
+
+
+def test_a_boss_stage_states_its_tune_whole():
+    base = spec(loop=True, start=-4, loop_from=0, length=64, role="battle")
+    tune_len = A._build(base)["tune_len"]
+    frag = {**base, "statements": [{"at": 0, "from": 0, "to": tune_len / 2}, {"at": 32, "from": tune_len / 2}]}
+    whole = {**base, "statements": [{"at": 0}, {"at": 32, "shift": 3}]}
+    assert [m for _, m in A.check(frag, listen=False) if "never states the boss's tune whole" in m]
+    assert not [m for _, m in A.check(whole, listen=False) if "never states the boss's tune whole" in m]
 
 
 def test_the_tune_listing_shows_every_note():

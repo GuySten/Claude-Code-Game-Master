@@ -63,7 +63,8 @@ cymbal), and a return to the opening texture so the wrap is seamless.
 
 ## A boss fight (a loop for a whole battle)
 
-Relentless but not monotonous, 75-120 s, `"role": "battle"`. At every moment
+Relentless but not monotonous, 2.5-4 minutes, `"role": "battle"` (a staged boss:
+`boss-music.md` - an entry, then a loop body of 2.5 minutes or more). At every moment
 at least three lines move besides the tune - typically an eighth-note ostinato
 (cellos + bassoons), a second ostinato or countermelody up high (violins2 +
 clarinets, horns answering the tune's phrases), a moving bass, and the drums -

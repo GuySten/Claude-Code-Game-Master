@@ -880,26 +880,29 @@ def run_job(job: dict, device: str) -> dict:
         return {"ok": False, "error": f"{type(e).__name__}: {e}"}
 
 
-def write(samples, rate: int, out: Path, loop_start: Optional[int] = None) -> Path:
+def write(samples, rate: int, out: Path, loop_start: Optional[int] = None,
+          landing: Optional[int] = None) -> Path:
     """OGG when this soundfile build can (small files), else WAV. ``loop_start``: a loop
     with an entry - the sample it loops back to, kept in the file's comment as
-    LOOPSTART=n (the table reads it: table_server.loop_start)."""
+    LOOPSTART=n; ``landing``: a sting's written end, before its reverb (LANDING=n: the
+    next cue starts there). The table reads both: table_server.loop_start."""
+    tags = " ".join(f"{k}={int(v)}" for k, v in (("LOOPSTART", loop_start), ("LANDING", landing)) if v)
     import soundfile as sf
     out.parent.mkdir(parents=True, exist_ok=True)
     try:
         # In blocks: libsndfile's OGG encoder can crash on one very long write.
         channels = 1 if getattr(samples, "ndim", 1) == 1 else samples.shape[1]
         with sf.SoundFile(str(out), "w", samplerate=rate, channels=channels) as f:
-            if loop_start:
-                f.comment = f"LOOPSTART={int(loop_start)}"
+            if tags:
+                f.comment = tags
             for i in range(0, len(samples), 1 << 16):
                 f.write(samples[i:i + (1 << 16)])
         return out
     except Exception:
         wav = out.with_suffix(".wav")
         with sf.SoundFile(str(wav), "w", samplerate=rate, channels=channels) as f:
-            if loop_start:
-                f.comment = f"LOOPSTART={int(loop_start)}"
+            if tags:
+                f.comment = tags
             f.write(samples)
         return wav
 

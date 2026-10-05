@@ -230,16 +230,18 @@ def audio_seconds(path: Path) -> Optional[float]:
         return None
 
 
-def loop_start(path: Path) -> Optional[float]:
+def loop_start(path: Path, tag: str = "LOOPSTART") -> Optional[float]:
     """Where a loop with an entry loops back to, in seconds (its LOOPSTART=<sample> tag,
-    written by music_compose.write), or None: a plain loop, from the top."""
+    written by music_compose.write), or None: a plain loop, from the top. With tag
+    "LANDING": where a sting's written music ends - the next cue starts there, while
+    its reverb rings on."""
     try:
         with open(path, "rb") as f:
             head = f.read(1 << 16)
-        i = head.find(b"LOOPSTART=")
+        i = head.find(tag.encode() + b"=")
         if i < 0:
             return None
-        digits = head[i + 10:i + 22]
+        digits = head[i + len(tag) + 1:i + len(tag) + 13]
         n = int(digits[:len(digits) - len(digits.lstrip(b"0123456789"))] or 0)
         if path.suffix.lower() == ".wav":
             rate = int.from_bytes(head[24:28], "little")
@@ -590,8 +592,9 @@ class TableState:
 
     def boss_music(self, name: str, stage: Optional[int] = None, via: Optional[str] = None,
                    hit: bool = False, end: Optional[str] = None) -> Dict[str, Any]:
-        """Move a boss fight's music on: to a stage (through a rise or a break: the new loop
-        starts as the sting ends), an accent over the loop (hit), or an ending (victory,
+        """Move a boss fight's music on: to a stage - a number or "pre_end", the finale's
+        short last loop - (through a rise or a break: the new loop starts where the sting
+        lands), an accent over the loop (hit), or an ending (victory,
         requiem, escape, wipe: played once, then quiet). Raises ValueError if the cue
         isn't there."""
         name = " ".join(str(name).split())
@@ -614,24 +617,31 @@ class TableState:
                 raise ValueError("an ending is victory, requiem, escape or wipe")
             f = cue(end)
             return self.set_music(f.name, 0.75, False, f"{name}: {end}", mood="boss", theme=name)
-        stage = int(stage or 1)
-        loop = self.boss_cue(name, f"stage{stage}")
+        if str(stage).replace("-", "_") == "pre_end":
+            stage, tag = "pre_end", "pre_end"
+        else:
+            stage = int(stage or 1)
+            tag = f"stage{stage}"
+        loop = self.boss_cue(name, tag)
         if loop is None and stage == 1:
             track = self.theme_track(name, True)               # (their boss version)
         elif loop is None:
-            raise ValueError(f"no stage{stage} cue for {name}: {composer.slug(name)}-stage{stage}.ogg in music/")
+            raise ValueError(f"no {tag} cue for {name}: {composer.slug(name)}-{tag}.ogg in music/")
         else:
             track = loop.name
         sting = cue(via) if via else None
         if via and via not in ("rise", "break"):
             raise ValueError("a stage is entered through a rise or a break")
-        self.set_music(track, 0.7, True, f"{name}, stage {stage}", mood="boss", theme=name, boss=True)
+        self.set_music(track, 0.7, True, f"{name}, " + ("the end nears" if stage == "pre_end" else f"stage {stage}"),
+                       mood="boss", theme=name, boss=True)
         with self.lock:
             self.music["stage"] = stage
             if sting is not None:
                 now = time.time()
                 self.music["sting"] = {"id": int(now * 1000), "src": sting.name, "started_at": now}
-                self.music["started_at"] = now + (audio_seconds(sting) or 4.0)   # the loop starts as the sting ends
+                self.music["via"] = via                    # (a rise builds over the old loop; a break cuts it)
+                lands = loop_start(sting, "LANDING") or audio_seconds(sting) or 4.0
+                self.music["started_at"] = now + lands     # the loop starts where the sting lands
             self._save_music()
             return dict(self.music)
 
@@ -4546,11 +4556,11 @@ def main() -> None:
         if args.track == "boss":
             what = args.extra
             if not args.value or what not in ("stage", "hit", "end"):
-                sys.exit('Usage: gm-table.sh music boss "<name>" stage <N> [--via rise|break] | hit | '
+                sys.exit('Usage: gm-table.sh music boss "<name>" stage <N>|pre_end [--via rise|break] | hit | '
                          'end victory|requiem|escape|wipe')
             body = {"boss_fight": args.value}
             if what == "stage":
-                body.update(stage=int(args.more or 1), via=args.via)
+                body.update(stage=args.more if args.more == "pre_end" else int(args.more or 1), via=args.via)
             elif what == "hit":
                 body["hit"] = True
             else:

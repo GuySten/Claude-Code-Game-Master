@@ -321,3 +321,13 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   then a loop body that drops back and builds to its own peak (`boss-music.md` rule 6,
   `"loop_from"`). Lesson: a rule drawn from one verdict is checked against the research
   before it is written broadly.
+- **The workflow checked against the research** (the host: "compare our workflow against
+  research and look for problems"). Found and fixed: the table faded every stage in
+  and out (a stage now cuts in, a rise builds over the old loop and lands on the new
+  stage, a break cuts it); stage loops were half the research's length (now 2.5 min at
+  least); stages varied the tune until it couldn't be recognised (now stated whole each
+  loop; invert/retro/alter for a story reason); a stage's event had taken over the
+  carrying concept (now a strong concept; the identity carries); escalation by level
+  (now by colour, loops level-matched); choir rules disagreed; the pre-end could not be
+  played. "Stage 1 started too strong" was a "maybe" and is superseded by the stage
+  entries. Not built yet: a sparse alternate of each stage for speech, quantised switches.

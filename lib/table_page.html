@@ -1107,7 +1107,8 @@
         if (!m.loop && elapsed >= dur) return;          // a one-shot that already finished
         try { el.currentTime = m.loop ? elapsed % dur : Math.max(0, elapsed); } catch (e) {}
       }
-      el.play().then(() => fadeAudio(el, level, 1500))
+      const at_once = m.mood === "boss" && elapsed < 1;          // (a late joiner fades in)
+      el.play().then(() => { if (at_once) el.volume = level; else fadeAudio(el, level, 1500); })
         .catch(() => { pendingPlay = start; setStatus(t("tapForMusic"), true); });
     };
     el.addEventListener("loadedmetadata", start, { once: true });
@@ -1133,9 +1134,12 @@
     }, 5000);
     return {
       setLevel(v) { level = v; if (!el.paused) el.volume = v; },
-      stop() {
-        live = false; clearInterval(resync); clearTimeout(nudge);
-        fadeAudio(el, 0, 1200, () => { el.pause(); el.removeAttribute("src"); el.load(); });
+      stop(ms = 1200, after = 0) {
+        live = false; clearInterval(resync);
+        setTimeout(() => {
+          clearTimeout(nudge);
+          fadeAudio(el, 0, ms, () => { el.pause(); el.removeAttribute("src"); el.load(); });
+        }, after * 1000);
       },
     };
   }
@@ -1431,7 +1435,7 @@
       mark = { ctx: ctx.currentTime, e };
       gain.gain.cancelScheduledValues(ctx.currentTime);
       gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
-      gain.gain.linearRampToValueAtTime(level, ctx.currentTime + (e < 0 ? 0.05 : 1.5));
+      gain.gain.linearRampToValueAtTime(level, ctx.currentTime + (e < 1 ? 0.03 : 1.5));
     };
     fetch("/music/" + encodeURIComponent(m.src) + "?code=" + encodeURIComponent(code))
       .then((r) => r.arrayBuffer())
@@ -1451,12 +1455,13 @@
         gain.gain.cancelScheduledValues(ctx.currentTime);
         gain.gain.setTargetAtTime(v, ctx.currentTime, 0.1);
       },
-      stop() {
+      stop(ms = 1200, after = 0) {
         live = false; clearInterval(resync);
+        const t0 = ctx.currentTime + after;
         gain.gain.cancelScheduledValues(ctx.currentTime);
-        gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.2);
-        setTimeout(() => { try { src && src.stop(); } catch (e) {} gain.disconnect(); }, 1400);
+        gain.gain.setValueAtTime(gain.gain.value, t0);
+        gain.gain.linearRampToValueAtTime(0, t0 + ms / 1000);
+        setTimeout(() => { try { src && src.stop(); } catch (e) {} gain.disconnect(); }, after * 1000 + ms + 200);
       },
     };
   }
@@ -1484,7 +1489,15 @@
     musicState = m || null;
     updateMusicToggle();
     if (!changed) return levelChanged();
-    if (track) { track.stop(); track = null; }
+    // A boss fight's cues cut in on time (combat starts at once; a fail cue cuts straight
+    // in). A rise builds over the old loop until the new stage lands; a break's impact
+    // cuts it.
+    const cut = m && m.mood === "boss";
+    if (track) {
+      const lands = cut && m.via === "rise" ? Math.max(0, (m.started_at || 0) - (Date.now() + skew) / 1000) : 0;
+      track.stop(cut ? 120 : 1200, lands);
+      track = null;
+    }
     if (!m || !m.track || !musicOn) return;
     track = m.kind === "ambient" ? ambientTrack(m)
           : m.kind === "theme" ? ambientTrack(m, themeBuilder(m.src, !!m.boss))

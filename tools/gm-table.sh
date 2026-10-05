@@ -15,7 +15,7 @@
 #   gm-table.sh say "..." --theme "Lich" --boss   An enemy's own theme (boss = exciting version)
 #   gm-table.sh music <track>|list|stop   Shared background music for every player
 #   gm-table.sh music theme "<enemy>" [file]      Play / assign an enemy's theme
-#   gm-table.sh music boss "<boss>" stage 2 [--via rise|break] | hit | end victory|requiem|escape|wipe
+#   gm-table.sh music boss "<boss>" stage 2|pre_end [--via rise|break] | hit | end victory|requiem|escape|wipe
 #                                                 A named boss's fight in stages (its <boss>-<cue> files)
 #   gm-table.sh say "..." --theme "Lich" --villain --look "..."  A main villain (composed theme, portrait)
 #   gm-table.sh say "..." --heroic "<pc>"  A PC's heroic moment: their anthem, then the scene's music
@@ -77,7 +77,7 @@ case "$ACTION" in
         echo "  round <seconds>|off           How long the GM waits for everyone once someone acts"
         echo "  alias \"<name>\" \"<spelling>\"   Another spelling of a name, for the hover cards"
         echo "  music theme \"<enemy>\" [file]  Play / assign an enemy's theme; music themes lists them"
-        echo "  music boss \"<boss>\" stage N [--via rise|break] | hit | end victory|requiem|escape|wipe"
+        echo "  music boss \"<boss>\" stage N|pre_end [--via rise|break] | hit | end victory|requiem|escape|wipe"
         echo "                                A boss fight in stages: its <boss>-stageN / -rise / -break / -hit /"
         echo "                                -victory / -requiem / -escape / -wipe files in music/"
         echo "  music auto on|off             Let --mood change the music (default on)"
