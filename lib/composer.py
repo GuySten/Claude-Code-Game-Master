@@ -87,16 +87,7 @@ def available() -> bool:
     return composer_python() is not None
 
 
-def slug(name: str) -> str:
-    """A file-name stem for a piece. A name with letters outside a-z (קסטרל)
-    gets a short fingerprint of the whole name, or every Hebrew name would come
-    out as the same "piece" and overwrite the others' music."""
-    name = str(name)
-    base = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:40]
-    if re.fullmatch(r"[\x00-\x7f]*", name) and base:
-        return base
-    tag = hashlib.sha1(name.strip().encode("utf-8")).hexdigest()[:8]
-    return f"{base}-{tag}" if base else f"piece-{tag}"
+from music import slug  # noqa: E402,F401  (a piece's file-name stem; the music package's)
 
 
 def flavor(campaign_dir) -> str:
