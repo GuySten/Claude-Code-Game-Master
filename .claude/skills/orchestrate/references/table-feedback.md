@@ -276,3 +276,7 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   corruption a layer. Now: the subject's defining trait carries and the cue's job is the
   frame (section 1, step 2; SKILL translator step 1); Corruption as a main feature puts
   the victim clean first and the damage in the foreground (its Intensity line).
+  And the underlying problem, in the host's words: "Battle or combat could be in the
+  theme of a lot of dnd pieces but it's not unique. We should use it sparingly, maybe
+  if the players participate in war." Now combat is the cue's frame (role: battle), not
+  a concept for a foe; only distinctive concepts go into a brief.
