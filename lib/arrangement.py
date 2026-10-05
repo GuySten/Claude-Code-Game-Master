@@ -58,6 +58,17 @@ except in "hits" and "rolls", where it is the velocity itself (1-127).
   ],                     # [at, pitch, units, (vel offset), ({"slide": semitones over the
                          # note, "wobble": an uneven vibrato's depth in semitones})] - for
                          # one voice at a time (a solo line): a bend moves the whole part
+  "motifs": {"call": [[0, "D4", 1], [1, "A4", 1], [2, "D5", 2], [4, "A4", 2]]},
+                         # a theme written ONCE (times from 0), then placed in "lines" as
+                         # often as wanted, each time transformed - instead of writing
+                         # its notes again:
+                         # {"part": "trombones", "motif": "call", "at": 16, "shift": 3,
+                         #  "stretch": 2, "alter": {"2": -1}, "repeat": 2, "every": 8}
+                         # shift (semitones) or octave; stretch 2 = twice as slow (0.5:
+                         # twice as fast); invert (mirrored round its first note); retro
+                         # (backwards); take [i, j] (a fragment: notes i..j-1); alter
+                         # {note index: semitones, or a pitch} - the corrupted interval;
+                         # repeat / every; "notes" may be added to the same line too
   "patterns": [          # percussion (or any part) on one note, in a rhythm
     {"part": "kit", "note": "snare", "from": 36, "to": 60, "pattern": "xoooox", "vel": -30},
     {"part": "timpani", "note": "root", "from": 0, "to": 84, "pattern": "x     ", "vel": -6}
@@ -271,8 +282,67 @@ def build(spec: Dict[str, Any]) -> Tuple["orchestra.Score", float, Optional[floa
     return ctx["score"], ctx["seconds"], ctx["loop"]
 
 
+def expand_motifs(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """The spec with every "lines" entry that places a motif written out as plain notes.
+    A motif is written once ("motifs": {name: notes from time 0}) and placed as often as
+    wanted, each time transformed: shift (semitones) / octave, stretch (time), invert
+    (mirrored round its first note), retro (backwards), take [i, j] (a fragment: notes
+    i..j-1), alter {index: semitones or a pitch} (the corrupted interval), repeat / every."""
+    motifs = spec.get("motifs") or {}
+    if not any(isinstance(l, dict) and "motif" in l for l in spec.get("lines") or []):
+        return spec
+    lines = []
+    for line in spec.get("lines") or []:
+        if "motif" not in line:
+            lines.append(line)
+            continue
+        name = line["motif"]
+        if name not in motifs:
+            raise ArrangementError(f"no such motif: {name!r} (motifs: {', '.join(motifs) or 'none'})")
+        src = [list(n) for n in motifs[name]]
+        if not src:
+            raise ArrangementError(f"motif {name!r} has no notes")
+        idx = list(range(len(src)))
+        if line.get("take"):
+            i, j = (list(line["take"]) + [len(src)])[:2]
+            idx = idx[int(i):int(j)]
+            if not idx:
+                raise ArrangementError(f"motif {name!r}: take {line['take']} leaves no notes")
+        p0 = pitch(src[idx[0]][1])
+        t0 = min(float(src[i][0]) for i in idx)
+        end = max(float(src[i][0]) + float(src[i][2]) for i in idx)
+        stretch = float(line.get("stretch", 1))
+        move = int(line.get("shift", 0)) + 12 * int(line.get("octave", 0))
+        alter = {int(k): v for k, v in (line.get("alter") or {}).items()}
+        bad = [k for k in alter if k not in idx]
+        if bad:
+            raise ArrangementError(f"motif {name!r}: alter names note(s) {bad} it doesn't play")
+        placed = []
+        for i in idx:
+            n = src[i]
+            at, d = float(n[0]) - t0, float(n[2])
+            if line.get("retro"):
+                at = (end - t0) - (at + d)
+            p = pitch(n[1])
+            if line.get("invert"):
+                p = 2 * p0 - p
+            p += move
+            if i in alter:
+                p = pitch(alter[i]) if isinstance(alter[i], str) else p + int(alter[i])
+            placed.append([at * stretch, p, d * stretch] + list(n[3:]))
+        placed.sort(key=lambda n: n[0])
+        reps, every = int(line.get("repeat", 1)), float(line.get("every", (end - t0) * stretch))
+        notes = [[float(line.get("at", 0)) + k * every + n[0]] + n[1:] for k in range(reps) for n in placed]
+        out = {k: v for k, v in line.items() if k not in
+               ("motif", "at", "shift", "octave", "stretch", "invert", "retro", "take", "alter", "repeat", "every")}
+        out["notes"] = notes + list(line.get("notes") or [])
+        lines.append(out)
+    return {**spec, "lines": lines}
+
+
 def _build(spec: Dict[str, Any]) -> Dict[str, Any]:
     """build(), with what the score critic needs too: the tune, the chords, the clock."""
+    spec = expand_motifs(spec)
     t = dict(spec.get("tune") or {})
     if not t.get("seed"):
         raise ArrangementError('"tune": {"seed": ...} is needed (the character\'s name)')
@@ -527,6 +597,7 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
     "warn" (very likely heard), "note" (a choice to confirm). ``listen``: also
     render it, to measure what's heard (the tune over the rest, the choir, a loop's
     seam): a few seconds."""
+    spec = expand_motifs(spec)
     ctx = _build(spec)
     sc, tune, T, unit = ctx["score"], ctx["tune"], ctx["T"], ctx["unit"]
     bar = tune["bar"]

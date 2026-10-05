@@ -195,3 +195,42 @@ def test_a_falling_bend_on_brass_is_flagged_as_comic_and_a_sliding_part_with_cho
     assert not any(m.startswith("violins:") for m in found)          # a string slide is fine
     spec["role"] = "comic"
     assert not any("comic" in m for _, m in arrangement.check(spec, listen=False))
+
+
+def test_a_motif_is_written_once_and_placed_transformed():
+    import arrangement
+    spec = {"motifs": {"call": [[0, "D4", 1], [1, "A4", 1], [2, "D5", 2]]},
+            "lines": [{"part": "horns", "motif": "call", "at": 8},
+                      {"part": "trombones", "motif": "call", "at": 16, "shift": -12, "stretch": 2,
+                       "alter": {"1": -1}, "repeat": 2, "every": 8, "vel": -4},
+                      {"part": "violins", "motif": "call", "at": 0, "invert": True, "take": [0, 2]},
+                      {"part": "cellos", "motif": "call", "at": 0, "retro": True, "octave": -1,
+                       "notes": [[6, "D3", 1]]}]}
+    lines = arrangement.expand_motifs(spec)["lines"]
+    assert lines[0]["notes"] == [[8.0, 62, 1.0], [9.0, 69, 1.0], [10.0, 74, 2.0]]
+    tb = lines[1]["notes"]
+    assert [n[0] for n in tb] == [16.0, 18.0, 20.0, 24.0, 26.0, 28.0]          # twice as slow, twice
+    assert [n[1] for n in tb[:3]] == [50, 56, 62]                              # an octave down, the fifth bent to a tritone
+    assert lines[1]["vel"] == -4 and "motif" not in lines[1]
+    assert lines[2]["notes"] == [[0.0, 62, 1.0], [1.0, 55, 1.0]]                # mirrored: up a fifth becomes down a fifth
+    assert [n[1] for n in lines[3]["notes"]] == [62, 57, 50, "D3"]              # backwards, an octave down, plus a note
+    assert lines[3]["notes"][0][0] == 0.0 and lines[3]["notes"][-1] == [6, "D3", 1]
+
+
+def test_a_misnamed_motif_is_an_error_that_names_the_ones_there_are():
+    import arrangement, pytest as _pt
+    with _pt.raises(arrangement.ArrangementError, match="call"):
+        arrangement.expand_motifs({"motifs": {"call": [[0, "D4", 1]]}, "lines": [{"part": "horns", "motif": "cal"}]})
+
+
+def test_a_score_written_with_motifs_checks_and_builds():
+    import arrangement
+    spec = {"tune": {"seed": "sketch", "key": "D4", "meter": "4/4"}, "statements": [], "length": 16,
+            "chords": [[0, 16, "i"]],
+            "harmony": [{"part": "strings", "from": 0, "to": 16, "play": "chord", "range": ["D3", "A4"]}],
+            "motifs": {"call": [[0, "D4", 1], [1, "A4", 1], [2, "D5", 2]]},
+            "lines": [{"part": "horns", "motif": "call", "at": 0, "repeat": 4, "every": 4}]}
+    ctx = arrangement._build(spec)
+    horns = [e for e in ctx["score"].events if e[1] and e[2].partition(":")[0] == "horns"]
+    assert len(horns) == 12
+    assert not [m for lvl, m in arrangement.check(spec, listen=False) if lvl == "error"]

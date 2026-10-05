@@ -145,6 +145,14 @@ in motion at once besides the tune; the critic counts them (give a battle score
 `"role": "battle"`). The professional tracks that outscored ours were the denser
 ones.
 
+**Write a theme once, as a motif.** Put each recurring idea in `"motifs"` and place
+it in `"lines"` transformed (`shift`/`octave`, `stretch`, `invert`, `retro`, `take`,
+`alter`, `repeat`/`every`) instead of writing its notes again: the corrupted call is
+the hero's call with `"alter": {"2": -1}`, the phase-2 vow is the vow with
+`"stretch": 2`. It is faster to write, keeps every return true to the original, and
+shows the development at a glance (a composer wrote note by note took 8-12 minutes
+for a battle loop).
+
 **Spend the surprise once: the tune or the setting.** In the host's 2x2 test
 (a simple vs a surprising tune, in a supportive vs a rich arrangement) the
 winners were the simple tune richly set and the surprising tune plainly set;
