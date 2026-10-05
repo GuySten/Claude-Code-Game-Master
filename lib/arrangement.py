@@ -29,7 +29,7 @@ except in "hits" and "rolls", where it is the velocity itself (1-127).
                          # critic checks it keeps several lines moving)
   "ritard": {"from": 84, "amount": 0.4},     # slowing to the end (40% slower at the last note)
   "dynamics": [[-12, 60], [0, 80], [36, 96], [60, 124]],   # velocity, linear between points
-  "statements": [{"at": 0}],                 # where the tune is played (default: once, at 0);
+  "statements": [{"at": 0}],                 # where the tune is played (default: once, at 0; [] for none);
                          # optional "from"/"to" (a slice of the tune, in its own units) and
                          # "shift" (semitones): {"at": 96, "from": 0, "to": 36, "shift": -12}
   "keys": [{"from": 96, "to": 192, "shift": 2}],  # a key change: the chords there are read in
@@ -276,7 +276,8 @@ def _build(spec: Dict[str, Any]) -> Dict[str, Any]:
         notes.append((u, b, st))
         u += b
     tune_len = u
-    statements = spec.get("statements") or [{"at": 0}]
+    # (an explicit empty list: no tune at all - a sketch whose melody is written in "lines")
+    statements = spec["statements"] if isinstance(spec.get("statements"), list) else [{"at": 0}]
     played = []                                                 # (time, units, MIDI as written)
     for s in statements:
         at, lo, hi = float(s.get("at", 0)), float(s.get("from", 0)), float(s.get("to", tune_len))
@@ -674,7 +675,7 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
                         "and bring the new parts in waves")
     # The surprise budget: a surprising tune wants a supportive setting, a simple tune
     # a rich one (the host's 2x2: those pairings beat both-plain and both-rich).
-    budget = surprise_budget(ctx, spec) if host_checks else None
+    budget = surprise_budget(ctx, spec) if host_checks and ctx["played"] else None
     if budget:
         tune_pct, chromatic, changes, verdict = budget
         if verdict == "both":
