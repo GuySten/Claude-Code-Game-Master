@@ -87,6 +87,11 @@ def test_the_finals_judge_finished_pieces(tmp_path):
                                                               "confidence": 90}}))
     d = hj.decide_finals(out)
     assert d["ranking"][0][0] == str(files[1]) and d["ask_host"] is None
+    # A close call: the host is asked about their own characters; an NPC's is decided here.
+    (out / "verdicts.json").write_text(json.dumps({"pair00": {"prefer": "X", "confidence": 52}}))
+    assert hj.decide_finals(out)["ask_host"] and hj.decide_finals(out)["winner"] is None
+    npc = hj.decide_finals(out, ask=False)
+    assert npc["ask_host"] is None and npc["winner"] == npc["ranking"][0][0] and npc["close"]
 
 
 def test_a_blind_score_carries_no_names():

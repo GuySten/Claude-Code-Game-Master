@@ -294,9 +294,11 @@ def prepare_finals(files: List[Path], out: Path, seed: int = 0) -> Dict[str, Any
     return state
 
 
-def decide_finals(out: Path) -> Dict[str, Any]:
+def decide_finals(out: Path, ask: bool = True) -> Dict[str, Any]:
     """The finished pieces ranked: the critic and the surprise budget first (a piece
-    with errors, warnings or an unbalanced budget loses), then the blind reader."""
+    with errors, warnings or an unbalanced budget loses), then the blind reader.
+    ``ask=False`` (an important NPC: the host chooses only their own characters'
+    tunes): a close call is decided here too, by the ranking."""
     state = json.loads((out.parent / f"{out.name}.key.json").read_text(encoding="utf-8"))
     verdicts = json.loads((out / "verdicts.json").read_text(encoding="utf-8"))
     cands = state["candidates"]
@@ -317,7 +319,8 @@ def decide_finals(out: Path) -> Dict[str, Any]:
     close = (len(ranking) > 1 and cands[ranking[0]]["checks"]["score"] == cands[ranking[1]]["checks"]["score"]
              and share[ranking[0]] - share[ranking[1]] < CLOSE / 2)
     return {"ranking": [(c, round(share[c], 3), cands[c]["checks"]) for c in ranking],
-            "ask_host": [ranking[0], ranking[1]] if close else None}
+            "ask_host": [ranking[0], ranking[1]] if close and ask else None,
+            "winner": None if close and ask else ranking[0], "close": bool(close)}
 
 
 # --- asking the host ---
@@ -387,6 +390,8 @@ def main() -> None:
     fz.add_argument("step", choices=["prepare", "decide"])
     fz.add_argument("files", nargs="*")
     fz.add_argument("--out", required=False)
+    fz.add_argument("--no-host", action="store_true",
+                    help="an important NPC: decide close calls too (the host picks only their own characters')")
     c = sub.add_parser("clips")
     c.add_argument("files", nargs=2)
     c.add_argument("--out", required=True)
@@ -412,7 +417,7 @@ def main() -> None:
                               "next": f"a fresh agent reads {a.out}/README.txt and writes {a.out}/verdicts.json"},
                              indent=1, ensure_ascii=False))
         else:
-            print(json.dumps(decide_finals(Path(a.out or a.files[0])), indent=1, ensure_ascii=False))
+            print(json.dumps(decide_finals(Path(a.out or a.files[0]), ask=not a.no_host), indent=1, ensure_ascii=False))
     elif a.cmd == "clips":
         print("\n".join(str(p) for p in clips([Path(f) for f in a.files], Path(a.out))))
     elif a.cmd == "record":

@@ -20,10 +20,23 @@ So the loop below is not optional ceremony; it's how you hear.
 
 ## The loop
 
-0. **Main characters: write the tune yourself** (the host clearly preferred
+0. **Important characters: write the tune yourself** (the host clearly preferred
    hand-written tunes to the generator's): `references/tunes.md`. Write three
-   candidates, different in hook and rhythm, and let the **host judge** pick
-   (below). Everyone else gets the generator's (gen 2).
+   candidates from the character's **distinctive concepts** (the translator's, below:
+   the mode, the hook's interval and rhythm come from who they are), different in
+   hook and rhythm, each passing the memorability floor; let the **host judge** pick
+   (below). Who counts:
+   - **the party** - the host's own characters: a close call in the finals goes to
+     the host;
+   - **important NPCs** - bosses, main villains, main allies, unique summons: the
+     same workflow, decided automatically (`host_judge.py finals decide --no-host`);
+     the host isn't asked to choose (host: "a workflow that is similar to the players
+     but without me picking from two").
+   Do it when they're introduced, in prep - never compose a boss's fight before its
+   tune exists. A boss's fight carries that tune in every stage (`"motifs"`):
+   the host couldn't tell whether the Ashen Saint's second stage had the first
+   stage's tune, because her improvised one (scored 4.0-5.0) was unmemorable.
+   Everyone else gets the generator's (gen 2).
 1. **Read the tune.**
    `python lib/arrangement.py tune "<seed>" --class <Class> [--minor] [--stage N] [--dark N]`
    (on the host's laptop: `bash tools/gm-music-compose.sh tune "<name>" [--minor]`).

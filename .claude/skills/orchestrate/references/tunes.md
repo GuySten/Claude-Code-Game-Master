@@ -38,6 +38,22 @@ generator's) unless "key" is given. Save it in the campaign's
 - Singable: range up to ~16-19 semitones, leaps up to an octave (filled in by
   steps afterwards).
 
+## Memorable: the floor (every important character)
+
+The host recognises a character by the tune in every form - a boss's every stage, a
+villain's every return. So each candidate needs:
+- **a cell that repeats** - a short figure heard at least twice in the tune (the
+  scorer's motif repetition must not be 0);
+- **a rhythm you could tap** that belongs to this character, not "long notes then a
+  long note";
+- **one characteristic interval** from their concepts (holiness: the sacred
+  Phrygian flat 2 or a Lydian 4; corruption: the tritone at the harm; grief: the
+  falling semitone sigh) placed in the hook;
+- **a composite of at least 6.5** in `tune_score.py` (the host's picked tunes scored
+  6.6-7.2; the Ashen Saint's improvised vow scored 4.0 and her lament 5.0, and the
+  host couldn't follow her through her two stages). A lament or a chorale can be
+  slower than a folk tune - but not without a cell that returns.
+
 ## Check it
 
 `python lib/tune_score.py --json <tune.json>` scores it against 3,000 real folk
