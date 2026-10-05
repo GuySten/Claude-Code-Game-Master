@@ -226,9 +226,11 @@ def decide_tunes(out: Path) -> Dict[str, Any]:
     share = {c: wins[c] / games[c] if games[c] else .5 for c in cands}
     ranking = sorted(cands, key=lambda c: (share[c], cands[c]["composite"]), reverse=True)
     close = len(ranking) > 1 and share[ranking[0]] - share[ranking[1]] < CLOSE / 2
-    finalists = [c for c in ranking if not versatility(cands[c]["spec"])][:2]
+    weak = {c: versatility(cands[c]["spec"]) for c in ranking}
+    finalists = [c for c in ranking if not weak[c]][:2]
     return {"ranking": [(c, round(share[c], 3), cands[c]["composite"]) for c in ranking],
             "dropped": {c: d["flags"] for c, d in state["dropped"].items()},
+            "not_versatile": {c: f for c, f in weak.items() if f},   # (why a well-ranked tune isn't a finalist)
             "finalists": finalists,            # (to be arranged and judged as finished pieces)
             "close": close}
 
