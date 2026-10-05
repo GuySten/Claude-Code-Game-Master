@@ -280,3 +280,9 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   theme of a lot of dnd pieces but it's not unique. We should use it sparingly, maybe
   if the players participate in war." Now combat is the cue's frame (role: battle), not
   a concept for a foe; only distinctive concepts go into a brief.
+- **Identity or moment** (the host, after combat was made a frame): "Heroism should be
+  reserved for paladins and heroes not for every bard player. Heroism could apply to the
+  players if they are currently doing something heroic like battling a dragon." The
+  index had sent "adventurer", "protagonist" and "the party's theme" to Heroism. Now a
+  portrait takes only distinctive concepts; a situation's concept is a moment, played as
+  the character's own theme in that form.

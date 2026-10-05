@@ -191,7 +191,9 @@ composer's brief this way - the same for every character, so nothing is tuned to
    the *strong* ones, the *colours* - only **distinctive** concepts, what sets this subject
    apart; the subject's **defining trait carries**. A battle or a lament is the cue's job,
    the frame (the format's `role`: tempo, drive, form), never a concept - combat and war only
-   where the fighting is the subject (a war, a siege, a defining duel). Always decide **stature** (how much they weigh in the
+   where the fighting is the subject (a war, a siege, a defining duel). Identity, not
+   moment: heroism is in a paladin's or a champion's portrait, not every adventurer's; a
+   bard battling a dragon gets the bard's theme turned heroic for that scene. Always decide **stature** (how much they weigh in the
    story: a king or archvillain gets one grand climax, a minor figure stays small).
    Find them in `references/concepts-index.md` (keywords per concept).
 2. **Read only those entries** in `concepts.md` (search "#### <name>"), and its section 1
