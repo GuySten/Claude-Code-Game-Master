@@ -383,6 +383,13 @@ class TableState:
         self.ui_failed: Dict[str, float] = {}
         self.music_path = self.dir / "music.json"
         self.music: Dict[str, Any] = self._read_json(self.music_path, {})
+        # Tracks the players can see (the midnight clock, a PC's Ravel): "show the bomb" -
+        # a danger counts only if the table can watch it come (gm-craft, Decisions).
+        self.tracks_path = self.dir / "tracks.json"
+        tracks = self._read_json(self.tracks_path, [])
+        self.tracks: List[Dict[str, Any]] = tracks if isinstance(tracks, list) else []
+        # The stop signal (the X): it reaches the GM at once, past any round.
+        self.stop_signal: Optional[Dict[str, Any]] = None
         self.settings_path = self.dir / "settings.json"
         self.settings: Dict[str, Any] = self._read_json(self.settings_path, {})
         self.turn_times_path = self.dir / "turn-times.json"
@@ -676,6 +683,31 @@ class TableState:
             return time.mktime(time.strptime(msg.get("ts", ""), "%Y-%m-%dT%H:%M:%S"))
         except (TypeError, ValueError):
             return time.time()
+
+    def set_track(self, name: str, value: Optional[int] = None, maximum: Optional[int] = None,
+                  note: Optional[str] = None, remove: bool = False) -> List[Dict[str, Any]]:
+        """Show, move or remove a track on every player's page (a clock, a PC's Ravel)."""
+        name = " ".join(str(name).split())[:60]
+        if not name:
+            raise ValueError("a track needs a name")
+        with self.lock:
+            old = next((t for t in self.tracks if t["name"].lower() == name.lower()), None)
+            if remove:
+                self.tracks = [t for t in self.tracks if t is not old]
+            else:
+                t = dict(old or {"name": name, "value": 0, "max": 6})
+                if maximum is not None:
+                    t["max"] = max(1, min(20, int(maximum)))
+                if value is not None:
+                    t["value"] = max(0, min(t["max"], int(value)))
+                if note is not None:
+                    t["note"] = str(note)[:80]
+                t["changed_at"] = time.time()
+                self.tracks = [x for x in self.tracks if x is not old] + [t]
+            tmp = self.tracks_path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(self.tracks, indent=2), encoding="utf-8")
+            tmp.replace(self.tracks_path)
+            return [dict(t) for t in self.tracks]
 
     def round_state(self, now: Optional[float] = None) -> Dict[str, Any]:
         """The round the GM will answer next: the actions it hasn't read yet. It
@@ -3329,7 +3361,7 @@ def make_handler(state: TableState, code: str, host_key: str):
                 if not self._is_host():
                     return self._err("host only", 403)
                 if url.path == "/api/gm/pending":
-                    return self._json({"ok": True, "round": state.round_state(),
+                    return self._json({"ok": True, "round": state.round_state(), "stop": state.stop_signal,
                                    "unread": len(state.gm_unread(mark=False)),
                                    "waiting_on": state.waiting_on(),
                                    "seated": sorted(set(state.seats.values())),
@@ -3353,6 +3385,7 @@ def make_handler(state: TableState, code: str, host_key: str):
                                    "round": state.round_state(),
                                    "lore_terms": state.lore_terms(me, q.get("lang")),
                                    "fight": state.fight_for(me),
+                                   "tracks": state.tracks,
                                    "languages": languages.describe(state.languages),
                                    "lang": state.lang_for(me),
                                    "narration_id": state.last_narration(me),
@@ -3503,6 +3536,14 @@ def make_handler(state: TableState, code: str, host_key: str):
                                    lang=lang, voice=bool(data.get("voice")))
                 return self._json({"ok": True, "message": msg})
 
+            if url.path == "/api/stop":
+                # The stop signal (gm-craft Safety): no reason needed, no round to wait for.
+                if not me:
+                    return self._err("Take a seat first.", 403)
+                state.stop_signal = {"pc": me, "at": time.time(),
+                                     "note": " ".join(str(data.get("note", "")).split())[:200]}
+                return self._json({"ok": True})
+
             if url.path == "/api/edit":
                 if not me:
                     return self._err("Take a seat first.", 403)
@@ -3563,6 +3604,12 @@ def make_handler(state: TableState, code: str, host_key: str):
         def _gm(self, path: str, data: Dict[str, Any]):
             if path == "/api/gm/inbox":
                 rnd = state.round_state()
+                stop, state.stop_signal = state.stop_signal, None
+                if stop:                            # the X outranks the round: nothing waits for it
+                    return self._json({"ok": True, "messages": [], "stop": stop, "round": rnd,
+                                       "waiting_on": rnd.get("waiting_on", []), "langs": state.seated_langs(),
+                                       "languages": state.languages,
+                                       "music": state.music, "auto_music": state.auto_music})
                 if rnd["open"] or rnd.get("settling"):
                     # The players are still acting (or just did, and may fix a typo):
                     # their actions wait.
@@ -3771,6 +3818,13 @@ def make_handler(state: TableState, code: str, host_key: str):
                 return
             if path == "/api/gm/activity":
                 return self._json({"ok": state.set_stage(str(data.get("stage", "")))})
+            if path == "/api/gm/track":
+                try:
+                    tracks = state.set_track(str(data.get("name", "")), data.get("value"), data.get("max"),
+                                             data.get("note"), bool(data.get("remove")))
+                except (TypeError, ValueError) as e:
+                    return self._err(str(e))
+                return self._json({"ok": True, "tracks": tracks})
             if path == "/api/gm/round":
                 if "seconds" in data:
                     try:
@@ -4143,8 +4197,9 @@ def _call(campaign_dir: Path, method: str, path: str, data: Optional[dict] = Non
 
 def _print_redo_missed(r: dict) -> None:
     if r.get("redo_missed"):
-        print(f"TIME UP: {', '.join(r['redo_missed'])} chose no new action — they hesitate and "
-              f"lose the moment. Resolve the round (the actions read before) without them.")
+        print(f"TIME UP: {', '.join(r['redo_missed'])} chose no new action in time — they hold their "
+              f"action this round (nothing worse). Resolve the round without them, and offer them the "
+              f"first move next round.")
 
 
 def _print_translate_request(needed: List[dict]) -> None:
@@ -4347,6 +4402,12 @@ def main() -> None:
     lg.add_argument("codes", nargs="*", help="ISO codes, the main one first: en he fr ... "
                                              "(omit to show the current ones)")
 
+    tk = sub.add_parser("track", help="Show a track on every player's page: a clock, a PC's Ravel "
+                                      "(say every change aloud too)")
+    tk.add_argument("name", nargs="?", help="The track's name ('list' to see them)")
+    tk.add_argument("value", nargs="?", help="<value>[/<max>] (e.g. 2/6), or 'off' to hide it")
+    tk.add_argument("--note", help="A short line under it (e.g. 'ten o'clock')")
+
     ro = sub.add_parser("round", help="How long the GM waits for everyone once the first player acts")
     ro.add_argument("value", nargs="?", help="Seconds (default 60), or 'off'. Omit to show it.")
 
@@ -4421,6 +4482,35 @@ def main() -> None:
                   + ". wait lists the players' actions to translate.")
         return
 
+    if args.action == "track":
+        if not args.name or args.name == "list":
+            state = TableState(campaign_dir, str(CampaignManager().world_state_dir))
+            for t in state.tracks:
+                print(f"{t['name']}: {t['value']}/{t['max']}" + (f" ({t['note']})" if t.get("note") else ""))
+            if not state.tracks:
+                print("No tracks shown.")
+            return
+        body = {"name": args.name}
+        if args.value in ("off", "remove", "hide"):
+            body["remove"] = True
+        elif args.value:
+            v, _, m = args.value.partition("/")
+            try:
+                body["value"] = int(v)
+                if m:
+                    body["max"] = int(m)
+            except ValueError:
+                sys.exit('Usage: gm-table.sh track "<name>" <value>[/<max>] [--note "..."] | off')
+        if args.note is not None:
+            body["note"] = args.note
+        r = _call(campaign_dir, "POST", "/api/gm/track", body)
+        if not r.get("ok"):
+            sys.exit(f"[ERROR] {r.get('error')}")
+        t = next((x for x in r["tracks"] if x["name"].lower() == args.name.lower()), None)
+        print(f"TRACK {args.name}: " + (f"{t['value']}/{t['max']}" + (f" ({t['note']})" if t.get("note") else "")
+                                        if t else "hidden"))
+        return
+
     if args.action == "round":
         body = {}
         if args.value:
@@ -4450,6 +4540,8 @@ def main() -> None:
             if rnd.get("settling"):                 # a player may still be fixing a typo
                 time.sleep(max(0.2, min(1.0, rnd["ready_at"] - time.time() + 0.05)))
                 continue
+            if r.get("stop"):
+                break                               # the X: at once, past any round
             if rnd.get("redo") and rnd.get("timed_out"):
                 break                               # chose nothing new in time
             if r.get("unread") and rnd.get("seconds"):
@@ -4466,6 +4558,12 @@ def main() -> None:
                         break
             time.sleep(1.0)
         r = _call(campaign_dir, "POST", "/api/gm/inbox", {})
+        if r.get("stop"):
+            s = r["stop"]
+            print(f"STOP: {s['pc']} raised the stop signal (X){': ' + s['note'] if s.get('note') else ''}. "
+                  "Halt the scene now - no questions about why. Rewind or skip the moment, check in "
+                  "with them privately (say --to), and only go on when they're ready (gm-craft Safety).")
+            return
         if r.get("held"):
             print(f"(the players are still acting — run wait again)")
             return

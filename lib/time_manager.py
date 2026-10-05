@@ -39,10 +39,11 @@ def ticks_for_elapsed(ticks: Optional[int] = None, duration: Optional[str] = Non
     """Resolve clock ticks for a time advance.
 
     Explicit ticks win over duration. Default (neither given) is 1, so a
-    Dawn→Noon hop stays +1.
+    Dawn→Noon hop stays +1. Explicit 0: a few minutes that move no clock (crossing
+    a room; a clock counted in half-hours is advanced by hand).
     """
     if ticks is not None:
-        return max(1, int(ticks))
+        return max(0, int(ticks))
     if duration:
         return ticks_from_duration(duration)
     return 1

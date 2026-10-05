@@ -110,6 +110,7 @@ def test_duration_minutes_and_default_are_one_tick():
     assert ticks_from_duration("Dawn to Noon") == 1
     assert ticks_for_elapsed() == 1
     assert ticks_for_elapsed(ticks=1) == 1
+    assert ticks_for_elapsed(ticks=0) == 0          # a few minutes: no clock moves
 
 
 def _gm_time(dcc_world, *args):

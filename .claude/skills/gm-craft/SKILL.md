@@ -187,7 +187,11 @@ A clever, effective, unique, daring, or punishing-but-cool beat EARNS progress �
 ## Safety
 - At session zero ask for lines (never in the game) and veils (off-screen only), privately if a
   player prefers; record them without names (`gm-note.sh rules "Table line: ..."`); the strictest binds.
-- An "X" in an action or a private aside stops that content at once, no reason asked: cut or rewind.
+- The ✋ button on a player's page (or an "X" in an action or a private aside) stops that content
+  at once, no reason asked: cut or rewind. The button reaches you past any round: `wait` prints
+  `STOP:` - halt the scene, check in privately, go on only when they're ready.
+- Tracks the players live by (a clock, a PC's corruption) are on their page: `gm-table.sh track
+  "<name>" <value>/<max> [--note ..]` at every change, and said aloud.
 
 ## The Golden Rules
 1. **Fun > Rules.** 2. **Persist before narrating.** 3. **Failure creates story.** 4. **Players write the story; you set the stage.** 5. **The world is alive** — things happen when players aren't looking (threat clocks tick, consequences fire, NPCs pursue goals).

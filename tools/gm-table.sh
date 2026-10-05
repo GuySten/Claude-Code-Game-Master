@@ -17,6 +17,7 @@
 #   gm-table.sh music theme "<enemy>" [file]      Play / assign an enemy's theme
 #   gm-table.sh music boss "<boss>" stage 2|pre_end|<event> [--via rise|break] | hit | end victory|requiem|escape|wipe
 #                                                 A named boss's fight in stages (its <boss>-<cue> files)
+#   gm-table.sh track "<name>" <value>[/<max>] [--note ".."] | off   (a clock or a PC's track on every page)
 #   gm-table.sh say "..." --theme "Lich" --villain --look "..."  A main villain (composed theme, portrait)
 #   gm-table.sh say "..." --heroic "<pc>"  A PC's heroic moment: their anthem, then the scene's music
 #   gm-table.sh say "..." --loot "<item>" --loot-look "..." --loot-for "<pc>"  Important loot, painted
@@ -42,7 +43,7 @@ ACTION=$1
 shift
 
 case "$ACTION" in
-    "serve"|"start"|"status"|"wait"|"inbox"|"say"|"redo"|"warn"|"punish"|"atone"|"grow"|"translate"|"music"|"free"|"stop"|"round"|"alias"|"languages")
+    "serve"|"start"|"status"|"wait"|"inbox"|"say"|"redo"|"warn"|"punish"|"atone"|"grow"|"translate"|"music"|"free"|"stop"|"round"|"alias"|"languages"|"track")
         $PYTHON_CMD "$LIB_DIR/table_server.py" "$ACTION" "$@"
         ;;
 
@@ -80,6 +81,7 @@ case "$ACTION" in
         echo "  music boss \"<boss>\" stage N|pre_end|<event> [--via rise|break] | hit | end victory|requiem|escape|wipe"
         echo "                                A boss fight in stages: its <boss>-stageN / -rise / -break / -hit /"
         echo "                                -victory / -requiem / -escape / -wipe files in music/"
+        echo "  track \"<name>\" <value>[/<max>] [--note \"..\"] | off   a clock or track on every player's page"
         echo "  music auto on|off             Let --mood change the music (default on)"
         echo "  free \"<pc>\"                   Free a seat so a player can rejoin from a new device"
         echo "  stop                          Close the table"

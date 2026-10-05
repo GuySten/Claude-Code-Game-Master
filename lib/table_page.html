@@ -313,6 +313,12 @@
   #now-playing { margin-bottom: 6px; }
   #party-toggle { display: none; }
   /* The fight: order, whose turn, how the foes look, what's on the battlefield. */
+  #tracks { margin: 6px 16px 0; display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .85rem; }
+  #tracks .tk { display: flex; align-items: center; gap: 6px; }
+  #tracks .pips { letter-spacing: 1px; color: var(--hp-low); }
+  #tracks .tk.moved { animation: tkpulse 1.6s ease-out 2; }
+  #tracks .note { color: var(--muted); font-size: .78rem; }
+  @keyframes tkpulse { 0% { background: color-mix(in srgb, var(--hp-low) 30%, transparent); } 100% { background: transparent; } }
   #fight { margin: 6px 16px 0; padding: 6px 10px; border: 1px solid var(--hp-low); border-radius: 10px;
            background: color-mix(in srgb, var(--hp-low) 5%, var(--panel)); font-size: .88rem; }
   #fight .fhead { display: flex; justify-content: space-between; gap: 8px; color: var(--hp-low); font-weight: bold; }
@@ -514,6 +520,7 @@
           <select class="lang-pick hidden" data-i18n-label="language"></select>
           <button id="leave" type="button" data-i18n="leave"></button>
         </div>
+        <button id="stop-signal" type="button" data-i18n-label="stopSignal">✋</button>
         <button id="sheet-toggle" type="button" data-i18n="mySheet"></button>
         <button id="chat-toggle" type="button"><span data-i18n="chatButton"></span><span class="badge hidden" id="chat-unread"></span></button>
         <button id="party-toggle" type="button" data-i18n="party"></button>
@@ -521,6 +528,7 @@
                 data-i18n-label="menu">⋯</button>
       </div>
     </header>
+    <div id="tracks" class="hidden" aria-live="polite"></div>
     <div id="fight" class="hidden" aria-live="polite"></div>
     <div id="log" aria-live="polite"></div>
     <div id="turn" class="hidden" aria-live="polite"></div>
@@ -1745,6 +1753,7 @@
     progressState = info.progress || { state: "idle" };
     roundState = info.round || { open: false };
     fightState = info.fight || null;
+    renderTracks(info.tracks || []);
     setLoreTerms(info.lore_terms);
     waitingOn = info.waiting_on || [];
     updateProgress();
@@ -1890,6 +1899,28 @@
   const fxWords = (f) => (f.effects || []).map((e) =>
     t(e.kind === "adv" ? "fxAdv" : "fxDis").replace("{what}",
       (e.ability ? tx(e.ability.toUpperCase()) + " " : "") + t("fx_" + e.roll))).join(", ");
+  // Tracks the GM shows the table (a clock, a PC's Ravel): filled pips out of the max.
+  let trackSeen = {};
+  function renderTracks(list) {
+    const box = $("tracks");
+    const sig = lang + JSON.stringify(list);
+    if (box.dataset.sig === sig) return;
+    box.dataset.sig = sig;
+    box.textContent = "";
+    box.classList.toggle("hidden", !list.length);
+    list.forEach((k) => {
+      const d = document.createElement("div");
+      d.className = "tk";
+      d.dir = "auto";
+      const was = trackSeen[k.name];
+      if (was !== undefined && was !== k.value) d.classList.add("moved");
+      trackSeen[k.name] = k.value;
+      const pips = "●".repeat(k.value) + "○".repeat(Math.max(0, k.max - k.value));
+      d.innerHTML = `<b>${esc(tx(k.name))}</b><span class="pips" aria-label="${k.value}/${k.max}">${pips}</span>` +
+        `<span>${k.value}/${k.max}</span>` + (k.note ? `<span class="note">${esc(tx(k.note))}</span>` : "");
+      box.appendChild(d);
+    });
+  }
   function renderFight() {
     const box = $("fight"), f = fightState;
     if (!f) { box.classList.add("hidden"); box.textContent = ""; box.dataset.sig = ""; return; }
@@ -3392,6 +3423,12 @@
   setInterval(() => {
     if (!me && code && !$("seat-cards").classList.contains("hidden")) refreshSeats();
   }, 4000);
+  // The stop signal (the X): it reaches the GM at once, past the round; no reason needed.
+  $("stop-signal").onclick = async () => {
+    stopSpeaking();
+    const r = await api("/api/stop", {});
+    setStatus(r && r.ok ? t("stopSent") : (r && r.error) || "✗", !(r && r.ok));
+  };
   $("leave").onclick = async () => {
     if (!confirm(t("leaveConfirm"))) return;
     await api("/api/leave", {});

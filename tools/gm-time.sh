@@ -65,7 +65,9 @@ CLOCK_TICKS=$($PYTHON_CMD "$LIB_DIR/time_manager.py" "${RESOLVE_ARGS[@]}")
 RESULT=$?
 if [ $RESULT -ne 0 ]; then exit $RESULT; fi
 
-$PYTHON_CMD "$LIB_DIR/threat_clocks.py" tick-time --ticks "$CLOCK_TICKS"
+if [ "$CLOCK_TICKS" != "0" ]; then        # (--ticks 0: a few minutes, no clock moves)
+    $PYTHON_CMD "$LIB_DIR/threat_clocks.py" tick-time --ticks "$CLOCK_TICKS"
+fi
 
 # Reactivity: time passing can fire on_time consequences (e.g. nightfall, deadlines).
 echo ""

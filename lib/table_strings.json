@@ -298,7 +298,9 @@
   "purseNow": "now",
   "purseGot": "received",
   "purseLost": "no longer has",
-  "coin_gold": "gold"
+  "coin_gold": "gold",
+  "stopSignal": "Stop (X): pause the scene, no reason needed",
+  "stopSent": "✋ The GM has been asked to stop. No reason needed."
  },
  "he": {
   "title": "השולחן",
@@ -599,6 +601,8 @@
   "purseNow": "עכשיו",
   "purseGot": "קיבל/ה",
   "purseLost": "כבר אין",
-  "coin_gold": "זהב"
+  "coin_gold": "זהב",
+  "stopSignal": "עצירה (X): לעצור את הסצנה, בלי צורך להסביר",
+  "stopSent": "✋ ביקשת מהשה\"מ לעצור. אין צורך להסביר."
  }
 }

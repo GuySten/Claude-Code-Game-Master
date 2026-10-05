@@ -2078,6 +2078,41 @@ def test_a_stage_with_an_entry_tells_the_pages_where_it_loops_back_to(table):
     assert body["music"]["src"] == "ashen-saint-the-unwinding.ogg" and body["music"]["loop"]
 
 
+def test_tracks_are_shown_to_the_table(table):
+    call = table["call"]
+    _, body = call("/api/gm/track", {"name": "Midnight", "value": 1, "max": 6, "note": "half past nine"}, host=True)
+    assert body["tracks"] == [{**body["tracks"][0], "name": "Midnight", "value": 1, "max": 6, "note": "half past nine"}]
+    call("/api/gm/track", {"name": "Ravel (Pip)", "value": 9, "max": 5}, host=True)       # (kept in range)
+    call("/api/gm/track", {"name": "midnight", "value": 2}, host=True)                     # (by any case)
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    _, info = call(f"/api/info?code={CODE}&token={pip}")
+    assert [(t["name"], t["value"], t["max"]) for t in info["tracks"]] == [("Ravel (Pip)", 5, 5), ("Midnight", 2, 6)]
+    call("/api/gm/track", {"name": "Midnight", "remove": True}, host=True)
+    _, info = call(f"/api/info?code={CODE}&token={pip}")
+    assert [t["name"] for t in info["tracks"]] == ["Ravel (Pip)"]
+    code, _ = call("/api/gm/track", {"name": "Midnight", "value": 1})                    # the GM's alone
+    assert code in (401, 403)
+
+
+def test_the_stop_signal_reaches_the_gm_at_once_past_the_round(table):
+    call, state = table["call"], table["state"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    call("/api/gm/round", {"seconds": 60}, host=True)
+    call("/api/say", {"code": CODE, "token": pip, "text": "I open the door."})
+    bram = call("/api/create", {"code": CODE, "name": "Bram", "concept": "a dwarf"})[1]["token"]
+    call("/api/say", {"code": CODE, "token": bram, "text": "I wait."})
+    code, _ = call("/api/stop", {"code": CODE, "token": pip})
+    assert code == 200
+    _, pending = call("/api/gm/pending", host=True)
+    assert pending["stop"]["pc"] == "Pip"
+    _, inbox = call("/api/gm/inbox", {}, host=True)
+    assert inbox["stop"]["pc"] == "Pip" and not inbox.get("held")       # not held by the round
+    _, again = call("/api/gm/pending", host=True)
+    assert again["stop"] is None                                          # delivered once
+    code, _ = call("/api/stop", {"code": CODE, "token": "nobody"})
+    assert code == 403
+
+
 def test_a_boss_hit_matches_the_stage_it_is_played_over(table):
     call, camp = table["call"], table["camp"]
     _touch_music(camp, "ashen-saint-stage1.ogg", "ashen-saint-stage2.ogg", "ashen-saint-hit.ogg",
