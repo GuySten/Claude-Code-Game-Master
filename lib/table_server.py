@@ -580,8 +580,9 @@ class TableState:
                 raise ValueError(f"no {tag} cue for {name}: a file named {composer.slug(name)}-{tag}.ogg "
                                  f"in music/ (orchestrate/references/boss-music.md)")
             return f
-        if hit:
-            f = cue("hit")
+        if hit:                                           # (the current stage's own accent, if it has one)
+            stage_now = self.music.get("stage") if party_roster._same_name(self.music.get("theme"), name) else None
+            f = (self.boss_cue(name, f"hit-stage{stage_now}") if stage_now else None) or cue("hit")
             with self.lock:
                 self.music = {**self.music, "sting": {"id": int(time.time() * 1000), "src": f.name,
                                                         "started_at": time.time()}}

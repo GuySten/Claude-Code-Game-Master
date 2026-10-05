@@ -41,6 +41,17 @@ Ordinary fights share one campaign battle cue and get none of this.
    loops of 1 to 3 minutes with something new every 8 to 16 bars, so the loop doesn't
    show (`"loop": true`, `"role": "battle"`).
 
+## The order of work
+
+First the **stage plan**: every stage's key, tempo and core sound, decided together (a
+stage may move its key - up a step, a minor third). Then the stages. Only then the
+transitions and endings, written in the keys the stages ended up in: a rise or break in
+the key of the stage it leads *into*, the endings in the last stage's key, and one
+**hit** per key (`<boss>-hit-stage2` when stage 2 is in another key; the table plays
+the current stage's). A workflow test is run as written: a conflict it finds is fixed
+in these rules, never by editing a step's output by hand (host: "we are testing the
+workflow - you cannot override on a whim").
+
 ## Transitions and accents (short one-shots, in the next stage's key)
 
 8. **rise** - a one- or two-bar build (timpani roll, cymbal swell, tremolo crescendo)
@@ -49,8 +60,8 @@ Ordinary fights share one campaign battle cue and get none of this.
 9. **break** - an impact (tutti hit, low brass and bass drum, choir) dying away into
    3 to 6 seconds of quiet: for a transformation or a reveal. The new stage starts
    after it, while the GM narrates.
-10. **hit** - a one- to three-second accent over any stage loop, on the shared tonic and
-   fifth so it fits every loop: a shield broken, a decisive blow. At most one a round.
+10. **hit** - a one- to three-second accent over a stage loop, on that stage's tonic and
+   fifth (one per stage key): a shield broken, a decisive blow. At most one a round.
 
 ## Endings (one-shots, in the last stage's key)
 

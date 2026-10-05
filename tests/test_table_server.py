@@ -2046,3 +2046,15 @@ def test_a_boss_fight_moves_through_its_stages_with_stings_and_ends_with_its_own
     assert code == 400 and "ashen-saint-stage3" in body["error"]             # says which file is missing
     code, _ = call("/api/gm/music", {"boss_fight": "Ashen Saint", "end": "victory"}, host=True)
     assert code == 400
+
+
+def test_a_boss_hit_matches_the_stage_it_is_played_over(table):
+    call, camp = table["call"], table["camp"]
+    _touch_music(camp, "ashen-saint-stage1.ogg", "ashen-saint-stage2.ogg", "ashen-saint-hit.ogg",
+                 "ashen-saint-hit-stage2.ogg")
+    call("/api/gm/music", {"boss_fight": "Ashen Saint", "stage": 1}, host=True)
+    assert call("/api/gm/music", {"boss_fight": "Ashen Saint", "hit": True}, host=True)[1]["music"]["sting"]["src"] \
+        == "ashen-saint-hit.ogg"
+    call("/api/gm/music", {"boss_fight": "Ashen Saint", "stage": 2}, host=True)
+    assert call("/api/gm/music", {"boss_fight": "Ashen Saint", "hit": True}, host=True)[1]["music"]["sting"]["src"] \
+        == "ashen-saint-hit-stage2.ogg"
