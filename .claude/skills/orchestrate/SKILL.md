@@ -166,6 +166,14 @@ the hero's call with `"alter": {"2": -1}`, the phase-2 vow is the vow with
 shows the development at a glance (writing every note by hand took a composer 8-12 minutes
 for a battle loop).
 
+**Let the tools do the mechanics.** A doubling is one `"double": [{"part": "chorus",
+"octave": -1}]` on the line, not the notes written twice; a passage's chords are one
+`"progression": {"at": 0, "chords": "i bVI iv v | i bVII bVI iv i"}`; a written tune's
+notes with their times: `arrangement.py tune "<seed>" --written tune.json`. After
+`check`, run `arrangement.py fix <file>`: it moves notes into their instruments' ranges,
+doubles a slow string line's quick notes with a quick wind, sets the choir's level and
+evens a loop's seam - then checks again. What's left is musical: fix that by hand.
+
 **Spend the surprise once: the tune or the setting.** In the host's 2x2 test
 (a simple vs a surprising tune, in a supportive vs a rich arrangement) the
 winners were the simple tune richly set and the surprising tune plainly set;

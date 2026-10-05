@@ -41,6 +41,9 @@ except in "hits" and "rolls", where it is the velocity itself (1-127).
     {"from": 0, "to": 18, "parts": {"horns": 0}, "vel": 8},
     {"from": 18, "to": 36, "parts": {"violins": 12}}
   ],
+  "progression": {"at": 0, "chords": "i bVI iv v | i bVII bVI*0.5 iv*0.5 i", "repeat": 2},
+                         # chords a bar each (or "every": units), "*2" twice as long - added
+                         # to "chords"; a list of them for several passages
   "chords": [            # roman numerals in the tune's key, [from, to, chord]
     [0, 6, "I"], [6, 9, "IVadd9"], [9, 12, "I/E#"], [12, 18, "bVII"], [24, 27, "vi7"]
   ],                     # I ii iii IV V vi vii, b/# before, ° ø or + after (vii°7 the diminished
@@ -69,6 +72,8 @@ except in "hits" and "rolls", where it is the velocity itself (1-127).
                          # (backwards); take [i, j] (a fragment: notes i..j-1); alter
                          # {note index: semitones, or a pitch} - the corrupted interval;
                          # repeat / every; "notes" may be added to the same line too
+                         # "double": [{"part": "chorus", "octave": -1, "vel": -4}] on any
+                         # line or placement: the same notes on other parts, written once
   "patterns": [          # percussion (or any part) on one note, in a rhythm
     {"part": "kit", "note": "snare", "from": 36, "to": 60, "pattern": "xoooox", "vel": -30},
     {"part": "timpani", "note": "root", "from": 0, "to": 84, "pattern": "x     ", "vel": -6}
@@ -283,13 +288,14 @@ def build(spec: Dict[str, Any]) -> Tuple["orchestra.Score", float, Optional[floa
 
 
 def expand_motifs(spec: Dict[str, Any]) -> Dict[str, Any]:
-    """The spec with every "lines" entry that places a motif written out as plain notes.
+    """The spec with every "lines" entry that places a motif written out as plain notes,
+    and every "double" (the line played by other parts too) written out as lines.
     A motif is written once ("motifs": {name: notes from time 0}) and placed as often as
     wanted, each time transformed: shift (semitones) / octave, stretch (time), invert
     (mirrored round its first note), retro (backwards), take [i, j] (a fragment: notes
     i..j-1), alter {index: semitones or a pitch} (the corrupted interval), repeat / every."""
     motifs = spec.get("motifs") or {}
-    if not any(isinstance(l, dict) and "motif" in l for l in spec.get("lines") or []):
+    if not any(isinstance(l, dict) and ("motif" in l or "double" in l) for l in spec.get("lines") or []):
         return spec
     lines = []
     for line in spec.get("lines") or []:
@@ -337,7 +343,40 @@ def expand_motifs(spec: Dict[str, Any]) -> Dict[str, Any]:
                ("motif", "at", "shift", "octave", "stretch", "invert", "retro", "take", "alter", "repeat", "every")}
         out["notes"] = notes + list(line.get("notes") or [])
         lines.append(out)
-    return {**spec, "lines": lines}
+    # "double": the same line played by other parts too - written once
+    doubled = []
+    for line in lines:
+        twins = line.get("double") or []
+        base = {k: v for k, v in line.items() if k != "double"}
+        doubled.append(base)
+        for d in twins if isinstance(twins, list) else [twins]:
+            if not isinstance(d, dict) or not d.get("part"):
+                raise ArrangementError(f'"double" on {line.get("part")}: give each a "part" (and "octave"/"shift"/"vel")')
+            move = int(d.get("shift", 0)) + 12 * int(d.get("octave", 0))
+            doubled.append({**{k: v for k, v in base.items() if k not in ("part", "vel")},
+                            "part": d["part"], "vel": float(base.get("vel", 0)) + float(d.get("vel", 0)),
+                            "notes": [[n[0], pitch(n[1]) + move] + list(n[2:]) for n in base.get("notes") or []]})
+    return {**spec, "lines": doubled}
+
+
+def progression_chords(spec: Dict[str, Any], bar: float) -> List[list]:
+    """"progression": {"at": 0, "chords": "i bVI iv v | i bVII bVI iv i", "every": <units,
+    default a bar>, "repeat": 1} (or a list of them) -> [[from, to, chord], ...]. A chord
+    "iv*2" lasts twice as long, "v*0.5" half; "|" is only for the eye."""
+    prs = spec.get("progression") or []
+    out = []
+    for pr in prs if isinstance(prs, list) else [prs]:
+        every, t = float(pr.get("every", bar)), float(pr.get("at", 0))
+        tokens = str(pr.get("chords", "")).replace("|", " ").split()
+        if not tokens:
+            raise ArrangementError('"progression" needs "chords": "i bVI iv v ..."')
+        for _ in range(int(pr.get("repeat", 1))):
+            for tok in tokens:
+                sym, _, mult = tok.partition("*")
+                d = every * float(mult or 1)
+                out.append([t, t + d, sym])
+                t += d
+    return out
 
 
 def _build(spec: Dict[str, Any]) -> Dict[str, Any]:
@@ -369,7 +408,7 @@ def _build(spec: Dict[str, Any]) -> Dict[str, Any]:
                 played.append((at + u0 - lo, min(b, hi - u0), key + st + int(s.get("shift", 0))))
     start = float(spec.get("start", 0))
     if not played:                     # a sketch with no tune ends with its last written note
-        ends = [float(x[1]) for x in spec.get("chords", [])]
+        ends = [float(x[1]) for x in list(spec.get("chords", [])) + progression_chords(spec, tune["bar"])]
         ends += [float(x.get("to", 0)) for k in ("harmony", "patterns", "rolls") for x in spec.get(k, [])]
         ends += [float(n[0]) + float(n[2]) for x in spec.get("lines", []) for n in x.get("notes", [])]
         ends += [float(x.get("at", 0)) + float(x.get("len", 0)) for x in spec.get("hits", [])]
@@ -423,7 +462,7 @@ def _build(spec: Dict[str, Any]) -> Dict[str, Any]:
     def key_at(x: float) -> int:                       # a key change: chords read in the new key
         return key + next((sh for a, b, sh in keys if a - 1e-9 <= x < b - 1e-9), 0)
 
-    for item in spec.get("chords") or []:
+    for item in list(spec.get("chords") or []) + progression_chords(spec, tune["bar"]):
         a, b, sym = item
         prog.append((float(a), float(b), {**chord(sym, key_at(float(a))), "symbol": sym}))
     prog.sort(key=lambda c: c[0])
@@ -881,10 +920,143 @@ def surprise_budget(ctx: Dict[str, Any], spec: Dict[str, Any]):
     return tune_pct, chromatic, changes, verdict
 
 
+CHOIRS = ("choir", "chorus", "men_choir", "choir_oo", "choir_oh")
+
+
+def _octave_shift(keys: List[int], lo: int, hi: int) -> Tuple[int, int]:
+    """The octave shift (fewest octaves first) putting most of these notes in lo..hi,
+    and how many are still out."""
+    best = (0, len(keys))
+    for k in sorted(range(-4, 5), key=abs):
+        out = sum(not lo <= p + 12 * k <= hi for p in keys)
+        if out < best[1]:
+            best = (k, out)
+    return best
+
+
+def _fold(p: int, lo: int, hi: int) -> Optional[int]:
+    while p < lo:
+        p += 12
+    while p > hi:
+        p -= 12
+    return p if lo <= p <= hi else None
+
+
+def _quick_double(keys: List[int]) -> Optional[str]:
+    """A quick-speaking instrument whose range holds these notes (by register)."""
+    mid = sorted(keys)[len(keys) // 2]
+    for part in (("flutes", "clarinets", "bassoons") if mid >= 72 else ("clarinets", "bassoons", "flutes")
+                 if mid >= 55 else ("bassoons", "clarinets")):
+        lo, hi = orchestra.RANGES.get(part, (0, 127))
+        if all(lo <= k <= hi for k in keys):
+            return part
+    return None
+
+
+def fix(spec: Dict[str, Any], listen: bool = True) -> Tuple[Dict[str, Any], List[str]]:
+    """The critic's mechanical fixes, applied: notes moved by octaves into their
+    instrument's range (a whole line or placement if one shift fits, else note by note),
+    harmony ranges kept inside the instrument's, a quick doubling for a slow-speaking
+    line's short notes, the choir's level, a loop seam's dynamics. Musical decisions
+    (too many parts entering at once, a seam's harmony) are left to the composer."""
+    import copy
+    s = copy.deepcopy(spec)
+    changes: List[str] = []
+    for i, line in enumerate(s.get("lines") or []):
+        part = line.get("part")
+        lo, hi = orchestra.RANGES.get(part, (0, 127))
+        own = expand_motifs({**s, "lines": [{k: v for k, v in line.items() if k != "double"}]})["lines"][0]
+        keys = [pitch(n[1]) for n in own.get("notes") or []]
+        if keys and not all(lo <= p <= hi for p in keys):
+            k, out = _octave_shift(keys, lo, hi)
+            if k and out == 0:
+                if "motif" in line:
+                    line["octave"] = int(line.get("octave", 0)) + k
+                else:
+                    line["notes"] = [[n[0], name_of(pitch(n[1]) + 12 * k)] + list(n[2:]) for n in line["notes"]]
+                changes.append(f"{part}: line {i} moved {k:+d} octave(s) into its range")
+            elif "motif" not in line:
+                moved, new = 0, []
+                for n in line["notes"]:
+                    p = pitch(n[1])
+                    q = p if lo <= p <= hi else _fold(p, lo, hi)
+                    if q is not None and q != p:
+                        n, moved = [n[0], name_of(q)] + list(n[2:]), moved + 1
+                    new.append(n)
+                line["notes"] = new
+                if moved:
+                    changes.append(f"{part}: {moved} note(s) of line {i} moved by octaves into its range")
+        twins = line.get("double") or []
+        for d in twins if isinstance(twins, list) else [twins]:
+            dlo, dhi = orchestra.RANGES.get(d.get("part"), (0, 127))
+            move = int(d.get("shift", 0)) + 12 * int(d.get("octave", 0))
+            dk = [p + move for p in keys]
+            if dk and not all(dlo <= p <= dhi for p in dk):
+                k, out = _octave_shift(dk, dlo, dhi)
+                if k and out == 0:
+                    d["octave"] = int(d.get("octave", 0)) + k
+                    changes.append(f"{d['part']} (doubling {part}): moved {k:+d} octave(s) into its range")
+    for h in s.get("harmony") or []:
+        lo, hi = orchestra.RANGES.get(h.get("part"), (0, 127))
+        if not h.get("range"):
+            continue
+        a, b = pitch(h["range"][0]), pitch(h["range"][1])
+        na, nb = max(a, lo), min(b, hi)
+        if nb - na < 7:                                  # too narrow left: move the window by octaves
+            k, _ = _octave_shift([a, b], lo, hi)
+            na, nb = max(a + 12 * k, lo), min(b + 12 * k, hi)
+        if nb - na < 12 and (a < lo or b > hi):          # an octave at least, so every note of a chord fits
+            nb = min(hi, na + 12)
+            na = max(lo, nb - 12)
+        if (na, nb) != (a, b) and nb > na:
+            h["range"] = [name_of(na), name_of(nb)]
+            changes.append(f"{h['part']}: harmony range {name_of(a)}-{name_of(b)} -> {h['range'][0]}-{h['range'][1]}")
+    for kind in ("patterns", "rolls", "hits"):
+        for x in s.get(kind) or []:
+            note = x.get("note")
+            if isinstance(note, str) and (note in KIT or note in ("root", "fifth")):
+                continue
+            if note is None:
+                continue
+            lo, hi = orchestra.RANGES.get(x.get("part"), (0, 127))
+            p = pitch(note)
+            q = p if lo <= p <= hi else _fold(p, lo, hi)
+            if q is not None and q != p:
+                x["note"] = name_of(q)
+                changes.append(f"{x['part']}: {kind} note {name_of(p)} -> {name_of(q)}")
+    for level, msg in check(s, listen=listen):
+        m = re.match(r"(\w+): \d+ of \d+ notes are shorter than it takes to speak", msg)
+        if m:
+            part = m.group(1)
+            for line in s.get("lines") or []:
+                if line.get("part") != part or line.get("double"):
+                    continue
+                own = expand_motifs({**s, "lines": [line]})["lines"][0]
+                keys = [pitch(n[1]) for n in own.get("notes") or []]
+                twin = _quick_double(keys) if keys else None
+                if twin:
+                    line["double"] = [{"part": twin, "vel": -6}]
+                    changes.append(f"{part}: its quick notes doubled by {twin} (so they speak)")
+            continue
+        m = re.search(r'"mix": \{"choir": (-?\d+)\}', msg)
+        if m:
+            used = {l.get("part") for k in ("lines", "harmony") for l in s.get(k) or []} & set(CHOIRS)
+            for part in sorted(used):
+                s.setdefault("mix", {})[part] = round(float(s.get("mix", {}).get(part, 0)) + int(m.group(1)), 1)
+            changes.append(f"choir level +{m.group(1)} dB ({', '.join(sorted(used))})")
+            continue
+        if msg.startswith("the loop's seam steps") and len(s.get("dynamics") or []) >= 2:
+            first, last = s["dynamics"][0], s["dynamics"][-1]
+            if last[1] != first[1]:
+                last[1] = first[1]
+                changes.append(f"loop seam: the last dynamics point set to the first's ({first[1]})")
+    return s, changes
+
+
 def describe(seed: str, mode: str = "major", cls: str = "", stage: int = 1, dark: int = 0,
-             gen: int = 1) -> str:
+             gen: int = 1, written: Optional[Dict[str, Any]] = None) -> str:
     """The tune, for writing an arrangement: its key, meter, and every note with its time."""
-    tune = music_compose.leitmotif(seed, mode, cls, stage=stage, dark=dark, gen=gen)
+    tune = music_compose.leitmotif(seed, mode, cls, stage=stage, dark=dark, gen=gen, written=written)
     bar = tune["bar"]
     lines = [f"{seed} ({mode}{', ' + cls if cls else ''}, stage {stage}, dark {dark}): "
              f"tonic {name_of(tune['key'])}, {tune['meter']} ({'eighths' if tune['meter'] == '6/8' else 'beats'}), "
@@ -909,15 +1081,38 @@ def main() -> None:
     t.add_argument("--stage", type=int, default=1)
     t.add_argument("--dark", type=int, default=0)
     t.add_argument("--gen", type=int, default=1, help="the tune generator's version")
+    t.add_argument("--written", help="a hand-written tune (JSON): its notes, with times")
     p = sub.add_parser("play", help="play an arrangement (a JSON file)")
     p.add_argument("file")
     p.add_argument("--out", required=True)
     c = sub.add_parser("check", help="the score critic: what a listener would notice")
     c.add_argument("file")
     c.add_argument("--quick", action="store_true", help="read the score only (don't render it)")
+    fx = sub.add_parser("fix", help="apply the critic's mechanical fixes (ranges, quick doublings, "
+                                    "the choir's level, a loop's seam), then check again")
+    fx.add_argument("file")
+    fx.add_argument("--out", help="write the fixed score here (default: in place)")
+    fx.add_argument("--quick", action="store_true", help="read the score only (don't render it)")
     a = ap.parse_args()
     if a.cmd == "tune":
-        print(describe(a.seed, "minor" if a.minor else "major", a.cls, a.stage, a.dark, a.gen))
+        written = json.loads(Path(a.written).read_text(encoding="utf-8")) if a.written else None
+        print(describe(a.seed, "minor" if a.minor else "major", a.cls, a.stage, a.dark, a.gen, written))
+        return
+    if a.cmd == "fix":
+        path = Path(a.file)
+        spec = json.loads(path.read_text(encoding="utf-8"))
+        try:
+            fixed, changes = fix(spec, listen=not a.quick)
+        except (ArrangementError, KeyError, TypeError, ValueError) as e:
+            sys.exit(f"[arrangement] {a.file}: {e}")
+        Path(a.out or a.file).write_text(json.dumps(fixed, indent=1, ensure_ascii=False), encoding="utf-8")
+        for c in changes:
+            print(f"FIXED {c}")
+        left = check(fixed, listen=not a.quick)
+        for level, msg in left:
+            print(f"{level.upper():5} {msg}")
+        print(f"{len(changes)} fix(es); left: {sum(lv == 'error' for lv, _ in left)} error(s), "
+              f"{sum(lv == 'warn' for lv, _ in left)} warning(s), {sum(lv == 'note' for lv, _ in left)} note(s)")
         return
     if a.cmd == "check":
         try:

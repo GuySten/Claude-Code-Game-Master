@@ -234,3 +234,60 @@ def test_a_score_written_with_motifs_checks_and_builds():
     horns = [e for e in ctx["score"].events if e[1] and e[2].partition(":")[0] == "horns"]
     assert len(horns) == 12
     assert not [m for lvl, m in arrangement.check(spec, listen=False) if lvl == "error"]
+
+
+def test_a_line_is_doubled_by_naming_the_other_parts_once():
+    import arrangement
+    spec = {"motifs": {"m": [[0, "C5", 1], [1, "D5", 1]]},
+            "lines": [{"part": "violins", "vel": -2, "notes": [[0, "C5", 2]],
+                       "double": [{"part": "chorus", "octave": -1, "vel": -4}]},
+                      {"part": "trombones", "motif": "m", "at": 4, "octave": -2, "double": [{"part": "men_choir"}]}]}
+    lines = arrangement.expand_motifs(spec)["lines"]
+    assert [l["part"] for l in lines] == ["violins", "chorus", "trombones", "men_choir"]
+    assert lines[1]["notes"] == [[0, 60, 2]] and lines[1]["vel"] == -6 and "double" not in lines[0]
+    assert [n[1] for n in lines[3]["notes"]] == [48, 50] and lines[3]["notes"][0][0] == 4.0
+
+
+def test_a_progression_is_written_as_one_string_of_chords():
+    import arrangement
+    got = arrangement.progression_chords({"progression": [{"at": 0, "chords": "i bVI | iv*2", "repeat": 2},
+                                                          {"at": 32, "chords": "V", "every": 2}]}, 4)
+    assert got == [[0, 4, "i"], [4, 8, "bVI"], [8, 16, "iv"], [16, 20, "i"], [20, 24, "bVI"], [24, 32, "iv"],
+                   [32, 34, "V"]]
+    spec = {"tune": {"seed": "sketch", "key": "D4", "meter": "4/4"}, "statements": [], "length": 8,
+            "progression": {"chords": "i iv"},
+            "harmony": [{"part": "strings", "from": 0, "to": 8, "play": "chord", "range": ["D3", "A4"]}]}
+    ctx = arrangement._build(spec)
+    assert ctx["chord_at"](1)["symbol"] == "i" and ctx["chord_at"](5)["symbol"] == "iv"
+
+
+def test_a_written_tune_can_be_read_note_by_note():
+    import arrangement
+    tune = {"seed": "Ashen Saint", "key": "C4", "meter": "4/4", "mode": "aeolian",
+            "motif": [[0, 1], [0, 1], [4, 2]], "again": [[2, 4]], "climb": [], "home": [[0, 4]]}
+    out = arrangement.describe("Ashen Saint", written=tune)
+    assert "C4" in out and "G4" in out and "4/4" in out
+
+
+def test_fix_moves_notes_into_range_and_doubles_quick_notes_on_slow_strings():
+    import arrangement
+    spec = {"tune": {"seed": "sketch", "key": "D4", "meter": "4/4"}, "statements": [], "length": 16, "tempo": 120,
+            "chords": [[0, 16, "i"]],
+            "harmony": [{"part": "basses", "from": 0, "to": 16, "play": "root", "range": ["C1", "C2"]}],
+            "lines": [{"part": "trumpets", "notes": [[0, "D7", 2], [2, "A6", 2]]},          # all too high: one shift
+                      {"part": "bells", "notes": [[0, "C2", 4], [4, "C4", 4]]},             # one note too low
+                      {"part": "violins", "notes": [[i * 0.25, "D5", 0.25] for i in range(32)]}],
+            "patterns": [{"part": "timpani", "note": "D1", "from": 0, "to": 8, "pattern": "x"}]}
+    fixed, changes = arrangement.fix(spec, listen=False)
+    assert not [m for lv, m in arrangement.check(fixed, listen=False) if lv == "error"]
+    assert fixed["lines"][0]["notes"][0][1] == "D5"                  # the trumpets' line, an octave... or two down
+    assert fixed["lines"][1]["notes"][0][1] == "C4"
+    assert fixed["lines"][2]["double"][0]["part"] in ("flutes", "clarinets")
+    assert pitch_ok(fixed["harmony"][0]["range"])
+    assert len(changes) >= 4
+
+
+def pitch_ok(rng):
+    import arrangement, orchestra
+    lo, hi = orchestra.RANGES["basses"]
+    return lo <= arrangement.pitch(rng[0]) <= arrangement.pitch(rng[1]) <= hi
