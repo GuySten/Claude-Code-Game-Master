@@ -188,7 +188,8 @@ Colours and devices, With / against, Intensity, Not). Before composing, write th
 composer's brief this way - the same for every character, so nothing is tuned to one:
 1. **Concepts.** From the description (npcs.json, the world bible, their deeds, how the
    host defines them), list the concepts and weigh each: the one that *carries* the piece,
-   the *strong* ones, the *colours*. Always decide **stature** (how much they weigh in the
+   the *strong* ones, the *colours* - the subject's **defining trait carries**, even in a
+   battle or a lament (the cue's job is the frame: tempo, drive, form). Always decide **stature** (how much they weigh in the
    story: a king or archvillain gets one grand climax, a minor figure stays small).
    Find them in `references/concepts-index.md` (keywords per concept).
 2. **Read only those entries** in `concepts.md` (search "#### <name>"), and its section 1

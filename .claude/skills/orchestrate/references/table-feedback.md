@@ -271,3 +271,8 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   Loud falling bends on brass are the comic raspberry. Fixed in the lexicon (R16,
   Corruption, Combat), the format guide, and the critic (warns on falling brass bends,
   and on a sliding line in a part that also plays chords).
+  v2, every slide removed: "a lot better", but "the corruption is too subtle for a main
+  feature of the champion". The translator had made combat carry (the cue's job) and
+  corruption a layer. Now: the subject's defining trait carries and the cue's job is the
+  frame (section 1, step 2; SKILL translator step 1); Corruption as a main feature puts
+  the victim clean first and the damage in the foreground (its Intensity line).
