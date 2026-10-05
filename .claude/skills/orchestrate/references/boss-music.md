@@ -36,7 +36,17 @@ Ordinary fights share one campaign battle cue and get none of this.
    reversed or altered notes only for a story reason (the corruption bending the tune),
    and after the tune has been heard straight. Held back for the last stage: the tune's
    biggest setting (full brass and choir, the top register). A theme that answers it
-   (the party's, the campaign's) enters only there.
+   (the party's, the campaign's, an ally's) enters only there - or in the cue of the
+   turn that brings it (below).
+5a. **A turn the party may cause gets its own cue, never a place in a stage loop.** When
+   the plan has an event the players can bring about in more than one stage - a
+   counter-song, a ritual broken, an ally stepping in - and it changes the fight, score
+   it as its own loop (`<boss>-<event>`, as long as the plan says it lasts), started at
+   once over whichever stage is playing (`music boss "<boss>" stage <event>`) and left
+   by the next stage or an ending. Its material - the answering theme above all - never
+   sounds inside a stage loop: the table would hear the twist before anyone found it,
+   and it might never happen. It keeps the boss's identity in it (the boss's tune, the
+   current stage's core sound) with the answer on top.
 5. **A stage may reveal rather than escalate.** When the second stage shows the boss's
    grief, madness or former self, its cue may be sparser, slower or sacred. Mark it
    `reveal` so the GM knows the drop is meant.
@@ -111,7 +121,7 @@ workflow - you cannot override on a whim").
 
 Render each cue to the campaign's `music/` as `<boss>-<cue>.ogg` (the boss's name as
 a file stem: `ashen-saint-stage2.ogg`, `ashen-saint-break.ogg`). The GM plays them with
-`gm-table.sh music boss "<boss>" stage N|pre_end [--via rise|break]`, `... hit`, and
+`gm-table.sh music boss "<boss>" stage N|pre_end|<event> [--via rise|break]`, `... hit`, and
 `... end victory|requiem|escape|wipe`. A boss's cues cut in on time on every player's
 page (combat starts at once; no fade-in): a rise builds over the old loop and the new
 stage starts where the rise lands; a break's impact cuts the old loop and the new stage

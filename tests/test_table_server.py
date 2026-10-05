@@ -2073,6 +2073,9 @@ def test_a_stage_with_an_entry_tells_the_pages_where_it_loops_back_to(table):
     m = body["music"]
     assert m["src"] == "ashen-saint-pre_end.ogg" and m["stage"] == "pre_end" and m["via"] == "rise"
     assert 1.9 < m["started_at"] - m["sting"]["started_at"] < 2.1
+    _touch_music(camp, "ashen-saint-the-unwinding.ogg")            # a turn the party caused
+    _, body = call("/api/gm/music", {"boss_fight": "Ashen Saint", "stage": "The Unwinding"}, host=True)
+    assert body["music"]["src"] == "ashen-saint-the-unwinding.ogg" and body["music"]["loop"]
 
 
 def test_a_boss_hit_matches_the_stage_it_is_played_over(table):

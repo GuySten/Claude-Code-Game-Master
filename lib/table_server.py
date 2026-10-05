@@ -617,8 +617,10 @@ class TableState:
                 raise ValueError("an ending is victory, requiem, escape or wipe")
             f = cue(end)
             return self.set_music(f.name, 0.75, False, f"{name}: {end}", mood="boss", theme=name)
-        if str(stage).replace("-", "_") == "pre_end":
-            stage, tag = "pre_end", "pre_end"
+        if stage is not None and not str(stage).strip().isdigit():
+            # pre_end, or a turn the party caused (rule 5a: "the unwinding"): its own loop
+            stage = composer.slug(str(stage)).replace("pre-end", "pre_end")
+            tag = stage
         else:
             stage = int(stage or 1)
             tag = f"stage{stage}"
@@ -632,7 +634,8 @@ class TableState:
         sting = cue(via) if via else None
         if via and via not in ("rise", "break"):
             raise ValueError("a stage is entered through a rise or a break")
-        self.set_music(track, 0.7, True, f"{name}, " + ("the end nears" if stage == "pre_end" else f"stage {stage}"),
+        self.set_music(track, 0.7, True, f"{name}, " + ("the end nears" if stage == "pre_end" else
+                                                       f"stage {stage}" if isinstance(stage, int) else stage),
                        mood="boss", theme=name, boss=True)
         with self.lock:
             self.music["stage"] = stage
@@ -4556,11 +4559,11 @@ def main() -> None:
         if args.track == "boss":
             what = args.extra
             if not args.value or what not in ("stage", "hit", "end"):
-                sys.exit('Usage: gm-table.sh music boss "<name>" stage <N>|pre_end [--via rise|break] | hit | '
+                sys.exit('Usage: gm-table.sh music boss "<name>" stage <N>|pre_end|<event> [--via rise|break] | hit | '
                          'end victory|requiem|escape|wipe')
             body = {"boss_fight": args.value}
             if what == "stage":
-                body.update(stage=args.more if args.more == "pre_end" else int(args.more or 1), via=args.via)
+                body.update(stage=int(args.more) if str(args.more or "1").isdigit() else args.more, via=args.via)
             elif what == "hit":
                 body["hit"] = True
             else:
