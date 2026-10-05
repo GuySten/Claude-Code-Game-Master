@@ -206,6 +206,30 @@ def _stamp() -> float:
     return int(time.time() * 100) / 100
 
 
+def audio_seconds(path: Path) -> Optional[float]:
+    """How long a sound file plays (Ogg Vorbis/Opus or WAV), or None."""
+    try:
+        if path.suffix.lower() == ".wav":
+            import wave
+            with wave.open(str(path)) as w:
+                return w.getnframes() / float(w.getframerate())
+        data = path.read_bytes()
+        last = data.rfind(b"OggS")
+        if last < 0:
+            return None
+        granule = int.from_bytes(data[last + 6:last + 14], "little")
+        i = data.find(b"\x01vorbis")
+        if i >= 0:
+            rate = int.from_bytes(data[i + 12:i + 16], "little")
+        elif data.find(b"OpusHead") >= 0:
+            rate = 48000
+        else:
+            return None
+        return granule / rate if rate else None
+    except Exception:
+        return None
+
+
 def _now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%S")
 
@@ -532,6 +556,62 @@ class TableState:
                     seen.add(f.name.lower())
                     out.append({"track": f.name, "where": str(d)})
         return out
+
+    # --- a boss's fight in stages (gm-craft/references/boss-fights.md, orchestrate/references/boss-music.md) ---
+    def boss_cue(self, name: str, tag: str) -> Optional[Path]:
+        """A boss's staged-fight cue: a file named <boss>-<tag> (stage1..3, pre_end, rise,
+        break, hit, victory, requiem, escape, wipe) in the music folders."""
+        for stem in (f"{composer.slug(name)}-{tag}", f"{name}-{tag}"):
+            found = self.find_music(stem)
+            if found is not None:
+                return found
+        return None
+
+    def boss_music(self, name: str, stage: Optional[int] = None, via: Optional[str] = None,
+                   hit: bool = False, end: Optional[str] = None) -> Dict[str, Any]:
+        """Move a boss fight's music on: to a stage (through a rise or a break: the new loop
+        starts as the sting ends), an accent over the loop (hit), or an ending (victory,
+        requiem, escape, wipe: played once, then quiet). Raises ValueError if the cue
+        isn't there."""
+        name = " ".join(str(name).split())
+        def cue(tag):
+            f = self.boss_cue(name, tag)
+            if f is None:
+                raise ValueError(f"no {tag} cue for {name}: a file named {composer.slug(name)}-{tag}.ogg "
+                                 f"in music/ (orchestrate/references/boss-music.md)")
+            return f
+        if hit:
+            f = cue("hit")
+            with self.lock:
+                self.music = {**self.music, "sting": {"id": int(time.time() * 1000), "src": f.name,
+                                                        "started_at": time.time()}}
+                self._save_music()
+                return dict(self.music)
+        if end:
+            if end not in ("victory", "requiem", "escape", "wipe"):
+                raise ValueError("an ending is victory, requiem, escape or wipe")
+            f = cue(end)
+            return self.set_music(f.name, 0.75, False, f"{name}: {end}", mood="boss", theme=name)
+        stage = int(stage or 1)
+        loop = self.boss_cue(name, f"stage{stage}")
+        if loop is None and stage == 1:
+            track = self.theme_track(name, True)               # (their boss version)
+        elif loop is None:
+            raise ValueError(f"no stage{stage} cue for {name}: {composer.slug(name)}-stage{stage}.ogg in music/")
+        else:
+            track = loop.name
+        sting = cue(via) if via else None
+        if via and via not in ("rise", "break"):
+            raise ValueError("a stage is entered through a rise or a break")
+        self.set_music(track, 0.7, True, f"{name}, stage {stage}", mood="boss", theme=name, boss=True)
+        with self.lock:
+            self.music["stage"] = stage
+            if sting is not None:
+                now = time.time()
+                self.music["sting"] = {"id": int(now * 1000), "src": sting.name, "started_at": now}
+                self.music["started_at"] = now + (audio_seconds(sting) or 4.0)   # the loop starts as the sting ends
+            self._save_music()
+            return dict(self.music)
 
     # --- automatic music by scene mood ---
     @property
@@ -1640,10 +1720,14 @@ class TableState:
                     credit = credit_for(src, PROJECT_ROOT / "music" / "library.json")
                     if credit:
                         self.music["credit"] = credit   # shown on the page (CC BY needs it)
-            tmp = self.music_path.with_suffix(".tmp")
-            tmp.write_text(json.dumps(self.music, indent=2), encoding="utf-8")
-            tmp.replace(self.music_path)
+            self._save_music()
             return dict(self.music)
+
+    def _save_music(self) -> None:
+        """(with self.lock held)"""
+        tmp = self.music_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(self.music, indent=2), encoding="utf-8")
+        tmp.replace(self.music_path)
 
     # --- messages ---
     def append(self, kind: str, text: str, pc: Optional[str] = None,
@@ -3569,6 +3653,16 @@ def make_handler(state: TableState, code: str, host_key: str):
                 r = state.atone(str(data.get("pc", "")))
                 return self._json(r, 200 if r["ok"] else 409)
             if path == "/api/gm/music":
+                if data.get("boss_fight"):
+                    try:
+                        music = state.boss_music(str(data["boss_fight"])[:80], stage=data.get("stage"),
+                                                 via=data.get("via"), hit=bool(data.get("hit")),
+                                                 end=data.get("end"))
+                    except ValueError as e:
+                        return self._err(str(e))
+                    if not data.get("hit"):
+                        self._announce_music(music)
+                    return self._json({"ok": True, "music": music})
                 if "auto" in data:
                     state.set_auto_music(bool(data["auto"]))
                     return self._json({"ok": True, "auto": state.auto_music})
@@ -4164,7 +4258,11 @@ def main() -> None:
                          "('none' to go back to the generated one)")
     mu.add_argument("--mood", choices=list(MOODS) + [SILENCE],
                     help="Play whatever fits this mood (same choice as say --mood)")
+    mu.add_argument("more", nargs="?", help="After 'boss <name> stage': the stage; after 'boss <name> end': "
+                                            "victory, requiem, escape or wipe")
     mu.add_argument("--boss", action="store_true", help="With 'theme <enemy>': the boss version")
+    mu.add_argument("--via", choices=["rise", "break"],
+                    help="With 'boss <name> stage N': through a rise (escalation) or a break (transformation)")
     mu.add_argument("--volume", type=float, default=0.5, help="0.0 – 1.0 (default 0.5)")
     mu.add_argument("--no-loop", action="store_true", help="Play once instead of looping")
     mu.add_argument("--title", help="What players see (default: from the file name)")
@@ -4417,6 +4515,25 @@ def main() -> None:
             r = _call(campaign_dir, "POST", "/api/gm/music", {"theme": args.value, "boss": args.boss})
             m = r.get("music") or {}
             print(f"MUSIC {m.get('title')} [{m.get('track')}]")
+            return
+        if args.track == "boss":
+            what = args.extra
+            if not args.value or what not in ("stage", "hit", "end"):
+                sys.exit('Usage: gm-table.sh music boss "<name>" stage <N> [--via rise|break] | hit | '
+                         'end victory|requiem|escape|wipe')
+            body = {"boss_fight": args.value}
+            if what == "stage":
+                body.update(stage=int(args.more or 1), via=args.via)
+            elif what == "hit":
+                body["hit"] = True
+            else:
+                body["end"] = args.more
+            r = _call(campaign_dir, "POST", "/api/gm/music", body)
+            if not r.get("ok"):
+                sys.exit(f"[ERROR] {r.get('error')}")
+            m = r["music"]
+            print(f"MUSIC {m.get('title')} [{m.get('track')}]" + (f" after {m['sting']['src']}" if what == "stage" and m.get("sting") and args.via else "")
+                  + (f" + {m['sting']['src']}" if what == "hit" else ""))
             return
         if args.track == "auto":
             if args.value not in ("on", "off"):

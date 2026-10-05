@@ -2022,3 +2022,27 @@ def test_a_players_money_and_belongings_changes_are_told_to_them_with_the_narrat
     again = [m for m in call(f"/api/messages?code={CODE}&token={pip}&after=0")[1]["messages"]
              if (m.get("event") or {}).get("type") == "purse"]
     assert len(again) == 1
+
+
+def test_a_boss_fight_moves_through_its_stages_with_stings_and_ends_with_its_own_ending(table):
+    import wave
+    call, state, camp = table["call"], table["state"], table["camp"]
+    _touch_music(camp, "ashen-saint-stage1.ogg", "ashen-saint-stage2.ogg", "ashen-saint-hit.ogg",
+                 "ashen-saint-requiem.ogg")
+    with wave.open(str(camp / "music" / "ashen-saint-break.wav"), "wb") as w:   # a 3 s break
+        w.setnchannels(1); w.setsampwidth(2); w.setframerate(8000); w.writeframes(b"\0\0" * 24000)
+    _, body = call("/api/gm/music", {"boss_fight": "Ashen Saint", "stage": 1}, host=True)
+    assert body["music"]["src"] == "ashen-saint-stage1.ogg" and body["music"]["loop"] and body["music"]["stage"] == 1
+    _, body = call("/api/gm/music", {"boss_fight": "Ashen Saint", "hit": True}, host=True)
+    assert body["music"]["src"] == "ashen-saint-stage1.ogg"                    # the loop goes on...
+    assert body["music"]["sting"]["src"] == "ashen-saint-hit.ogg"               # ...under the accent
+    _, body = call("/api/gm/music", {"boss_fight": "Ashen Saint", "stage": 2, "via": "break"}, host=True)
+    m = body["music"]
+    assert m["src"] == "ashen-saint-stage2.ogg" and m["sting"]["src"] == "ashen-saint-break.wav"
+    assert 2.9 < m["started_at"] - m["sting"]["started_at"] < 3.1             # the loop starts as the break ends
+    _, body = call("/api/gm/music", {"boss_fight": "Ashen Saint", "end": "requiem"}, host=True)
+    assert body["music"]["src"] == "ashen-saint-requiem.ogg" and not body["music"]["loop"]
+    code, body = call("/api/gm/music", {"boss_fight": "Ashen Saint", "stage": 3}, host=True)
+    assert code == 400 and "ashen-saint-stage3" in body["error"]             # says which file is missing
+    code, _ = call("/api/gm/music", {"boss_fight": "Ashen Saint", "end": "victory"}, host=True)
+    assert code == 400

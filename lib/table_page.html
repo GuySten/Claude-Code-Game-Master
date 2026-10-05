@@ -1098,6 +1098,10 @@
     const start = () => {
       if (!live) return;
       const elapsed = (Date.now() + skew) / 1000 - (m.started_at || 0);
+      if (elapsed < -0.05) {                               // it starts later (as a boss sting ends)
+        setTimeout(start, -elapsed * 1000);
+        return;
+      }
       const dur = el.duration;
       if (isFinite(dur) && dur > 0) {
         if (!m.loop && elapsed >= dur) return;          // a one-shot that already finished
@@ -1116,6 +1120,7 @@
       const dur = el.duration;
       if (!live || el.paused || !isFinite(dur) || dur <= 0) return;
       let target = (Date.now() + skew) / 1000 - (m.started_at || 0);
+      if (target < 0) return;                              // (not started yet)
       if (m.loop) target %= dur; else if (target >= dur) return;
       let diff = el.currentTime - target;
       if (m.loop && Math.abs(diff) > dur / 2) diff -= Math.sign(diff) * dur;   // across the loop
@@ -1398,7 +1403,26 @@
       },
     };
   }
+  // A boss fight's sting (a rise, a break, a hit): played once over the music, in step
+  // with the table; a late joiner hears it only if it's still sounding.
+  let stingId = null;
+  function playSting(s) {
+    if (!s || s.id === stingId) return;
+    stingId = s.id;
+    if (!musicOn) return;
+    const el = new Audio();
+    el.preload = "auto";
+    el.src = "/music/" + encodeURIComponent(s.src) + "?code=" + encodeURIComponent(code);
+    el.addEventListener("loadedmetadata", () => {
+      const elapsed = (Date.now() + skew) / 1000 - (s.started_at || 0);
+      if (!isFinite(el.duration) || elapsed >= el.duration) return;
+      try { el.currentTime = Math.max(0, elapsed); } catch (e) {}
+      el.volume = Math.max(0, Math.min(1, musicVol * (ducked ? 0.3 : 1)));
+      el.play().catch(() => {});
+    }, { once: true });
+  }
   function applyMusic(m, serverNow) {
+    if (m && m.sting) playSting(m.sting);
     const changed = !musicState || !m || (musicState.id !== m.id);
     musicState = m || null;
     updateMusicToggle();

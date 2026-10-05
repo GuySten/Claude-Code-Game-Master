@@ -56,7 +56,14 @@ Ordinary fights share one campaign battle cue and get none of this.
 13. **wipe** - 2 to 5 seconds: a low hit, a falling cluster, then silence. Never back to
     the battle loop.
 
-## Playing them
+## Files and playing them
+
+Render each cue to the campaign's `music/` as `<boss>-<cue>.ogg` (the boss's name as
+a file stem: `ashen-saint-stage2.ogg`, `ashen-saint-break.ogg`). The GM plays them with
+`gm-table.sh music boss "<boss>" stage N [--via rise|break]`, `... hit`, and
+`... end victory|requiem|escape|wipe`: a rise or break plays over the old loop as it
+fades, and the new loop starts exactly as the sting ends, in step on every player's page.
+
 
 14. **Switch on the narration of the trigger**, not on the dice. A stage that grows
     out of the last: **rise** into the new loop. A transformation: **break**, the

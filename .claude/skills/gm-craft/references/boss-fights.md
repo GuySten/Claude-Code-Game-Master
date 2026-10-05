@@ -55,7 +55,9 @@ none of this. Numbers refer to `design-directives.md`; sources at the end.
     floor gives way, the flame takes her), state plainly what is new in the rules and
     that conditions on the boss have ended, roll its new initiative if the plan says
     so, then play on. Nobody is hurt during the change itself. Switch the music on the
-    narration (`boss-music.md`). [Giffyglyph; Angry GM]
+    narration: `gm-table.sh music boss "<boss>" stage 2 --via break` (a transformation)
+    or `--via rise` (an escalation); `... hit` for a decisive blow; `... end victory|requiem|escape|wipe`
+    when it falls, yields, flees or the party falls (`boss-music.md`). [Giffyglyph; Angry GM]
 12. **No secret numbers, ever.** No hidden hit-point changes, damage bumps or new
     resistances - even where Sly Flourish or Draw Steel suggest a dial. A fight that
     goes too easy or too hard moves only by planned, visible levers: announced
