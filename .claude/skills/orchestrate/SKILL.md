@@ -150,7 +150,7 @@ it in `"lines"` transformed (`shift`/`octave`, `stretch`, `invert`, `retro`, `ta
 `alter`, `repeat`/`every`) instead of writing its notes again: the corrupted call is
 the hero's call with `"alter": {"2": -1}`, the phase-2 vow is the vow with
 `"stretch": 2`. It is faster to write, keeps every return true to the original, and
-shows the development at a glance (a composer wrote note by note took 8-12 minutes
+shows the development at a glance (writing every note by hand took a composer 8-12 minutes
 for a battle loop).
 
 **Spend the surprise once: the tune or the setting.** In the host's 2x2 test
