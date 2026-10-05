@@ -214,3 +214,10 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   surface) and a question the translator answers for every character. The host's view:
   being a little weaker than a hand-directed piece is acceptable, because the workflow
   is automatic.
+- **The workflow check, round 2** (the same automatic route, with the Stature device and
+  the translator now asked for each trait and the character's stature; blind against
+  the hand-directed portrait): "I think all of them are close." The automatic route
+  reached the portrait's level once the brief carried the character's weight. Caveat:
+  the fix came from round 1's verdict on this same character, so the test of
+  generality is characters the library was not tuned on (concept recognition; new
+  characters).
