@@ -201,3 +201,16 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   a tiefling "heat-haze") because the score-format guide every composer read listed it.
   The tools built from the host's feedback (unhinge, slide, wobble) are the host's ideas
   too: in an ablation they belong only to the conditions given the host's ideas.
+- **The workflow check on the Margrave** (character facts -> a translator reading only
+  the device library and research -> a 200-word brief -> two composers who see only the
+  brief, the tune and the format; blind against the portrait made with the host's
+  help): the two automatic pieces were "close to each other", the portrait "clearly
+  better than them both" - "its climax feels more epic and grand. This reflects both
+  the fact that the Margrave is a very important person like a king and a grand
+  villain"; and "I am not sure the direction the composers got reflects that". It
+  didn't: the brief asked for narrow dynamics and no brass, because the library filed
+  grandeur under the battle piece and nothing asked for the character's **stature**.
+  Now a device (Stature: one grand climax for a great figure, however restrained the
+  surface) and a question the translator answers for every character. The host's view:
+  being a little weaker than a hand-directed piece is acceptable, because the workflow
+  is automatic.

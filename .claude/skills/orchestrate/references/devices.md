@@ -75,7 +75,8 @@ Entries marked **(from knowledge)** are general film and game scoring practice w
   like they are mourning"; adding a choir to a climax was "a lot better".
 
 ### Power - the march of the unstoppable ("'Bringer of War' Music", the Imperial March)
-- **Signals**: inevitability, force, an army; the villain at war.
+- **Signals**: inevitability, force, an army; the villain at war. (A great figure's
+  grandeur in their own theme is Stature, below.)
 - **Write it**: an ostinato that never lets go (Holst's *Mars* is in 5/4; a march in
   4/4 or a waltz "in one"), low brass and timpani on the beats, the tune in octaves,
   minor with blunt chord shifts (i-bVI, i-bII); fast enough to drive (battle: ~160 in
@@ -85,6 +86,23 @@ Entries marked **(from knowledge)** are general film and game scoring practice w
   the timpani rolls were slowed).
 - **Not**: brass on a climax tune in a seam - the climax must grow out of what came
   before (that, not the brass, was what failed in the Margrave's piece B).
+
+### Stature - how big the music gets ("Climactic Music", "Theme Music Power-Up"; majesty)
+- **Signals**: how much the character weighs in the world and the story: a king, an
+  archvillain, a god, the campaign's main enemy, a legendary hero - against a village
+  priest or a minor rival. Stature is separate from temperament: a calm, controlled,
+  dignified ruler is still a ruler.
+- **Write it**: set the piece's ceiling by stature. A great figure's theme, however
+  restrained its surface, reaches **one grand climax** that grows out of what came
+  before: the tune in octaves on horns and violins (or the full strings), trombones and
+  tuba underneath, the choir on held chords, a timpani roll into it, a cymbal or gong on
+  the arrival, the dynamics near the top of the range - then it can fall back to the
+  surface. Majesty is loud, consonant, broad and regular (research §1, Power): weight,
+  breadth and full harmony, not speed. A minor figure stays at chamber scale (a few
+  instruments, a modest swell).
+- **Not**: confusing *dignity* (a steady surface with little dynamic change) with *small*:
+  dignity governs the surface, stature governs the peak. And not a brass fanfare out of
+  nowhere - the climax must be earned (see Climactic Music).
 
 ### Corruption - the theme turned ("Corrupted Leitmotif", "Dark Reprise")
 - **Signals**: change for the worse, of the same character.
@@ -1078,7 +1096,8 @@ Entries marked **(from knowledge)** are general film and game scoring practice w
 
 | Their description says... | Carry the piece with | Add at their moments |
 |---|---|---|
-| elegant, aristocratic, refined, a lord | Façade (a dance) | Lament, Madness, Power |
+| elegant, aristocratic, refined, a lord | Façade (a dance) | Lament, Madness, Power, Stature |
+| a king, a ruler, an archvillain, the campaign's main villain, a god | their carrying device, with **Stature** (one grand climax) | Power for their battle piece |
 | mad, obsessed, unstable, sleepless | Madness | Façade (what they were), Dread |
 | grieving, guilty, tragic, lost someone | Lament | Façade, Corruption |
 | conqueror, warlord, army, relentless | Power (a march) | Doom, Shock |
