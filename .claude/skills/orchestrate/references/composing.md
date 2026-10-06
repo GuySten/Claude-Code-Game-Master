@@ -64,7 +64,8 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
 20. Long loops change something audible every 8-16 bars and state the tune twice in
     different colours with a contrasting section; loops have no seams - the end meets the
     start (a stage: the body's start): end on a swell, a pickup or a roll into bar 1, not on
-    a quiet offbeat. [r] (critic: seam; `make` fixes the dynamics)
+    a quiet offbeat. [r] (critic: seam - it measures the sound, so if it still warns after
+    `make` has matched the `dynamics`, write the swell, roll or pickup into the last bar)
 21. Slow speakers (the strings, oboe, english_horn, organ, the choirs) need held notes; a
     quick note of theirs - the tune's too - needs a quick double at the same moment and
     pitch (the critic names one: flutes, clarinets, bassoons, horns, trumpets, pizzicato;
@@ -105,8 +106,9 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
 
 ## 4. Writing it
 - See the tune first: `python lib/arrangement.py tune "<who>" --written music/tunes/<who>.json`
-  (every note, its time, the tune's length, and per bar a menu of chords that hold it -
-  chromatic ones included; the choice, and its surprise, are yours).
+  (every note, its time, the tune's length, and per bar - counted from the first downbeat,
+  as `grid` counts - a menu of chords that hold it, chromatic ones included; the choice, and
+  its surprise, are yours).
 - Let the tool do the arithmetic: `python lib/arrangement.py grid "<who>" --written <tune>
   --tempo 168 --entry 4` prints the bar grid in units and seconds, the body length (in whole
   sections), where a whole statement lands on a bar line after its pickup, and where the

@@ -328,6 +328,19 @@ def test_a_written_tune_can_be_read_note_by_note():
     assert "C4" in out and "G4" in out and "4/4" in out
 
 
+def test_the_tune_listing_counts_bars_from_the_first_downbeat_as_grid_does():
+    import arrangement
+    from music import music_compose
+    written = {"seed": "Picked", "key": "D4", "meter": "3/4", "mode": "aeolian", "pickup": [[4, 1]],
+               "motif": [[7, 3], [6, 2], [4, 1]], "again": [[7, 3], [6, 3]], "climb": [], "home": [[0, 3]]}
+    t = music_compose.leitmotif("Picked", "major", written=written)
+    assert t["pickup"] == 1
+    menu = arrangement.fitting_chords(t)
+    assert [label for label, _ in menu[:2]] == ["pickup", "bar 1"]
+    rows = [l.split() for l in arrangement.describe("Picked", written=written).splitlines()]
+    assert ["0", "0.2"] == rows[3][:2] and ["1", "1.0"] == rows[4][:2]     # the pickup, then bar 1
+
+
 def test_fix_moves_notes_into_range_and_doubles_quick_notes_on_slow_strings():
     import arrangement
     spec = {"tune": {"seed": "sketch", "key": "D4", "meter": "4/4"}, "statements": [], "length": 16, "tempo": 120,

@@ -1286,12 +1286,17 @@ def describe(seed: str, mode: str = "major", cls: str = "", stage: int = 1, dark
              f"{tune['kind']}, {sum(b for _, b in tune['notes']):g} units = "
              f"{sum(b for _, b in tune['notes']) / bar:g} bars",
              "at      bar.pos  note   units"]
+    pick = float(tune.get("pickup") or 0)
+    if pick:
+        lines.insert(1, f"bars count from the first downbeat, as in `grid` (bar 0: the {pick:g}-unit pickup); "
+                        f"a statement at unit (N-1)*{bar:g} - {pick:g} puts the tune's bar k on bar N+k-1")
     u = 0.0
     for st, b in tune["notes"]:
-        lines.append(f"{u:<7g} {int(u // bar) + 1:>3}.{u % bar:<4g} {name_of(tune['key'] + st):<6} {b:g}")
+        v = u - pick
+        lines.append(f"{u:<7g} {int(v // bar) + 1:>3}.{v % bar:<4g} {name_of(tune['key'] + st):<6} {b:g}")
         u += b
     lines.append("chords that hold each bar's main notes (a menu, not an answer - chromatic ones included):")
-    lines += [f"  bar {i + 1}: {' '.join(cs)}" for i, cs in enumerate(fitting_chords(tune))]
+    lines += [f"  {label}: {' '.join(cs)}" for label, cs in fitting_chords(tune)]
     return "\n".join(lines)
 
 
@@ -1332,27 +1337,30 @@ def grid(tune: Dict[str, Any], tempo: float, entry_bars: int = 0, body_seconds: 
     return "\n".join(lines)
 
 
-def fitting_chords(tune: Dict[str, Any]) -> List[List[str]]:
+def fitting_chords(tune: Dict[str, Any]) -> List[Tuple[str, List[str]]]:
     """For each bar of the tune, every chord in a wide palette (diatonic, borrowed and
     chromatic-mediant) that holds the bar's main notes (the long and strong ones) - a menu
     for a composer, never one answer: a single suggestion would steer every piece to the
-    plain choice (the host: "won't the suggested chord hurt creativity?")."""
+    plain choice (the host: "won't the suggested chord hurt creativity?"). -> [(label, chords)]:
+    "pickup", then "bar 1" from the first downbeat (the bars `grid` counts)."""
     palette = ["i", "I", "ii", "iiø", "bII", "III", "bIII", "iv", "IV", "v", "V", "vi", "bVI",
                "VI", "bVII", "vii°"]
     bar, key = tune["bar"], tune["key"]
+    pick = float(tune.get("pickup") or 0)
     weight: Dict[int, Dict[int, float]] = {}
-    u = 0.0
+    v = -pick
     for st, b in tune["notes"]:
-        strong = 1.5 if abs(u % bar) < 1e-6 else 1.0
-        w = weight.setdefault(int(u // bar), {})
+        strong = 1.5 if abs(v % bar) < 1e-6 else 1.0
+        w = weight.setdefault(int(v // bar), {})          # (-1: the pickup)
         w[(key + st) % 12] = w.get((key + st) % 12, 0.0) + b * strong
-        u += b
+        v += b
     out = []
-    for bi in range(int(-(-u // bar))):
+    for bi in range(-1 if pick else 0, int(-(-v // bar))):
         w = weight.get(bi) or {}
         total = sum(w.values()) or 1.0
-        held = [(sum(v for pc, v in w.items() if pc in chord(c, key)["pcs"]) / total, c) for c in palette]
-        out.append([c for f, c in sorted(held, key=lambda x: -x[0]) if f >= 0.7] or ["(passing notes: any)"])
+        held = [(sum(x for pc, x in w.items() if pc in chord(c, key)["pcs"]) / total, c) for c in palette]
+        out.append(("pickup" if bi < 0 else f"bar {bi + 1}",
+                    [c for f, c in sorted(held, key=lambda x: -x[0]) if f >= 0.7] or ["(passing notes: any)"]))
     return out
 
 
