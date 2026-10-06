@@ -1361,69 +1361,6 @@ def grid(tune: Dict[str, Any], tempo: float, entry_bars: int = 0, body_seconds: 
     return "\n".join(lines)
 
 
-def scaffold(bar_map: Dict[str, Any], written: Dict[str, Any]) -> Dict[str, Any]:
-    """A starting score from a stage plan's bar map, so the composer writes music, not
-    arithmetic: the tune and key, tempo, role, the entry and loop, the length, every
-    statement placed on its bars (with an empty "melody" entry to fill), a "dynamics"
-    curve through the sections' levels (the seam already matched), and "_map" - each
-    section's bars, units, seconds and what the plan says happens there.
-
-    bar_map: {"title", "seed", "key", "tempo", "role", "entry": {"bars", "level", "what"},
-    "sections": [{"bars": [first, last], "level": velocity, "what": "...",
-    "statement": true (the tune whole, its first downbeat on the first bar), "shift": n}]}
-    - body bars count from 1, as `grid` and `tune` count them."""
-    seed = bar_map["seed"]
-    tune = music_compose.leitmotif(seed, "major", "", written=written)
-    bar = float(tune["bar"])
-    beat = 3 if tune["meter"] == "6/8" else 1
-    unit_s = 60.0 / float(bar_map["tempo"]) / beat
-    pick = float(tune.get("pickup") or 0)
-    tune_u = sum(b for _, b in tune["notes"])
-    sections = sorted(bar_map["sections"], key=lambda x: x["bars"][0])
-    body_bars = max(x["bars"][1] for x in sections)
-    entry = bar_map.get("entry") or {}
-    entry_bars = int(entry.get("bars") or 0)
-    r = lambda x: int(x) if float(x).is_integer() else round(float(x), 4)
-    score: Dict[str, Any] = {"title": bar_map.get("title", seed),
-                             "tune": {"seed": seed, "written": written, "key": bar_map["key"]},
-                             "role": bar_map.get("role", "stage"), "tempo": bar_map["tempo"]}
-    if entry_bars:
-        score.update({"start": r(-entry_bars * bar), "loop": True, "loop_from": 0})
-    elif bar_map.get("loop", True):
-        score["loop"] = True
-    score["length"] = r(body_bars * bar)
-    statements, melody, keys, dyn, shown = [], [], [], [], []
-    if entry_bars:
-        dyn.append([r(-entry_bars * bar), int(entry.get("level", 110))])
-        shown.append({"bars": f"entry 1-{entry_bars}", "units": [r(-entry_bars * bar), 0],
-                      "seconds": [0.0, round(entry_bars * bar * unit_s, 2)], "what": entry.get("what", "")})
-    for sec in sections:
-        a, b = sec["bars"]
-        u0, u1 = (a - 1) * bar, b * bar
-        t0 = (entry_bars * bar + u0) * unit_s
-        dyn.append([r(u0), int(sec.get("level", 100))])
-        row = {"bars": f"{a}-{b}", "units": [r(u0), r(u1)],
-               "seconds": [round(t0, 2), round(t0 + (u1 - u0) * unit_s, 2)], "what": sec.get("what", "")}
-        if sec.get("statement"):
-            at = u0 - pick
-            st = {"at": r(at)}
-            if sec.get("shift"):
-                st["shift"] = sec["shift"]
-                keys.append({"from": r(at), "to": r(at + tune_u), "shift": sec["shift"]})
-            statements.append(st)
-            melody.append({"from": r(at), "to": r(at + tune_u), "parts": {}})
-            row["statement"] = f'"at": {r(at)} (the pickup, then the tune\'s bar 1 on bar {a}) to {r(at + tune_u)}'
-        shown.append(row)
-    if score.get("loop") and dyn:                   # the seam: the end meets the body's start
-        first = next(d for d in dyn if d[0] >= 0)
-        dyn.append([score["length"], first[1]])
-    score.update({"statements": statements, "melody": melody})
-    if keys:
-        score["keys"] = keys
-    score.update({"chords": [], "harmony": [], "patterns": [], "lines": [], "dynamics": dyn, "_map": shown})
-    return score
-
-
 def fitting_chords(tune: Dict[str, Any]) -> List[Tuple[str, List[str]]]:
     """For each bar of the tune, every chord in a wide palette (diatonic, borrowed and
     chromatic-mediant) that holds the bar's main notes (the long and strong ones) - a menu
@@ -1477,11 +1414,6 @@ def main() -> None:
     gr.add_argument("--entry", type=int, default=0, help="entry bars (a boss stage)")
     gr.add_argument("--body", type=float, default=150.0, help="body seconds at least (a stage: 150)")
     gr.add_argument("--section", type=int, default=8, help="bars per section")
-    sc_ = sub.add_parser("scaffold", help="a starting score from a stage plan's bar map (JSON): the tune, "
-                                          "entry, loop, length, statements, dynamics and section map set")
-    sc_.add_argument("bar_map")
-    sc_.add_argument("--written", required=True, help="the tune file (music/tunes/<who>.json)")
-    sc_.add_argument("--out", required=True, help="the score to write (refuses to overwrite one)")
     mk = sub.add_parser("make", help="the whole loop in one: apply the mechanical fixes, run the critic, "
                                      "and render when nothing is left but notes")
     mk.add_argument("file")
@@ -1500,15 +1432,6 @@ def main() -> None:
         written = json.loads(Path(a.written).read_text(encoding="utf-8"))
         tune = music_compose.leitmotif(a.seed, "major", "", written=written)
         print(grid(tune, a.tempo, a.entry, a.body, a.section))
-        return
-    if a.cmd == "scaffold":
-        out = Path(a.out)
-        if out.exists():
-            sys.exit(f"[arrangement] {out} exists: a scaffold starts a score, it never replaces one")
-        written = json.loads(Path(a.written).read_text(encoding="utf-8"))
-        bar_map = json.loads(Path(a.bar_map).read_text(encoding="utf-8"))
-        out.write_text(json.dumps(scaffold(bar_map, written), indent=1, ensure_ascii=False), encoding="utf-8")
-        print(f"wrote {out}: fill \"melody\" parts, chords, harmony, patterns, lines (see \"_map\")")
         return
     if a.cmd == "make":
         import time as _time

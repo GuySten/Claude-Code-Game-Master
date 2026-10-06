@@ -484,22 +484,3 @@ def test_the_grid_does_the_arithmetic():
     assert "1 bar = 3 units = 1.07 s" in g and "(1 pickup + 20 bars)" in g
     assert '"start": -12' in g and '"length": 432' in g                    # 144 bars >= 150 s
     assert '"at": 23 -> bars 9-28' in g
-
-
-def test_a_scaffold_sets_a_stages_arithmetic_and_leaves_the_music_to_the_composer():
-    import arrangement
-    written = {"seed": "Picked", "key": "D4", "meter": "3/4", "mode": "aeolian", "pickup": [[4, 1]],
-               "motif": [[7, 3], [6, 2], [4, 1]], "again": [[7, 3], [6, 3]], "climb": [], "home": [[0, 3]]}
-    bar_map = {"seed": "Picked", "key": "F4", "tempo": 168, "role": "stage",
-               "entry": {"bars": 2, "level": 112, "what": "the entry"},
-               "sections": [{"bars": [1, 8], "level": 104, "what": "the drive"},
-                            {"bars": [9, 16], "level": 120, "statement": True, "shift": 2, "what": "the peak"}]}
-    s = arrangement.scaffold(bar_map, written)
-    assert (s["start"], s["loop"], s["loop_from"], s["length"]) == (-6, True, 0, 48)
-    assert s["tune"]["key"] == "F4" and s["role"] == "stage"
-    assert s["statements"] == [{"at": 23, "shift": 2}]                   # bar 9's downbeat, after the pickup
-    assert s["keys"] == [{"from": 23, "to": 39, "shift": 2}]
-    assert s["melody"] == [{"from": 23, "to": 39, "parts": {}}]
-    assert s["dynamics"][0] == [-6, 112] and s["dynamics"][-1] == [48, 104]   # the seam meets the body's start
-    assert [m["bars"] for m in s["_map"]] == ["entry 1-2", "1-8", "9-16"]
-    assert not s["harmony"] and not s["lines"]
