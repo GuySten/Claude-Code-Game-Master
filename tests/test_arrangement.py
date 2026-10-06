@@ -579,3 +579,13 @@ def test_many_short_brass_stabs_are_flagged_but_a_few_are_not():
     few = {**base, "lines": [{"part": "brass", "notes": [[i * 8 + 0.5, "D3", 0.5] for i in range(4)]}]}
     flagged = lambda sp: [m for _, m in arrangement.check(sp, listen=False) if "stabs (" in m]
     assert flagged(stabs) and not flagged(few)
+
+
+def test_constant_semitone_dissonance_is_flagged_but_a_passing_grind_is_not():
+    import arrangement
+    base = {"tune": {"seed": "sketch", "key": "D4", "meter": "4/4"}, "length": 16, "tempo": 100,
+            "chords": [[0, 16, "i"]], "statements": []}
+    grind = {**base, "lines": [{"part": "strings", "notes": [[0, "D4", 16], [0, "D#4", 16]]}]}
+    passing = {**base, "lines": [{"part": "strings", "notes": [[0, "D4", 16], [14, "D#4", 1]]}]}
+    flagged = lambda sp: [m for _, m in arrangement.check(sp, listen=False) if "clash sounds" in m]
+    assert flagged(grind) and not flagged(passing)

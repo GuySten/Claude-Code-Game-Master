@@ -1105,6 +1105,28 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
             add("warn", f"{len(stabs)} short brass/trumpet stabs ({per_min:.0f} a minute, from {stabs[0]:.1f} s): "
                         "this sound set's brass is jarring in repeated short stabs (host). Use a few, "
                         "held longer, or give the hits to low strings, timpani and trombones blended")
+    if host_checks:
+        # Dissonance is a spice, not a bed: the host, of a stage with a semitone clash sounding 97%
+        # of the time ("terrible... painful to hear"); the liked pieces sound one 11-21% of the time.
+        perc = {"timpani", "kit", "taiko", "toms", "cymbal", "gong", "bells", "glockenspiel", "triangle"}
+        sounding: Dict[Tuple[str, int], int] = {}
+        t_prev, clash_t, total = 0.0, 0.0, 0.0
+        for t, on, part, key, vel in sorted(sc.events, key=lambda e: (e[0], -e[1])):
+            if t > t_prev:
+                ks = sorted({k for (pt, k) in sounding if pt.split(":")[0] not in perc})
+                if ks:
+                    total += t - t_prev
+                    if any(b - a in (1, 13, 25) for i, a in enumerate(ks) for b in ks[i + 1:]):
+                        clash_t += t - t_prev
+            t_prev = t
+            if on:
+                sounding[(part, key)] = vel
+            else:
+                sounding.pop((part, key), None)
+        if total > 0 and clash_t / total > 0.4:
+            add("warn", f"a semitone (or minor-ninth) clash sounds {clash_t / total:.0%} of the time: constant "
+                        "dissonance is painful to sit through (host; the liked pieces: 11-21%) - keep the "
+                        "grind for cadences, cracks and the peak, over chords that otherwise sound clean")
     if not listen:
         return out
     # Listening: render the layers apart and measure them.

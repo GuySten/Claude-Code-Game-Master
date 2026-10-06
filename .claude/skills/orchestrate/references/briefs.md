@@ -71,7 +71,10 @@ moor; not sad-romantic"), never a bare adjective.
 
 - **P1. The cue's role sets the emotional bounds.** A boss is always the enemy: every stage
   carries negative emotion - menace, dread, fury, agony, despair - and the boss's concepts are
-  their dark forms (`concepts.md` R18: holiness -> corrupted holiness, power -> tyranny). A
+  their dark forms (`concepts.md` R18: holiness -> corrupted holiness, power -> tyranny). Darkness is
+  never constant harshness: dissonance is a spice - at cadences, cracks and the peak - over chords
+  that otherwise sound clean (the host, of a hymn with a semitone grinding in every chord: "painful
+  to hear"). A reviewer can't hear harshness; the critic measures it. A
   villain's menace keeps momentum and control; darker is not slower, and slow and low reads as
   mourning. A player character is a protagonist, never a minor figure: their theme states who
   they are with conviction (R17). A word that fits the concept but not the role (rapture,

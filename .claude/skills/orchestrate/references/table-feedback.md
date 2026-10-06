@@ -415,3 +415,9 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   rounds; each caught a real fault in it (a stomping brute, a light grey lord, a waltz too slow to
   drive, an ending read as pity), and the tempo left the liked piece's 84 (P7: liked pieces are
   references, not ceilings).
+  The fixed version (the tune moved to violins + clarinets, the choir on its held notes only, the brass
+  stabs gone): "terrible. It is very different from stage 1, it is painful to hear." Measured: a
+  semitone or minor-ninth clash sounding 97% of the time - the brief had asked for the hymn "violated
+  in every chord, all the way through" (pushed by a review round); the liked pieces sound one 11-21% of
+  the time, the Saint's stage 1 3%, the rejected Pyre 90%. With the choir's blend gone the grind was
+  exposed. Now a critic warning (over 40%) and composing.md rule 13; briefs.md P1.

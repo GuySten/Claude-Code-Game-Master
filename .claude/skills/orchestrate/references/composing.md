@@ -66,6 +66,9 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
     strings or woods. And the brass section is jarring in repeated short stabs [H: "the trumpets are
     too jarring", ~45 stabs a minute]: a few, held longer, or the hits on low strings, timpani and
     trombones blended. (critic)
+    Dissonance is a spice, not a bed: a semitone clash sounding most of the time is "painful to hear"
+    [H, the Saint's violated hymn, a clash 97% of the time; the liked pieces 11-21%] - keep the grind for
+    cadences, cracks and the peak, over chords that otherwise sound clean. (critic)
 
 ## 2. What the research adds
 14. Themes the table can learn: short, distinct in rhythm and timbre, on a clear type
