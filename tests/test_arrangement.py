@@ -212,12 +212,13 @@ def test_a_key_change_reads_its_chords_in_the_new_key():
     assert [b - a for a, b in zip(horns[:n], horns[n:])] == [2] * n
 
 
-def test_the_critic_hears_a_thin_battle_and_a_static_theme():
+def test_the_critic_hears_a_static_theme():
     held = spec(chords=[[0, 1000, "I"]], harmony=[{"part": "strings", "play": "chord", "range": ["G3", "G4"]}],
                 patterns=[], hits=[])
     assert any("only the tune moves" in m for _, m in A.check(held, listen=False))
     battle = dict(held, role="battle", loop=True)
-    assert any("battle or loop texture" in m for _, m in A.check(battle, listen=False))
+    # (no count of moving lines any more: it came from the audio rater, not the host)
+    assert not any("battle or loop texture" in m for _, m in A.check(battle, listen=False))
     busy = dict(battle, harmony=held["harmony"] + [
         {"part": p, "play": "root", "range": ["C2", "B3"], "pattern": "xo"} for p in ("cellos", "bassoons", "pizzicato")])
     assert not any("texture" in m or "only the tune" in m for _, m in A.check(busy, listen=False))

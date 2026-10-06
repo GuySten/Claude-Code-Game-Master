@@ -852,12 +852,6 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
                         "inner line in motion would bring it to life")
         run = []
     ctx["texture"] = sum(n for _, n, _, _ in moving) / max(1, len(moving))
-    if moving:
-        avg = ctx["texture"]
-        if spec.get("role") == "battle" and avg < 3:
-            add("note", f"battle or loop texture: {avg:.1f} lines move per bar besides the tune "
-                        "(pitched parts): big music keeps three or more going - an ostinato, a "
-                        "countermelody or answer, a moving bass or inner line - under the tune")
     # A loop with an entry (a boss stage's opening, played once): the stage change is itself
     # a climax - "after stage change the music should start strong" (the host); the research:
     # a transformation restarts the music in its new form, opening with a signature attack.
@@ -870,7 +864,7 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
         if entry and max(entry) < 0.75 * body_peak:
             add("warn", f"the entry (before loop_from) peaks at {max(entry)} parts, the loop at {body_peak}: "
                         "a stage's entry is the stage change's climax - start strong (most of the stage's "
-                        "forces, its signature figure), then drop back for the loop to build")
+                        "forces, its signature figure) - and keep that energy into the body (composing.md 4)")
         if entry and len(entry) > 4:
             add("note", f"the entry is {len(entry)} bars: it plays once, under the GM's narration of the "
                         "change - 1 to 4 bars is usual")
@@ -879,9 +873,7 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
     # every 8-16 bars - and the boss's tune is heard whole, as written, so the table knows
     # it (a leitmotif is recognised in a reprise far more easily than in a variation; the
     # host could not tell whether a stage 2 had stage 1's tune).
-    if ctx["loop"] and spec.get("role") == "battle":
-        if entry_u is None:
-            entry_u = ctx["start"]
+    if entry_u is not None and ctx["loop"]:
         body_s = ctx["seconds"] - (ctx["loop_from"] or 0)
         if body_s < 150:
             add("warn", f"the loop body is {body_s:.0f} s: a stage plays 10-40 minutes - 150 s at least "
@@ -911,7 +903,23 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
             return pts[-1][1]
         peak_i = max(range(len(layers)), key=lambda i: (dyn(layers[i][0] + bar / 2), layers[i][1]))
         before = [n for _, n, _ in layers[:peak_i]]
-        if len(before) >= 4:
+        if entry_u is not None and len(before) >= 4:
+            def heard(u0: float, u1: float):
+                ps, top = set(), 0
+                a_s, b_s = T(u0), T(u1)
+                for t, on, name, key, _ in sc.events:
+                    if on and a_s - 1e-6 <= t < b_s - 1e-6:
+                        ps.add(name.partition(":")[0])
+                        top = max(top, key)
+                return ps, top
+            u_pk = layers[peak_i][0]
+            open_ps, open_top = heard(layers[0][0], layers[0][0] + 16 * bar)
+            pk_ps, pk_top = heard(u_pk - 2 * bar, u_pk + 2 * bar)
+            if not (pk_ps - open_ps) and pk_top <= open_top:
+                add("warn", f"the peak ({_where(ctx, u_pk)}) brings nothing the body's opening didn't have: "
+                            "save a part or a register for it (the open choir, full brass, the top octave, "
+                            "the tune's grandest setting) - the host: \"a climax without the climax\"")
+        elif len(before) >= 4:
             opening = [n for _, n, _ in layers[:max(2, len(layers) // 4)]]
             full = layers[peak_i][1]
             if min(opening) >= 0.8 * full and sorted(before)[len(before) // 2] >= 0.85 * full:
@@ -956,12 +964,7 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
         if len(started) >= 3 and (len(stopped) >= 2 or len(started) >= 5) and len(stopped) >= len(kept):
             add("warn", f"a seam at {_where(ctx, u0)}: {', '.join(stopped) or 'nothing'} stop as "
                         f"{', '.join(started)} start - heard as another piece glued on. Carry a layer "
-                        "or two across it, build the bars before it, and bring the new parts in waves")
-        elif len(started) >= 4 and len(now) >= 1.6 * max(1, len(before)):
-            add("warn", f"the orchestra jumps from {len(before)} to {len(now)} parts at {_where(ctx, u0)} "
-                        f"({', '.join(started)} all start): a climax that doesn't grow out of what came "
-                        "before. Build into it over the bars before (a crescendo, a roll, a rising line) "
-                        "and bring the new parts in waves")
+                        "or two across it and build the bars before it")
     # The surprise budget: a surprising tune wants a supportive setting, a simple tune
     # a rich one (the host's 2x2: those pairings beat both-plain and both-rich).
     budget = surprise_budget(ctx, spec) if host_checks and ctx["played"] else None
@@ -1127,7 +1130,8 @@ def _quick_double(keys: List[int]) -> Optional[str]:
     return None
 
 
-def fix(spec: Dict[str, Any], listen: bool = True) -> Tuple[Dict[str, Any], List[str]]:
+def fix(spec: Dict[str, Any], listen: bool = True,
+        found: Optional[List[Tuple[str, str]]] = None) -> Tuple[Dict[str, Any], List[str]]:
     """The critic's mechanical fixes, applied: notes moved by octaves into their
     instrument's range (a whole line or placement if one shift fits, else note by note),
     harmony ranges kept inside the instrument's, a quick doubling for a slow-speaking
@@ -1199,7 +1203,7 @@ def fix(spec: Dict[str, Any], listen: bool = True) -> Tuple[Dict[str, Any], List
             if q is not None and q != p:
                 x["note"] = name_of(q)
                 changes.append(f"{x['part']}: {kind} note {name_of(p)} -> {name_of(q)}")
-    for level, msg in check(s, listen=listen):
+    for level, msg in (found if found is not None else check(s, listen=listen)):
         m = re.match(r"(\w+): \d+ of \d+ notes are shorter than it takes to speak", msg)
         if m:
             part = m.group(1)
@@ -1228,10 +1232,13 @@ def fix(spec: Dict[str, Any], listen: bool = True) -> Tuple[Dict[str, Any], List
                 changes.append(f"melody entry #{m.group(1)}: \"gain\" {m.group(2)} (the tune on top, +3 dB)")
             continue
         if msg.startswith("the loop's seam steps") and len(s.get("dynamics") or []) >= 2:
-            first, last = s["dynamics"][0], s["dynamics"][-1]
-            if last[1] != first[1]:
-                last[1] = first[1]
-                changes.append(f"loop seam: the last dynamics point set to the first's ({first[1]})")
+            pts = sorted(s["dynamics"], key=lambda d: d[0])
+            at = float(s.get("loop_from", pts[0][0]))          # (a stage: where the body starts)
+            head = next((d for d in pts if d[0] >= at - 1e-9), pts[0])
+            last = s["dynamics"][-1]
+            if last[1] != head[1]:
+                last[1] = head[1]
+                changes.append(f"loop seam: the last dynamics point set to the body's start ({head[1]})")
     return s, changes
 
 
@@ -1270,6 +1277,10 @@ def main() -> None:
     c = sub.add_parser("check", help="the score critic: what a listener would notice")
     c.add_argument("file")
     c.add_argument("--quick", action="store_true", help="read the score only (don't render it)")
+    mk = sub.add_parser("make", help="the whole loop in one: apply the mechanical fixes, run the critic, "
+                                     "and render when nothing is left but notes")
+    mk.add_argument("file")
+    mk.add_argument("--out", help="the audio file to write (default: next to the score, .ogg)")
     fx = sub.add_parser("fix", help="apply the critic's mechanical fixes (ranges, quick doublings, "
                                     "the choir's level, a loop's seam), then check again")
     fx.add_argument("file")
@@ -1279,6 +1290,37 @@ def main() -> None:
     if a.cmd == "tune":
         written = json.loads(Path(a.written).read_text(encoding="utf-8")) if a.written else None
         print(describe(a.seed, "minor" if a.minor else "major", a.cls, a.stage, a.dark, a.gen, written))
+        return
+    if a.cmd == "make":
+        import time as _time
+        t0 = _time.time()
+        path = Path(a.file)
+        try:
+            spec = json.loads(path.read_text(encoding="utf-8"))
+            found = check(spec)
+            fixed, changes = fix(spec, found=found)
+            if changes:
+                path.write_text(json.dumps(fixed, indent=1, ensure_ascii=False), encoding="utf-8")
+                found = check(fixed)
+        except (ArrangementError, KeyError, TypeError, ValueError) as e:
+            sys.exit(f"[arrangement] {a.file}: {e}")
+        for c in changes:
+            print(f"FIXED {c}")
+        for level, msg in found:
+            print(f"{level.upper():5} {msg}")
+        errs, warns = (sum(lv == k for lv, _ in found) for k in ("error", "warn"))
+        print(f"{len(changes)} fix(es); {errs} error(s), {warns} warning(s), "
+              f"{sum(lv == 'note' for lv, _ in found)} note(s)")
+        if errs or warns:
+            sys.exit(f"not rendered: fix the error(s) and warning(s) above, then make again "
+                     f"({_time.time() - t0:.0f} s)")
+        samples, rate = render(fixed)
+        out = Path(a.out) if a.out else path.with_suffix(".ogg")
+        landing = None if fixed.get("loop") else int(round(build(fixed)[1] * rate))
+        made = music_compose.write(samples, rate, out, loop_start=loop_start(fixed, rate), landing=landing)
+        print(f"MADE {made} ({len(samples) / rate:.1f}s{', a loop' if fixed.get('loop') else ''}"
+              f"{f', loops from {loop_start(fixed, rate) / rate:.2f}s' if loop_start(fixed, rate) else ''}) "
+              f"in {_time.time() - t0:.0f} s")
         return
     if a.cmd == "fix":
         path = Path(a.file)

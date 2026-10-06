@@ -51,36 +51,9 @@ Ordinary fights share one campaign battle cue and get none of this.
 5. **A stage may reveal rather than escalate.** When the second stage shows the boss's
    grief, madness or former self, its cue may be sparser, slower or sacred. Mark it
    `reveal` so the GM knows the drop is meant.
-6. **Every stage opens strong, then builds again.** A stage change is itself a climax
-   (the host: "after stage change the music should start strong - there is a kind of
-   climax when the boss transforms"; the games: the music restarts in its new form,
-   opening with the boss's signature attack - Malenia, FFXIV). So a stage cue is an
-   **entry** played once and a **loop body** after it (`"start"` negative, `"loop":
-   true, "loop_from": 0`: the table plays the entry, then loops the body without a gap):
-   - **the entry**, 1 to 4 bars: most of the stage's forces at once on its new key and
-     tempo, the new form's signature figure (stage 2: the motif in its new shape, the
-     choir's first entrance), ff. Stage 1's entry is the boss's arrival, at stage 1's size.
-   - **the loop body keeps the entry's energy**: it starts on the stage's full drive (its
-     rhythmic engine at full strength, within about 3 dB of the entry - the host, of bodies
-     that fell 9-11 dB after their entry: "it dies after the transformation"). The dip comes
-     later: a breakdown a third to halfway through, then the rebuild in waves to a peak of
-     its own that holds something back - colour and register (the tune's full form, the top
-     register, full brass, the open choir), not a quiet start. Then it falls back to the
-     body's opening drive for the seam. The host on a stage that sat at its full texture
-     throughout: "it does not develop into anything... like a climax without the climax".
-   - **across the fight**: escalate in colour, not level - tempo, key, density, choir,
-     register, how complete the tune's setting is (rule 3). The stage loops are
-     level-matched (mastering brings every file to the same loudness; within about 2 LU),
-     stings a little hotter. Stage 1's entry is an instant switch into combat; what it
-     holds back is colours (the choir opening up, the top register, the tune's grandest
-     setting), not size. The fight's single biggest moment is the last stage's.
-   The critic checks a stage's entry is strong and judges the climax on the body alone.
-7. **Long loops with change inside.** A table stage lasts 10 to 40 minutes: a loop body
-   of 2.5 minutes at least (the research: 3 to 5), something new every 8 to 16 bars (a new
-   carrier, a breakdown and rebuild, a key move), so the loop doesn't show. One peak a
-   cycle: a swell every 30 seconds reads as false escalation - the players trust the
-   music's intensity like a barometer (`"loop": true`, `"role": "battle"`; the critic
-   warns under 150 s). Write repeats with `"motifs"` and `"repeat"`, not by hand.
+6. **How a stage is written** - its strong entry, a body that keeps that energy, the breakdown,
+   the one peak that brings something new, the length - is the composer's recipe:
+   `composing.md` ("Boss stage"). This file plans the fight; that one writes it.
 
 ## The order of work
 
@@ -93,7 +66,7 @@ the current stage's). **Once the plan is written, compose in
 parallel:** one composer per stage, and the stings in two (transitions and hits; endings),
 all started together - the plan has fixed every key, so none waits on another (a whole
 two-stage fight took about 20 minutes this way instead of 35 staggered). Each composer works
-from `composer-card.md`, not the whole skill. A workflow test is run as written: a conflict it finds is fixed
+from `composing.md`, not the whole skill. A workflow test is run as written: a conflict it finds is fixed
 in these rules, never by editing a step's output by hand (host: "we are testing the
 workflow - you cannot override on a whim").
 

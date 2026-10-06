@@ -593,7 +593,7 @@ def place_sketch(campaign_dir, name: str, rec: Optional[Dict[str, Any]] = None,
     """A place's music, sketched by rule (a score in the arrangement format, "sketch":
     true): a quiet two-minute loop in the place's colour, the adventure's signature
     motif and the place's own answer to it, low under the voices. The GM's own piece
-    replaces it (orchestrate skill: references/recipes.md, places)."""
+    replaces it (orchestrate skill: references/composing.md, places)."""
     word, _, c = colour_of(name, rec)
     rng = random.Random(hashlib.sha256(("place:" + name.casefold()).encode("utf-8")).hexdigest())
     sig = signature(campaign_dir, adventure)["motif"]
