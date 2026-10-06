@@ -118,6 +118,19 @@ entry in `table-feedback.md`.
   harmony, with momentum - the slow, gloomy rewrite "sounds less evil".
 - The host's evil: a character portrait (madness, isolation, inevitability) - Homelander's lone
   fast, jarring high violin; Evil Morty's sad human choir (a villain may mourn, sung).
+- An evil mastermind (the Margrave): low, dark colours - no harp, no plucked lightness; tense
+  diminished chords for the bright dominants; a pedal under it; dissonant low choir and organ at
+  the climax; an ending that never resolves. A villain needs two pieces on the tune: the theme,
+  and a battle piece (fast, an ostinato engine, drums).
+- A complex villain is a portrait in layers, each heard at its moment ("the Margrave is a complex
+  character"): the face (his elegant waltz), the guilt (a mourning choir), the power (the climax),
+  the mind fraying (the violin). The portrait built this way: "dramatically better".
+- Madness is instability, not crispness ("too crisp - it signals structured evil"): a violin that
+  plays along with the orchestra and suddenly misbehaves - "turns too high, breaks pitch and
+  stride"; the strings follow its madness when they accompany it. Audible all through ("I
+  thought we agreed it should accompany the whole piece"); each flash short and growing ("every
+  madness is felt clearly, so it should not take a lot of duration"); the piece starts briefly
+  and ends with the violin alone.
 
 **Boss fights**
 - Combat is the frame; the boss's defining trait carries, in the foreground ("the corruption is
