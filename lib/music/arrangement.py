@@ -149,7 +149,7 @@ What the tools can make - each sound serves many characters and moods, none is a
 Parts: violins, violins2, solo_violin (one player: exposed, quick), strings (sustained),
 tremolo, pizzicato, cellos, basses,
 flutes, piccolo, oboe, english_horn, clarinets, bassoons, horns, trumpets,
-trombones, tuba, brass, choir, chorus (E2-E6), men_choir (E2-A4), choir_oo, choir_oh (A2-D#6), harp, celesta, glockenspiel, bells, organ,
+trombones, tuba, brass, choir, chorus (E2-E6), men_choir (E2-A4; above E4 it sounds like an instrument), choir_oo, choir_oh (A2-D#6), harp, celesta, glockenspiel, bells, organ,
 timpani, taiko, toms, reverse_cymbal, kit (bd, snare, cymbals): as many as wanted.
 """
 
@@ -1078,6 +1078,7 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
         # Played notes per part (base part name: a tune's carrier is "part:..."), from the score.
         held: Dict[Tuple[str, int], List[Tuple[float, float]]] = {}
         played_notes: List[Tuple[str, float, float]] = []
+        men_high: List[Tuple[float, int]] = []
         for t, on, part, key, vel in sorted(sc.events, key=lambda e: (e[0], -e[1])):
             base = part.split(":")[0]
             if on:
@@ -1085,17 +1086,29 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
             elif held.get((base, key)):
                 t0, _ = held[(base, key)].pop(0)
                 played_notes.append((base, t0, t - t0))
+                if base == "men_choir" and key > 64:
+                    men_high.append((t0, key))
         # A sampled choir can't change notes fast: the host, of a hymn sung on eighth notes at
         # 126 ("the choir cannot do fast changes, they sound like an instrument"). Measured: that
         # piece changed notes 156 times in under 0.5 s; every liked piece held each note 0.7 s+.
+        # And the men's choir again, of a hook sung at 0.56 s a note: "the men choir cannot do fast
+        # changes" - the choirs the host accepted never moved faster than 0.71 s.
         for part in ("choir", "chorus", "men_choir", "choir_oo", "choir_oh"):
             ons = sorted({round(t0, 3) for b, t0, _ in played_notes if b == part})
-            quick = [b for a, b in zip(ons, ons[1:]) if b - a < 0.5]
-            if len(quick) >= 4:
-                add("warn", f"the {part} changes notes {len(quick)} times in under half a second (first at "
+            quick = [b for a, b in zip(ons, ons[1:]) if b - a < 0.7]
+            if quick:
+                add("warn", f"the {part} changes notes {len(quick)} time(s) in under 0.7 s (first at "
                             f"{quick[0]:.1f} s): a sampled choir can't sing that fast - it sounds like an "
-                            "instrument. Keep the voices on notes of 0.5 s or more (the tune's long notes, "
+                            "instrument. Keep the voices on notes of 0.7 s or more (the tune's long notes, "
                             "held chords) and give the quick notes to strings or woods (rule 13)")
+        # The men's choir's top sounds like an instrument (the host, of a men's choir rising to F4-G#4;
+        # one that stayed at D#4 and below drew no complaint).
+        if men_high:
+            add("warn", f"the men_choir sings above E4 {len(men_high)} time(s) (first at {min(men_high)[0]:.1f} s, up to "
+                        f"{NAMES[max(k for _, k in men_high) % 12]}{max(k for _, k in men_high) // 12 - 1}): its top "
+                        "sounds like an instrument (host) - keep it at E4 and below, and take a rising line "
+                        "higher on the `chorus`")
+
         # Brass stabs: the host, of a stage with ~45 short brass-section stabs a minute: "the
         # trumpets are too jarring". Liked pieces used a few (Kestrel's trumpets: 6 notes, saved
         # for the climb). This sound set's brass is harsh when it stabs over and over.

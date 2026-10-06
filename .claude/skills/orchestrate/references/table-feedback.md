@@ -421,3 +421,10 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   in every chord, all the way through" (pushed by a review round); the liked pieces sound one 11-21% of
   the time, the Saint's stage 1 3%, the rejected Pyre 90%. With the choir's blend gone the grind was
   exposed. Now a critic warning (over 40%) and composing.md rule 13; briefs.md P1.
+- **The Margrave's boss fight, stage 1 "The Audience"** (Oct 2026, new brief process, five review rounds:
+  his dark waltz at 160 made the fight - his own waltz figure as the engine, the Keep's tread, the guilt
+  choir, one violin flash, a dark peak): "except that the piece is great". The one fault: "the men choir
+  cannot do fast changes and cannot do the highest sound. They sound like an instrument there" - it sang
+  his hook at 0.56 s a note and rose to F4-G#4 (the Saint's men's choir, never above D#4 and never faster
+  than 0.79 s, drew no complaint). Now the critic warns on any choir change under 0.7 s and on the men's
+  choir above E4.

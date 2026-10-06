@@ -60,10 +60,11 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
     their B1 is thin). [H, Kestrel: "a weak start and weaker instruments, and weaker combination"; "it's
     not always good to start strong"; the brass "really weak" as a lead] (critic: the tune on
     brass or low reeds alone)
-    The voices can't run: a sampled choir changing notes faster than every half second sounds like an
+    The voices can't run: a sampled choir changing notes faster than every 0.7 s sounds like an
     instrument [H, the Saint's hymn on eighths at 126: "the choir cannot do fast changes, they sound
-    like an instrument"] - give the voices the tune's long notes and held chords, the quick notes to
-    strings or woods. And the brass section is jarring in repeated short stabs [H: "the trumpets are
+    like an instrument"; again of a men's choir at 0.56 s a note] - give the voices the tune's long
+    notes and held chords, the quick notes to strings or woods. The `men_choir` stays at E4 and below
+    (its top "sounds like an instrument" [H]); a line that rises higher moves to the `chorus`. And the brass section is jarring in repeated short stabs [H: "the trumpets are
     too jarring", ~45 stabs a minute]: a few, held longer, or the hits on low strings, timpani and
     trombones blended. (critic)
     Dissonance is a spice, not a bed: a semitone clash sounding most of the time is "painful to hear"

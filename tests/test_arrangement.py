@@ -589,3 +589,13 @@ def test_constant_semitone_dissonance_is_flagged_but_a_passing_grind_is_not():
     passing = {**base, "lines": [{"part": "strings", "notes": [[0, "D4", 16], [14, "D#4", 1]]}]}
     flagged = lambda sp: [m for _, m in arrangement.check(sp, listen=False) if "clash sounds" in m]
     assert flagged(grind) and not flagged(passing)
+
+
+def test_a_mens_choir_above_e4_is_flagged():
+    import arrangement
+    base = {"tune": {"seed": "sketch", "key": "D4", "meter": "4/4"}, "length": 8, "tempo": 80,
+            "chords": [[0, 8, "i"]], "statements": []}
+    high = {**base, "lines": [{"part": "men_choir", "notes": [[0, "D3", 4], [4, "G#4", 4]]}]}
+    low = {**base, "lines": [{"part": "men_choir", "notes": [[0, "D3", 4], [4, "D#4", 4]]}]}
+    flagged = lambda sp: [m for _, m in arrangement.check(sp, listen=False) if "above E4" in m]
+    assert flagged(high) and not flagged(low)
