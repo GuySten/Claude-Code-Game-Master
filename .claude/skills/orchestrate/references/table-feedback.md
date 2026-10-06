@@ -357,3 +357,7 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   bassoons (about 280 short notes each) and gave the tune to horns alone. -> composing.md rule 13
   (the sound set's strengths, blended), and a critic warning for the tune on brass or low reeds
   alone - which flags both losing versions and none of the liked pieces.
+  **Round 3** (labels swapped, so not a position habit): the GM wrote the brief from the
+  campaign - no translator - and a composer wrote from it (53 s, two whole statements, tune on
+  flutes + clarinets then horns + violins then octave tutti with choir, ending on its peak):
+  the original still better, "but B is closer". The GM's brief closed part of the gap.
