@@ -33,8 +33,11 @@ from, never where the brief starts.
    five of the seven the host rejected - every one whose overall feel contradicted the role -
    and passed the near-good one; it misses craft faults no verdict has named yet, and it holds
    the verdicts strictly. It is a check before the host's ears, never instead of them.
-   At most two review rounds: after the second, the GM decides the open points, writes the
-   decision in the brief, and the composer starts (a reviewer can always find one more thing).
+   Review again after every fix - a round costs about a minute, a composition 10-15 - until a
+   round has no blocking finding about the feel (up to five rounds). The GM decides a point
+   instead, and writes the decision in the brief, when it comes back after a fix (the reviewer
+   and the brief disagree) or when it pulls against a host verdict or a piece the host liked
+   (a reviewer can always find one more thing; the host's ears outrank it).
 6. **Store it** in the campaign: `music/briefs/<cue stem>.md` (the brief, the review, and later
    the host's verdict on the piece), so a verdict traces to the brief line behind it.
 
