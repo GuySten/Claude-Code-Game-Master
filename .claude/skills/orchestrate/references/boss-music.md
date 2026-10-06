@@ -176,6 +176,9 @@ once, then its body loops (`"loop_from"`).
 
 ## At the table
 
+14a. **Before initiative, the boss's theme.** As the boss appears and the GM sets the scene, play their
+    theme - the suspense; the stage-1 entry lands when the fight begins, and from there every stage is
+    dark and exciting, never only dread.
 15. **Switch on the narration of the trigger**, not on the dice. A stage that grows
     out of the last: **rise** into the new loop. A transformation: **break**, the
     pause under the GM's words, then the new loop. A turn the party caused: switch at

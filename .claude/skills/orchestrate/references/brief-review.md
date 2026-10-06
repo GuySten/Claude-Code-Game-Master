@@ -13,6 +13,9 @@ Work in this order, and write each answer down before the next step:
    sense about what this role means to the people at the table.
    A boss stage or a battle piece is a fight: it must drive like one (an engine and drums). Flag
    a brief that removes the fight's drive as surely as one that makes combat its subject.
+   And the players must want to fight it: a stage is dark *and* thrilling - energy, and awe at a
+   magnificent enemy. Flag a stage whose feelings are only dread, suspense or horror (that is the
+   boss's theme, before the fight), and never flag dark grandeur as if it were triumph.
 2. **Read the brief and imagine the sound it asks for**, ignoring its labels and feeling words:
    only the tempo, meter, mode and harmony, register, instruments, articulation, dynamics, the
    dance or march it implies, the shape. In one sentence: what would a listener feel if a

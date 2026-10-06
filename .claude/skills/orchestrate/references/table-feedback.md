@@ -465,3 +465,11 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   better than her old tune." The old hook's falling semitone sigh was the grief interval the reviewers kept
   hearing; A1's reciting tone rising to the Phrygian flat second says sacred and cold. Recorded in
   taste/verdicts.json.
+- **The Ashen Saint's two-stage fight on her new tune** (Oct 2026; stage 1 "The Rite", a hammering cell at 120;
+  stage 2 "Consumed", the Amelia chant at both extremes at 140; every Job written as dread or horror, and
+  "epic grandeur" ruled out on a reviewer's advice): "the saint stages are only ok. Which is an improvement
+  over her previous takes. But I do not think the players will feel excited to fight her." And: "the
+  suspense is good for an introduction before the fight starts... so for her theme it is good." Not note
+  density (both stages are as busy as the Margrave's "great" ones): the briefs aimed at dark-but-calm
+  (suspense) instead of dark-and-energised (a fight), and banned the dark grandeur that makes a villain
+  thrilling to face. Now briefs.md P1, a reviewer check, boss-music.md 14a.

@@ -76,6 +76,14 @@ moor; not sad-romantic"), never a bare adjective.
 - **P1. The cue's role sets the emotional bounds.** A boss is always the enemy: every stage
   carries negative emotion - menace, dread, fury, agony, despair - and the boss's concepts are
   their dark forms (`concepts.md` R18: holiness -> corrupted holiness, power -> tyranny). Darkness is
+  **A fight is the energised corner, a theme the calm one.** Dread and suspense are dark but calm: they
+  belong to the boss's *theme*, played as the boss appears, before initiative (the host, of the Saint's
+  dread-led stages: "the suspense is good for an introduction before the fight starts... for her theme it
+  is good"). A boss *stage* is dark and energised: its Job names both what the boss is and the thrill of
+  fighting them - the players' blood up, excited to take this enemy on ("only ok... I do not think the
+  players will feel excited to fight her"). Dark grandeur and awe belong to a magnificent enemy and are
+  welcome (One-Winged Angel "half worships him while it fights you"; listeners find it exhilarating);
+  triumph and heroism belong to the party and stay out. Darkness is
   never constant harshness: dissonance is a spice - at cadences, cracks and the peak - over chords
   that otherwise sound clean (the host, of a hymn with a semitone grinding in every chord: "painful
   to hear"). A reviewer can't hear harshness; the critic measures it. A
@@ -181,6 +189,9 @@ entry in `table-feedback.md`.
 - Fire written as sparkle (harp, glockenspiel, celesta, flute rings) reads as magic.
 - Fast, bright, high with the bass thinned reads as "playful... certainly not boss music".
 - "A boss is always the bad guy": every stage negative; holiness corrupted, power as tyranny.
+- Players must be excited to fight the boss: the Saint's stages briefed on dread and horror alone (grandeur
+  ruled out) were "only ok... I do not think the players will feel excited to fight her" - while their
+  suspense suits her theme, before the fight.
 - The Saint's violated-hymn stage 2: "very different... almost feels like a boss transformation";
   but a choir can't carry a quick line ("they sound like an instrument") and repeated brass stabs are
   "too jarring".
