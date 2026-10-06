@@ -456,3 +456,12 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   marcato strings and a hemiola engine in C minor; stage 3 the violin in jolts over an uneven engine,
   the whole tune once crushing from below in E-flat minor): "the margrave is great." A whole three-stage
   boss fight accepted on its first composition of each stage.
+- **The Ashen Saint, redone entirely** (Oct 2026: her first theme, then a new tune, on the brief process). Her
+  theme's brief took five blind review rounds; four found pity, each in a different depiction of the god's
+  silence or her loss - the GM's decision: the theme is what she does now, a cold, certain rite. The host then
+  asked for her tune to be regenerated too: six written candidates (composites 9.2-9.8; her old tune 8.8), a
+  blind bare-tune judge that ranked the *old* tune first, then finals of the two best new tunes arranged from
+  the same brief (A1 won blind). The host, hearing A1's theme, B2's and the old tune's: "A1 is better. It also
+  better than her old tune." The old hook's falling semitone sigh was the grief interval the reviewers kept
+  hearing; A1's reciting tone rising to the Phrygian flat second says sacred and cold. Recorded in
+  taste/verdicts.json.

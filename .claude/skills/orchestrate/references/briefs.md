@@ -155,6 +155,10 @@ entry in `table-feedback.md`.
   diminished chords for the bright dominants; a pedal under it; dissonant low choir and organ at
   the climax; an ending that never resolves. A villain needs two pieces on the tune: the theme,
   and a battle piece (fast, an ostinato engine, drums).
+- A tragic villain's theme is about what they do now, not what they lost: the Ashen Saint's brief went
+  five review rounds finding pity in every depiction of her abandonment (silence bars, a plea upward, a
+  sighing interval); rebuilt as a cold, certain rite on a new tune (a reciting tone rising to the Phrygian
+  flat second), "A1 is better... also better than her old tune".
 - A complex villain is a portrait in layers, each heard at its moment ("the Margrave is a complex
   character"): the face (his elegant waltz), the guilt (a mourning choir), the power (the climax),
   the mind fraying (the violin). The portrait built this way: "dramatically better".

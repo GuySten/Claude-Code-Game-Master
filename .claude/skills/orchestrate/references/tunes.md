@@ -49,6 +49,11 @@ villain's every return. So each candidate needs:
 - **one characteristic interval** from their concepts (holiness: the sacred
   Phrygian flat 2 or a Lydian 4; corruption: the tritone at the harm; grief: the
   falling semitone sigh) placed in the hook;
+  The interval must mean the character's *role*, not their backstory: the Ashen Saint's old
+  hook ended in a falling semitone sigh (grief) and her music kept reading as pity; her new hook (a
+  reciting tone rising to the flat second) won by the host's ear over the old tune - although a blind
+  bare-tune judge had ranked the old one first. Bare-tune judging narrows the field; the finished
+  piece decides.
 - **a composite of at least 6.5** in `tune_score.py` (the host's picked tunes scored
   6.6-7.2; the Ashen Saint's improvised vow scored 4.0 and her lament 5.0, and the
   host couldn't follow her through her two stages). A lament or a chorale can be
