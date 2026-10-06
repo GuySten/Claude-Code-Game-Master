@@ -43,7 +43,8 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
     phrase; a second statement differs (new carrier, key, harmony, or a breakdown and
     rebuild); where the tune holds, something else moves. [H "it does not develop into
     anything"; "all the new themes feel a bit repetitive" - the shorter one, its tune stated
-    once and passed round, won; the remedies r]
+    once and passed round, won; the remedies r] (critic: a theme holding still 10 s or more
+    before its peak)
 11. A strong effect is a flash (about a beat, growing a little each time), not a section.
     [H, the madness violin]
 12. Spend surprise once: a bold tune gets a plain setting; a simple tune gets the key

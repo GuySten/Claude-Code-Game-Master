@@ -1114,6 +1114,39 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
             add("warn", f"the lead line ({l.get('part')}) at {_where(ctx, a)}-{_where(ctx, b - 1e-6)} is "
                         f"{gap:+.0f} dB over the rest (lead line #{li} \"gain\": "
                         f"{round(3 - gap) + float(raw.get('gain', 0)):g} would put it at +3; or thin what's under it)")
+    # A theme grows every phrase up to its peak (the host: "all the new themes feel a bit
+    # repetitive"; measured, the liked one never held still more than ~6 s - parts joining,
+    # the level rising - while the weaker one sat 20 s on the same six parts at one level).
+    if spec.get("role") == "theme" and not ctx["loop"]:
+        full = lead + choir + rest
+        win = 2 * rate
+        lv = [db(full[i:i + win]) for i in range(0, len(full) - win + 1, win)]
+        if lv:
+            peak = int(np.argmax(lv))
+            active = [set() for _ in lv]
+            onset: Dict[Tuple[str, int], float] = {}
+            for t, is_on, name, key, _ in sorted(sc.events, key=lambda e: (e[0], e[1])):
+                part = name.partition(":")[0]
+                if is_on == 1:
+                    onset[(part, key)] = t
+                elif is_on == 0 and (part, key) in onset:
+                    a = onset.pop((part, key))
+                    for w in range(int(a // 2), min(len(lv), int(t // 2) + 1)):
+                        active[w].add(part)
+            start, worst = None, (0, 0)
+            for j in range(peak + 1):
+                if lv[j] < -60:                                 # (silence before it starts)
+                    start = None
+                    continue
+                if start is None or len(active[j] - active[start]) > 0 or lv[j] >= lv[start] + 2:
+                    start = j
+                if (j - start + 1) > worst[1] - worst[0]:
+                    worst = (start, j + 1)
+            secs = 2 * (worst[1] - worst[0])
+            if secs >= 10:
+                add("warn", f"the theme holds still for {secs} s before its peak ({worst[0] * 2}-{worst[1] * 2} s: "
+                            f"no part joins, the level rises under 2 dB) - grow every phrase: a carrier or a "
+                            f"layer joins, or the level climbs (rule 10)")
     # The choir, where it sings.
     w = rate // 2
     sung = [i for i in range(0, len(choir) - w, w) if np.abs(choir[i:i + w]).max() > 1e-3]
