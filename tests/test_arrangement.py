@@ -136,6 +136,43 @@ def test_the_critic_wants_a_stage_entry_strong_and_judges_the_climax_on_the_body
     assert not [m for _, m in arrangement.check(long, listen=False) if "loop body is" in m]
 
 
+def test_a_statement_can_be_stretched_and_a_bar_of_two_is_a_meter():
+    # A chant over a fast engine: the tune augmented at the piece's own tempo (the Ashen
+    # Saint's composer had to write "tempo": 35 for a piece at 140 to get it).
+    def horns(sp):
+        score, _, _ = A.build(sp)
+        return sorted((t, k) for t, on, p, k, _ in score.events if on and p == "horns:4")
+    plain, slow = horns(spec()), horns(spec(statements=[{"at": 0, "stretch": 4}]))
+    assert [k for _, k in slow] == [k for _, k in plain]
+    assert [t for t, _ in slow] == pytest.approx([4 * t for t, _ in plain])
+    with pytest.raises(A.ArrangementError, match="stretch"):
+        A.build(spec(statements=[{"at": 0, "stretch": 0}]))
+    sketch = {"tune": {"seed": "sketch", "key": "D4", "meter": "2/4"}, "statements": [], "length": 8,
+              "chords": [[0, 8, "i"]], "harmony": [{"part": "strings", "play": "chord", "range": ["D3", "D4"]}]}
+    assert A.build(sketch)[1] > 0
+
+
+def test_the_peak_is_judged_against_the_bodys_first_half_minute_not_sixteen_slow_bars():
+    import arrangement
+    parts = ["violins", "violins2", "cellos", "basses", "horns", "trombones", "flutes", "clarinets",
+             "bassoons", "trumpets", "tuba", "oboe"]
+
+    def piece(tempo, all_from_start):
+        lines = []
+        for i, part in enumerate(parts):
+            lo, _ = orchestra.RANGES[part]
+            notes = [[u, lo + 7, 4] for u in range(-8, 0, 4)]                      # a strong entry
+            notes += [[u, lo + 7, 4] for u in range(0, 96, 4) if all_from_start or i < 5 or 56 <= u < 68]
+            lines.append({"part": part, "notes": notes})
+        return {"tune": {"seed": "sketch", "key": "D4", "meter": "4/4"}, "statements": [], "start": -8,
+                "length": 96, "loop": True, "loop_from": 0, "role": "battle", "tempo": tempo,
+                "chords": [[-8, 96, "i"]], "dynamics": [[-8, 118], [0, 80], [56, 124], [68, 80]], "lines": lines}
+    def flagged(sp):
+        return [m for _, m in arrangement.check(sp, listen=False) if "brings nothing" in m]
+    assert not flagged(piece(40, False))        # 16 bars here are 96 s: the old window swallowed the peak
+    assert flagged(piece(40, True))             # a peak with nothing new is still caught
+
+
 def test_a_boss_stage_states_its_tune_whole():
     base = spec(loop=True, start=-4, loop_from=0, length=64, role="battle")
     tune_len = A._build(base)["tune_len"]

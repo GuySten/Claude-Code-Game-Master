@@ -39,7 +39,9 @@ except in "hits" and "rolls", where it is the velocity itself (1-127).
   "dynamics": [[-12, 60], [0, 80], [36, 96], [60, 124]],   # velocity, linear between points
   "statements": [{"at": 0}],                 # where the tune is played (default: once, at 0; [] for none);
                          # optional "from"/"to" (a slice of the tune, in its own units) and
-                         # "shift" (semitones): {"at": 96, "from": 0, "to": 36, "shift": -12}
+                         # "shift" (semitones): {"at": 96, "from": 0, "to": 36, "shift": -12},
+                         # and "stretch" (augmentation: 2 plays it at half speed, 4 at a quarter,
+                         # at the piece's own tempo - a chant over a fast engine)
   "keys": [{"from": 96, "to": 192, "shift": 2}],  # a key change: the chords there are read in
                          # the new key (pair it with that statement's "shift": 2), so "I" is
                          # still home - the new home; alone (no statement there) it moves a
@@ -490,8 +492,9 @@ def _build(spec: Dict[str, Any]) -> Dict[str, Any]:
                                    gen=int(t.get("gen", 1)), written=t.get("written"))
     if t.get("key"):                    # a set key (a sketch with no tune: chords read in it)
         tune = {**tune, "key": pitch(t["key"])}
-    if t.get("meter") in ("4/4", "3/4", "2/4", "6/8"):    # ...and a set meter (bars, beats)
-        tune = {**tune, "meter": t["meter"], "bar": music_compose.METERS[t["meter"]]}
+    bars = {"4/4": 4, "3/4": 3, "2/4": 2, "6/8": 6}             # (the generator's METERS lack 2/4)
+    if t.get("meter") in bars:                                  # ...and a set meter (bars, beats)
+        tune = {**tune, "meter": t["meter"], "bar": bars[t["meter"]]}
     key = tune["key"]
     notes, u = [], 0.0
     for st, b in tune["notes"]:
@@ -504,9 +507,12 @@ def _build(spec: Dict[str, Any]) -> Dict[str, Any]:
     played = []                                                 # (time, units, MIDI as written)
     for s in statements:
         at, lo, hi = float(s.get("at", 0)), float(s.get("from", 0)), float(s.get("to", tune_len))
+        k = float(s.get("stretch", 1))
+        if k <= 0:
+            raise ArrangementError(f'a statement\'s "stretch" must be above 0 (got {k:g})')
         for u0, b, st in notes:
             if lo - 1e-9 <= u0 < hi - 1e-9:
-                played.append((at + u0 - lo, min(b, hi - u0), key + st + int(s.get("shift", 0))))
+                played.append((at + (u0 - lo) * k, min(b, hi - u0) * k, key + st + int(s.get("shift", 0))))
     start = float(spec.get("start", 0))
     if not played:                     # a sketch with no tune ends with its last written note
         ends = [float(x[1]) for x in list(spec.get("chords", [])) + progression_chords(spec, tune["bar"])]
@@ -986,7 +992,14 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
                         top = max(top, key)
                 return ps, top
             u_pk = layers[peak_i][0]
-            open_ps, open_top = heard(layers[0][0], layers[0][0] + 16 * bar)
+            # the body's opening: 16 bars, but at most its first 30 s and never into the
+            # peak's own bars (at a slow tempo 16 bars ran to 110 s, so the peak had to
+            # wait behind 40 s of filler before the critic would believe it)
+            u0 = layers[0][0]
+            u1 = u0 + 16 * bar
+            if T(u1) - T(u0) > 30:
+                u1 = u0 + 16 * bar * 30 / (T(u1) - T(u0))
+            open_ps, open_top = heard(u0, min(u1, u_pk - 2 * bar))
             pk_ps, pk_top = heard(u_pk - 2 * bar, u_pk + 2 * bar)
             if not (pk_ps - open_ps) and pk_top <= open_top:
                 add("warn", f"the peak ({_where(ctx, u_pk)}) brings nothing the body's opening didn't have: "

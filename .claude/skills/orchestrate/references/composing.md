@@ -177,7 +177,8 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
 - The tune: `"tune": {"seed": "<who>", "written": <the tune file's object>, "key": "F4"}`
   (`key` moves tune and chords together). Statements: `{"at": 32}`; a statement's
   `"shift": 2` needs `"keys": [{"from": 32, "to": 64, "shift": 2}]` too, or the chords stay
-  in the old key. Who plays it: `"melody": [{"from": 0, "to": 32, "parts": {"horns": 0}}]`
+  in the old key. `"stretch": 4` augments a statement at the piece's own tempo (a chant
+  over a fast engine) - keep `"tempo"` the real tempo. Who plays it: `"melody": [{"from": 0, "to": 32, "parts": {"horns": 0}}]`
   (semitones from as written) - every statement needs one (critic).
 - Chords: `"progression": "i bVI iv V"` (`every`, `repeat`) or `"chords"` [from, to,
   symbol]; they sound only through `"harmony"` parts (`"play"`: chord, bass, root, third,
