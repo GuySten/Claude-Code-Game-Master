@@ -428,3 +428,7 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   his hook at 0.56 s a note and rose to F4-G#4 (the Saint's men's choir, never above D#4 and never faster
   than 0.79 s, drew no complaint). Now the critic warns on any choir change under 0.7 s and on the men's
   choir above E4.
+  With the men's choir fixed (slow, at E4 and below; the higher line on the chorus): "the margrave battle is
+  a lot better. But it is a bit too similar to his theme" - the same waltz at the same tempo and key, the
+  tune on the theme's own carriers (violins with cellos), his hook as the engine. A battle piece must be
+  recognisably his and still clearly not his theme (research requested, Oct 2026).
