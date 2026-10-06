@@ -22,7 +22,7 @@ So the loop below is not optional ceremony; it's how you hear.
 
 0. **Important characters: write the tune yourself** (the host clearly preferred
    hand-written tunes to the generator's): `references/tunes.md`. Write three
-   candidates from the character's **distinctive concepts** (the translator's, below:
+   candidates from the character's **distinctive concepts** (the brief's, below:
    the mode, the hook's interval and rhythm come from who they are), different in
    hook and rhythm, each passing the memorability floor; let the **host judge** pick
    (below). Who counts:
@@ -83,13 +83,19 @@ did no better than a coin flip on our music):
   judges against all of them - run it after changing a rule, and if agreement
   drops, the rule is wrong, not the host.
 
-## From concepts to a brief (the translator)
+## The brief: the GM writes it
+
+The GM writes every brief, not a separate translator: the GM knows the character - the
+scenes, the players, what the story made of them - and a translator working from a few
+files squeezed them into concept labels and lost the picture (the host, Kestrel's theme in
+three blind rounds: both translator briefs lost, the second "clearly"; the GM's came "closer"). Start
+from the image of who they are in the story ("the outsider of the chain-gang, turning
+rebel"); use the concepts below as a reference that makes the image musical.
 
 A character, place or moment stands for concepts (holiness, nobility, cunning, decay,
 the sea, a farewell...); `references/concepts.md` translates each into music, from the
 research and the documented conventions (189 concepts, each with Cues, Melody, Harmony,
-Colours and devices, With / against, Intensity, Not). Before composing, write the
-composer's brief this way - the same for every character, so nothing is tuned to one:
+Colours and devices, With / against, Intensity, Not). Write the composer's brief this way:
 1. **Concepts.** From the description (npcs.json, the world bible, their deeds, how the
    host defines them), list the concepts and weigh each: the one that *carries* the piece,
    the *strong* ones, the *colours* - only **distinctive** concepts, what sets this subject

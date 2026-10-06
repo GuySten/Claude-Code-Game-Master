@@ -1,7 +1,7 @@
 # Composing: the rulebook
 
 Everything a composer needs, on one page. Read it whole; read nothing else unless a line
-here sends you. A brief (the translator's) says WHAT the piece expresses; this says HOW to
+here sends you. A brief (the GM's) says WHAT the piece expresses; this says HOW to
 write any piece well. Tags: **[H]** the host's verdict (their ears are final), **[R]** the
 research (`research/` in the campaigns repo; several sources agree), **[r]** one source or an
 inference. **(critic)** = `arrangement.py make` checks it: follow the rule and you pass.
