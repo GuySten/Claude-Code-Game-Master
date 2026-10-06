@@ -176,6 +176,10 @@ the hero's call with `"alter": {"2": -1}`, the phase-2 vow is the vow with
 shows the development at a glance (writing every note by hand took a composer 8-12 minutes
 for a battle loop).
 
+**A composer working from a plan** (a boss stage, a sting) reads
+`references/composer-card.md` - the rules, the format's shortcuts, the parts and the check
+loop on one page - instead of this whole file.
+
 **Let the tools do the mechanics.** A doubling is one `"double": [{"part": "chorus",
 "octave": -1}]` on the line, not the notes written twice; a passage's chords are one
 `"progression": {"at": 0, "chords": "i bVI iv v | i bVII bVI iv i"}`; a written tune's

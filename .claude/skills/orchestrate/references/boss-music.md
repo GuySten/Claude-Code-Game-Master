@@ -86,7 +86,11 @@ stage may move its key - up a step, a minor third). Then the stages. Only then t
 transitions and endings, written in the keys the stages ended up in: a rise or break in
 the key of the stage it leads *into*, the endings in the last stage's key, and one
 **hit** per key (`<boss>-hit-stage2` when stage 2 is in another key; the table plays
-the current stage's). A workflow test is run as written: a conflict it finds is fixed
+the current stage's). **Once the plan is written, compose in
+parallel:** one composer per stage, and the stings in two (transitions and hits; endings),
+all started together - the plan has fixed every key, so none waits on another (a whole
+two-stage fight took about 20 minutes this way instead of 35 staggered). Each composer works
+from `composer-card.md`, not the whole skill. A workflow test is run as written: a conflict it finds is fixed
 in these rules, never by editing a step's output by hand (host: "we are testing the
 workflow - you cannot override on a whim").
 

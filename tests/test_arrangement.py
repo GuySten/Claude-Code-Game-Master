@@ -374,3 +374,32 @@ def test_fix_puts_the_tune_on_top_with_the_gain_the_critic_names(monkeypatch):
     fixed, changes = A.fix(sp)
     assert [m.get("gain") for m in fixed["melody"]] == [3.0, 8.0]
     assert len(changes) == 2 and sp["melody"][0].get("gain") is None       # (the original untouched)
+
+
+def test_a_figure_is_written_once_and_played_in_many_sections():
+    sp = spec(figures={"waltz": [{"play": "bass", "range": ["D2", "C#3"], "pattern": "x--"},
+                                 {"play": "chord", "range": ["A3", "F4"], "pattern": " oo", "vel": -6}]},
+              harmony=[{"figure": "waltz", "part": "cellos", "spans": [[0, 12], [24, 36]], "vel": -10, "octave": 1},
+                       {"part": "strings", "play": "chord", "spans": [[0, 6], [12, 18]], "vel": -20}])
+    out = A.expand_figures(sp)["harmony"]
+    assert len(out) == 4 + 2
+    assert out[0] == {"play": "bass", "range": ["D3", "C#4"], "pattern": "x--", "from": 0, "to": 12,
+                      "part": "cellos", "vel": -10.0}
+    assert out[1]["vel"] == -16.0 and out[3]["from"] == 24
+    assert [(e["from"], e["to"]) for e in out[4:]] == [(0, 6), (12, 18)]
+    A.build(sp)                                                     # (it plays)
+    with pytest.raises(A.ArrangementError):
+        A.expand_figures(spec(harmony=[{"figure": "nope", "part": "cellos", "spans": [[0, 4]]}]))
+
+
+def test_a_line_marked_lead_is_measured_like_the_tune():
+    pytest.importorskip("numpy")
+    pytest.importorskip("tinysoundfont")
+    if not orchestra.SF2.is_file():
+        pytest.skip("the SoundFont isn't downloaded here")
+    sp = {"tune": {"seed": "sketch", "key": "D4", "meter": "4/4"}, "statements": [], "length": 16,
+          "chords": [[0, 16, "i"]], "dynamics": [[0, 100]],
+          "harmony": [{"part": "strings", "from": 0, "to": 16, "play": "chord", "range": ["D3", "D5"], "vel": 10}],
+          "lines": [{"part": "flutes", "lead": True, "vel": -40,
+                     "notes": [[u, "A5", 2] for u in range(0, 16, 2)]}]}
+    assert [m for _, m in A.check(sp) if "lead line (flutes)" in m]

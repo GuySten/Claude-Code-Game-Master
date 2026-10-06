@@ -59,7 +59,17 @@ except in "hits" and "rolls", where it is the velocity itself (1-127).
   ],                     # play: chord | bass | root | third | fifth | root5 | octaves
                          # pattern (repeating from "from", one character a "step" of units):
                          # x accent, o a note, - holds the previous one on, space or . a rest
+                         # "spans": [[0, 132], [138, 201]] instead of from/to: the same entry
+                         # in several sections (harmony, patterns, rolls)
+  "figures": {"waltz": [ # an accompaniment written ONCE (harmony entries, no from/to), then
+    {"play": "bass", "range": ["D2", "C#3"], "pattern": "x--", "legato": 0.95},
+    {"play": "chord", "range": ["A3", "F4"], "pattern": " oo", "vel": -6}]},
+                         # played in "harmony" wherever wanted: {"figure": "waltz", "part":
+                         # "cellos", "spans": [[0, 132], [237, 432]], "vel": -12, "octave": -1}
+                         # (part, vel and octave apply to every entry of the figure)
   "lines": [             # anything written out: countermelodies, ostinati, fanfares
+                         # ("lead": true marks a line carrying a tune: the critic measures
+                         # it over the rest, like the tune's statements)
     {"part": "horns", "vel": 0, "notes": [[18, "E#4", 3], [21, "G#4", 3], [24, "A#4", 6, 10]]}
   ],                     # [at, pitch, units, (vel offset), ({"slide": semitones over the
                          # note, "wobble": an uneven vibrato's depth in semitones})] - for
@@ -290,6 +300,52 @@ def build(spec: Dict[str, Any]) -> Tuple["orchestra.Score", float, Optional[floa
     return ctx["score"], ctx["seconds"], ctx["loop"]
 
 
+def expand_figures(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """The spec with "harmony" figures and "spans" written out. A figure is an
+    accompaniment written once ("figures": {name: [harmony entries without from/to]}) and
+    played wherever wanted: {"figure": name, "part": ..., "spans": [[from, to], ...],
+    "vel": offset, "octave": n}. Any "harmony", "patterns" or "rolls" entry may give
+    "spans" instead of from/to (the same entry in several sections)."""
+    figures = spec.get("figures") or {}
+    keys = ("harmony", "patterns", "rolls")
+    if not figures and not any("spans" in e or "figure" in e for k in keys for e in spec.get(k) or []
+                               if isinstance(e, dict)):
+        return spec
+
+    def octave(rng, n):
+        if not n or not rng:
+            return rng
+        return [name_of(pitch(x) + 12 * int(n)) for x in rng]
+
+    out = {**spec}
+    for k in keys:
+        entries = []
+        for e in spec.get(k) or []:
+            if not isinstance(e, dict) or ("spans" not in e and "figure" not in e):
+                entries.append(e)
+                continue
+            spans = e.get("spans") or [[e["from"], e["to"]]]
+            if "figure" in e:
+                if e["figure"] not in figures:
+                    raise ArrangementError(f"no such figure: {e['figure']!r} (figures: {', '.join(figures) or 'none'})")
+                parts = [dict(t) for t in figures[e["figure"]]]
+            else:
+                parts = [{x: v for x, v in e.items() if x != "spans"}]
+            for a, b in spans:
+                for t in parts:
+                    one = {**t, "from": a, "to": b}
+                    if "figure" in e:
+                        if "part" in e and "part" not in t:      # (a figure's own part wins)
+                            one["part"] = e["part"]
+                        if "vel" in e:
+                            one["vel"] = float(t.get("vel", 0)) + float(e["vel"])
+                        if e.get("octave") and "range" in one:
+                            one["range"] = octave(one["range"], e["octave"])
+                    entries.append(one)
+        out[k] = entries
+    return out
+
+
 def expand_motifs(spec: Dict[str, Any]) -> Dict[str, Any]:
     """The spec with every "lines" entry that places a motif written out as plain notes,
     and every "double" (the line played by other parts too) written out as lines.
@@ -297,6 +353,7 @@ def expand_motifs(spec: Dict[str, Any]) -> Dict[str, Any]:
     wanted, each time transformed: shift (semitones) / octave, stretch (time), invert
     (mirrored round its first note), retro (backwards), take [i, j] (a fragment: notes
     i..j-1), alter {index: semitones or a pitch} (the corrupted interval), repeat / every."""
+    spec = expand_figures(spec)
     motifs = spec.get("motifs") or {}
     if not any(isinstance(l, dict) and ("motif" in l or "double" in l) for l in spec.get("lines") or []):
         return spec
@@ -624,6 +681,9 @@ def loop_start(spec: Dict[str, Any], rate: int = orchestra.RATE) -> Optional[int
     return int(round(at * rate)) or None
 
 
+STING_SECONDS = 15.0    # a one-shot shorter than this is a sting (boss-music.md: a little louder)
+
+
 def render(spec: Dict[str, Any], rate: int = orchestra.RATE, sf2: Path = orchestra.SF2):
     """An arrangement played by the orchestra -> (stereo float32 samples, rate). A loop with
     an entry ("loop_from") loops back to loop_start(spec), not to its first sample."""
@@ -635,6 +695,9 @@ def render(spec: Dict[str, Any], rate: int = orchestra.RATE, sf2: Path = orchest
                              loop_from=loop_start(spec, rate) or 0)
         return orchestra.master(wet, rate, loop=True), rate
     dry = orchestra.play(score, seconds, sf2, rate, mix)
+    if seconds < STING_SECONDS:            # a sting plays over the loops: a little hotter
+        return orchestra.master(orchestra.hall(dry, rate), rate, hot_db=orchestra.STING_HOT_DB,
+                                limit_db=orchestra.STING_LIMIT_DB), rate
     return orchestra.master(orchestra.hall(dry, rate), rate), rate
 
 
@@ -924,9 +987,14 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
         part.events = [e for e in sc.events if keep(e[2])]
         return orchestra.play(part, ctx["seconds"], rate=rate, mix=mix).mean(axis=1)
 
-    lead = layer(lambda n: ":" in n)
-    choir = layer(lambda n: n in ("choir", "chorus", "men_choir", "choir_oo", "choir_oh"))
-    rest = layer(lambda n: ":" not in n and n not in ("choir", "chorus", "men_choir", "choir_oo", "choir_oh"))
+    # A line marked "lead": true is a tune too (an ally's phrase written as a motif line):
+    # measured against the rest like the tune's own statements.
+    lead_lines = [l for l in expand_motifs(spec).get("lines") or [] if isinstance(l, dict) and l.get("lead")]
+    lead_parts = {l.get("part") for l in lead_lines}
+    lead = layer(lambda n: ":" in n or n in lead_parts)
+    choir = layer(lambda n: n in ("choir", "chorus", "men_choir", "choir_oo", "choir_oh") and n not in lead_parts)
+    rest = layer(lambda n: ":" not in n and n not in lead_parts
+                 and n not in ("choir", "chorus", "men_choir", "choir_oo", "choir_oh"))
 
     def db(x) -> float:
         return float(20 * np.log10(np.sqrt(np.mean(x ** 2)) + 1e-12)) if len(x) else -240.0
@@ -943,6 +1011,18 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
         elif gap < 1:
             add("warn", f"the tune is barely over the rest at {_where(ctx, a)}-{_where(ctx, b - 1e-6)}: "
                         f"{gap:+.0f} dB (melody entry #{mi} \"gain\": {round(3 - gap) + float(m.get('gain', 0)):g} would put it at +3)")
+    for l in lead_lines:
+        ns = l.get("notes") or []
+        if not ns:
+            continue
+        a, b = min(float(n[0]) for n in ns), max(float(n[0]) + float(n[2]) for n in ns)
+        i, j = int(T(a) * rate), int(T(min(b, ctx["length"])) * rate)
+        if j - i < rate // 2 or db(lead[i:j]) < -200:
+            continue
+        gap = db(lead[i:j]) - db(rest[i:j])
+        if gap < 1:
+            add("warn", f"the lead line ({l.get('part')}) at {_where(ctx, a)}-{_where(ctx, b - 1e-6)} is "
+                        f"{gap:+.0f} dB over the rest: raise its \"vel\" by {round(3 - gap)} or thin what's under it")
     # The choir, where it sings.
     w = rate // 2
     sung = [i for i in range(0, len(choir) - w, w) if np.abs(choir[i:i + w]).max() > 1e-3]
