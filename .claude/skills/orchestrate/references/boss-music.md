@@ -29,6 +29,11 @@ Ordinary fights share one campaign battle cue and get none of this.
    not a stage [H, the Saint v6: a step up, +12 bpm and a choir on the same march - "the
    second stage does not have more emotion; the change is minimal"]. The engine masters
    each later stage louder than the one before (`"stage": N`).
+   **A new world is still a boss's world:** every stage keeps low weight and menace
+   (`composing.md` 7). Fast, bright and high with the bass thinned reads as playful, whatever
+   the story says [H, the Saint's 6/8 fire-dance in F# major colours, piccolo and high choir
+   over a thinned bass: "read as playful... certainly not boss music"]. A recipe or a
+   research example never overrides a host verdict.
 4. **The table must know the tune first; hold back its grandest form, not its notes.**
    A leitmotif is recognised in a reprise far more easily than in a variation, and stage 1
    is where the players learn the boss (the host could not tell whether a stage 2 had
