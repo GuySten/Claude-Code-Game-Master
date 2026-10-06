@@ -361,3 +361,7 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   campaign - no translator - and a composer wrote from it (53 s, two whole statements, tune on
   flutes + clarinets then horns + violins then octave tutti with choir, ending on its peak):
   the original still better, "but B is closer". The GM's brief closed part of the gap.
+  What the host singled out in the original: "the low bass in the start is very good" (the
+  basses' lowest octave held a bar per note, under a pizzicato and taiko stride) and "the
+  climax is exceptional" (two waves, the tune in three octaves over the held choir, a
+  IVmaj7 lift, a bVI-bVII-I close, ending on its strongest stroke) -> composing.md, Theme.

@@ -90,7 +90,18 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
   a decided ending (held chord, roll and stroke, or a quiet echo). It makes a strong
   impression of who the character is from the first statement: small means fewer forces,
   never timid; a held-back trait is one layer or moment, not the piece's level [H, Kestrel:
-  "stronger impression, strong character"]. Villains also get a
+  "stronger impression, strong character"].
+  **The model the host called exceptional** (Kestrel's theme, 34 s at 66 in 6/8):
+  - *The start* ("the low bass is very good"): `basses` holding one note a bar in their lowest
+    octave (E1-D#2), a plucked stride over it (`pizzicato` roots on the two beats), `taiko` on
+    the same beats, held `strings` quietly above, the tune on `flutes` + `clarinets` at once.
+  - *The climax* ("exceptional"): reached in two waves - a timpani roll on the dominant
+    into a crash and a first peak, a dip, then higher - over held `choir` chords and an
+    offbeat snare; at the top the tune in three octaves (`violins` + `flutes` up an octave,
+    `horns` as written, `trombones` an octave down); a IVmaj7 lift before it and a bVI-bVII-I
+    close; the piece ends on its strongest stroke (a roll, then timpani + crash + tutti).
+  A model of what works, not a template: take the principles (a deep held floor, a light
+  stride, the tune blended from bar 1; two waves, three octaves, end on the peak). Villains also get a
   battle piece on the same tune.
 - **Boss stage** (`"role": "stage"`, from a stage plan): an ENTRY played once (`"start":
   -<beats>`, `"loop": true`, `"loop_from": 0`): 1-4 bars, most of the stage's forces, its
