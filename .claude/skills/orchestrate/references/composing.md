@@ -8,8 +8,8 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
 
 ## 1. The host's ears (never break these)
 1. The tune is on top: at least +1 dB over everything else where it plays, aim +3. [H "now
-   it's a lot better"] (critic; `make` sets a melody entry's gain; a `"lead": true` line:
-   raise its `vel`)
+   it's a lot better"] (critic; `make` sets the gain of a melody entry and of a `"lead": true`
+   line)
 2. A climax arrives: after a build, something nothing before it had - a part, a higher
    register, the tune's grandest setting. [H "a climax without the climax"] (critic: a theme
    that starts at full texture fails; in a stage, the peak - the top of `"dynamics"` - needs
@@ -64,8 +64,8 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
 20. Long loops change something audible every 8-16 bars and state the tune twice in
     different colours with a contrasting section; loops have no seams - the end meets the
     start (a stage: the body's start): end on a swell, a pickup or a roll into bar 1, not on
-    a quiet offbeat. [r] (critic: seam - it measures the sound, so if it still warns after
-    `make` has matched the `dynamics`, write the swell, roll or pickup into the last bar)
+    a quiet offbeat. [r] (critic: seam, measured as heard on a repeat - a step means
+    write the swell, roll or pickup into the last bar; `dynamics` alone won't do it)
 21. Slow speakers (the strings, oboe, english_horn, organ, the choirs) need held notes; a
     quick note of theirs - the tune's too - needs a quick double at the same moment and
     pitch (the critic names one: flutes, clarinets, bassoons, horns, trumpets, pizzicato;
@@ -130,7 +130,7 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
   `"patterns"` or `"hits"` with `"note": "root"`, not `"harmony"`. No scripts that generate notes (a short one
   that edits the score is fine).
 - `"dynamics"`: the velocity curve, [[time, velocity], ...] - the critic finds the peak at
-  its top; `make` edits its last point for the seam.
+  its top.
 - Parts: violins, violins2 (also the viola register - there is no viola), strings, tremolo,
   pizzicato, cellos, basses, flutes, piccolo, oboe, english_horn, clarinets, bassoons,
   horns, trumpets, trombones, tuba, brass, harp, celesta, glockenspiel, bells, organ,

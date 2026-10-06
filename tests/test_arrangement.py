@@ -423,6 +423,32 @@ def test_a_line_marked_lead_is_measured_like_the_tune():
           "lines": [{"part": "flutes", "lead": True, "vel": -40,
                      "notes": [[u, "A5", 2] for u in range(0, 16, 2)]}]}
     assert [m for _, m in A.check(sp) if "lead line (flutes)" in m]
+    fixed, changes = A.fix(sp)                               # make sets its gain, as for the tune
+    assert fixed["lines"][0]["gain"] > 0 and any("lead line #0" in c for c in changes)
+    assert not [m for _, m in A.check(fixed) if "lead line (flutes)" in m]
+
+
+def _seam_loop(entry: bool, end_at: int = 32):
+    """A loop of steady strings (to ``end_at``, then nothing); ``entry``: an ff brass chord
+    from the entry held two bars into the body - heard on the first pass only."""
+    harmony = [{"part": "strings", "from": 0, "to": end_at, "play": "chord", "range": ["D3", "D5"],
+                "pattern": "xxxx"}]
+    if entry:
+        harmony.append({"part": "brass", "from": -4, "to": 4, "play": "chord", "range": ["D3", "D5"],
+                        "pattern": "x-------", "vel": 20})
+    return {"tune": {"seed": "sketch", "key": "D4", "meter": "4/4"}, "statements": [], "length": 32,
+            "tempo": 120, "loop": True, "start": -4 if entry else 0, "loop_from": 0,
+            "chords": [[-4, 32, "i"]], "dynamics": [[-4, 120], [0, 90], [32, 90]], "harmony": harmony}
+
+
+def test_the_loop_seam_is_heard_as_on_a_repeat_not_through_the_entry():
+    pytest.importorskip("numpy")
+    pytest.importorskip("tinysoundfont")
+    if not orchestra.SF2.is_file():
+        pytest.skip("the SoundFont isn't downloaded here")
+    seam = lambda sp: [m for _, m in A.check(sp) if "loop's seam" in m]
+    assert not seam(_seam_loop(entry=True))                  # the entry's chord isn't there on a repeat
+    assert seam(_seam_loop(entry=False, end_at=24))          # the music stops two bars before the end
 
 
 def test_steady_pieces_written_to_their_recipe_pass_the_critic():

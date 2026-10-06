@@ -995,7 +995,7 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
         started = sorted(p for p in now if p not in before and p not in earlier)
         kept = before & now
         if len(started) >= 3 and (len(stopped) >= 2 or len(started) >= 5) and len(stopped) >= len(kept):
-            add("warn", f"a seam at {_where(ctx, u0)}: {', '.join(stopped) or 'nothing'} stop as "
+            add("warn", f"a join at {_where(ctx, u0)}: {', '.join(stopped) or 'nothing'} stop as "
                         f"{', '.join(started)} start - heard as another piece glued on. Carry a layer "
                         "or two across it and build the bars before it")
     # The surprise budget: a surprising tune wants a supportive setting, a simple tune
@@ -1047,7 +1047,10 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
         elif gap < 1:
             add("warn", f"the tune is barely over the rest at {_where(ctx, a)}-{_where(ctx, b - 1e-6)}: "
                         f"{gap:+.0f} dB (melody entry #{mi} \"gain\": {round(3 - gap) + float(m.get('gain', 0)):g} would put it at +3)")
-    for l in lead_lines:
+    for li, raw in enumerate(spec.get("lines") or []):
+        if not (isinstance(raw, dict) and raw.get("lead")):
+            continue
+        l = expand_motifs({**spec, "lines": [raw]})["lines"][0]
         ns = l.get("notes") or []
         if not ns:
             continue
@@ -1058,7 +1061,8 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
         gap = db(lead[i:j]) - db(rest[i:j])
         if gap < 1:
             add("warn", f"the lead line ({l.get('part')}) at {_where(ctx, a)}-{_where(ctx, b - 1e-6)} is "
-                        f"{gap:+.0f} dB over the rest: raise its \"vel\" by {round(3 - gap)} or thin what's under it")
+                        f"{gap:+.0f} dB over the rest (lead line #{li} \"gain\": "
+                        f"{round(3 - gap) + float(raw.get('gain', 0)):g} would put it at +3; or thin what's under it)")
     # The choir, where it sings.
     w = rate // 2
     sung = [i for i in range(0, len(choir) - w, w) if np.abs(choir[i:i + w]).max() > 1e-3]
@@ -1073,13 +1077,29 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
         full = (lead + choir + rest)
         n = int(ctx["seconds"] * rate)
         tail = full[n:]
-        m = int((ctx.get("loop_from") or 0) * rate)         # where it loops back to
-        body = full[:n].copy()
-        body[m:m + len(tail[:n - m])] += tail[:n - m]
-        q = rate // 2
-        step = db(body[m:m + q]) - db(body[-q:])
-        if abs(step) > 3:
-            add("warn", f"the loop's seam steps {step:+.0f} dB (end -> start): bring the ends' dynamics together")
+        lf = float(ctx.get("loop_from") or 0)
+        m = int(lf * rate)                                  # where it loops back to
+        q = rate                                            # (a second each side: a downbeat isn't a step)
+        if m:
+            # Heard on a repeat, the body's start follows the loop's end - not the entry,
+            # whose ff still rings in the first pass: play the body's opening alone.
+            first = orchestra.Score()
+            first.events = [(t - lf, *e) for t, *e in sc.events if lf - 1e-6 <= t < lf + 1.0]
+            opening = orchestra.play(first, 1.0, rate=rate, mix=mix).mean(axis=1)[:q]
+        else:
+            opening = full[:q]
+        start = opening.copy()
+        start[:len(tail[:q])] += tail[:q]                   # (the end's ring, wrapped over it)
+        end = db(full[n - q:n])
+        step = db(start) - end
+        if end < -120 and db(start) > -120:
+            add("warn", "the loop's seam: its last second is silent, then the start comes in - carry the "
+                        "music to the end, into a swell, roll or pickup")
+        elif step > 4 or step < -4:
+            add("warn", f"the loop's seam steps {step:+.0f} dB (end -> start, as heard on a repeat): "
+                        + ("swell into it - a crescendo, a roll or a pickup in the last bar" if step > 0
+                           else "the end is louder than where it loops back to: let the end settle, or "
+                                "start the body stronger"))
     # A stage's body keeps its entry's energy: the host, of bodies that fell 9-11 dB right
     # after the entry, "it dies after the transformation".
     if is_stage:
@@ -1169,8 +1189,8 @@ def fix(spec: Dict[str, Any], listen: bool = True,
     instrument's range (a whole line or placement if one shift fits, else note by note),
     harmony ranges kept inside the instrument's, a quick doubling for a slow-speaking
     line's short notes, the choir's level, the tune's level (a melody entry's "gain"), a
-    loop seam's dynamics. Musical decisions
-    (too many parts entering at once, a seam's harmony) are left to the composer."""
+    lead line's level. Musical decisions (too many parts entering at once, a loop's seam)
+    are left to the composer."""
     import copy
     s = copy.deepcopy(spec)
     changes: List[str] = []
@@ -1264,14 +1284,13 @@ def fix(spec: Dict[str, Any], listen: bool = True,
                 entry["gain"] = float(m.group(2))
                 changes.append(f"melody entry #{m.group(1)}: \"gain\" {m.group(2)} (the tune on top, +3 dB)")
             continue
-        if msg.startswith("the loop's seam steps") and len(s.get("dynamics") or []) >= 2:
-            pts = sorted(s["dynamics"], key=lambda d: d[0])
-            at = float(s.get("loop_from", pts[0][0]))          # (a stage: where the body starts)
-            head = next((d for d in pts if d[0] >= at - 1e-9), pts[0])
-            last = s["dynamics"][-1]
-            if last[1] != head[1]:
-                last[1] = head[1]
-                changes.append(f"loop seam: the last dynamics point set to the body's start ({head[1]})")
+        m = re.search(r'lead line #(\d+) "gain": (-?[\d.]+)', msg)
+        if m and int(m.group(1)) < len(s.get("lines") or []):
+            line = s["lines"][int(m.group(1))]
+            if float(line.get("gain", 0)) < float(m.group(2)):
+                line["gain"] = float(m.group(2))
+                changes.append(f"lead line #{m.group(1)} ({line.get('part')}): \"gain\" {m.group(2)} (on top, +3 dB)")
+            continue
     return s, changes
 
 
