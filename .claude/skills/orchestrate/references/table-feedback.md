@@ -391,3 +391,8 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   third-relations, the bass thinned "to burn upward", piccolo, trumpets and a high choir - it
   "is read as playful... certainly not boss music". Rule 7 had said so already (fast, bright and
   high with no low weight reads as comic). A new world must keep a boss's weight and menace.
+- **The Saint's stage 2, "The Pyre"** (Oct 2026; the plan written before the new brief process:
+  a 3+3+2 engine at 152 in F# phrygian, the tune at half speed - so at stage 1's pace - on horns +
+  violins2, the choir in agony, organ, bells and chorale all dropped): "the pyre clip is not good".
+  A blind brief review, run before the host heard it, had predicted a generic war machine ("close
+  to a Mars-style battle cue"), the holy fire absent, and stage 1's tune at stage 1's pace on top.
