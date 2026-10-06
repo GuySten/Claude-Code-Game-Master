@@ -1018,19 +1018,19 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
     rate = 22050
     mix = spec.get("mix") or {}
 
-    def layer(keep) -> "np.ndarray":
-        part = orchestra.Score()
-        part.events = [e for e in sc.events if keep(e[2])]
-        return orchestra.play(part, ctx["seconds"], rate=rate, mix=mix).mean(axis=1)
-
     # A line marked "lead": true is a tune too (an ally's phrase written as a motif line):
     # measured against the rest like the tune's own statements.
     lead_lines = [l for l in expand_motifs(spec).get("lines") or [] if isinstance(l, dict) and l.get("lead")]
     lead_parts = {l.get("part") for l in lead_lines}
-    lead = layer(lambda n: ":" in n or n in lead_parts)
-    choir = layer(lambda n: n in ("choir", "chorus", "men_choir", "choir_oo", "choir_oh") and n not in lead_parts)
-    rest = layer(lambda n: ":" not in n and n not in lead_parts
-                 and n not in ("choir", "chorus", "men_choir", "choir_oo", "choir_oh"))
+    voices = ("choir", "chorus", "men_choir", "choir_oo", "choir_oh")
+
+    def which(n: str) -> str:
+        return "lead" if ":" in n or n in lead_parts else "choir" if n in voices else "rest"
+
+    heard = orchestra.play_layers(sc, ctx["seconds"], which, rate=rate, mix=mix, send=False)
+    silent = np.zeros(int((ctx["seconds"] + 0.5) * rate), dtype="float32")
+    lead, choir, rest = (np.asarray(heard[k]).mean(axis=1) if k in heard else silent
+                         for k in ("lead", "choir", "rest"))
 
     def db(x) -> float:
         return float(20 * np.log10(np.sqrt(np.mean(x ** 2)) + 1e-12)) if len(x) else -240.0

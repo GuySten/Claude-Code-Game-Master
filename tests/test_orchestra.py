@@ -98,6 +98,29 @@ def test_the_real_choirs_fall_back_to_the_sound_sets_choir_when_they_cant_be_had
     assert float(abs(out).max()) > 0.001                                # heard, not silent
 
 
+def test_the_parts_played_in_parallel_sound_as_played_one_by_one(monkeypatch):
+    np = pytest.importorskip("numpy")
+    pytest.importorskip("tinysoundfont")
+    if not orchestra.SF2.is_file():
+        pytest.skip("the SoundFont isn't downloaded here")
+    sc = orchestra.Score()
+    for i, part in enumerate(["violins", "cellos", "horns", "flutes", "timpani"]):
+        sc.note(part, 48 + 5 * i, 0.3 * i, 1.0, 100)
+    sc.note("violins:4", 72, 2.0, 1.0, 100)                          # a layer: the tune
+    played = {}
+    for workers in ("1", "3"):
+        monkeypatch.setenv("GM_ORCHESTRA_WORKERS", workers)
+        played[workers] = orchestra.play(sc, 4.0, rate=22050)
+    one, many = played["1"], played["3"]
+    assert float(abs(one).max()) > 0.01
+    assert float(abs(one - many).max()) < 1e-2 * float(abs(one).max())
+    assert float(abs(one.send - many.send).max()) < 1e-2 * float(abs(one.send).max())
+    layers = orchestra.play_layers(sc, 4.0, lambda n: "tune" if ":" in n else "rest", rate=22050)
+    assert set(layers) == {"tune", "rest"}
+    assert float(abs(layers["tune"] + layers["rest"] - one).max()) < 1e-2 * float(abs(one).max())
+    assert float(abs(layers["tune"][: 22050]).max()) == 0.0               # (the tune starts at 2 s)
+
+
 def test_mastering_keeps_a_climax_above_what_led_to_it():
     np = pytest.importorskip("numpy")
     rate = 8000

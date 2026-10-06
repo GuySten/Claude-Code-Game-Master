@@ -594,70 +594,179 @@ def _dry_type():
     return _DRY
 
 
+_SYNTHS: Dict[Tuple[int, str], list] = {}
+
+
+def _synth(rate: int, sf2: Path, need=()):
+    """One synth per rate and sound set, kept for the process (loading the SoundFont took
+    about a second, on every play), with the extra sound sets ``need``s loaded on it."""
+    import tinysoundfont
+    key = (rate, str(sf2))
+    if key not in _SYNTHS:
+        syn = tinysoundfont.Synth(gain=-12, samplerate=rate)
+        _SYNTHS[key] = [syn, syn.sfload(str(sf2)), {}]
+    syn, sfid, fonts = _SYNTHS[key]
+    for font in need:
+        if font not in fonts:
+            try:
+                fonts[font] = syn.sfload(str(EXTRA_FONTS[font](quiet=True)))
+            except Exception as e:                              # offline: the sound set's choir
+                print(f"[orchestra] no {font} ({e}): the sound set's choir plays", file=sys.stderr)
+    return syn, sfid, fonts
+
+
+def _stem(syn, sfid, fonts, name: str, events: list, total: int, rate: int):
+    """One part (or one layer of one) played alone -> (first sample, stereo float32 stem
+    from there): nothing is played before its first note or after its last note has rung
+    out (most parts are silent most of a piece)."""
+    import numpy as np
+    part = name.partition(":")[0]
+    bank, preset, pan, vol = PARTS[part][:4]
+    font = sfid
+    if len(PARTS[part]) > 4:
+        if fonts.get(PARTS[part][4]) is not None:
+            font = fonts[PARTS[part][4]]
+        else:
+            bank, preset = FALLBACK[part]
+    bends = any(e[1] == 2 for e in events)
+    ch = 9 if part in DRUMS else 0
+    syn.program_select(ch, font, bank, preset, part in DRUMS)
+    syn.control_change(ch, 7, vol)
+    syn.control_change(ch, 10, pan)
+    if bends:
+        syn.pitchbend_range(ch, 12)
+        syn.pitchbend(ch, 8192)
+    events = sorted(events, key=lambda e: (e[0], e[1]))
+    first = min(total, int(events[0][0] * rate)) if events else total
+    chunks, pos = [], first
+    for t, is_on, _, key, vel in events:
+        at = min(total, int(t * rate))
+        if at > pos:
+            chunks.append(np.frombuffer(syn.generate(at - pos), dtype="float32"))
+            pos = at
+        if is_on == 2:
+            syn.pitchbend(ch, int(max(0, min(16383, 8192 + vel / 12 * 8191))))
+        elif is_on:
+            syn.noteon(ch, key, vel)
+        else:
+            syn.noteoff(ch, key)
+    step = max(1, rate // 4)
+    while pos < total:                                      # ring out, then stop: silence
+        piece = np.frombuffer(syn.generate(min(step, total - pos)), dtype="float32")
+        chunks.append(piece)
+        pos += len(piece) // 2
+        if float(np.abs(piece).max(initial=0.0)) < 1e-6:
+            break
+    syn.sounds_off(ch)
+    if bends:
+        syn.pitchbend(ch, 8192)
+    syn.generate(256)                                       # (let the cut voices go)
+    stem = np.concatenate(chunks).reshape(-1, 2) if chunks else np.zeros((0, 2), dtype="float32")
+    return first, stem
+
+
+def _workers(jobs: int) -> int:
+    """How many processes play a piece's parts (GM_ORCHESTRA_WORKERS overrides; 1: here)."""
+    want = os.environ.get("GM_ORCHESTRA_WORKERS")
+    n = int(want) if want and want.isdigit() else (os.cpu_count() or 1)
+    if n > 1 and not hasattr(os, "fork"):
+        n = 1
+    return max(1, min(n, jobs, 8))
+
+
+def play_layers(score: Score, seconds: float, layer_of, sf2: Path = SF2, rate: int = RATE,
+                mix: Optional[Dict[str, float]] = None, align: bool = True, send: bool = True):
+    """Like play(), but the parts sum into separate layers: ``layer_of(part name)`` -> a
+    layer key (None: left out) -> {key: dry mix (with ``.send`` when ``send``)}. The parts
+    play in parallel, one process per core: the synth holds Python's lock."""
+    import mmap
+    import numpy as np
+    groups: Dict[str, list] = {}
+    for e in score.events:
+        groups.setdefault(e[2], []).append(e)
+    keys: List = []
+    jobs = []
+    for name, events in groups.items():
+        k = layer_of(name)
+        if k is None:
+            continue
+        if k not in keys:
+            keys.append(k)
+        part = name.partition(":")[0]
+        bends = [(t, 2, name, 0, sem) for t, p, sem in getattr(score, "bends", []) if p == part]
+        events = list(events) + bends                        # (2: a bend, its semitones as "vel")
+        early = ADVANCE.get(part, 0.0) if align else 0.0
+        if early:                                           # (heard on the beat: see ADVANCE)
+            events = [(max(0.0, t - early), *rest) for t, *rest in events]
+        jobs.append((name, keys.index(k), events))
+    total = int((seconds + 0.5) * rate)
+    need = {PARTS[n.partition(":")[0]][4] for n, _, _ in jobs if len(PARTS[n.partition(":")[0]]) > 4}
+    syn, sfid, fonts = _synth(rate, sf2, sorted(need))
+    lanes = 2 if send else 1
+    w = _workers(len(jobs))
+    shape = (w, len(keys), lanes, total, 2)
+    size = int(np.prod(shape)) * 4
+    buf = mmap.mmap(-1, max(1, size)) if w > 1 else bytearray(max(1, size))
+    acc = np.frombuffer(buf, dtype="float32", count=int(np.prod(shape))).reshape(shape)
+
+    def run(slot: int, mine) -> None:
+        for name, k, events in mine:
+            first, stem = _stem(syn, sfid, fonts, name, events, total, rate)
+            if not len(stem):
+                continue
+            part, _, layer = name.partition(":")
+            gain = level_db(part, mix) + (float(layer) if layer else 0.0)
+            span = slice(first, first + len(stem))
+            acc[slot, k, 0, span] += stem * np.float32(10 ** (gain / 20))
+            if send:
+                acc[slot, k, 1, span] += stem * np.float32(10 ** ((gain + send_db(ROOM.get(part))) / 20))
+
+    if w == 1:
+        run(0, jobs)
+    else:                                       # longest parts first, each to the least busy
+        cost = lambda j: len(j[2]) + 40 * (max(e[0] for e in j[2]) - min(e[0] for e in j[2]))
+        shares: List[list] = [[] for _ in range(w)]
+        load = [0.0] * w
+        for j in sorted(jobs, key=cost, reverse=True):
+            i = load.index(min(load))
+            shares[i].append(j)
+            load[i] += cost(j)
+        pids = []
+        for slot in range(w):
+            pid = os.fork()
+            if pid == 0:                                    # (a child: play, then leave at once)
+                code = 0
+                try:
+                    run(slot, shares[slot])
+                except BaseException:
+                    import traceback
+                    traceback.print_exc()
+                    code = 1
+                os._exit(code)
+            pids.append(pid)
+        failed = [pid for pid in pids if os.waitpid(pid, 0)[1] != 0]
+        if failed:
+            raise RuntimeError(f"[orchestra] {len(failed)} of {w} player processes failed")
+    out = {}
+    for i, k in enumerate(keys):
+        dry = acc[:, i, 0].sum(axis=0).view(_dry_type())
+        dry.send = acc[:, i, 1].sum(axis=0) if send else None
+        out[k] = dry
+    del acc
+    return out
+
+
 def play(score: Score, seconds: float, sf2: Path = SF2, rate: int = RATE,
          mix: Optional[Dict[str, float]] = None, align: bool = True):
     """The score through the SoundFont -> stereo float32 (n, 2), dry. Each part (and
     each layer of one: "horns:4", the tune's notes) is played on its own and mixed
     at its level (level_db, plus the layer's dB), so a piece can use any number."""
     import numpy as np
-    import tinysoundfont
-    syn = tinysoundfont.Synth(gain=-12, samplerate=rate)
-    sfid = syn.sfload(str(sf2))
-    fonts = {}                                  # the extra sound sets a piece needs, loaded once
-    for font in {PARTS[e[2].partition(":")[0]][4] for e in score.events if len(PARTS[e[2].partition(":")[0]]) > 4}:
-        try:
-            fonts[font] = syn.sfload(str(EXTRA_FONTS[font](quiet=True)))
-        except Exception as e:                                  # offline: the sound set's choir
-            print(f"[orchestra] no {font} ({e}): the sound set's choir plays", file=sys.stderr)
-    total = int((seconds + 0.5) * rate)
-    out = np.zeros((total, 2), dtype="float32").view(_dry_type())
-    out.send = np.zeros((total, 2), dtype="float32")      # what goes to the hall (see ROOM)
-    groups: Dict[str, list] = {}
-    for e in score.events:
-        groups.setdefault(e[2], []).append(e)
-    for name, events in groups.items():
-        part, _, layer = name.partition(":")
-        bends = [(t, 2, name, 0, sem) for t, p, sem in getattr(score, "bends", []) if p == part]
-        events = list(events) + bends                        # (2: a bend, its semitones as "vel")
-        early = ADVANCE.get(part, 0.0) if align else 0.0
-        if early:                                           # (heard on the beat: see ADVANCE)
-            events = [(max(0.0, t - early), *rest) for t, *rest in events]
-        bank, preset, pan, vol = PARTS[part][:4]
-        font = sfid
-        if len(PARTS[part]) > 4:
-            if PARTS[part][4] in fonts:
-                font = fonts[PARTS[part][4]]
-            else:
-                bank, preset = FALLBACK[part]
-        ch = 9 if part in DRUMS else 0
-        syn.program_select(ch, font, bank, preset, part in DRUMS)
-        syn.control_change(ch, 7, vol)
-        syn.control_change(ch, 10, pan)
-        if bends:
-            syn.pitchbend_range(ch, 12)
-            syn.pitchbend(ch, 8192)
-        stem = np.zeros((total, 2), dtype="float32")
-        pos = 0
-        for t, is_on, _, key, vel in sorted(events, key=lambda e: (e[0], e[1])):
-            at = min(total, int(t * rate))
-            if at > pos:
-                stem[pos:at] = np.frombuffer(syn.generate(at - pos), dtype="float32").reshape(-1, 2)
-                pos = at
-            if is_on == 2:
-                syn.pitchbend(ch, int(max(0, min(16383, 8192 + vel / 12 * 8191))))
-            elif is_on:
-                syn.noteon(ch, key, vel)
-            else:
-                syn.noteoff(ch, key)
-        if pos < total:
-            stem[pos:] = np.frombuffer(syn.generate(total - pos), dtype="float32").reshape(-1, 2)
-        syn.sounds_off(ch)
-        if bends:
-            syn.pitchbend(ch, 8192)
-        syn.generate(256)                                   # (let the cut voices go)
-        gain = level_db(part, mix) + (float(layer) if layer else 0.0)
-        out += stem * np.float32(10 ** (gain / 20))
-        out.send += stem * np.float32(10 ** ((gain + send_db(ROOM.get(part))) / 20))
+    out = play_layers(score, seconds, lambda name: 0, sf2, rate, mix, align).get(0)
+    if out is None:
+        total = int((seconds + 0.5) * rate)
+        out = np.zeros((total, 2), dtype="float32").view(_dry_type())
+        out.send = np.zeros((total, 2), dtype="float32")
     return out
 
 
@@ -677,15 +786,15 @@ def _fast_len(n: int) -> int:
     return best
 
 
-def hall(dry, rate: int = RATE, rt60: float = 2.3, wet: float = 0.28, seed: int = 7,
-         loop_at: Optional[int] = None, loop_from: int = 0):
-    """A concert hall: the dry orchestra (its hall send, when play() made it: see
-    ROOM) convolved with a synthetic hall response
-    (early reflections, then a diffuse tail that darkens as it decays); the tail
-    is left to ring after the last chord, or, for a loop (``loop_at``: its length
-    in samples), rings on over its start - or over ``loop_from``, where a loop with an
-    entry loops back to - so the seam can't be heard."""
+_IRS: Dict[Tuple[int, float, int], "object"] = {}
+
+
+def _hall_ir(rate: int, rt60: float, seed: int):
+    """The hall's response (stereo, unit energy), built once per process."""
     import numpy as np
+    key = (rate, rt60, seed)
+    if key in _IRS:
+        return _IRS[key]
     rng = np.random.default_rng(seed)
     n = int(rt60 * 1.3 * rate)
     t = np.arange(n) / rate
@@ -709,15 +818,35 @@ def hall(dry, rate: int = RATE, rt60: float = 2.3, wet: float = 0.28, seed: int 
     pre = int(0.018 * rate)
     ir = np.vstack([np.zeros((pre, 2)), ir])
     ir /= np.sqrt((ir ** 2).sum(axis=0))
+    _IRS[key] = ir
+    return ir
+
+
+def hall(dry, rate: int = RATE, rt60: float = 2.3, wet: float = 0.28, seed: int = 7,
+         loop_at: Optional[int] = None, loop_from: int = 0):
+    """A concert hall: the dry orchestra (its hall send, when play() made it: see
+    ROOM) convolved with a synthetic hall response
+    (early reflections, then a diffuse tail that darkens as it decays); the tail
+    is left to ring after the last chord, or, for a loop (``loop_at``: its length
+    in samples), rings on over its start - or over ``loop_from``, where a loop with an
+    entry loops back to - so the seam can't be heard."""
+    import numpy as np
+    ir = _hall_ir(rate, rt60, seed)
     tail = len(ir)
-    size = _fast_len(len(dry) + tail)                      # (5-smooth: up to 2x smaller than a power of two)
-    out = np.zeros((len(dry) + tail, 2))
     send = getattr(dry, "send", None)
     send = dry if send is None else send
     dry = np.asarray(dry)
+    out = np.zeros((len(dry) + tail, 2))
+    # Block by block (overlap-add): FFTs a few times the response's length, not one the
+    # length of the whole piece (a 3-minute loop: 4.2 s -> 1.3 s, the same sound).
+    size = _fast_len(4 * tail)
+    hop = size - tail + 1
     for c in range(2):
-        y = np.fft.irfft(np.fft.rfft(send[:, c], size) * np.fft.rfft(ir[:, c], size), size)
-        out[:, c] = y[:len(dry) + tail]
+        h = np.fft.rfft(ir[:, c], size)
+        for at in range(0, len(dry), hop):
+            seg = send[at:at + hop, c]
+            y = np.fft.irfft(np.fft.rfft(seg, size) * h, size)[:len(seg) + tail - 1]
+            out[at:at + len(y), c] += y
     mix = out * wet
     mix[:len(dry)] += dry * (1 - wet * 0.5)
     if loop_at:                                            # a loop: what rings past its end
