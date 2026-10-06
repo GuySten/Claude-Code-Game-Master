@@ -17,7 +17,9 @@ from, never where the brief starts.
 ## The order
 
 1. **Read what the host has said about this kind of piece** (below) and the subject's notes
-   (npcs.json, the world bible, their deeds, how the host defines them).
+   (npcs.json, the world bible, their deeds, how the host defines them). When a piece keeps missing a feeling the host
+   can't describe ("monstrous", "evil"), offer a few well-known reference pieces and let the host pick
+   one; research what makes it work and brief from that ("take / leave"), never copying it.
 2. **Write the Job** - one sentence: what the table must feel by the last bar, and why music
    plays here. Everything after it serves it.
 3. **Fill the rest of the brief** (the template), every prescriptive line with its "because"

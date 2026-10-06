@@ -445,3 +445,8 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   tune once late): "the new margrave fight ost is great. "His theme is recognized clearly and it sounds like a
   fight." Recognition and similarity really are separate
   dials: keep the hook, change the surface.
+- **The Saint's stage 2 with the drive** (take 1 plus a drum engine locked to the fire's churn): "it does not
+  sound monstrous. Maybe because I do not know how the correct sound should sound." Offered four references
+  for "holy turned monstrous", the host picked Bloodborne's "Vicar Amelia" (a church vicar become a beast) -
+  the target the Saint's stage 2 is now briefed against (research/music-sources/reference-vicar-amelia.md).
+  When the host can't picture the target, ask for a reference piece before another rewrite.
