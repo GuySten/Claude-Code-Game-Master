@@ -432,3 +432,9 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   a lot better. But it is a bit too similar to his theme" - the same waltz at the same tempo and key, the
   tune on the theme's own carriers (violins with cellos), his hook as the engine. A battle piece must be
   recognisably his and still clearly not his theme (research requested, Oct 2026).
+- **The Saint's stage 2, two takes from the revised page** (dark hymn, rationed grind, choir on long
+  notes; blind): the fresh take "is a lot better but it still does not feel like a boss stage. I
+  suspect the brief again." It was: the brief had banned the fight's drive ("never a war machine...
+  an ostinato engine with drums", "timpani as the roar, not a drum groove") - a misreading of "combat
+  is not unique" (combat as the concept) as "no combat drive" - and the take had no drums but rolls.
+  Now briefs.md P2 ("the frame is still a fight") and a reviewer check.

@@ -11,6 +11,8 @@ Work in this order, and write each answer down before the next step:
 1. **Before reading the brief**, from the subject card and the verdicts alone: in one sentence,
    what must the table feel by the end of this piece, and what must it never feel? Use plain
    sense about what this role means to the people at the table.
+   A boss stage or a battle piece is a fight: it must drive like one (an engine and drums). Flag
+   a brief that removes the fight's drive as surely as one that makes combat its subject.
 2. **Read the brief and imagine the sound it asks for**, ignoring its labels and feeling words:
    only the tempo, meter, mode and harmony, register, instruments, articulation, dynamics, the
    dance or march it implies, the shape. In one sentence: what would a listener feel if a

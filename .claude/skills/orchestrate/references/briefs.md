@@ -85,6 +85,12 @@ moor; not sad-romantic"), never a bare adjective.
   duel); heroism for paladins and heroes, not every adventurer - a situation's concept is a
   moment, played as the subject's own theme in that form. A defining trait sits in the
   foreground, never a subtle layer.
+  **The frame is still a fight:** a boss stage or a villain's battle piece drives like one - an
+  engine and drums from the first bar (the host: a villain's battle piece is "fast, an ostinato
+  engine, drums"). "Combat is not unique" bans combat as the *concept*, never the fight's drive:
+  the concept makes the engine *theirs* (her fire's churn, his own hook's cell), it does not remove
+  it (the Saint's hymn stage with the drive written out: "a lot better but it still does not feel
+  like a boss stage").
 - **P3. Stature sets the peak.** A king or archvillain gets one grand climax, however
   restrained the surface; a minor figure stays small.
 - **P4. As many ideas as the length holds** (about one per 15-20 s; one carries). A portrait
