@@ -541,3 +541,21 @@ def test_timpani_roots_sit_in_the_drums_lowest_octave():
     score, _, _ = arrangement.build(spec)
     keys = sorted({k for t, on, p, k, _ in score.events if on and p == "timpani"})
     assert [arrangement.name_of(k) for k in keys] == ["D2", "G2"]
+
+
+def test_a_later_boss_stage_is_mastered_louder_than_the_one_before():
+    np = pytest.importorskip("numpy")
+    pytest.importorskip("tinysoundfont")
+    if not orchestra.SF2.is_file():
+        pytest.skip("the SoundFont isn't downloaded here")
+    import arrangement
+    from music import music_compose
+    spec = {"tune": {"seed": "sketch", "key": "D4", "meter": "4/4"}, "statements": [], "length": 16,
+            "tempo": 120, "loop": True, "role": "stage", "chords": [[0, 16, "i"]],
+            "harmony": [{"part": "strings", "from": 0, "to": 16, "play": "chord", "range": ["D3", "D5"],
+                         "pattern": "xxxx"}],
+            "hits": [{"part": "timpani", "note": "D2", "at": 8, "len": 1, "vel": 120}]}
+    one, rate = arrangement.render({**spec, "stage": 1})
+    two, _ = arrangement.render({**spec, "stage": 2})
+    level = lambda x: music_compose.loudness_db(x.mean(axis=1), rate)
+    assert level(two) > level(one) + 1.0

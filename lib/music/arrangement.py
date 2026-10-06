@@ -31,6 +31,8 @@ except in "hits" and "rolls", where it is the velocity itself (1-127).
                          # strong opening), then [loop_from, length) loops; the file says where
                          # (a LOOPSTART tag) and the table plays it so. Default: start
   "role": "theme",       # what it's for: theme, villain, battle, lament, place, ... "stage"
+                         # (a boss stage also says which: "stage": 2 - a later stage is
+                         # mastered louder than the one before it)
                          # (a boss stage: entry + body - the critic's stage checks), "pre_end",
                          # "turn" and "place" (steady by design: no climax check), "comic"
   "ritard": {"from": 84, "amount": 0.4},     # slowing to the end (40% slower at the last note)
@@ -736,6 +738,10 @@ def loop_start(spec: Dict[str, Any], rate: int = orchestra.RATE) -> Optional[int
 
 
 STING_SECONDS = 15.0    # a one-shot shorter than this is a sting (boss-music.md: a little louder)
+STAGE_STEP_DB = 2.0     # each later boss stage ("stage": 2, 3) plays this much louder than the last
+STAGE_LIMIT_DB = 4.0    # (and may limit its peak harder to get there - as much as a sting)
+# The host, of a stage 2 mastered 1.6 dB quieter than stage 1 (its bigger climax left the
+# limiter less room): "the second stage does not have more emotion; the change is minimal".
 
 
 def render(spec: Dict[str, Any], rate: int = orchestra.RATE, sf2: Path = orchestra.SF2):
@@ -747,6 +753,10 @@ def render(spec: Dict[str, Any], rate: int = orchestra.RATE, sf2: Path = orchest
         dry = orchestra.play(score, seconds + 3.0, sf2, rate, mix)  # (what rings past the end)
         wet = orchestra.hall(dry, rate, loop_at=int(round(seconds * rate)),
                              loop_from=loop_start(spec, rate) or 0)
+        later = max(0, int(spec.get("stage", 1)) - 1) if spec.get("role") == "stage" else 0
+        if later:                          # a later boss stage: louder than the one before
+            return orchestra.master(wet, rate, loop=True, hot_db=STAGE_STEP_DB * later,
+                                    limit_db=STAGE_LIMIT_DB), rate
         return orchestra.master(wet, rate, loop=True), rate
     dry = orchestra.play(score, seconds, sf2, rate, mix)
     if seconds < STING_SECONDS:            # a sting plays over the loops: a little hotter
