@@ -404,3 +404,20 @@ def test_a_line_marked_lead_is_measured_like_the_tune():
           "lines": [{"part": "flutes", "lead": True, "vel": -40,
                      "notes": [[u, "A5", 2] for u in range(0, 16, 2)]}]}
     assert [m for _, m in A.check(sp) if "lead line (flutes)" in m]
+
+
+def test_steady_pieces_written_to_their_recipe_pass_the_critic():
+    # composing.md: a pre-end is intense with no development; a turn cue and a place hold a
+    # steady texture. The critic's climax and stage checks are for themes and stages only.
+    parts = ["violins", "violins2", "cellos", "basses", "horns", "trombones", "flutes", "clarinets", "bassoons"]
+    def steady(role, **extra):
+        lines = [{"part": p, "notes": [[u, orchestra.RANGES[p][0] + 7, 4] for u in range(0, 64, 4)]} for p in parts]
+        return {"tune": {"seed": "sketch", "key": "D4", "meter": "4/4"}, "statements": [], "length": 64,
+                "loop": True, "role": role, "chords": [[0, 64, "i"]], "dynamics": [[0, 110], [64, 110]],
+                "lines": lines, **extra}
+    for role in ("pre_end", "turn", "place"):
+        found = [m for _, m in A.check(steady(role), listen=False)]
+        assert not [m for m in found if "nothing left to arrive" in m or "loop body is" in m], (role, found)
+    # a theme loop with a played-once intro is not a stage either
+    intro = steady("theme", start=-4, loop_from=0)
+    assert not [m for _, m in A.check(intro, listen=False) if "loop body is" in m]

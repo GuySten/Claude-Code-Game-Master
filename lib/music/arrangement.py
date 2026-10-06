@@ -30,8 +30,9 @@ except in "hits" and "rolls", where it is the velocity itself (1-127).
   "loop_from": 0,        # a loop with an entry: [start, loop_from) plays once (a boss stage's
                          # strong opening), then [loop_from, length) loops; the file says where
                          # (a LOOPSTART tag) and the table plays it so. Default: start
-  "role": "theme",       # what it's for: theme, villain, battle, lament, ... ("battle": the
-                         # critic checks it keeps several lines moving)
+  "role": "theme",       # what it's for: theme, villain, battle, lament, place, ... "stage"
+                         # (a boss stage: entry + body - the critic's stage checks), "pre_end",
+                         # "turn" and "place" (steady by design: no climax check), "comic"
   "ritard": {"from": 84, "amount": 0.4},     # slowing to the end (40% slower at the last note)
   "dynamics": [[-12, 60], [0, 80], [36, 96], [60, 124]],   # velocity, linear between points
   "statements": [{"at": 0}],                 # where the tune is played (default: once, at 0; [] for none);
@@ -856,7 +857,11 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
     # a climax - "after stage change the music should start strong" (the host); the research:
     # a transformation restarts the music in its new form, opening with a signature attack.
     # The checks below of how the piece grows look at the loop body only.
-    entry_u = ctx["loop_from_u"] if ctx.get("loop_from") else None
+    # (a boss stage: "role": "stage" - or the older form, a battle loop with an entry. A
+    # pre-end, a turn cue or a theme with a played-once intro is not a stage.)
+    role = spec.get("role")
+    is_stage = ctx.get("loop_from") is not None and (role == "stage" or (role == "battle" and ctx.get("loop_from")))
+    entry_u = ctx["loop_from_u"] if is_stage else None
     if entry_u is not None:
         entry = [n for u, n, _ in layers if u < entry_u - 1e-9]
         layers = [x for x in layers if x[0] >= entry_u - 1e-9]
@@ -891,7 +896,7 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
     # A climax needs something to arrive: if the piece already plays at nearly its full
     # texture from the start, its peak adds nothing (the host, of the Ashen Saint's second
     # stage - 16-19 parts from bar 1, 20 at the "climax": "a climax without the climax").
-    if len(layers) >= 8:
+    if len(layers) >= 8 and role not in ("pre_end", "turn", "place"):   # (steady by design)
         pts = ctx["dyn_pts"]
 
         def dyn(u: float) -> float:                    # the dynamics curve at u
@@ -1049,7 +1054,7 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
             add("warn", f"the loop's seam steps {step:+.0f} dB (end -> start): bring the ends' dynamics together")
     # A stage's body keeps its entry's energy: the host, of bodies that fell 9-11 dB right
     # after the entry, "it dies after the transformation".
-    if ctx.get("loop_from"):
+    if is_stage:
         full = lead + choir + rest
         m = int(ctx["loop_from"] * rate)
         after = full[m:m + int(min(12.0, ctx["seconds"] - ctx["loop_from"]) * rate)]

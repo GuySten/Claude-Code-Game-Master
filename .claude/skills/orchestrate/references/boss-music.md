@@ -17,8 +17,8 @@ Ordinary fights share one campaign battle cue and get none of this.
    collapsing). A stage the table can't read is noise.
 2. **One identity throughout.** Every stage carries the boss's motif and its concepts,
    on a shared core sound (low strings, timpani...) and the same tempo grid or a simple
-   ratio of it. Write the motif once (`"motifs"`) and place it transformed in each
-   stage. Game scores almost always vary the boss's theme across phases; an unrelated
+   ratio of it. The tune enters through `"tune"` and `"statements"` (only a
+   statement counts as stated whole, `composing.md` 5); its hook may also be a motif. Game scores almost always vary the boss's theme across phases; an unrelated
    new theme only when the boss turns out to be someone else.
 3. **Change two or three things a stage, audibly**: tempo (+8 to 15 a minute, or the
    same tempo with double the motion), key (up a step or a minor third), choir (one
@@ -39,7 +39,7 @@ Ordinary fights share one campaign battle cue and get none of this.
    biggest setting (full brass and choir, the top register). A theme that answers it
    (the party's, the campaign's, an ally's) enters only there - or in the cue of the
    turn that brings it (below).
-5a. **A turn the party may cause gets its own cue, never a place in a stage loop.** When
+5. **A turn the party may cause gets its own cue, never a place in a stage loop.** When
    the plan has an event the players can bring about in more than one stage - a
    counter-song, a ritual broken, an ally stepping in - and it changes the fight, score
    it as its own loop (`<boss>-<event>`, as long as the plan says it lasts), started at
@@ -48,10 +48,10 @@ Ordinary fights share one campaign battle cue and get none of this.
    sounds inside a stage loop: the table would hear the twist before anyone found it,
    and it might never happen. It keeps the boss's identity in it (the boss's tune, the
    current stage's core sound) with the answer on top.
-5. **A stage may reveal rather than escalate.** When the second stage shows the boss's
+6. **A stage may reveal rather than escalate.** When the second stage shows the boss's
    grief, madness or former self, its cue may be sparser, slower or sacred. Mark it
    `reveal` so the GM knows the drop is meant.
-6. **How a stage is written** - its strong entry, a body that keeps that energy, the breakdown,
+7. **How a stage is written** - its strong entry, a body that keeps that energy, the breakdown,
    the one peak that brings something new, the length - is the composer's recipe:
    `composing.md` ("Boss stage"). This file plans the fight; that one writes it.
 
@@ -78,7 +78,7 @@ first ones (the stage plan first: its key, tempo, core sound, entry), with three
 earlier stages already decided:
 - **What the table has heard stays.** The tune, the core sound and stages 1-2 as played are
   the boss's identity now; the new stage grows from them (rule 2).
-- **The arc is re-planned with the new stage at its top** (rule 6: the fight's biggest
+- **The arc is re-planned with the new stage at its top** (rule 4 and `composing.md` 17: the fight's biggest
   moment is the last stage's). If the old last stage spent everything - full brass, the open
   choir, the tune's top register - either re-score that stage's peak to hold something back
   (only when the table hasn't heard it fight in that form, or a session has passed), or let
@@ -131,6 +131,8 @@ stage starts where the rise lands; a break's impact cuts the old loop and the ne
 starts after its quiet; an ending cuts the loop under its attack. The stage's entry plays
 once, then its body loops (`"loop_from"`).
 
+
+## At the table
 
 15. **Switch on the narration of the trigger**, not on the dice. A stage that grows
     out of the last: **rise** into the new loop. A transformation: **break**, the

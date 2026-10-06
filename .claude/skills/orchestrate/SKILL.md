@@ -36,7 +36,7 @@ So the loop below is not optional ceremony; it's how you hear.
    tune exists. A boss's finals are arranged as **their theme** - the piece the table
    hears when they appear, before any fight - so the players know the tune before the
    fight varies it (stage 1 is where they learn a boss; a leitmotif is recognised in
-   a reprise, not a variation); the stages are built from the winner after. A boss's fight carries that tune in every stage (`"motifs"`):
+   a reprise, not a variation); the stages are built from the winner after. A boss's fight states that tune whole in every stage (`"statements"`):
    the host couldn't tell whether the Ashen Saint's second stage had the first
    stage's tune, because her improvised one (scored 4.0-5.0) was unmemorable.
    Everyone else gets the generator's (gen 2).
