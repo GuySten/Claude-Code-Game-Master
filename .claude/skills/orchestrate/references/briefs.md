@@ -16,7 +16,8 @@ from, never where the brief starts.
 
 ## The order
 
-1. **Read what the host has said about this kind of piece** (below) and the subject's notes
+1. **Read the reference cards that fit the piece** (`research/music-sources/references/` in the campaigns
+   repo - canon, P7a), **what the host has said about this kind of piece** (below) and the subject's notes
    (npcs.json, the world bible, their deeds, how the host defines them). When a piece keeps missing a feeling the host
    can't describe ("monstrous", "evil"), offer a few well-known reference pieces and let the host pick
    one; research what makes it work and brief from that ("take / leave"), never copying it.
@@ -112,6 +113,14 @@ moor; not sad-romantic"), never a bare adjective.
   open. A new idea may depart from it (its tempo, its form, its colours); a blind A/B against it
   decides. Never copy a liked piece's recipe onto another subject (Izrin's brief copied Kestrel's
   rising rebel and read as heroic for a killer).
+- **P7a. Canon outranks a taste verdict** (the host: "a score on the level of the Imperial March does
+  not need to be vetoed by me - it is more correct that I need to be vetoed by it"). An acclaimed,
+  well-documented score's means (a reference card in `research/music-sources/references/`) steer a
+  brief without the host hearing it first; where a card and a host *taste* verdict disagree, follow
+  the card and let the host hear the result. Two things stay above any card: the host's verdicts on
+  what *our sampled instruments* can't do (a choir changing notes under 0.7 s, the men's choir above E4,
+  repeated brass-section stabs, constant dissonance in this render) - a masterwork written for a real
+  orchestra can't overrule the sound set - and the rule to take the means, never the piece.
 - **P7b. Recipes, research examples and lexicon entries give means.** A means that doesn't serve
   the Job is dropped however well sourced; the host's verdicts override all of them. A lexicon
   entry has several readings (fire as light or as destruction); the Job picks the reading.
