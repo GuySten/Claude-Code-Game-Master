@@ -442,5 +442,6 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   rhythm exposed early and every 20-30 s; the tune on horns + violins2 + clarinets, never his theme's
   violins + cellos; an engine from the first turn of his hook with a syncopated push, no waltz oom-pah;
   i-bII-iv-vii°7 moving, never home; F# minor, not his theme's A minor; fragment-and-develop, the whole
-  tune once late): "the new margrave fight ost is great." Recognition and similarity really are separate
+  tune once late): "the new margrave fight ost is great. "His theme is recognized clearly and it sounds like a
+  fight." Recognition and similarity really are separate
   dials: keep the hook, change the surface.
