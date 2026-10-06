@@ -8,7 +8,12 @@ none of this. Numbers refer to `design-directives.md`; sources at the end.
 ## Before the session: the stage plan
 
 1. **Write the stages in prep, never mid-fight.** Default three stages for an arc
-   boss, two for a lieutenant. For each: its numbers (a stat block or a hit-point
+   boss, two for a lieutenant. **The rank is the GM's call, from the boss's weight in
+   the story, not the campaign's length:** a one-shot's boss can be its arc boss when the
+   whole adventure builds to them (three stages and an arc boss's music), and a long
+   campaign's boss can stay a lieutenant. Say the rank in the stage plan's first lines
+   with the reason. An arc boss in a short session keeps the fight's length (five to
+   eight rounds in all): its stages are shorter, not more. For each: its numbers (a stat block or a hit-point
    pool), the **trigger**, what changes, how it shows, and its music cue. No new
    stage and no new numbers are invented at the table (34, T2). [Angry GM; Giffyglyph; Theros mythic]
 2. **Triggers the players can see.** Bloodied (half hit points: a public state in

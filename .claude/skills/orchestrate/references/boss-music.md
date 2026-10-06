@@ -9,7 +9,8 @@ Ordinary fights share one campaign battle cue and get none of this.
 ## What to score
 
 1. **As many stages as the fight has triggers**, never more than four: two for a
-   lieutenant, three for an arc boss; a finale may add a short **pre-end** loop (30-60 s,
+   lieutenant, three for an arc boss (the rank is the GM's, in the boss's stage plan: a
+   one-shot's boss may be an arc boss - `gm-craft/references/boss-fights.md` 1); a finale may add a short **pre-end** loop (30-60 s,
    high intensity, no melodic development, its last bar resolving into every ending;
    the GM plays it when the boss is one blow from falling or the last countdown starts). Each stage cue answers a
    trigger the GM can name in one line (bloodied, the transformation, the lair
