@@ -75,6 +75,14 @@ one role and one length (the bar map's), rule numbers from `composing.md`, and e
 names ("the engine", "the pedal") said in parts and notes, with the double a quick string
 figure needs (`composing.md` 22) - a contradiction or a guess costs a composer minutes of thought.
 Before handing it over, check the plan against the rules a composer will meet:
+- **Read it as the table will hear it, first**: put every word that names a feeling or a
+  device next to "this is the enemy" (rule 3). Bright, rapture, ecstatic, light, dance, play,
+  a major chord or a triumphant cadence in a boss stage is wrong, however well each word fits
+  the concept alone (the Saint's "fire-dance": the GM's plan linked holy fire to "rapture...
+  not darkness", "an ecstatic fire-dance in 6/8", "major chords a third apart"; the composer
+  wrote exactly that, and the host heard it as "playful... certainly not boss music"). A
+  composer who finds such a line raises it before writing: a brief never overrides what the
+  cue is.
 - **Ranges**, in the stage's key: every figure inside its part (`composing.md` §4 - violins2
   can't take an F-minor root at F3).
 - **One job per part at a time**: where the tune is on cellos, say who takes the engine's bass.
