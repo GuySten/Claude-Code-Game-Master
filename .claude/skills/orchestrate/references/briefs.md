@@ -76,10 +76,10 @@ moor; not sad-romantic"), never a bare adjective.
 - **P1. The cue's role sets the emotional bounds.** A boss is always the enemy: every stage
   carries negative emotion - menace, dread, fury, agony, despair - and the boss's concepts are
   their dark forms (`concepts.md` R18: holiness -> corrupted holiness, power -> tyranny). Darkness is
-  **A fight is the energised corner, a theme the calm one.** Dread and suspense are dark but calm: they
-  belong to the boss's *theme*, played as the boss appears, before initiative (the host, of the Saint's
-  dread-led stages: "the suspense is good for an introduction before the fight starts... for her theme it
-  is good"). A boss *stage* is dark and energised: its Job names both what the boss is and the thrill of
+  **A fight is the energised corner.** Dread and suspense are dark but calm: they suit a boss's
+  introduction before initiative, where the encounter has one (the host, of the Saint's dread-led stages:
+  "the suspense is good for an introduction before the fight starts... for her theme it is good"; but "not
+  every boss should have a suspenseful introduction" - an ambush or a brawler starts at stage 1). A boss *stage* is dark and energised: its Job names both what the boss is and the thrill of
   fighting them - the players' blood up, excited to take this enemy on ("only ok... I do not think the
   players will feel excited to fight her"). Dark grandeur and awe belong to a magnificent enemy and are
   welcome (One-Winged Angel "half worships him while it fights you"; listeners find it exhilarating);
