@@ -336,3 +336,11 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   the forces". Now the body keeps the entry's energy (within about 3 dB), the dip is a
   breakdown a third to halfway through, and the peak holds back colour and register, not
   level (`boss-music.md` rule 6; the critic warns when a body falls more than 4 dB).
+- **Kestrel's theme again, blind A/B (Oct 2026): the original beat the rebuilt workflow.**
+  The original - written by the GM straight from the device library and the campaign notes
+  (34 s at 66: the outsider's tune passed from flutes to horns to tutti, rising in one arc
+  to a hope chord, choir, a decided ending) - "B is better" than the translator + composer
+  under the rebuilt rulebook (66 s at 104; the brief: Rage carries, *leashed* - pressed down
+  for most of the piece, one tutti, no triumphant ending; low stature; the tune stated whole
+  three times). The composer did what the brief asked; the brief's reading (a held-down,
+  anti-climactic portrait) is the likeliest loss. Reason not yet given by the host.
