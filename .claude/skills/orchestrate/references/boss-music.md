@@ -50,6 +50,20 @@ Ordinary fights share one campaign battle cue and get none of this.
    biggest setting (full brass and choir, the top register). A theme that answers it
    (the party's, the campaign's, an ally's) enters only there - or in the cue of the
    turn that brings it (below).
+4b. **A villain's fight is his, but never his theme again.** Recognition and "too similar" are
+   separate judgements [R: `research/music-sources/villain-battle.md`]: the tune is recognised by its
+   hook - the first 5-7 notes' exact intervals and their long-short pattern - while similarity is
+   heard mostly in the surface - the instruments above all, then texture, groove and articulation
+   [H, the Margrave's stage 1 on his theme's meter, tempo, key, carriers and waltz engine, with drums
+   added: "a bit too similar to his theme"]. So: **keep** the hook's intervals and long-short pattern,
+   stated clearly and exposed within the first 8 bars and again every 20-30 s, and one or two of his
+   signature colours in a new job; **always change the carriers** (the theme's tune instruments drive
+   the engine instead); **and change at least two more, decisively**: the engine (never the theme's
+   accompaniment, never the hook looped in its own rhythm - build it from his harmony or a 2-3-note
+   cell of the hook, re-rhythmed), the meter feel (every beat struck, or a new grouping, within the
+   tempo cap), a distant key, a moving harmonic loop in place of a pedal, fragment-and-develop form.
+   A mode change, added drums or more volume alone never make the difference. The whole tune, when it
+   comes, comes in a form the theme never used.
 5. **A turn the party may cause gets its own cue, never a place in a stage loop.** When
    the plan has an event the players can bring about in more than one stage - a
    counter-song, a ritual broken, an ally stepping in - and it changes the fight, score
