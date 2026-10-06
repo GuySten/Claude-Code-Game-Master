@@ -378,3 +378,7 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   repetitive" - they stated the whole tune two or three times (53-66 s); the original once
   (34 s), passed round the orchestra. -> the Theme recipe: about 30-45 s, the tune once and
   developed as it goes; rule 10: never the tune twice the same way.
+- **Handing the composer music (Izrin's theme, blind, Oct 2026):** the GM's brief alone vs the
+  brief plus the GM's opening and climax written in notes and a read-back step (both with no time
+  pressure, revising freely): "they are close". Handing over music did not audibly help and costs
+  the GM about 10 minutes a theme: the brief alone stays the workflow.
