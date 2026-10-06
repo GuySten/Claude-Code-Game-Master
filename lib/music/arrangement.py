@@ -816,12 +816,16 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
     # every 8-16 bars - and the boss's tune is heard whole, as written, so the table knows
     # it (a leitmotif is recognised in a reprise far more easily than in a variation; the
     # host could not tell whether a stage 2 had stage 1's tune).
-    if entry_u is not None and spec.get("role") == "battle":
-        body_s = ctx["seconds"] - ctx["loop_from"]
+    if ctx["loop"] and spec.get("role") == "battle":
+        if entry_u is None:
+            entry_u = ctx["start"]
+        body_s = ctx["seconds"] - (ctx["loop_from"] or 0)
         if body_s < 150:
             add("warn", f"the loop body is {body_s:.0f} s: a stage plays 10-40 minutes - 150 s at least "
                         "(3-5 min is the research's length), with something new every 8-16 bars")
-        if ctx["played"]:
+        t = spec.get("tune") or {}
+        has_tune = isinstance(t, dict) and (t.get("written") or (t.get("seed") and t.get("seed") != "sketch"))
+        if ctx["played"] or has_tune:
             whole = [x for x in ctx["statements"] if float(x.get("from", 0)) <= 1e-9 and
                      float(x.get("at", 0)) >= entry_u - 1e-9 and
                      float(x.get("to", ctx["tune_len"])) >= ctx["tune_len"] - 1e-9]
