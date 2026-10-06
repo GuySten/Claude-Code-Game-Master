@@ -438,3 +438,9 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   an ostinato engine with drums", "timpani as the roar, not a drum groove") - a misreading of "combat
   is not unique" (combat as the concept) as "no combat drive" - and the take had no drums but rolls.
   Now briefs.md P2 ("the frame is still a fight") and a reviewer check.
+- **The Margrave's fight stage 1, rebuilt by the research rule** (boss-music 4b: his hook's exact notes and
+  rhythm exposed early and every 20-30 s; the tune on horns + violins2 + clarinets, never his theme's
+  violins + cellos; an engine from the first turn of his hook with a syncopated push, no waltz oom-pah;
+  i-bII-iv-vii°7 moving, never home; F# minor, not his theme's A minor; fragment-and-develop, the whole
+  tune once late): "the new margrave fight ost is great." Recognition and similarity really are separate
+  dials: keep the hook, change the surface.
