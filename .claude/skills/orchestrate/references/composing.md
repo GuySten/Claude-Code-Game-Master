@@ -55,7 +55,8 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
     riffs of cellos, basses and bassoons in bare fifths. Carry the tune in a blend (flutes +
     clarinets, horns + violins, violins in octaves + flutes); brass and bassoons go with
     strings or underneath, for weight. A start can be quiet - it can't be made of the weak
-    sounds. [H, Kestrel: "a weak start and weaker instruments, and weaker combination"; "it's
+    sounds. A deep floor needs a key whose tonic sits in the basses' lowest octave (E1-D#2;
+    their B1 is thin). [H, Kestrel: "a weak start and weaker instruments, and weaker combination"; "it's
     not always good to start strong"; the brass "really weak" as a lead] (critic: the tune on
     brass or low reeds alone)
 
@@ -183,7 +184,9 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
   `"patterns"` or `"hits"` with `"note": "root"`, not `"harmony"`. No scripts that generate notes (a short one
   that edits the score is fine).
 - `"dynamics"`: the velocity curve, [[time, velocity], ...] - the critic finds the peak at
-  its top.
+  its top. Velocity changes a sampled note's attack and colour more than its level: the
+  growth you hear comes from parts joining and doubling (raising a phrase from 80 to 92
+  measured as nothing).
 - Parts: violins, violins2 (also the viola register - there is no viola), strings, tremolo,
   pizzicato, cellos, basses, flutes, piccolo, oboe, english_horn, clarinets, bassoons,
   horns, trumpets, trombones, tuba, brass, harp, celesta, glockenspiel, bells, organ,

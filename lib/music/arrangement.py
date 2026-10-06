@@ -103,7 +103,8 @@ except in "hits" and "rolls", where it is the velocity itself (1-127).
     {"part": "kit", "note": "snare", "from": 36, "to": 60, "pattern": "xoooox", "vel": -30},
     {"part": "timpani", "note": "root", "from": 0, "to": 84, "pattern": "x     ", "vel": -6}
   ],                     # note: a pitch, "root"/"fifth" (of the chord, in the timpani's
-                         # range - for drums; a pitched part's root is a "harmony" entry), or
+                         # lowest octave, D2-C#3 - for drums; a pitched part's root is a
+                         # "harmony" entry), or
                          # snare, bd, crash, cymbal, china, splash, ride, triangle, gong
   "rolls": [{"part": "timpani", "note": "G#2", "from": 57, "to": 60, "vel": [70, 120]}],
   "unhinge": [{"parts": ["strings", "tremolo", "violins"], "from": 36, "to": 40, "drift": 0.6,
@@ -665,7 +666,7 @@ def _build(spec: Dict[str, Any]) -> Dict[str, Any]:
             c = chord_at(x)
             if c is None:
                 raise ArrangementError(f'"{what}" at {x}: there is no chord there')
-            return place(c[what], 40, 52)
+            return place(c[what], 38, 49)           # (the drums' lowest octave, D2-C#3: under the bass)
         return pitch(what)
 
     for p in spec.get("patterns") or []:
@@ -771,6 +772,7 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
     "warn" (very likely heard), "note" (a choice to confirm). ``listen``: also
     render it, to measure what's heard (the tune over the rest, the choir, a loop's
     seam): a few seconds."""
+    written = spec                                   # (as written: a lead line keeps its "double")
     spec = expand_motifs(spec)
     ctx = _build(spec)
     sc, tune, T, unit = ctx["score"], ctx["tune"], ctx["T"], ctx["unit"]
@@ -1057,7 +1059,7 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
                         f"({len(alone)} notes): this sound set's brass and low reeds are its weakest "
                         "recordings exposed - blend them (horns + violins, bassoons + cellos) or give "
                         "the tune to strings or woods (rule 13)")
-        for l in spec.get("lines") or []:
+        for l in written.get("lines") or []:
             if isinstance(l, dict) and l.get("lead") and l.get("part") in exposed and not any(
                     isinstance(d, dict) and d.get("part") not in exposed for d in l.get("double") or []):
                 add("warn", f"the lead line on {l.get('part')} is exposed: double it with strings or woods "
@@ -1098,10 +1100,10 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
         elif gap < 1:
             add("warn", f"the tune is barely over the rest at {_where(ctx, a)}-{_where(ctx, b - 1e-6)}: "
                         f"{gap:+.0f} dB (melody entry #{mi} \"gain\": {round(3 - gap) + float(m.get('gain', 0)):g} would put it at +3)")
-    for li, raw in enumerate(spec.get("lines") or []):
+    for li, raw in enumerate(written.get("lines") or []):
         if not (isinstance(raw, dict) and raw.get("lead")):
             continue
-        l = expand_motifs({**spec, "lines": [raw]})["lines"][0]
+        l = expand_motifs({**written, "lines": [{k: v for k, v in raw.items() if k != "double"}]})["lines"][0]
         ns = l.get("notes") or []
         if not ns:
             continue

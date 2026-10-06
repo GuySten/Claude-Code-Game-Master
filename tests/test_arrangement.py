@@ -520,3 +520,24 @@ def test_the_tune_on_brass_alone_is_flagged_but_a_blend_is_not():
                                 {"from": 0, "to": 16, "parts": {"violins": 0}}]}       # (another entry, same time)
     flagged = lambda sp: [m for _, m in arrangement.check(sp, listen=False) if "rule 13" in m]
     assert flagged(alone) and not flagged(blend)
+
+
+def test_a_lead_line_on_horns_doubled_by_woods_is_not_exposed():
+    import arrangement
+    base = {"tune": {"seed": "sketch", "key": "D4", "meter": "4/4"}, "length": 8, "tempo": 100,
+            "chords": [[0, 8, "I"]], "statements": [],
+            "lines": [{"part": "horns", "lead": True, "notes": [[0, "D4", 4], [4, "A4", 4]]}]}
+    exposed = lambda sp: [m for _, m in arrangement.check(sp, listen=False) if "is exposed" in m]
+    assert exposed(base)
+    doubled = {**base, "lines": [{**base["lines"][0], "double": [{"part": "clarinets"}]}]}
+    assert not exposed(doubled)
+
+
+def test_timpani_roots_sit_in_the_drums_lowest_octave():
+    import arrangement
+    spec = {"tune": {"seed": "sketch", "key": "D4", "meter": "4/4"}, "length": 8, "tempo": 100,
+            "chords": [[0, 4, "I"], [4, 8, "IV"]], "statements": [],
+            "patterns": [{"part": "timpani", "note": "root", "from": 0, "to": 8, "pattern": "x---"}]}
+    score, _, _ = arrangement.build(spec)
+    keys = sorted({k for t, on, p, k, _ in score.events if on and p == "timpani"})
+    assert [arrangement.name_of(k) for k in keys] == ["D2", "G2"]
