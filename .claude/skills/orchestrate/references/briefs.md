@@ -17,7 +17,8 @@ from, never where the brief starts.
 ## The order
 
 1. **Read the reference cards that fit the piece** (`research/music-sources/references/` in the campaigns
-   repo - canon, P7a), **what the host has said about this kind of piece** (below) and the subject's notes
+   repo - canon, P7a; the host's favourite composer is Hans Zimmer: `zimmer-style.md` and his cards are
+   the first place to look), **what the host has said about this kind of piece** (below) and the subject's notes
    (npcs.json, the world bible, their deeds, how the host defines them). When a piece keeps missing a feeling the host
    can't describe ("monstrous", "evil"), offer a few well-known reference pieces and let the host pick
    one; research what makes it work and brief from that ("take / leave"), never copying it.
