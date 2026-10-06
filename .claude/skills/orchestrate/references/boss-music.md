@@ -60,11 +60,14 @@ Ordinary fights share one campaign battle cue and get none of this.
    - **the entry**, 1 to 4 bars: most of the stage's forces at once on its new key and
      tempo, the new form's signature figure (stage 2: the motif in its new shape, the
      choir's first entrance), ff. Stage 1's entry is the boss's arrival, at stage 1's size.
-   - **the loop body** drops back to the drive (about half the forces) and climbs in
-     waves to a peak of its own, holding something back for it (the tune's full form, the
-     top register, full brass), then falls back for the seam - not to the entry's level,
-     which never comes back. The host on a stage that sat at its full texture throughout:
-     "it does not develop into anything... like a climax without the climax".
+   - **the loop body keeps the entry's energy**: it starts on the stage's full drive (its
+     rhythmic engine at full strength, within about 3 dB of the entry - the host, of bodies
+     that fell 9-11 dB after their entry: "it dies after the transformation"). The dip comes
+     later: a breakdown a third to halfway through, then the rebuild in waves to a peak of
+     its own that holds something back - colour and register (the tune's full form, the top
+     register, full brass, the open choir), not a quiet start. Then it falls back to the
+     body's opening drive for the seam. The host on a stage that sat at its full texture
+     throughout: "it does not develop into anything... like a climax without the climax".
    - **across the fight**: escalate in colour, not level - tempo, key, density, choir,
      register, how complete the tune's setting is (rule 3). The stage loops are
      level-matched (mastering brings every file to the same loudness; within about 2 LU),

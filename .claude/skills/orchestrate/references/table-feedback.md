@@ -331,3 +331,8 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   (now by colour, loops level-matched); choir rules disagreed; the pre-end could not be
   played. "Stage 1 started too strong" was a "maybe" and is superseded by the stage
   entries. Not built yet: a sparse alternate of each stage for speech, quantised switches.
+- **"It dies after the transformation sequence"** (the Ashen Saint v5): every stage body fell
+  5-11 dB right after its strong entry - the rule said to "drop back to the drive, about half
+  the forces". Now the body keeps the entry's energy (within about 3 dB), the dip is a
+  breakdown a third to halfway through, and the peak holds back colour and register, not
+  level (`boss-music.md` rule 6; the critic warns when a body falls more than 4 dB).

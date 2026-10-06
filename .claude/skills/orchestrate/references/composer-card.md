@@ -14,9 +14,11 @@ the format docstring at the top of `lib/music/arrangement.py`, and `boss-music.m
   story reason, after it has been heard straight. The critic checks.
 - **A stage = a strong once-only entry + a loop body.** `"start": -<entry beats>`, `"loop":
   true`, `"loop_from": 0`, `"role": "battle"`. The entry (1-4 bars): most of the stage's
-  forces, its signature figure, ff. The body: drop to the drive (about half the forces),
-  build in waves, ONE peak a cycle with something held back for it, fall back to bar 1's
-  texture for the seam. Body at least 150 s; something new every 8-16 bars.
+  forces, its signature figure, ff. The body KEEPS that energy: it opens on the full drive
+  (within about 3 dB of the entry - a body that fell 9-11 dB "dies after the
+  transformation", the host); the dip is a breakdown a third to halfway through; then
+  waves to ONE peak a cycle, with colour and register held back for it; back to the
+  opening drive for the seam. Body at least 150 s; something new every 8-16 bars.
 - **Never** falling brass bends or slides (comic), harp / celesta / glockenspiel sparkle (reads
   as magic), the full texture from bar 1 ("a climax without the climax"), V-I inside a loop.
 - **Stings** (not loops): break = impact + 3-6 s quiet, its `"length"` covering the quiet;

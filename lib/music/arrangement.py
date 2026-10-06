@@ -1044,6 +1044,17 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
         step = db(body[m:m + q]) - db(body[-q:])
         if abs(step) > 3:
             add("warn", f"the loop's seam steps {step:+.0f} dB (end -> start): bring the ends' dynamics together")
+    # A stage's body keeps its entry's energy: the host, of bodies that fell 9-11 dB right
+    # after the entry, "it dies after the transformation".
+    if ctx.get("loop_from"):
+        full = lead + choir + rest
+        m = int(ctx["loop_from"] * rate)
+        after = full[m:m + int(min(12.0, ctx["seconds"] - ctx["loop_from"]) * rate)]
+        drop = db(full[:m]) - db(after)
+        if m > rate // 2 and len(after) > rate and drop > 4:
+            add("warn", f"the body falls {drop:.0f} dB right after the entry: the music dies after the stage "
+                        "change. Open the body on the full drive (within about 3 dB of the entry); put the "
+                        "dip later (a breakdown a third to halfway through)")
     peak_level = db(lead + choir + rest)
     if peak_level < -60:
         add("error", "the piece is silent")
