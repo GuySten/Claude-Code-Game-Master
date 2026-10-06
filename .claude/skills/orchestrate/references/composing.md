@@ -74,9 +74,12 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
     still sounding - a second choir at the peak goes on another choir part. [r] (critic)
 
 ## 3. Recipes (length · form · what must be there)
-- **Theme** (a character, a villain's scenes): 40-75 s; a loop if it holds under scenes.
+- **Theme** (a character, a villain's scenes): 30-75 s; a loop if it holds under scenes.
   Vamp in, the tune small, the tune again developed to ONE climax, back to the vamp (loop) or
-  a decided ending (held chord, roll and stroke, or a quiet echo). Villains also get a
+  a decided ending (held chord, roll and stroke, or a quiet echo). It makes a strong
+  impression of who the character is from the first statement: small means fewer forces,
+  never timid; a held-back trait is one layer or moment, not the piece's level [H, Kestrel:
+  "stronger impression, strong character"]. Villains also get a
   battle piece on the same tune.
 - **Boss stage** (`"role": "stage"`, from a stage plan): an ENTRY played once (`"start":
   -<beats>`, `"loop": true`, `"loop_from": 0`): 1-4 bars, most of the stage's forces, its

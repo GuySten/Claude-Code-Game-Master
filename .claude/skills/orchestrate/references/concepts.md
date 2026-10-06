@@ -85,6 +85,8 @@ This lexicon turns what a character, place or moment stands for into the musical
 
 - **R16. A falling bend on brass or low reeds is comic.** Trombone and trumpet slides downward are the stock sound of deflation and the raspberry (*Deflation*; the cowardice and grotesque entries use them for laughs). Outside comedy, bend strings or soft voices, and corrupt a brass line by its intervals and harmony instead (host verdict on a boss fight: "it sounds like he farts"; critic check).
 
+- **R17. A portrait states its character with conviction.** The carrying concept is heard clearly from the first statement; a hidden, suppressed or leashed trait is a layer or a moment of tension under a confident surface (a stab, a riff that pushes against the pulse, one break-out), never the level of the whole piece. A theme that holds itself down for most of its length, then gives up its climax, makes a weak impression (host blind A/B on Kestrel, 2026-10: the version that rose in one arc to its peak had "stronger impression, strong character" than the one that kept a leashed rage pressed down and fell back).
+
 **Orchestra substitutes.** The orchestra has no piano, guitar, harpsichord, mandolin, lute, xylophone, marimba, saxophone, accordion, bagpipes, whistle, recorder, cimbalom, theremin, synthesizer, tambourine, castanets, sleigh bells, anvil or metal plates (`format-full.md`). Where a source names one, use the stand-in below; the entries already do. Each substitute keeps the feature that carried the meaning (R1, vicarious functioning).
 
 | Source names | Feature that carries the meaning | Use instead |
@@ -901,7 +903,7 @@ This lexicon turns what a character, place or moment stands for into the musical
 - **Melody** - Tempesta lines: disjunct, fragmented, very wide and augmented leaps, rapid scales, repeated notes, fast 4/4 (McCl. 282 top.). The enraged Statue: a sequence pushed a step higher each time, a glissando, an angular line (McCl. 288–89 top.).
 - **Harmony** - Minor, D or C minor above all; vii°7, augmented sixths and bII, often over a V pedal (McCl. 282 top.).
 - **Colours and devices** - `strings` to the fore in `tremolo` and fast runs, full brass and `timpani` (McCl. 282 top.); timpani-backed tutti outbursts (Sisman 90–91 top.); brass stabs, `taiko`, *Rock drive*; rasping low brass for roughness. A berserker: tempesta (T028).
-- **With / against** - With comedy, Osmin (§7.6 r3). With grief, vengeance. Suppressed fury breaking out: a composed minuet collapsing into a contredanse, a fall down the rank ladder (Hunter 87 top.).
+- **With / against** - With comedy, Osmin (§7.6 r3). With grief, vengeance. Suppressed fury breaking out: a composed minuet collapsing into a contredanse, a fall down the rank ladder (Hunter 87 top.) - a moment of the piece, not its level (R17).
 - **Intensity** - Hint: a stab on one accent. Whole: the anger profile in tempesta.
 - **Not** - Sustained shrill dissonance throughout (§7.6 r12); felt anger comes mostly from music people dislike (§7.2). Rage as noble: Mattheson ranks anger low (Mirka 3–7 top.).
 

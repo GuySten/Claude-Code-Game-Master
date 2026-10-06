@@ -102,7 +102,10 @@ composer's brief this way - the same for every character, so nothing is tuned to
    **strong** concept - its own layer or moment and two or three dials - while the boss's
    identity keeps carrying; it carries only when the boss becomes someone or something
    else (concepts.md section 1, "A stage... is its own moment"). Always decide **stature** (how much they weigh in the
-   story: a king or archvillain gets one grand climax, a minor figure stays small).
+   story: a king or archvillain gets one grand climax, a minor figure stays small). A
+   **player character** is a protagonist, never a minor figure: their story stage (seed,
+   theme, heroic, legendary) sets the forces, and at every stage the theme makes a strong
+   impression of who they are (concepts.md R17).
    Find them in `references/concepts-index.md` (keywords per concept).
 2. **Read only those entries** in `concepts.md` (search "#### <name>"), and its section 1
    (how concepts combine: agreeing cues add up; conflicting ones go on different layers
