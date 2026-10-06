@@ -339,6 +339,9 @@ def test_the_tune_listing_counts_bars_from_the_first_downbeat_as_grid_does():
     assert [label for label, _ in menu[:2]] == ["pickup", "bar 1"]
     rows = [l.split() for l in arrangement.describe("Picked", written=written).splitlines()]
     assert ["0", "0.2"] == rows[3][:2] and ["1", "1.0"] == rows[4][:2]     # the pickup, then bar 1
+    moved = arrangement.describe("Picked", written=written, key="F4").splitlines()
+    assert "tonic F4" in moved[0] and moved[4].split()[2] == "F5"            # D5 (the octave) -> F5
+    assert moved[4].endswith("(the hook)")
 
 
 def test_fix_moves_notes_into_range_and_doubles_quick_notes_on_slow_strings():

@@ -1276,9 +1276,13 @@ def fix(spec: Dict[str, Any], listen: bool = True,
 
 
 def describe(seed: str, mode: str = "major", cls: str = "", stage: int = 1, dark: int = 0,
-             gen: int = 1, written: Optional[Dict[str, Any]] = None) -> str:
-    """The tune, for writing an arrangement: its key, meter, and every note with its time."""
+             gen: int = 1, written: Optional[Dict[str, Any]] = None, key: Optional[str] = None) -> str:
+    """The tune, for writing an arrangement: its key, meter, and every note with its time
+    (``key``: moved there, as a score's ``"tune": {"key": ...}`` moves it)."""
     tune = music_compose.leitmotif(seed, mode, cls, stage=stage, dark=dark, gen=gen, written=written)
+    if key:
+        tune = {**tune, "key": pitch(key)}
+    h0, hn = tune.get("hook") or (0, 0)
     bar = tune["bar"]
     lines = [f"{seed} ({mode}{', ' + cls if cls else ''}, stage {stage}, dark {dark}): "
              f"tonic {name_of(tune['key'])}, {tune['meter']} ({'eighths' if tune['meter'] == '6/8' else 'beats'}), "
@@ -1291,9 +1295,10 @@ def describe(seed: str, mode: str = "major", cls: str = "", stage: int = 1, dark
         lines.insert(1, f"bars count from the first downbeat, as in `grid` (bar 0: the {pick:g}-unit pickup); "
                         f"a statement at unit (N-1)*{bar:g} - {pick:g} puts the tune's bar k on bar N+k-1")
     u = 0.0
-    for st, b in tune["notes"]:
+    for i, (st, b) in enumerate(tune["notes"]):
         v = u - pick
-        lines.append(f"{u:<7g} {int(v // bar) + 1:>3}.{v % bar:<4g} {name_of(tune['key'] + st):<6} {b:g}")
+        hook = "  (the hook)" if h0 <= i < h0 + hn else ""
+        lines.append(f"{u:<7g} {int(v // bar) + 1:>3}.{v % bar:<4g} {name_of(tune['key'] + st):<6} {b:g}{hook}")
         u += b
     lines.append("chords that hold each bar's main notes (a menu, not an answer - chromatic ones included):")
     lines += [f"  {label}: {' '.join(cs)}" for label, cs in fitting_chords(tune)]
@@ -1375,6 +1380,7 @@ def main() -> None:
     t.add_argument("--dark", type=int, default=0)
     t.add_argument("--gen", type=int, default=1, help="the tune generator's version")
     t.add_argument("--written", help="a hand-written tune (JSON): its notes, with times")
+    t.add_argument("--key", help="show it moved to this tonic (e.g. F4), as the score's tune \"key\" moves it")
     p = sub.add_parser("play", help="play an arrangement (a JSON file)")
     p.add_argument("file")
     p.add_argument("--out", required=True)
@@ -1401,7 +1407,7 @@ def main() -> None:
     a = ap.parse_args()
     if a.cmd == "tune":
         written = json.loads(Path(a.written).read_text(encoding="utf-8")) if a.written else None
-        print(describe(a.seed, "minor" if a.minor else "major", a.cls, a.stage, a.dark, a.gen, written))
+        print(describe(a.seed, "minor" if a.minor else "major", a.cls, a.stage, a.dark, a.gen, written, a.key))
         return
     if a.cmd == "grid":
         written = json.loads(Path(a.written).read_text(encoding="utf-8"))

@@ -61,8 +61,8 @@ Ordinary fights share one campaign battle cue and get none of this.
 First the **stage plan**: every stage's key, tempo and core sound, decided together, and each stage's **bar map** - its entry and body sections as bar ranges (drive, statements, breakdown, rebuild, peak, fall-back), laid out on `arrangement.py grid` - so the composer fills a map instead of designing one (a
 stage may move its key - up a step, a minor third). The plan is the composer's whole brief:
 one role and one length (the bar map's), rule numbers from `composing.md`, and every sound it
-names ("the engine", "the pedal") said in parts and notes - a contradiction or a guess
-costs a composer minutes of thought. Then the stages. Only then the
+names ("the engine", "the pedal") said in parts and notes, with the double a quick string
+figure needs (`composing.md` 21) - a contradiction or a guess costs a composer minutes of thought. Then the stages. Only then the
 transitions and endings, written in the keys the stages ended up in: a rise or break in
 the key of the stage it leads *into*, the endings in the last stage's key, and one
 **hit** per key (`<boss>-hit-stage2` when stage 2 is in another key; the table plays

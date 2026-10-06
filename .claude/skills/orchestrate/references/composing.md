@@ -105,10 +105,10 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
   the very end - with momentum (rule 7).
 
 ## 4. Writing it
-- See the tune first: `python lib/arrangement.py tune "<who>" --written music/tunes/<who>.json`
-  (every note, its time, the tune's length, and per bar - counted from the first downbeat,
-  as `grid` counts - a menu of chords that hold it, chromatic ones included; the choice, and
-  its surprise, are yours).
+- See the tune first: `python lib/arrangement.py tune "<who>" --written music/tunes/<who>.json
+  --key F4` (in the piece's key: every note, its time, the hook's notes marked, the tune's
+  length, and per bar - counted from the first downbeat, as `grid` counts - a menu of chords
+  that hold it, chromatic ones included; the choice, and its surprise, are yours).
 - Let the tool do the arithmetic: `python lib/arrangement.py grid "<who>" --written <tune>
   --tempo 168 --entry 4` prints the bar grid in units and seconds, the body length (in whole
   sections), where a whole statement lands on a bar line after its pickup, and where the
@@ -127,7 +127,8 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
   the tune stated whole); accompaniment ONCE: `"figures"` played with `"spans"`; any
   harmony / patterns / rolls / hits entry takes `"parts": [...]`, a hit `"at": [...]` (a
   tutti written once); `"double"` for doublings. Timpani on the chord's root or fifth:
-  `"patterns"` or `"hits"` with `"note": "root"`, not `"harmony"`. No helper scripts.
+  `"patterns"` or `"hits"` with `"note": "root"`, not `"harmony"`. No scripts that generate notes (a short one
+  that edits the score is fine).
 - `"dynamics"`: the velocity curve, [[time, velocity], ...] - the critic finds the peak at
   its top; `make` edits its last point for the seam.
 - Parts: violins, violins2 (also the viola register - there is no viola), strings, tremolo,
