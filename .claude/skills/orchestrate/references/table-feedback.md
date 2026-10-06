@@ -364,7 +364,10 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   What the host singled out in the original: "the low bass in the start is very good" (the
   basses' lowest octave held a bar per note, under a pizzicato and taiko stride) and "the
   climax is exceptional" (two waves, the tune in three octaves over the held choir, a
-  IVmaj7 lift, a bVI-bVII-I close, ending on its strongest stroke) -> composing.md, Theme.
+  IVmaj7 lift, a bVI-bVII-I close) -> composing.md, Theme. Measured over time (2 s windows):
+  the original grows every phrase (3 -> 15 parts, -35 -> -21 dB over 20 s), peaks at 22 of 34 s
+  and releases 6-8 dB to a short stroke; the newest sat flat for its first 24 s (6 parts, about
+  -29 dB), then stepped up and peaked at 90% of its length.
   And: "the original is also better because it is shorter. All the new themes feel a bit
   repetitive" - they stated the whole tune two or three times (53-66 s); the original once
   (34 s), passed round the orchestra. -> the Theme recipe: about 30-45 s, the tune once and

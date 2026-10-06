@@ -96,18 +96,24 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
   impression of who the character is from the first statement: small means fewer forces,
   never timid; a held-back trait is one layer or moment, not the piece's level [H, Kestrel:
   "stronger impression, strong character"].
-  **The model the host called exceptional** (Kestrel's theme, 34 s at 66 in 6/8):
-  - *The start* ("the low bass is very good"): `basses` holding one note a bar in their lowest
-    octave (E1-D#2), a plucked stride over it (`pizzicato` roots on the two beats), `taiko` on
-    the same beats, held `strings` quietly above, the tune on `flutes` + `clarinets` at once.
-  - *The climax* ("exceptional"): reached in two waves - a timpani roll on the dominant
-    into a crash and a first peak, a dip, then higher - over held `choir` chords and an
-    offbeat snare; at the top the tune in three octaves (`violins` + `flutes` up an octave,
-    `horns` as written, `trombones` an octave down); a IVmaj7 lift before it and a bVI-bVII-I
-    close; the piece ends on its strongest stroke (a roll, then timpani + crash + tutti).
-  A model of what works, not a template: take the principles (a deep held floor, a light
-  stride, the tune blended from bar 1; two waves, three octaves, end on the peak). Villains also get a
-  battle piece on the same tune.
+  **The model the host called exceptional** (Kestrel's theme, 34 s at 66 in 6/8; measured
+  from its render):
+  - *The start* ("the low bass is very good"): the bass alone for its first ~2 s (`basses`
+    holding one note a bar in their lowest octave, E1-D#2 - 81% of the sound under 120 Hz),
+    a plucked stride over it (`pizzicato` roots on the two beats, `taiko` with them), then
+    held `strings` quietly above and the tune on `flutes` + `clarinets`.
+  - *The growth*: never flat - parts join phrase by phrase (3 -> 15 over the first 20 s) in
+    one long crescendo (about +14 dB) up to the peak.
+  - *The climax* ("exceptional"), at about two-thirds of the piece: reached in two waves - a
+    timpani roll on the dominant into a crash and a first peak, a dip, then higher - over held
+    `choir` chords and an offbeat snare; at the top the tune in three octaves (`violins` +
+    `flutes` up an octave, `horns` as written, `trombones` an octave down), a IVmaj7 lift
+    before it. Then a release (the horns echo the hook, 6-8 dB down) and a decided close on
+    bVI-bVII-I: a roll and one stroke, under the peak.
+  A model of what works, not a template: take the principles (a deep held floor, then the
+  tune in a blend; growth every phrase; two waves, three octaves, the peak at about two-thirds,
+  a release and a decided close).
+  Villains also get a battle piece on the same tune.
 - **Boss stage** (`"role": "stage"`, from a stage plan): an ENTRY played once (`"start":
   -<beats>`, `"loop": true`, `"loop_from": 0`): 1-4 bars, most of the stage's forces, its
   signature figure, ff. Then the BODY, at least 150 s: the full drive (rule 4), the tune
