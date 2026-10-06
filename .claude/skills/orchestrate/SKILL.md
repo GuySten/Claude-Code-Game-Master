@@ -83,56 +83,29 @@ did no better than a coin flip on our music):
   judges against all of them - run it after changing a rule, and if agreement
   drops, the rule is wrong, not the host.
 
-## The brief: the GM writes it
+## The brief: the GM writes it, by `references/briefs.md`
+
+Most of the host's verdicts were lost in the brief, not the score: each line a faithful
+translation of a word, and nobody checking what the whole would make the table feel. So every
+brief follows `references/briefs.md`: read the host's verdicts on this kind of piece, write the
+**Job** (what the table must feel by the last bar, and why music plays here), fill the template
+with a reason on every instruction, read it as the table will hear it, have a **fresh agent
+review it** (`references/brief-review.md`) before any composing, and store it in the campaign
+(`music/briefs/`). Its principles (P1-P8) are the only brief rules; they replace the ones that
+used to live here and in `concepts.md`.
 
 The GM writes every brief, not a separate translator: the GM knows the character - the
 scenes, the players, what the story made of them - and a translator working from a few
 files squeezed them into concept labels and lost the picture (the host, Kestrel's theme in
-three blind rounds: both translator briefs lost, the second "clearly"; the GM's came "closer"). Start
-from the image of who they are in the story ("the outsider of the chain-gang, turning
-rebel"); use the concepts below as a reference that makes the image musical.
+three blind rounds: both translator briefs lost, the second "clearly"; the GM's came "closer").
+The means come from the references: `references/concepts.md` translates what a subject stands
+for (holiness, cunning, the sea, a farewell...) into music - find the entries in
+`references/concepts-index.md` and read only those, with its section 1 (how concepts combine) -
+and `references/devices.md` gives character devices. A lexicon entry has several readings;
+the Job picks one (P7).
 
-A character, place or moment stands for concepts (holiness, nobility, cunning, decay,
-the sea, a farewell...); `references/concepts.md` translates each into music, from the
-research and the documented conventions (189 concepts, each with Cues, Melody, Harmony,
-Colours and devices, With / against, Intensity, Not). Write the composer's brief this way:
-1. **Concepts.** From the description (npcs.json, the world bible, their deeds, how the
-   host defines them), list the concepts and weigh each: the one that *carries* the piece,
-   the *strong* ones, the *colours* - only **distinctive** concepts, what sets this subject
-   apart; the subject's **defining trait carries**. A battle or a lament is the cue's job,
-   the frame (the format's `role`: tempo, drive, form), never a concept - combat and war only
-   where the fighting is the subject (a war, a siege, a defining duel). Identity, not
-   moment: heroism is in a paladin's or a champion's portrait, not every adventurer's; a
-   bard battling a dragon gets the bard's theme turned heroic for that scene. For a boss in
-   stages, decide the concepts **per stage**: what changed in the story **carries** that stage,
-   and the earlier stage's concepts go to the background or out - only the tune ties the
-   stages together (`boss-music.md` 2-3; the host: "stage 2 should feel nothing like stage 1
-   except the tune"). Every boss stage's concepts are negative emotions (menace, dread, fury,
-   agony, despair): a boss is always the enemy, so even holiness or beauty is heard as a threat - a boss's concepts are
-   their dark forms (`concepts.md` R18: holiness -> corrupted holiness, power -> tyranny). Always decide **stature** (how much they weigh in the
-   story: a king or archvillain gets one grand climax, a minor figure stays small). A
-   **player character** is a protagonist, never a minor figure: their story stage (seed,
-   theme, heroic, legendary) sets the forces, and at every stage the theme makes a strong
-   impression of who they are (concepts.md R17).
-   Find them in `references/concepts-index.md` (keywords per concept).
-2. **Read only those entries** in `concepts.md` (search "#### <name>"), and its section 1
-   (how concepts combine: agreeing cues add up; conflicting ones go on different layers
-   or moments, never averaged; a short piece carries one or two ideas, layered).
-3. **The brief:** as many concepts as the piece's length holds (`composing.md` rule 9:
-   about one per 15-20 s; one carries, the rest colour it) - for a player character, only
-   what the story has made of them so far (each recorded growth adds its idea to the next
-   version). At most ~200 words, in musical terms - tempo and pulse, register,
-   colours, articulation, harmony, dynamics and how big it gets, texture, the melody's
-   shape, the devices and how they relate, what to avoid. Name the concepts used (so a
-   weak result can be traced to an entry). No section-by-section plan: that's the
-   composer's.
-4. The composer writes from the brief, the tune and the format; the critic checks; the
-   host listens. A verdict on character goes into `table-feedback.md` and, if it shows an
-   entry is wrong, into that entry - never as a patch for one character.
-
-**Name only the orchestra's own parts** (the parts list in `lib/music/arrangement.py`'s
-docstring): there is no viola section - a viola line is `violins2` in the viola register
-(a Countess brief asked for violas, and the composer had to translate it).
+A verdict on character goes into `table-feedback.md`, one line under its kind in `briefs.md`,
+and, if it shows an entry is wrong, into that entry - never as a patch for one character.
 
 ## Characters: a portrait in devices
 
@@ -150,7 +123,8 @@ the end: no model judges a piece's character for them (`table-feedback.md`).
 Every kind of piece has its recipe in `references/composing.md`; a named boss's fight in
 stages - the stage plan, transitions, endings, playing them at the table - in
 `references/boss-music.md`. Full scores from play live in the campaign's
-`music/arrangements/` folder.
+`music/arrangements/` folder, their briefs (with the review and the host's verdict) in
+`music/briefs/`.
 
 ## When the host says something sounds wrong
 

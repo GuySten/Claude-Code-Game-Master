@@ -1,8 +1,9 @@
 # Composing: the rulebook
 
 Everything a composer needs, on one page. Read it whole; read nothing else unless a line
-here sends you. A brief (the GM's) says WHAT the piece expresses; this says HOW to
-write any piece well. Tags: **[H]** the host's verdict (their ears are final), **[R]** the
+here sends you. A brief (the GM's) says WHAT the piece expresses - its Job line says what the
+table must feel; this says HOW to write any piece well. A brief line that contradicts its Job or
+the cue's role (a bright, dancing boss) is raised with the GM before writing, never followed. Tags: **[H]** the host's verdict (their ears are final), **[R]** the
 research (`research/` in the campaigns repo; several sources agree), **[r]** one source or an
 inference. **(critic)** = `arrangement.py make` checks it: follow the rule and you pass.
 

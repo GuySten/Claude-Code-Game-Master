@@ -382,6 +382,10 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   brief plus the GM's opening and climax written in notes and a read-back step (both with no time
   pressure, revising freely): "they are close". Handing over music did not audibly help and costs
   the GM about 10 minutes a theme: the brief alone stays the workflow.
+  Later, on the theme itself: "I liked Izrin's theme but I do agree that it does not suit an
+  assassin" - the brief's 6/8 prowl at a dotted quarter of about 60 in C# dorian, a dark blend
+  rising, read as brooding and wistful, not a poised killer. A blind brief review had said the same
+  before the host did ("a swaying ballad... wistful rocking, not poised menace").
 - **The Saint's stage 2 as a new world (blind transformation clips, Oct 2026):** following the
   boss-phase research's worked example - an ecstatic 6/8 fire-dance in F# at 126, bright major
   third-relations, the bass thinned "to burn upward", piccolo, trumpets and a high choir - it

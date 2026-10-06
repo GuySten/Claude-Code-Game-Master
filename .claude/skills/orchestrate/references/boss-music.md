@@ -69,20 +69,13 @@ Ordinary fights share one campaign battle cue and get none of this.
 
 ## The order of work
 
-First the **stage plan**: every stage's key, tempo, carrying concept and own sound, decided together, and each stage's **bar map** - its entry and body sections as bar ranges (drive, statements, breakdown, rebuild, peak, fall-back), laid out on `arrangement.py grid` - so the composer fills a map instead of designing one (a
+First the **intent page** (`briefs.md`): for each stage its Cue, Job (what the table must feel - always a threat, rule 3), Fable (what changed in the story), Ideas and Not-this, written before any notes and reviewed by a fresh agent (`brief-review.md`); a wrong intent can't be fixed in a bar map. Then the **stage plan**: every stage's key, tempo, carrying concept and own sound, decided together, and each stage's **bar map** - its entry and body sections as bar ranges (drive, statements, breakdown, rebuild, peak, fall-back), laid out on `arrangement.py grid` - so the composer fills a map instead of designing one (a
 stage may move its key - up a step, a minor third). The plan is the composer's whole brief:
 one role and one length (the bar map's), rule numbers from `composing.md`, and every sound it
 names ("the engine", "the pedal") said in parts and notes, with the double a quick string
 figure needs (`composing.md` 22) - a contradiction or a guess costs a composer minutes of thought.
 Before handing it over, check the plan against the rules a composer will meet:
-- **Read it as the table will hear it, first**: put every word that names a feeling or a
-  device next to "this is the enemy" (rule 3). Bright, rapture, ecstatic, light, dance, play,
-  a major chord or a triumphant cadence in a boss stage is wrong, however well each word fits
-  the concept alone (the Saint's "fire-dance": the GM's plan linked holy fire to "rapture...
-  not darkness", "an ecstatic fire-dance in 6/8", "major chords a third apart"; the composer
-  wrote exactly that, and the host heard it as "playful... certainly not boss music"). A
-  composer who finds such a line raises it before writing: a brief never overrides what the
-  cue is.
+- **The bar map still serves the reviewed Job:** every feeling word or device in it is read against "this is the enemy" (rule 3; `briefs.md` P1). A composer who finds a line that contradicts it raises it before writing: a plan never overrides what the cue is.
 - **Ranges**, in the stage's key: every figure inside its part (`composing.md` §4 - violins2
   can't take an F-minor root at F3).
 - **One job per part at a time**: where the tune is on cellos, say who takes the engine's bass.
