@@ -1074,6 +1074,37 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
                     isinstance(d, dict) and d.get("part") not in exposed for d in l.get("double") or []):
                 add("warn", f"the lead line on {l.get('part')} is exposed: double it with strings or woods "
                             "(rule 13)")
+    if host_checks:
+        # Played notes per part (base part name: a tune's carrier is "part:..."), from the score.
+        held: Dict[Tuple[str, int], List[Tuple[float, float]]] = {}
+        played_notes: List[Tuple[str, float, float]] = []
+        for t, on, part, key, vel in sorted(sc.events, key=lambda e: (e[0], -e[1])):
+            base = part.split(":")[0]
+            if on:
+                held.setdefault((base, key), []).append((t, vel))
+            elif held.get((base, key)):
+                t0, _ = held[(base, key)].pop(0)
+                played_notes.append((base, t0, t - t0))
+        # A sampled choir can't change notes fast: the host, of a hymn sung on eighth notes at
+        # 126 ("the choir cannot do fast changes, they sound like an instrument"). Measured: that
+        # piece changed notes 156 times in under 0.5 s; every liked piece held each note 0.7 s+.
+        for part in ("choir", "chorus", "men_choir", "choir_oo", "choir_oh"):
+            ons = sorted({round(t0, 3) for b, t0, _ in played_notes if b == part})
+            quick = [b for a, b in zip(ons, ons[1:]) if b - a < 0.5]
+            if len(quick) >= 4:
+                add("warn", f"the {part} changes notes {len(quick)} times in under half a second (first at "
+                            f"{quick[0]:.1f} s): a sampled choir can't sing that fast - it sounds like an "
+                            "instrument. Keep the voices on notes of 0.5 s or more (the tune's long notes, "
+                            "held chords) and give the quick notes to strings or woods (rule 13)")
+        # Brass stabs: the host, of a stage with ~45 short brass-section stabs a minute: "the
+        # trumpets are too jarring". Liked pieces used a few (Kestrel's trumpets: 6 notes, saved
+        # for the climb). This sound set's brass is harsh when it stabs over and over.
+        stabs = [t0 for b, t0, d in played_notes if b in ("brass", "trumpets") and d < 0.35]
+        per_min = len(stabs) / max(ctx["seconds"] / 60.0, 1e-9)
+        if len(stabs) >= 12 and per_min > 15:
+            add("warn", f"{len(stabs)} short brass/trumpet stabs ({per_min:.0f} a minute, from {stabs[0]:.1f} s): "
+                        "this sound set's brass is jarring in repeated short stabs (host). Use a few, "
+                        "held longer, or give the hits to low strings, timpani and trombones blended")
     if not listen:
         return out
     # Listening: render the layers apart and measure them.

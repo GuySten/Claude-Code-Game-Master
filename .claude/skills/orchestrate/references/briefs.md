@@ -156,6 +156,9 @@ entry in `table-feedback.md`.
 - Fire written as sparkle (harp, glockenspiel, celesta, flute rings) reads as magic.
 - Fast, bright, high with the bass thinned reads as "playful... certainly not boss music".
 - "A boss is always the bad guy": every stage negative; holiness corrupted, power as tyranny.
+- The Saint's violated-hymn stage 2: "very different... almost feels like a boss transformation";
+  but a choir can't carry a quick line ("they sound like an instrument") and repeated brass stabs are
+  "too jarring".
 - The Pyre: a new engine under the tune, but the tune itself at stage 1's pace (half speed at double
   tempo) on stage 1's carriers - "too similar to stage 1". The layer the table follows must change:
   the tune's speed as heard, its carriers, its register, the harmony under it.

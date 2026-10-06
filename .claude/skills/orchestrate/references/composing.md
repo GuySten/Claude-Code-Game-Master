@@ -60,6 +60,12 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
     their B1 is thin). [H, Kestrel: "a weak start and weaker instruments, and weaker combination"; "it's
     not always good to start strong"; the brass "really weak" as a lead] (critic: the tune on
     brass or low reeds alone)
+    The voices can't run: a sampled choir changing notes faster than every half second sounds like an
+    instrument [H, the Saint's hymn on eighths at 126: "the choir cannot do fast changes, they sound
+    like an instrument"] - give the voices the tune's long notes and held chords, the quick notes to
+    strings or woods. And the brass section is jarring in repeated short stabs [H: "the trumpets are
+    too jarring", ~45 stabs a minute]: a few, held longer, or the hits on low strings, timpani and
+    trombones blended. (critic)
 
 ## 2. What the research adds
 14. Themes the table can learn: short, distinct in rhythm and timbre, on a clear type

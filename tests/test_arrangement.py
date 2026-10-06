@@ -559,3 +559,23 @@ def test_a_later_boss_stage_is_mastered_louder_than_the_one_before():
     two, _ = arrangement.render({**spec, "stage": 2})
     level = lambda x: music_compose.loudness_db(x.mean(axis=1), rate)
     assert level(two) > level(one) + 1.0
+
+
+def test_a_choir_on_quick_notes_is_flagged_but_held_choir_notes_are_not():
+    import arrangement
+    base = {"tune": {"seed": "sketch", "key": "D4", "meter": "4/4"}, "length": 16, "tempo": 126,
+            "chords": [[0, 16, "i"]], "statements": []}
+    quick = {**base, "lines": [{"part": "chorus", "notes": [[i / 2, "D4" if i % 2 else "F4", 0.5] for i in range(16)]}]}
+    held = {**base, "lines": [{"part": "chorus", "notes": [[i * 2, "D4" if i % 2 else "F4", 2] for i in range(8)]}]}
+    flagged = lambda sp: [m for _, m in arrangement.check(sp, listen=False) if "changes notes" in m]
+    assert flagged(quick) and not flagged(held)
+
+
+def test_many_short_brass_stabs_are_flagged_but_a_few_are_not():
+    import arrangement
+    base = {"tune": {"seed": "sketch", "key": "D4", "meter": "4/4"}, "length": 32, "tempo": 120,
+            "chords": [[0, 32, "i"]], "statements": []}
+    stabs = {**base, "lines": [{"part": "brass", "notes": [[i + 0.5, "D3", 0.5] for i in range(32)]}]}
+    few = {**base, "lines": [{"part": "brass", "notes": [[i * 8 + 0.5, "D3", 0.5] for i in range(4)]}]}
+    flagged = lambda sp: [m for _, m in arrangement.check(sp, listen=False) if "stabs (" in m]
+    assert flagged(stabs) and not flagged(few)

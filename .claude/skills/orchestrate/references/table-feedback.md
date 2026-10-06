@@ -399,3 +399,10 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   Asked why: "the Pyre stage 2 felt too similar to stage 1" - the review's third point: the tune
   in doubled note values at double the tempo moves exactly as in stage 1, on stage 1's carriers
   (horns + violins2), so the layer the table follows did not change; only the engine under it did.
+- **The Saint's stage 2, rebuilt by the new brief process** (Oct 2026: her vow sung by the full chorus
+  as a violated hymn at 126 in F# minor, the fire a churning low drive; nothing of stage 1's sound):
+  "very different from stage 1 and it even almost feels like a boss transformation" - the first stage 2
+  heard as a real change. Two faults: "the choir cannot do fast changes, they sound like an instrument"
+  (it sang the tune's eighths, 0.24 s a note: 156 changes under half a second; every liked piece held
+  each choir note 0.7 s or more) and "the trumpets are too jarring" (121 short brass-section stabs, ~45
+  a minute; liked pieces used a handful). Both now critic warnings, and composing.md rule 13.
