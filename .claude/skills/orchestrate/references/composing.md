@@ -39,9 +39,11 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
    30-45 s theme two, a 60-75 s theme three, a 2-3 minute loop four or five, each given its
    own section - layered over the one that carries, never a chain of events. [H "too much
    story in ~50 seconds"; "the number of ideas should match the length of the piece"]
-10. Develop: the second statement differs (new carrier, key, harmony, or a breakdown and
-    rebuild), and where the tune holds, something else moves. [H "it does not develop
-    into anything"; the remedies r]
+10. Develop, never repeat: inside a statement, the carriers and the setting grow phrase by
+    phrase; a second statement differs (new carrier, key, harmony, or a breakdown and
+    rebuild); where the tune holds, something else moves. [H "it does not develop into
+    anything"; "all the new themes feel a bit repetitive" - the shorter one, its tune stated
+    once and passed round, won; the remedies r]
 11. A strong effect is a flash (about a beat, growing a little each time), not a section.
     [H, the madness violin]
 12. Spend surprise once: a bold tune gets a plain setting; a simple tune gets the key
@@ -85,9 +87,12 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
     still sounding - a second choir at the peak goes on another choir part. [r] (critic)
 
 ## 3. Recipes (length · form · what must be there)
-- **Theme** (a character, a villain's scenes): 30-75 s; a loop if it holds under scenes.
-  Vamp in, the tune small, the tune again developed to ONE climax, back to the vamp (loop) or
-  a decided ending (held chord, roll and stroke, or a quiet echo). It makes a strong
+- **Theme** (a character, a villain's scenes): short - a first theme about 30-45 s, the
+  tune stated ONCE and developed as it goes: a short vamp in, then the one statement passed
+  round the orchestra (a new carrier and a fuller setting each phrase), building to ONE
+  climax, then a decided ending (held chord, roll and stroke, or a quiet echo) - or back to
+  the vamp, for a loop that holds under scenes. A second statement only when the piece has
+  grown longer (later story stages, a loop): never the tune twice the same way. It makes a strong
   impression of who the character is from the first statement: small means fewer forces,
   never timid; a held-back trait is one layer or moment, not the piece's level [H, Kestrel:
   "stronger impression, strong character"].

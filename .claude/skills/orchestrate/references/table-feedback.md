@@ -365,3 +365,7 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   basses' lowest octave held a bar per note, under a pizzicato and taiko stride) and "the
   climax is exceptional" (two waves, the tune in three octaves over the held choir, a
   IVmaj7 lift, a bVI-bVII-I close, ending on its strongest stroke) -> composing.md, Theme.
+  And: "the original is also better because it is shorter. All the new themes feel a bit
+  repetitive" - they stated the whole tune two or three times (53-66 s); the original once
+  (34 s), passed round the orchestra. -> the Theme recipe: about 30-45 s, the tune once and
+  developed as it goes; rule 10: never the tune twice the same way.
