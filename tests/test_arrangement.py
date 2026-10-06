@@ -364,3 +364,13 @@ def test_a_climax_with_nothing_left_to_arrive_is_flagged_and_a_built_one_is_not(
     flat = [m for _, m in arrangement.check(piece(12), listen=False) if "nothing left to arrive" in m]
     built = [m for _, m in arrangement.check(piece(5), listen=False) if "nothing left to arrive" in m]
     assert flat and not built
+
+
+def test_fix_puts_the_tune_on_top_with_the_gain_the_critic_names(monkeypatch):
+    sp = spec(melody=[{"from": 0, "to": 16, "parts": {"horns": 0}}, {"from": 16, "to": 32, "parts": {"horns": 0}, "gain": 2}])
+    said = [("warn", 'the tune is barely over the rest at bar 1-bar 4: +0 dB (melody entry #0 "gain": 3 would put it at +3)'),
+            ("error", 'the tune is buried at bar 5-bar 8: -3 dB under the rest (give melody entry #1 "gain": 8)')]
+    monkeypatch.setattr(A, "check", lambda s, listen=True: said)
+    fixed, changes = A.fix(sp)
+    assert [m.get("gain") for m in fixed["melody"]] == [3.0, 8.0]
+    assert len(changes) == 2 and sp["melody"][0].get("gain") is None       # (the original untouched)

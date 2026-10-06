@@ -931,7 +931,7 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
     def db(x) -> float:
         return float(20 * np.log10(np.sqrt(np.mean(x ** 2)) + 1e-12)) if len(x) else -240.0
 
-    for m in melody:
+    for mi, m in enumerate(melody):
         a, b = float(m.get("from", ctx["start"])), float(m.get("to", ctx["length"]))
         i, j = int(T(a) * rate), int(T(min(b, ctx["length"])) * rate)
         if j - i < rate // 2 or db(lead[i:j]) < -200:
@@ -939,10 +939,10 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
         gap = db(lead[i:j]) - db(rest[i:j])
         if gap < -2:
             add("error", f"the tune is buried at {_where(ctx, a)}-{_where(ctx, b - 1e-6)}: {gap:+.0f} dB "
-                         f"under the rest (give that melody entry \"gain\": {round(3 - gap)})")
+                         f"under the rest (give melody entry #{mi} \"gain\": {round(3 - gap) + float(m.get('gain', 0)):g})")
         elif gap < 1:
             add("warn", f"the tune is barely over the rest at {_where(ctx, a)}-{_where(ctx, b - 1e-6)}: "
-                        f"{gap:+.0f} dB (\"gain\": {round(3 - gap)} would put it at +3)")
+                        f"{gap:+.0f} dB (melody entry #{mi} \"gain\": {round(3 - gap) + float(m.get('gain', 0)):g} would put it at +3)")
     # The choir, where it sings.
     w = rate // 2
     sung = [i for i in range(0, len(choir) - w, w) if np.abs(choir[i:i + w]).max() > 1e-3]
@@ -1040,7 +1040,8 @@ def fix(spec: Dict[str, Any], listen: bool = True) -> Tuple[Dict[str, Any], List
     """The critic's mechanical fixes, applied: notes moved by octaves into their
     instrument's range (a whole line or placement if one shift fits, else note by note),
     harmony ranges kept inside the instrument's, a quick doubling for a slow-speaking
-    line's short notes, the choir's level, a loop seam's dynamics. Musical decisions
+    line's short notes, the choir's level, the tune's level (a melody entry's "gain"), a
+    loop seam's dynamics. Musical decisions
     (too many parts entering at once, a seam's harmony) are left to the composer."""
     import copy
     s = copy.deepcopy(spec)
@@ -1127,6 +1128,13 @@ def fix(spec: Dict[str, Any], listen: bool = True) -> Tuple[Dict[str, Any], List
             for part in sorted(used):
                 s.setdefault("mix", {})[part] = round(float(s.get("mix", {}).get(part, 0)) + int(m.group(1)), 1)
             changes.append(f"choir level +{m.group(1)} dB ({', '.join(sorted(used))})")
+            continue
+        m = re.search(r'melody entry #(\d+) "gain": (-?[\d.]+)', msg)
+        if m and int(m.group(1)) < len(s.get("melody") or []):
+            entry = s["melody"][int(m.group(1))]
+            if float(entry.get("gain", 0)) < float(m.group(2)):
+                entry["gain"] = float(m.group(2))
+                changes.append(f"melody entry #{m.group(1)}: \"gain\" {m.group(2)} (the tune on top, +3 dB)")
             continue
         if msg.startswith("the loop's seam steps") and len(s.get("dynamics") or []) >= 2:
             first, last = s["dynamics"][0], s["dynamics"][-1]
