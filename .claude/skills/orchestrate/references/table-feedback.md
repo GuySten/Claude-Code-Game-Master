@@ -343,4 +343,10 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   under the rebuilt rulebook (66 s at 104; the brief: Rage carries, *leashed* - pressed down
   for most of the piece, one tutti, no triumphant ending; low stature; the tune stated whole
   three times). The composer did what the brief asked; the brief's reading (a held-down,
-  anti-climactic portrait) is the likeliest loss. Reason not yet given by the host.
+  anti-climactic portrait) is the likeliest loss. The host's reason: "B has stronger impression,
+  strong character" (-> concepts.md R17, a PC is never a minor figure). **Round 2**, the same
+  workflow with those fixes (Rage stated with conviction from the first bar, the tune on horns,
+  57 s at 80, two whole statements, no choir): the original again, "B is clearly better". The
+  fixes did not close the gap: the loss is elsewhere (open: the translator's concept-label brief
+  vs the original's direct reading of the character, the recipe's repeated statements vs one
+  statement passed round the orchestra, tempo, the choir).
