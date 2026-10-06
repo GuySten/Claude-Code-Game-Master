@@ -116,6 +116,7 @@ def use_of(spec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         out.update(stage=int(use.get("stage", tune.get("stage", 1))), dark=int(use.get("dark", tune.get("dark", 0))),
                    wound=bool(use.get("wound", False)), warm=bool(use.get("warm", False)))
         out["version"] = character_arcs.version(out)
+        out["story"] = int(use.get("story", 0))        # (how many of their moments it holds)
     return out
 
 
@@ -447,9 +448,20 @@ def wanted(campaign_dir, pcs: Optional[List[str]] = None, places: Optional[List[
         if tune_of(camp, name) is None:
             out.append({"what": "tune", "who": name, "why": "a main character: their tune is written by hand"})
         arc = character_arcs.spec(character_arcs.state_of(camp, name))
+        moments = character_arcs.state_of(camp, name)["milestones"]
+        story = [f"{m.get('kind')}: {m.get('what')}" for m in moments]
         for a, why in ((arc, "where their story is now"), (character_arcs.next_growth(arc), "their next growth")):
             if a and _key({"as": "anthem", "who": name, "version": character_arcs.version(a)}) not in have:
-                out.append({"what": "anthem", "who": name, "version": character_arcs.version(a), "why": why})
+                out.append({"what": "anthem", "who": name, "version": character_arcs.version(a), "why": why,
+                            **({"story": story} if a is arc and story else {})})
+        # The theme grows with the character: each recorded moment adds its idea, so the
+        # version that plays now is rewritten once it holds fewer moments than they've lived
+        # (until then it plays as it is; "use": {"story": N} says how many it holds).
+        now = have.get(_key({"as": "anthem", "who": name, "version": character_arcs.version(arc)}))
+        if now and moments and int(now["use"].get("story", 0)) < len(moments):
+            out.append({"what": "anthem", "who": name, "version": character_arcs.version(arc),
+                        "why": f"add the idea of their latest moment ({story[-1]}); set \"story\": {len(moments)}",
+                        "story": story})
         if _key({"as": "dark", "who": name}) not in have:
             out.append({"what": "dark", "who": name, "why": "the villain they could become"})
     for r in (_read(camp / WANTED, {}) or {}).get("requests", []):

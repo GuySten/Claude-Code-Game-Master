@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from lib import score_music, composer
+from lib import score_music, character_arcs, composer
 from tests.test_table_server import table, CODE  # noqa: F401  (the fixture)
 
 TUNE = {"seed": "Pip", "meter": "4/4", "mode": "dorian", "kind": "test", "hook": 3, "pickup": [],
@@ -252,3 +252,23 @@ def test_a_villains_theme_follows_their_descent_unannounced(table):  # noqa: F81
     call("/api/gm/say", {"text": "Grimaldi bows.", "theme": "Grimaldi"}, host=True)
     assert state.music["track"] == "grimaldi-theme-d1-score.ogg"
     assert score_music.has_score(camp, "theme", "Grimaldi")
+
+
+def test_a_pc_theme_is_rewritten_to_hold_each_new_moment_of_their_story(tmp_path):
+    camp = tmp_path
+    _score(camp, "pip-0", {"as": "anthem", "who": "Pip", "stage": 0}, {"seed": "Pip", "stage": 0})
+    anthems = lambda: [w for w in score_music.wanted(camp, pcs=["Pip"])
+                       if w["what"] == "anthem" and w["version"] == "s0-d0-w0-b0"]
+    assert anthems() == []                                                  # written, nothing lived yet
+    character_arcs.record(camp, "Pip", "bond", "swore to guard the twins", other="the twins")
+    character_arcs.record(camp, "Pip", "wound", "lost the farm")             # (not a stage change)
+    character_arcs.record(camp, "Pip", "healing", "the farm rebuilt")
+    character_arcs.record(camp, "Pip", "bond", "befriended the miller", other="the miller")
+    arc = character_arcs.spec(character_arcs.state_of(camp, "Pip"))
+    got = [w for w in score_music.wanted(camp, pcs=["Pip"]) if w["what"] == "anthem"
+           and w["version"] == character_arcs.version(arc)]
+    assert got and got[0]["story"][-1] == "bond: befriended the miller"
+    _score(camp, "pip-b", {"as": "anthem", "who": "Pip", "stage": 0, "warm": True, "story": 4},
+           {"seed": "Pip", "stage": 0})
+    assert not [w for w in score_music.wanted(camp, pcs=["Pip"]) if w["what"] == "anthem"
+                and w["version"] == character_arcs.version(arc)]            # holds all four

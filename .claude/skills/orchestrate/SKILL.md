@@ -110,7 +110,10 @@ composer's brief this way - the same for every character, so nothing is tuned to
 2. **Read only those entries** in `concepts.md` (search "#### <name>"), and its section 1
    (how concepts combine: agreeing cues add up; conflicting ones go on different layers
    or moments, never averaged; a short piece carries one or two ideas, layered).
-3. **The brief:** at most ~200 words, in musical terms - tempo and pulse, register,
+3. **The brief:** as many concepts as the piece's length holds (`composing.md` rule 9:
+   about one per 15-20 s; one carries, the rest colour it) - for a player character, only
+   what the story has made of them so far (each recorded growth adds its idea to the next
+   version). At most ~200 words, in musical terms - tempo and pulse, register,
    colours, articulation, harmony, dynamics and how big it gets, texture, the melody's
    shape, the devices and how they relate, what to avoid. Name the concepts used (so a
    weak result can be traced to an entry). No section-by-section plan: that's the

@@ -35,8 +35,10 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
 8. Choirs are heard where they sing (critic: level) [H "I do not hear the choir"]. They
    sing held chords; chorus and men_choir may chant in quarter notes [r]. Prefer chorus,
    men_choir, choir; choir_oo/oh only for long pads [H "works only from midway"].
-9. A short piece carries one or two ideas, layered, not a chain of events. [H "too much
-   story in ~50 seconds"]
+9. The number of ideas matches the length: about one per 15-20 seconds - a seed one, a
+   30-45 s theme two, a 60-75 s theme three, a 2-3 minute loop four or five, each given its
+   own section - layered over the one that carries, never a chain of events. [H "too much
+   story in ~50 seconds"; "the number of ideas should match the length of the piece"]
 10. Develop: the second statement differs (new carrier, key, harmony, or a breakdown and
     rebuild), and where the tune holds, something else moves. [H "it does not develop
     into anything"; the remedies r]
@@ -108,6 +110,13 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
   broken off on an unresolved chord; wipe 2-5 s, a low hit, a falling cluster, silence.
 - **Place** (`"role": "place"`): a long calm loop (60-180 s), mild dynamics, no events, no
   melody line, the place's own colour.
+- **A PC's theme grows with the character.** Its first version carries who they are now
+  (one idea, a second as colour). Each growth the GM records (`gm-craft`: growth, bond,
+  wound, darkness, light) adds that moment's idea to the theme - a new layer or a new
+  section, or it replaces a colour - and the theme grows longer to hold it (rule 9); the
+  carrying idea and the tune stay. Ideas the story hasn't given them yet wait. The GM's
+  to-do list (`score_music.wanted`) asks for the rewrite with the moments listed; the score
+  says how many it holds: `"use": {"as": "anthem", ..., "story": 4}`.
 - **A PC's anthem by story stage** (the tune's versions come from the tool, never by hand):
   seed 15-20 s, one instrument over almost nothing; theme small, then developed, a modest
   ending; heroic: brass from the climb, the choir may enter; legendary: the hook's rhythm in

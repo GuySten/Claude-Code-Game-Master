@@ -208,5 +208,5 @@ changes, on your own judgement, the moment it happens (never for levels, XP or a
 About once per story arc for each character, never every session: if you wonder whether
 it counts, it doesn't yet. The table announces only "<PC> has changed: <what>", and it
 joins the story on their sheet. Narrate the change itself in the story. Their theme
-follows on its own (it grows, laments, darkens, brightens). Never mention their music,
+follows on its own: it gains that moment's idea, and grows, laments, darkens or brightens. Never mention their music,
 their theme or how it changed: players discover it at their next heroic moment.
