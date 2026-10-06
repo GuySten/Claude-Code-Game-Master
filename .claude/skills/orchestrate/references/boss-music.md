@@ -62,7 +62,7 @@ First the **stage plan**: every stage's key, tempo and core sound, decided toget
 stage may move its key - up a step, a minor third). The plan is the composer's whole brief:
 one role and one length (the bar map's), rule numbers from `composing.md`, and every sound it
 names ("the engine", "the pedal") said in parts and notes, with the double a quick string
-figure needs (`composing.md` 21) - a contradiction or a guess costs a composer minutes of thought.
+figure needs (`composing.md` 22) - a contradiction or a guess costs a composer minutes of thought.
 Before handing it over, check the plan against the rules a composer will meet:
 - **Ranges**, in the stage's key: every figure inside its part (`composing.md` §4 - violins2
   can't take an F-minor root at F3).
@@ -94,7 +94,7 @@ first ones (the stage plan first: its key, tempo, core sound, entry), with three
 earlier stages already decided:
 - **What the table has heard stays.** The tune, the core sound and stages 1-2 as played are
   the boss's identity now; the new stage grows from them (rule 2).
-- **The arc is re-planned with the new stage at its top** (rule 4 and `composing.md` 17: the fight's biggest
+- **The arc is re-planned with the new stage at its top** (rule 4 and `composing.md` 18: the fight's biggest
   moment is the last stage's). If the old last stage spent everything - full brass, the open
   choir, the tune's top register - either re-score that stage's peak to hold something back
   (only when the table hasn't heard it fight in that form, or a session has passed), or let

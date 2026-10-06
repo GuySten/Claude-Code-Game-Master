@@ -349,4 +349,11 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   57 s at 80, two whole statements, no choir): the original again, "B is clearly better". The
   fixes did not close the gap: the loss is elsewhere (open: the translator's concept-label brief
   vs the original's direct reading of the character, the recipe's repeated statements vs one
-  statement passed round the orchestra, tempo, the choir).
+  statement passed round the orchestra, tempo, the choir). The host's reasons: "A has a weak
+  start and weaker instruments, and weaker combination" - and "it's not always good to start
+  strong" (the original itself opens quietly). The scores bear it out: the original rests on the
+  held `strings` ensemble with the tune always in a blend (flutes + clarinets, horns + violins,
+  an octave tutti) and a choir; the new one opened on a dry bare-fifth riff of cellos, basses and
+  bassoons (about 280 short notes each) and gave the tune to horns alone. -> composing.md rule 13
+  (the sound set's strengths, blended), and a critic warning for the tune on brass or low reeds
+  alone - which flags both losing versions and none of the liked pieces.

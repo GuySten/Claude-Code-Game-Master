@@ -44,29 +44,38 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
     [H, the madness violin]
 12. Spend surprise once: a bold tune gets a plain setting; a simple tune gets the key
     change, the chromatic lift or the breakdown. [H, the 2x2 test] (critic: note)
+13. Use the sound set's strengths, blended. Its best sounds: the held `strings` ensemble (the
+    bed under almost everything), violins in octaves, the choir, flutes with clarinets. Its
+    weakest, exposed: brass (trumpets most) and low reeds as a lone lead, and dry repeated-note
+    riffs of cellos, basses and bassoons in bare fifths. Carry the tune in a blend (flutes +
+    clarinets, horns + violins, violins in octaves + flutes); brass and bassoons go with
+    strings or underneath, for weight. A start can be quiet - it can't be made of the weak
+    sounds. [H, Kestrel: "a weak start and weaker instruments, and weaker combination"; "it's
+    not always good to start strong"; the brass "really weak" as a lead] (critic: the tune on
+    brass or low reeds alone)
 
 ## 2. What the research adds
-13. Themes the table can learn: short, distinct in rhythm and timbre, on a clear type
+14. Themes the table can learn: short, distinct in rhythm and timbre, on a clear type
     (march, lament, waltz...), the same skeleton every return. [R]
-14. Escalate by 2-3 audible dimensions at once - density, register, key (a step or a minor
+15. Escalate by 2-3 audible dimensions at once - density, register, key (a step or a minor
     third up), choir, tempo (+8-15 bpm, or double the motion) - while separate pieces stay
     level-matched; volume alone is not a stage. Chained key lifts turn into parody. [R]
-15. Every climax: a build, a peak above the earlier peaks, a release; one peak per loop
+16. Every climax: a build, a peak above the earlier peaks, a release; one peak per loop
     cycle. [r]
-16. Under talk, sit back: steady level, no big tutti; music meant to play under scenes and
+17. Under talk, sit back: steady level, no big tutti; music meant to play under scenes and
     places carries no melody spikes, and a place loop no melody at all. [R]
-17. Hold the grandest setting (full brass, open choir, top register) for the arc's biggest
+18. Hold the grandest setting (full brass, open choir, top register) for the arc's biggest
     moment; the tune itself is heard early, its full setting late. [R]
-18. Save a full V-I for real arrivals; open scenes end off the tonic. [r Lehman]
-19. Meaning comes from stacks of features (tempo, register, harmony, timbre together);
+19. Save a full V-I for real arrivals; open scenes end off the tonic. [r Lehman]
+20. Meaning comes from stacks of features (tempo, register, harmony, timbre together);
     context decides. Heroes: diatonic, brass, rising fifths. Villains: chromatic but
     centred, low and heavy. Wonder: chromatic third relations, used sparingly. [R]
-20. Long loops change something audible every 8-16 bars and state the tune twice in
+21. Long loops change something audible every 8-16 bars and state the tune twice in
     different colours with a contrasting section; loops have no seams - the end meets the
     start (a stage: the body's start): end on a swell, a pickup or a roll into bar 1, not on
     a quiet offbeat. [r] (critic: seam, measured as heard on a repeat - a step means
     write the swell, roll or pickup into the last bar; `dynamics` alone won't do it)
-21. Slow speakers (the bowed strings - violins, violins2, strings, tremolo, cellos; not basses
+22. Slow speakers (the bowed strings - violins, violins2, strings, tremolo, cellos; not basses
     or pizzicato - oboe, english_horn, organ, the choirs) need held notes; a
     quick note of theirs - the tune's too - needs a quick double at the same moment and
     pitch (the critic names one: flutes, clarinets, bassoons, horns, trumpets, pizzicato;
@@ -86,7 +95,7 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
   signature figure, ff. Then the BODY, at least 150 s: the full drive (rule 4), the tune
   whole at least once (rule 5), a breakdown a third to halfway through (never silent),
   waves to one peak that brings something new (rule 2), back to the opening drive for the
-  seam. Each later stage changes 2-3 things (rule 14) on the same core sound. A stage the
+  seam. Each later stage changes 2-3 things (rule 15) on the same core sound. A stage the
   plan marks `reveal` may be sparser, slower or sacred; its entry and body stay level.
 - **Turn cue** (`"role": "turn"`, no `loop_from`): a loop as long as the plan says; the
   boss's identity under, the answer on top (`"lead": true`). **Pre-end** (`"role":

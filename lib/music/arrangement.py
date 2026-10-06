@@ -1039,6 +1039,29 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
             add("note", f"a simple tune (surprise at the {tune_pct}th percentile) in a plain setting "
                         f"({chromatic:.0%} chromatic chords, no key change): spend some surprise in the "
                         "setting - a key change, a chromatic lift at the climax, a breakdown")
+    if host_checks:
+        # The sound set's strengths, blended (the host, of Kestrel's theme: "a weak start and
+        # weaker instruments, and weaker combination"): its brass and low reeds are its weakest
+        # recordings exposed - judged at each tune note, by everything carrying it there.
+        exposed = {"horns", "trumpets", "trombones", "tuba", "brass", "bassoons"}
+        alone = []
+        for u0, _, _ in ctx["played"]:
+            carriers = {pt for m in spec.get("melody") or []
+                        if float(m.get("from", ctx["start"])) - 1e-9 <= u0 < float(m.get("to", ctx["length"])) - 1e-9
+                        for pt in (m.get("parts") or {})}
+            if carriers and carriers <= exposed:
+                alone.append((u0, carriers))
+        if alone:
+            parts = sorted(set().union(*(c for _, c in alone)))
+            add("warn", f"the tune is on {' + '.join(parts)} alone at {_where(ctx, alone[0][0])} "
+                        f"({len(alone)} notes): this sound set's brass and low reeds are its weakest "
+                        "recordings exposed - blend them (horns + violins, bassoons + cellos) or give "
+                        "the tune to strings or woods (rule 13)")
+        for l in spec.get("lines") or []:
+            if isinstance(l, dict) and l.get("lead") and l.get("part") in exposed and not any(
+                    isinstance(d, dict) and d.get("part") not in exposed for d in l.get("double") or []):
+                add("warn", f"the lead line on {l.get('part')} is exposed: double it with strings or woods "
+                            "(rule 13)")
     if not listen:
         return out
     # Listening: render the layers apart and measure them.
