@@ -90,6 +90,25 @@ the current stage's). A workflow test is run as written: a conflict it finds is 
 in these rules, never by editing a step's output by hand (host: "we are testing the
 workflow - you cannot override on a whim").
 
+## Promoting a boss (a stage added later)
+
+The GM may promote a boss whose fight is already scored - a lieutenant who escaped returns
+as the arc boss (`gm-craft/references/boss-fights.md` 1). The new stage is planned like the
+first ones (the stage plan first: its key, tempo, core sound, entry), with three things the
+earlier stages already decided:
+- **What the table has heard stays.** The tune, the core sound and stages 1-2 as played are
+  the boss's identity now; the new stage grows from them (rule 2).
+- **The arc is re-planned with the new stage at its top** (rule 6: the fight's biggest
+  moment is the last stage's). If the old last stage spent everything - full brass, the open
+  choir, the tune's top register - either re-score that stage's peak to hold something back
+  (only when the table hasn't heard it fight in that form, or a session has passed), or let
+  the new stage arrive with something new rather than louder: the answering theme (an ally's,
+  the party's; rule 4), a new tempo or key (a step up; mind chained lifts - self-parody),
+  or a reveal (rule 5). Never louder alone (rule 3).
+- **The endings move to the new last stage's key** (rules 11-14): re-render requiem, victory,
+  escape and wipe; add the new stage's transition and its `hit-stageN`.
+Record the promotion in the boss's stage plan (the rank, why, what changed).
+
 ## Transitions and accents (short one-shots, in the next stage's key)
 
 8. **rise** - a one- or two-bar build (timpani roll, cymbal swell, tremolo crescendo)
