@@ -29,7 +29,10 @@ Ordinary fights share one campaign battle cue and get none of this.
    not a stage [H, the Saint v6: a step up, +12 bpm and a choir on the same march - "the
    second stage does not have more emotion; the change is minimal"]. The engine masters
    each later stage louder than the one before (`"stage": N`).
-   **A new world is still a boss's world:** every stage keeps low weight and menace
+   **A boss is always the enemy: every stage carries negative emotion** - menace, dread,
+   fury, agony, despair - and a "holy", "beautiful" or "ecstatic" concept is heard as a
+   threat, never as joy or rapture [H: "a boss is always the bad guy so all his stages should
+   carry negative emotions"]. **A new world is still a boss's world:** every stage keeps low weight and menace
    (`composing.md` 7). Fast, bright and high with the bass thinned reads as playful, whatever
    the story says [H, the Saint's 6/8 fire-dance in F# major colours, piccolo and high choir
    over a thinned bass: "read as playful... certainly not boss music"]. A recipe or a

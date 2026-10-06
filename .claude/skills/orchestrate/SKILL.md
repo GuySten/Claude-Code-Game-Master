@@ -107,7 +107,8 @@ Colours and devices, With / against, Intensity, Not). Write the composer's brief
    stages, decide the concepts **per stage**: what changed in the story **carries** that stage,
    and the earlier stage's concepts go to the background or out - only the tune ties the
    stages together (`boss-music.md` 2-3; the host: "stage 2 should feel nothing like stage 1
-   except the tune"). Always decide **stature** (how much they weigh in the
+   except the tune"). Every boss stage's concepts are negative emotions (menace, dread, fury,
+   agony, despair): a boss is always the enemy, so even holiness or beauty is heard as a threat. Always decide **stature** (how much they weigh in the
    story: a king or archvillain gets one grand climax, a minor figure stays small). A
    **player character** is a protagonist, never a minor figure: their story stage (seed,
    theme, heroic, legendary) sets the forces, and at every stage the theme makes a strong
