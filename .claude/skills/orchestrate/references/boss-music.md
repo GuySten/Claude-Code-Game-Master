@@ -32,7 +32,8 @@ Ordinary fights share one campaign battle cue and get none of this.
    **A boss is always the enemy: every stage carries negative emotion** - menace, dread,
    fury, agony, despair - and a "holy", "beautiful" or "ecstatic" concept is heard as a
    threat, never as joy or rapture [H: "a boss is always the bad guy so all his stages should
-   carry negative emotions"]. **A new world is still a boss's world:** every stage keeps low weight and menace
+   carry negative emotions"]. Its concepts are their dark forms: holiness is corrupted holiness, power is
+   tyranny (`concepts.md` R18). **A new world is still a boss's world:** every stage keeps low weight and menace
    (`composing.md` 7). Fast, bright and high with the bass thinned reads as playful, whatever
    the story says [H, the Saint's 6/8 fire-dance in F# major colours, piccolo and high choir
    over a thinned bass: "read as playful... certainly not boss music"]. A recipe or a
