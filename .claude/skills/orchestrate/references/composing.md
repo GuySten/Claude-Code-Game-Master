@@ -109,7 +109,8 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
     timpani roll on the dominant into a crash and a first peak, a dip, then higher - over held
     `choir` chords and an offbeat snare; at the top the tune in three octaves (`violins` +
     `flutes` up an octave, `horns` as written, `trombones` an octave down), a IVmaj7 lift
-    before it. Then a release (the horns echo the hook, 6-8 dB down) and a decided close on
+    before it. The `trumpets` are saved for the climb into it: heard once, on the tune's
+    falling phrase with the horns and violins ("its trumpets at the end are great"). Then a release (the horns echo the hook, 6-8 dB down) and a decided close on
     bVI-bVII-I: a roll and one stroke, under the peak.
   A model of what works, not a template: take the principles (a deep held floor, then the
   tune in a blend; growth every phrase; two waves, three octaves, the peak at about two-thirds,

@@ -368,6 +368,12 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   the original grows every phrase (3 -> 15 parts, -35 -> -21 dB over 20 s), peaks at 22 of 34 s
   and releases 6-8 dB to a short stroke; the newest sat flat for its first 24 s (6 parts, about
   -29 dB), then stepped up and peaked at 90% of its length.
+  **Round 4** (the GM's brief, the fixed recipe - once, short, growing - no time pressure,
+  two composers revising freely for 13-15 minutes, the better by the checks; it matched the
+  original's profile: a deep start, +12.5 dB growth, the peak at 54%, a release): the original
+  "now only slightly better" - "its trumpets at the end are great" (saved for the climb,
+  on the tune's falling phrase with horns and violins; the new one used them only as a held
+  chord at the peak).
   And: "the original is also better because it is shorter. All the new themes feel a bit
   repetitive" - they stated the whole tune two or three times (53-66 s); the original once
   (34 s), passed round the orchestra. -> the Theme recipe: about 30-45 s, the tune once and
