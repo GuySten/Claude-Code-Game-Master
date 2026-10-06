@@ -166,17 +166,28 @@ def has_score(campaign_dir, kind: str, who: str, version: Optional[str] = None) 
 
 
 # --- where the rendered music goes, and the registry the table reads ---
-def target(campaign_dir, use: Dict[str, Any], how: str = "score") -> Path:
+def real_title(title: Optional[str]) -> str:
+    """The piece's own name, for its file name ("<who>: the Last Waltz (her theme)" ->
+    "the-last-waltz"): kept in the file so the host can learn it after the campaign;
+    the table never shows it (table_server strips everything after "--")."""
+    t = str(title or "")
+    t = t.split(":", 1)[1] if ":" in t else ""
+    t = re.sub(r"\([^)]*\)", "", t).strip()
+    return slug(t)[:60].strip("-") if re.search(r"\w", t) else ""
+
+
+def target(campaign_dir, use: Dict[str, Any], how: str = "score", title: Optional[str] = None) -> Path:
     music = Path(campaign_dir) / "music"
+    named = f"--{real_title(title)}" if real_title(title) else ""
     if use["as"] == "place":
-        return music / "places" / f"place-{slug(use['place'])}.ogg"
+        return music / "places" / f"place-{slug(use['place'])}{named}.ogg"
     who = slug(use["who"])
     if use["as"] == "anthem":
-        return music / "anthems" / f"anthem-{who}-{use['version']}-{'score' if how == 'score' else 'orch'}.ogg"
+        return music / "anthems" / f"anthem-{who}-{use['version']}-{'score' if how == 'score' else 'orch'}{named}.ogg"
     if use["as"] == "dark":
-        return music / "anthems" / f"anthem-{who}-dark-score.ogg"
+        return music / "anthems" / f"anthem-{who}-dark-score{named}.ogg"
     d = f"-d{use['descent']}" if use.get("descent") is not None else ""
-    return music / "themes" / f"{who}-{'boss' if use['as'] == 'boss' else 'theme'}{d}-score.ogg"
+    return music / "themes" / f"{who}-{'boss' if use['as'] == 'boss' else 'theme'}{d}-score{named}.ogg"
 
 
 def registry(campaign_dir) -> Dict[str, Any]:
@@ -360,8 +371,9 @@ def stale(campaign_dir) -> List[Dict[str, Any]]:
         if item["problem"]:
             continue
         rec = registered(campaign_dir, item["use"])
-        if not rec or rec.get("how") != "score" or rec.get("hash") != item["hash"]:
-            out.append(item)
+        named = target(campaign_dir, item["use"], title=item["spec"].get("title")).name
+        if not rec or rec.get("how") != "score" or rec.get("hash") != item["hash"] or rec.get("file") != named:
+            out.append(item)                  # (a new title: a new file name)
     return out
 
 
@@ -385,7 +397,7 @@ def sync(campaign_dir, extra: Optional[List[Dict[str, Any]]] = None,
          on_piece: Optional[Callable[[Dict[str, Any], str], None]] = None) -> List[str]:
     """Render every new or changed score (and ``extra`` rule-arranged jobs, each with
     its "use"), register each as it lands; returns the files made."""
-    jobs = [{"kind": "score", "spec": it["spec"], "out": str(target(campaign_dir, it["use"])),
+    jobs = [{"kind": "score", "spec": it["spec"], "out": str(target(campaign_dir, it["use"], title=it["spec"].get("title"))),
              "use": it["use"], "hash": it["hash"], "score": it["file"].name} for it in stale(campaign_dir)]
     jobs += list(extra or [])
     if not jobs:
@@ -395,6 +407,9 @@ def sync(campaign_dir, extra: Optional[List[Dict[str, Any]]] = None,
     def landed(i: int, r: Dict[str, Any]) -> None:
         job = jobs[i]
         how = "score" if job["kind"] == "score" else "orchestra"
+        old = registered(campaign_dir, job["use"])
+        if old and old.get("file") and old["file"] != Path(r["path"]).name:     # renamed: the old one goes
+            (Path(r["path"]).parent / old["file"]).unlink(missing_ok=True)
         register(campaign_dir, job["use"], Path(r["path"]), r.get("seconds") or 0, how,
                  job.get("hash"), job.get("score"))
         made.append(Path(r["path"]).name)

@@ -39,3 +39,12 @@ def test_a_piece_has_one_file_name_stem_everywhere():
     import composer
     from music import slug
     assert composer.slug is slug and slug("Ashen Saint") == "ashen-saint" and slug("קסטרל").startswith("piece-")
+
+
+def test_a_rendered_score_keeps_its_real_title_in_its_file_name(tmp_path):
+    import score_music
+    assert score_music.real_title("Countess Isolde Varnay: the Last Waltz (her theme)") == "the-last-waltz"
+    assert score_music.real_title("Kestrel's anthem") == ""                     # (no title: no suffix)
+    out = score_music.target(tmp_path, {"as": "theme", "who": "Countess Isolde Varnay"},
+                             title="Countess Isolde Varnay: the Last Waltz (her theme)")
+    assert out.name == "countess-isolde-varnay-theme-score--the-last-waltz.ogg"

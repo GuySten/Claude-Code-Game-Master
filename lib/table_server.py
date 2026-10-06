@@ -591,11 +591,18 @@ class TableState:
     # --- a boss's fight in stages (gm-craft/references/boss-fights.md, orchestrate/references/boss-music.md) ---
     def boss_cue(self, name: str, tag: str) -> Optional[Path]:
         """A boss's staged-fight cue: a file named <boss>-<tag> (stage1..3, pre_end, rise,
-        break, hit, victory, requiem, escape, wipe) in the music folders."""
+        break, hit, victory, requiem, escape, wipe) in the music folders - optionally with
+        the piece's real title after "--" (<boss>-<tag>--<title>), never shown at the table."""
         for stem in (f"{composer.slug(name)}-{tag}", f"{name}-{tag}"):
             found = self.find_music(stem)
             if found is not None:
                 return found
+        for d in self.music_dirs():
+            if d.is_dir():
+                for f in sorted(d.iterdir()):
+                    if f.is_file() and f.suffix.lower() in AUDIO_TYPES and \
+                            f.stem.lower().startswith(f"{composer.slug(name)}-{tag}--".lower()):
+                        return f
         return None
 
     def boss_music(self, name: str, stage: Optional[int] = None, via: Optional[str] = None,
@@ -1773,7 +1780,8 @@ class TableState:
                     title = title or Path(urlparse(track).path).stem or "Music"
                 else:
                     kind, src = "file", Path(track).name
-                    title = title or Path(src).stem.replace("-", " ").replace("_", " ")
+                    # (a piece's real title after "--" stays in the file, for after the campaign)
+                    title = title or Path(src).stem.split("--")[0].replace("-", " ").replace("_", " ")
                 self.music = {"id": next_id, "track": track, "kind": kind, "src": src,
                               "title": title, "volume": max(0.0, min(1.0, float(volume))),
                               "loop": bool(loop), "started_at": time.time(), "mood": mood}

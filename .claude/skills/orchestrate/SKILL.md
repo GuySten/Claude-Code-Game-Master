@@ -52,7 +52,10 @@ So the loop below is not optional ceremony; it's how you hear.
    before the JSON is what makes a piece *composed* rather than filled in.
 3. **Write the score** as JSON (the format: the docstring at the top of
    `lib/arrangement.py`; read it the first time). Save it in the campaign's
-   `music/arrangements/<who>-<version>.json`.
+   `music/arrangements/<who>-<version>.json`. Give it a `"title"`: `"<who>: <the piece's
+   real name> (what it is)"` - "Countess Isolde Varnay: the Last Waltz (her theme)". The real
+   name goes into the rendered file's name after `--` (`...-theme-score--the-last-waltz.ogg`)
+   for the host to learn after the campaign; the table never shows it.
 4. **Run the critic** - `python lib/arrangement.py check <file>` - and fix every
    ERROR and WARN. Each NOTE is a question: confirm it's what you meant (a
    half-step sigh you wrote on purpose) or fix it. Re-run until clean. The critic

@@ -2076,6 +2076,12 @@ def test_a_stage_with_an_entry_tells_the_pages_where_it_loops_back_to(table):
     m = body["music"]
     assert m["src"] == "ashen-saint-pre_end.ogg" and m["stage"] == "pre_end" and m["via"] == "rise"
     assert 1.9 < m["started_at"] - m["sting"]["started_at"] < 2.1
+    _touch_music(camp, "ashen-saint-stage4--the-ash-falls.ogg")    # its real title, kept in the file name
+    _, body = call("/api/gm/music", {"boss_fight": "Ashen Saint", "stage": 4}, host=True)
+    assert body["music"]["src"] == "ashen-saint-stage4--the-ash-falls.ogg"
+    assert "ash falls" not in body["music"]["title"].lower()       # never shown at the table
+    _, body = call("/api/gm/music", {"track": "ashen-saint-stage4--the-ash-falls.ogg"}, host=True)
+    assert body["music"]["title"] == "ashen saint stage4"
     _touch_music(camp, "ashen-saint-the-unwinding.ogg")            # a turn the party caused
     _, body = call("/api/gm/music", {"boss_fight": "Ashen Saint", "stage": "The Unwinding"}, host=True)
     assert body["music"]["src"] == "ashen-saint-the-unwinding.ogg" and body["music"]["loop"]

@@ -119,8 +119,11 @@ workflow - you cannot override on a whim").
 
 ## Files and playing them
 
-Render each cue to the campaign's `music/` as `<boss>-<cue>.ogg` (the boss's name as
-a file stem: `ashen-saint-stage2.ogg`, `ashen-saint-break.ogg`). The GM plays them with
+Render each cue to the campaign's `music/` as `<boss>-<cue>--<its real title>.ogg` (the
+boss's name as a file stem, then the piece's own name: `ashen-saint-stage2--the-flame-takes-her.ogg`,
+`countess-isolde-varnay-requiem--i-was-only-isolde.ogg`). The table finds a cue by what comes
+before `--` and never shows what comes after: the title is for the host to learn after the
+campaign, so it may name what the players haven't found yet. The GM plays them with
 `gm-table.sh music boss "<boss>" stage N|pre_end|<event> [--via rise|break]`, `... hit`, and
 `... end victory|requiem|escape|wipe`. A boss's cues cut in on time on every player's
 page (combat starts at once; no fade-in): a rise builds over the old loop and the new
