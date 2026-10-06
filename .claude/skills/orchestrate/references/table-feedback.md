@@ -406,3 +406,12 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   (it sang the tune's eighths, 0.24 s a note: 156 changes under half a second; every liked piece held
   each choir note 0.7 s or more) and "the trumpets are too jarring" (121 short brass-section stabs, ~45
   a minute; liked pieces used a handful). Both now critic warnings, and composing.md rule 13.
+- **The Margrave, rebuilt by the new brief process** (Oct 2026, blind A/B against the Velvet Waltz -
+  the hand-directed portrait the host had called "dramatically better"): the new one - a fast, dark
+  danse-macabre waltz at 160, one to the bar, his madness violin in three growing flashes with the
+  strings following, his guilt sung by a choir while the waltz drives on, an unhinged violin snapping
+  back at the loop - "is great. Maybe even a tad better than the original." The first time an
+  automatic piece matched or beat a host-directed portrait. Its brief went through five blind review
+  rounds; each caught a real fault in it (a stomping brute, a light grey lord, a waltz too slow to
+  drive, an ending read as pity), and the tempo left the liked piece's 84 (P7: liked pieces are
+  references, not ceilings).
