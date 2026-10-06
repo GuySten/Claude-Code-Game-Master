@@ -396,3 +396,6 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   violins2, the choir in agony, organ, bells and chorale all dropped): "the pyre clip is not good".
   A blind brief review, run before the host heard it, had predicted a generic war machine ("close
   to a Mars-style battle cue"), the holy fire absent, and stage 1's tune at stage 1's pace on top.
+  Asked why: "the Pyre stage 2 felt too similar to stage 1" - the review's third point: the tune
+  in doubled note values at double the tempo moves exactly as in stage 1, on stage 1's carriers
+  (horns + violins2), so the layer the table follows did not change; only the engine under it did.

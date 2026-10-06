@@ -33,6 +33,8 @@ from, never where the brief starts.
    five of the seven the host rejected - every one whose overall feel contradicted the role -
    and passed the near-good one; it misses craft faults no verdict has named yet, and it holds
    the verdicts strictly. It is a check before the host's ears, never instead of them.
+   At most two review rounds: after the second, the GM decides the open points, writes the
+   decision in the brief, and the composer starts (a reviewer can always find one more thing).
 6. **Store it** in the campaign: `music/briefs/<cue stem>.md` (the brief, the review, and later
    the host's verdict on the piece), so a verdict traces to the brief line behind it.
 
@@ -144,6 +146,9 @@ entry in `table-feedback.md`.
 - Fire written as sparkle (harp, glockenspiel, celesta, flute rings) reads as magic.
 - Fast, bright, high with the bass thinned reads as "playful... certainly not boss music".
 - "A boss is always the bad guy": every stage negative; holiness corrupted, power as tyranny.
+- The Pyre: a new engine under the tune, but the tune itself at stage 1's pace (half speed at double
+  tempo) on stage 1's carriers - "too similar to stage 1". The layer the table follows must change:
+  the tune's speed as heard, its carriers, its register, the harmony under it.
 
 **Player-character themes**
 - The liked model (Kestrel's original, 34 s): a deep low bass alone at the start, the tune once,
