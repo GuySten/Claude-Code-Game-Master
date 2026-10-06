@@ -107,6 +107,10 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
 - See the tune first: `python lib/arrangement.py tune "<who>" --written music/tunes/<who>.json`
   (every note, its time, the tune's length, and per bar a menu of chords that hold it -
   chromatic ones included; the choice, and its surprise, are yours).
+- Let the tool do the arithmetic: `python lib/arrangement.py grid "<who>" --written <tune>
+  --tempo 168 --entry 4` prints the bar grid in units and seconds, the body length (in whole
+  sections), where a whole statement lands on a bar line after its pickup, and where the
+  breakdown and the peak fall. Lay the piece out on it; don't compute beats in your head.
 - The tune: `"tune": {"seed": "<who>", "written": <the tune file's object>, "key": "F4"}`
   (`key` moves tune and chords together). Statements: `{"at": 32}`; a statement's
   `"shift": 2` needs `"keys": [{"from": 32, "to": 64, "shift": 2}]` too, or the chords stay

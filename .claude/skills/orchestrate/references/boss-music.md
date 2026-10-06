@@ -58,7 +58,7 @@ Ordinary fights share one campaign battle cue and get none of this.
 
 ## The order of work
 
-First the **stage plan**: every stage's key, tempo and core sound, decided together (a
+First the **stage plan**: every stage's key, tempo and core sound, decided together, and each stage's **bar map** - its entry and body sections as bar ranges (drive, statements, breakdown, rebuild, peak, fall-back), laid out on `arrangement.py grid` - so the composer fills a map instead of designing one (a
 stage may move its key - up a step, a minor third). Then the stages. Only then the
 transitions and endings, written in the keys the stages ended up in: a rise or break in
 the key of the stage it leads *into*, the endings in the last stage's key, and one

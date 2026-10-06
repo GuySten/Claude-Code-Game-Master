@@ -434,3 +434,11 @@ def test_several_parts_and_several_hits_are_written_once():
     assert sorted((h["part"], h["at"]) for h in out["hits"]) == [("timpani", 0), ("timpani", 8), ("timpani", 16),
                                                                  ("trombones", 0), ("trombones", 8), ("trombones", 16)]
     A.build(sp)
+
+
+def test_the_grid_does_the_arithmetic():
+    tune = {"bar": 3, "meter": "3/4", "pickup": 1, "notes": [(0, 1)] + [(0, 3)] * 20}
+    g = A.grid(tune, 168, entry_bars=4, body_seconds=150)
+    assert "1 bar = 3 units = 1.07 s" in g and "(1 pickup + 20 bars)" in g
+    assert '"start": -12' in g and '"length": 432' in g                    # 144 bars >= 150 s
+    assert '"at": 23 -> bars 9-28' in g

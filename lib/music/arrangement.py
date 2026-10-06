@@ -1295,6 +1295,43 @@ def describe(seed: str, mode: str = "major", cls: str = "", stage: int = 1, dark
     return "\n".join(lines)
 
 
+def grid(tune: Dict[str, Any], tempo: float, entry_bars: int = 0, body_seconds: float = 150.0,
+         section_bars: int = 8) -> str:
+    """The arithmetic of a piece, done for the composer: the bar grid in units and seconds,
+    the tune's length in bars, where to place a whole statement so its first downbeat lands
+    on a bar line (after its pickup), the entry, and a body long enough - in whole sections.
+    (Two benchmark composers spent about half their time thinking before writing a note,
+    much of it beat arithmetic.)"""
+    bar = float(tune["bar"])
+    beat = 3 if tune["meter"] == "6/8" else 1
+    unit_s = 60.0 / tempo / beat
+    bar_s = bar * unit_s
+    pick = float(tune.get("pickup") or 0)
+    tune_u = sum(b for _, b in tune["notes"])
+    tune_bars = (tune_u - pick) / bar
+    body_bars = int(-(-body_seconds // bar_s))
+    body_bars = int(-(-body_bars // section_bars) * section_bars)          # whole sections
+    lines = [f"{tune['meter']} at {tempo:g}: 1 unit = {unit_s:.3f} s, 1 bar = {bar:g} units = {bar_s:.2f} s",
+             f"the tune: {tune_u:g} units ({pick:g} pickup + {tune_bars:g} bars); a whole statement lasts "
+             f"{tune_u * unit_s:.1f} s",
+             f"to land its first downbeat on bar N of the body, place it at unit (N-1)*{bar:g} - {pick:g}"]
+    if entry_bars:
+        lines.append(f"entry: {entry_bars} bars = units {-entry_bars * bar:g} to 0 ({entry_bars * bar_s:.1f} s): "
+                     f"\"start\": {-entry_bars * bar:g}, \"loop\": true, \"loop_from\": 0")
+    lines.append(f"body: {body_bars} bars = units 0 to {body_bars * bar:g} = {body_bars * bar_s:.1f} s "
+                 f"(at least {body_seconds:g} s, whole {section_bars}-bar sections): \"length\": {body_bars * bar:g}")
+    third, half, peak = round(body_bars / 3), round(body_bars / 2), round(body_bars * 0.75)
+    lines.append(f"the breakdown a third to halfway through: bars {third + 1}-{half}; the peak about bar "
+                 f"{peak + 1} (units {peak * bar:g}, {peak * bar_s:.0f} s into the body)")
+    lines.append(f"sections ({section_bars} bars each): bar  units  seconds   | a whole statement placed to start here")
+    for k in range(0, body_bars, section_bars):
+        at = k * bar - pick
+        fits = at + tune_u <= body_bars * bar + 1e-9 and at >= -pick
+        lines.append(f"  bar {k + 1:>3}  {k * bar:>6g}  {k * bar_s:>6.1f}   | "
+                     + (f"\"at\": {at:g} -> bars {k + 1}-{k + int(-(-tune_bars // 1))}" if fits else "(runs past the end)"))
+    return "\n".join(lines)
+
+
 def fitting_chords(tune: Dict[str, Any]) -> List[List[str]]:
     """For each bar of the tune, every chord in a wide palette (diatonic, borrowed and
     chromatic-mediant) that holds the bar's main notes (the long and strong ones) - a menu
@@ -1336,6 +1373,14 @@ def main() -> None:
     c = sub.add_parser("check", help="the score critic: what a listener would notice")
     c.add_argument("file")
     c.add_argument("--quick", action="store_true", help="read the score only (don't render it)")
+    gr = sub.add_parser("grid", help="the arithmetic of a piece: the bar grid in units and seconds, "
+                                     "where whole statements land, the entry and body lengths")
+    gr.add_argument("seed")
+    gr.add_argument("--written", required=True, help="the tune file (music/tunes/<who>.json)")
+    gr.add_argument("--tempo", type=float, required=True)
+    gr.add_argument("--entry", type=int, default=0, help="entry bars (a boss stage)")
+    gr.add_argument("--body", type=float, default=150.0, help="body seconds at least (a stage: 150)")
+    gr.add_argument("--section", type=int, default=8, help="bars per section")
     mk = sub.add_parser("make", help="the whole loop in one: apply the mechanical fixes, run the critic, "
                                      "and render when nothing is left but notes")
     mk.add_argument("file")
@@ -1349,6 +1394,11 @@ def main() -> None:
     if a.cmd == "tune":
         written = json.loads(Path(a.written).read_text(encoding="utf-8")) if a.written else None
         print(describe(a.seed, "minor" if a.minor else "major", a.cls, a.stage, a.dark, a.gen, written))
+        return
+    if a.cmd == "grid":
+        written = json.loads(Path(a.written).read_text(encoding="utf-8"))
+        tune = music_compose.leitmotif(a.seed, "major", "", written=written)
+        print(grid(tune, a.tempo, a.entry, a.body, a.section))
         return
     if a.cmd == "make":
         import time as _time
