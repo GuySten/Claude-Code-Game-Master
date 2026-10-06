@@ -1122,20 +1122,17 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
         # Dissonance is a spice, not a bed: the host, of a stage with a semitone clash sounding 97%
         # of the time ("terrible... painful to hear"); the liked pieces sound one 11-21% of the time.
         perc = {"timpani", "kit", "taiko", "toms", "cymbal", "gong", "bells", "glockenspiel", "triangle"}
-        sounding: Dict[Tuple[str, int], int] = {}
+        sounding: Dict[Tuple[str, int], int] = {}   # a count: a re-struck held note overlaps itself
         t_prev, clash_t, total = 0.0, 0.0, 0.0
         for t, on, part, key, vel in sorted(sc.events, key=lambda e: (e[0], -e[1])):
             if t > t_prev:
-                ks = sorted({k for (pt, k) in sounding if pt.split(":")[0] not in perc})
+                ks = sorted({k for (pt, k), c in sounding.items() if c > 0 and pt.split(":")[0] not in perc})
                 if ks:
                     total += t - t_prev
                     if any(b - a in (1, 13, 25) for i, a in enumerate(ks) for b in ks[i + 1:]):
                         clash_t += t - t_prev
             t_prev = t
-            if on:
-                sounding[(part, key)] = vel
-            else:
-                sounding.pop((part, key), None)
+            sounding[(part, key)] = sounding.get((part, key), 0) + (1 if on else -1)
         if total > 0 and clash_t / total > 0.4:
             add("warn", f"a semitone (or minor-ninth) clash sounds {clash_t / total:.0%} of the time: constant "
                         "dissonance is painful to sit through (host; the liked pieces: 11-21%) - keep the "
