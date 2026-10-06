@@ -484,3 +484,28 @@ def test_the_grid_does_the_arithmetic():
     assert "1 bar = 3 units = 1.07 s" in g and "(1 pickup + 20 bars)" in g
     assert '"start": -12' in g and '"length": 432' in g                    # 144 bars >= 150 s
     assert '"at": 23 -> bars 9-28' in g
+
+
+def test_an_arpeggio_plays_one_chord_tone_per_hit_and_flows_across_chords():
+    import arrangement
+    spec = {"tune": {"seed": "sketch", "key": "F4", "meter": "4/4"}, "statements": [], "length": 8,
+            "tempo": 120, "chords": [[0, 4, "i"], [4, 8, "bVI"]],
+            "harmony": [{"part": "pizzicato", "play": "arpeggio", "from": 0, "to": 8, "range": ["F3", "C5"],
+                         "pattern": "xxxxxxxx", "step": 0.5}]}
+    score, _, _ = arrangement.build(spec)
+    keys = [k for t, on, p, k, _ in sorted(score.events) if on and p == "pizzicato"]
+    names = [arrangement.name_of(k) for k in keys]
+    assert names[:5] == ["F3", "G#3", "C4", "F4", "G#4"]                 # up through F minor's tones
+    assert set(keys[8:]) <= {k for k in range(53, 73) if k % 12 in (1, 5, 8)}   # then Db major's
+    down = arrangement.build({**spec, "harmony": [{**spec["harmony"][0], "order": "down"}]})[0]
+    assert arrangement.name_of(next(k for t, on, p, k, _ in sorted(down.events) if on)) == "C5"
+    with pytest.raises(arrangement.ArrangementError):
+        arrangement.build({**spec, "harmony": [{**spec["harmony"][0], "pattern": None}]})
+
+
+def test_a_written_tunes_listing_says_written_not_a_generated_mode():
+    import arrangement
+    tune = {"seed": "Ashen Saint", "key": "C4", "meter": "4/4", "mode": "aeolian",
+            "motif": [[0, 1], [0, 1], [4, 2]], "again": [[2, 4]], "climb": [], "home": [[0, 4]]}
+    head = arrangement.describe("Ashen Saint", written=tune).splitlines()[0]
+    assert "(written)" in head and "major" not in head

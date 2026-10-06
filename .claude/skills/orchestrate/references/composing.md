@@ -66,7 +66,8 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
     start (a stage: the body's start): end on a swell, a pickup or a roll into bar 1, not on
     a quiet offbeat. [r] (critic: seam, measured as heard on a repeat - a step means
     write the swell, roll or pickup into the last bar; `dynamics` alone won't do it)
-21. Slow speakers (the strings, oboe, english_horn, organ, the choirs) need held notes; a
+21. Slow speakers (the bowed strings - violins, violins2, strings, tremolo, cellos; not basses
+    or pizzicato - oboe, english_horn, organ, the choirs) need held notes; a
     quick note of theirs - the tune's too - needs a quick double at the same moment and
     pitch (the critic names one: flutes, clarinets, bassoons, horns, trumpets, pizzicato;
     `make` adds it to `lines`, you add it to `melody`). A part never restarts a pitch
@@ -106,7 +107,8 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
 
 ## 4. Writing it
 - See the tune first: `python lib/arrangement.py tune "<who>" --written music/tunes/<who>.json
-  --key F4` (in the piece's key: every note, its time, the hook's notes marked, the tune's
+  --key F4` (in the piece's key: every note, its time, the hook's notes marked - "the hook" is
+  those notes, after the pickup - the tune's
   length, and per bar - counted from the first downbeat, as `grid` counts - a menu of chords
   that hold it, chromatic ones included; the choice, and its surprise, are yours).
 - Let the tool do the arithmetic: `python lib/arrangement.py grid "<who>" --written <tune>
@@ -119,14 +121,20 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
   in the old key. Who plays it: `"melody": [{"from": 0, "to": 32, "parts": {"horns": 0}}]`
   (semitones from as written) - every statement needs one (critic).
 - Chords: `"progression": "i bVI iv V"` (`every`, `repeat`) or `"chords"` [from, to,
-  symbol]; they sound only through `"harmony"` parts. Every tune note needs a chord under
-  it (critic: error).
+  symbol]; they sound only through `"harmony"` parts (`"play"`: chord, bass, root, third,
+  fifth, root5, octaves, or arpeggio - one chord tone per pattern hit, for flowing figures).
+  Numerals count from the tonic's MAJOR scale: in F minor iv = Bbm, bIII = Ab, bVI = Db,
+  bVII = Eb, V = C. `"keys"` alone (no statement there) lifts a passage's chords; give
+  motifs placed there the same `"shift"`. Every tune note needs a chord under it (critic:
+  error).
 - Repeated material ONCE: `"motifs"` placed in `"lines"` (`at`, `shift`, `octave`,
   `stretch`, `repeat`/`every`; `invert`/`retro`/`alter` only for a story reason, once the
   tune has been heard straight - here or in an earlier piece - and a motif never counts as
   the tune stated whole); accompaniment ONCE: `"figures"` played with `"spans"`; any
   harmony / patterns / rolls / hits entry takes `"parts": [...]`, a hit `"at": [...]` (a
-  tutti written once); `"double"` for doublings. Timpani on the chord's root or fifth:
+  tutti written once); `"double"` for doublings (its octave counts from the line as
+  placed). `alter` indexes count in the whole motif, also inside a `take`; `at` places the
+  first note taken. Timpani on the chord's root or fifth:
   `"patterns"` or `"hits"` with `"note": "root"`, not `"harmony"`. No scripts that generate notes (a short one
   that edits the score is fine).
 - `"dynamics"`: the velocity curve, [[time, velocity], ...] - the critic finds the peak at
@@ -138,15 +146,18 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
   taiko, toms, reverse_cymbal (`"patterns"`). Ranges: violins G3-E7, violins2 G3-C7, cellos
   C2-E5, basses E1-C4, flutes C4-C7, piccolo D5-C8, oboe A#3-G6, english_horn E3-A5,
   clarinets D3-G6, bassoons A#1-C5, horns F2-F5, trumpets F#3-A#5, trombones E2-C5, tuba
-  E1-A#3, timpani D2-G3, men_choir E2-A4, chorus E2-E6, choir_oo/oh A2-D#6 (critic).
-- Title: `"<who>: <its real name> (<what it is>)"`. Scores: `music/arrangements/<who>-
+  E1-A#3, timpani D2-G3, men_choir E2-A4, chorus E2-E6, choir_oo/oh A2-D#6 (critic). A
+  low root may fall below a part (an F-minor arpeggio on violins2 starts on Ab3 or C4). A
+  part plays one job at a time: where cellos carry the tune, the engine's bass moves to
+  the basses; one `"range"` serves every part an entry lists.
+- `"title"`: `"<who>: <its real name> (<what it is>)"`. Scores: `music/arrangements/<who>-
   <version>.json`; a boss's cues render to `music/<boss>-<cue>--<title>.ogg`.
 - Anything else in the format: the docstring at the top of `lib/music/arrangement.py` -
   look things up, don't read it through.
 
 ## 5. The loop
 Python: the orchestra's (`.compose-venv/bin/python`, set up by `gm-music-compose.sh setup
---orchestra`).
+--orchestra`), or the one your brief names.
 1. Plan in words: one line per section (who carries the tune, what builds, the peak).
 2. Write the score.
 3. `python lib/arrangement.py make score.json --out piece.ogg`: applies the mechanical fixes

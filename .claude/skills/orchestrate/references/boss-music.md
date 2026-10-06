@@ -62,7 +62,19 @@ First the **stage plan**: every stage's key, tempo and core sound, decided toget
 stage may move its key - up a step, a minor third). The plan is the composer's whole brief:
 one role and one length (the bar map's), rule numbers from `composing.md`, and every sound it
 names ("the engine", "the pedal") said in parts and notes, with the double a quick string
-figure needs (`composing.md` 21) - a contradiction or a guess costs a composer minutes of thought. Then the stages. Only then the
+figure needs (`composing.md` 21) - a contradiction or a guess costs a composer minutes of thought.
+Before handing it over, check the plan against the rules a composer will meet:
+- **Ranges**, in the stage's key: every figure inside its part (`composing.md` §4 - violins2
+  can't take an F-minor root at F3).
+- **One job per part at a time**: where the tune is on cellos, say who takes the engine's bass.
+- **Every join says what carries across** (rule 3): a section that returns after a breakdown
+  creeps in under what precedes it (the engine re-enters under the count), never all at once
+  on a bar line.
+- **The hook** is the notes `tune` marks: give its length in units, and make any slot for it
+  fit it - or say which notes go there.
+- **Parts, not families or adjectives** ("violins and cellos", not "strings"; "trumpet
+  stabs off the beat", not "outbursts"); a range written as a range (`clarinets, range
+  C4-Ab4`), notes as notes; a lift as a `keys` shift ("bars 57-60: keys +3"). Then the stages. Only then the
 transitions and endings, written in the keys the stages ended up in: a rise or break in
 the key of the stage it leads *into*, the endings in the last stage's key, and one
 **hit** per key (`<boss>-hit-stage2` when stage 2 is in another key; the table plays

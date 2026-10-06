@@ -40,7 +40,8 @@ except in "hits" and "rolls", where it is the velocity itself (1-127).
                          # "shift" (semitones): {"at": 96, "from": 0, "to": 36, "shift": -12}
   "keys": [{"from": 96, "to": 192, "shift": 2}],  # a key change: the chords there are read in
                          # the new key (pair it with that statement's "shift": 2), so "I" is
-                         # still home - the new home
+                         # still home - the new home; alone (no statement there) it moves a
+                         # passage's chords - give motifs placed there the same "shift"
   "melody": [            # who plays the tune, when, and how many semitones from as written
     {"from": 0, "to": 18, "parts": {"horns": 0}, "vel": 8},
     {"from": 18, "to": 36, "parts": {"violins": 12}}
@@ -48,7 +49,9 @@ except in "hits" and "rolls", where it is the velocity itself (1-127).
   "progression": {"at": 0, "chords": "i bVI iv v | i bVII bVI*0.5 iv*0.5 i", "repeat": 2},
                          # chords a bar each (or "every": units), "*2" twice as long - added
                          # to "chords"; a list of them for several passages
-  "chords": [            # roman numerals in the tune's key, [from, to, chord]
+  "chords": [            # roman numerals in the tune's key, [from, to, chord]: counted
+                         # from the tonic's MAJOR scale, so in F minor i = Fm, iv = Bbm,
+                         # bIII = Ab, bVI = Db, bVII = Eb, V = C, bII = Gb
     [0, 6, "I"], [6, 9, "IVadd9"], [9, 12, "I/E#"], [12, 18, "bVII"], [24, 27, "vi7"]
   ],                     # I ii iii IV V vi vii, b/# before, ° ø or + after (vii°7 the diminished
                          # seventh, iiø7 the half-diminished); then 7 maj7 add9
@@ -65,6 +68,11 @@ except in "hits" and "rolls", where it is the velocity itself (1-127).
   "figures": {"waltz": [ # an accompaniment written ONCE (harmony entries, no from/to), then
     {"play": "bass", "range": ["D2", "C#3"], "pattern": "x--", "legato": 0.95},
     {"play": "chord", "range": ["A3", "F4"], "pattern": " oo", "vel": -6}]},
+                         # play: chord, bass, root, third, fifth, root5, octaves, or
+                         # arpeggio - one chord tone per pattern hit, cycling through the
+                         # chord's tones in "range" ("order": up / down / updown); a figure
+                         # or entry for several "parts" uses one "range" for all of them
+                         # (give parts that need different ranges entries of their own)
                          # played in "harmony" wherever wanted: {"figure": "waltz", "part":
                          # "cellos", "spans": [[0, 132], [237, 432]], "vel": -12, "octave": -1}
                          # (part, vel and octave apply to every entry of the figure)
@@ -84,14 +92,18 @@ except in "hits" and "rolls", where it is the velocity itself (1-127).
                          # shift (semitones) or octave; stretch 2 = twice as slow (0.5:
                          # twice as fast); invert (mirrored round its first note); retro
                          # (backwards); take [i, j] (a fragment: notes i..j-1); alter
-                         # {note index: semitones, or a pitch} - the corrupted interval;
-                         # repeat / every; "notes" may be added to the same line too
+                         # {note index: semitones, or a pitch} - the corrupted interval
+                         # (indexes count in the whole motif, also inside a "take"; "at"
+                         # places the first note taken); repeat / every; "notes" may be
+                         # added to the same line too
                          # "double": [{"part": "chorus", "octave": -1, "vel": -4}] on any
                          # line or placement: the same notes on other parts, written once
+                         # ("octave"/"shift" count from the line as placed, after its own)
   "patterns": [          # percussion (or any part) on one note, in a rhythm
     {"part": "kit", "note": "snare", "from": 36, "to": 60, "pattern": "xoooox", "vel": -30},
     {"part": "timpani", "note": "root", "from": 0, "to": 84, "pattern": "x     ", "vel": -6}
-  ],                     # note: a pitch, "root"/"fifth" (of the chord, timpani range), or
+  ],                     # note: a pitch, "root"/"fifth" (of the chord, in the timpani's
+                         # range - for drums; a pitched part's root is a "harmony" entry), or
                          # snare, bd, crash, cymbal, china, splash, ride, triangle, gong
   "rolls": [{"part": "timpani", "note": "G#2", "from": 57, "to": 60, "vel": [70, 120]}],
   "unhinge": [{"parts": ["strings", "tremolo", "violins"], "from": 36, "to": 40, "drift": 0.6,
@@ -596,9 +608,25 @@ def _build(spec: Dict[str, Any]) -> Dict[str, Any]:
             elif play == "octaves":
                 r = place(c["bass"], lo, hi)
                 keys = [r, r + 12]
+            elif play == "arpeggio":                    # one chord tone per hit, through the range
+                if not h.get("pattern"):
+                    raise ArrangementError('"play": "arpeggio" needs a "pattern" (one tone per hit)')
+                tones = [k for k in range(lo, hi + 1) if k % 12 in c["pcs"]]
+                if not tones:
+                    raise ArrangementError(f'arpeggio on {part}: no tone of {c["symbol"]} in {h.get("range")}')
+                order = h.get("order", "up")
+                keys = (tones[::-1] if order == "down" else
+                        tones + tones[-2:0:-1] if order == "updown" else tones)
             else:
-                raise ArrangementError(f"play is chord, bass, root, third, fifth, root5 or octaves, not {play!r}")
-            if h.get("pattern"):
+                raise ArrangementError("play is chord, bass, root, third, fifth, root5, octaves or arpeggio, "
+                                       f"not {play!r}")
+            if play == "arpeggio":
+                # counted from the harmony's own start, like the pattern: it flows across chords
+                for i, (t0, hold, acc) in enumerate(_pattern_hits(h["pattern"], a, b, step)):
+                    if s0 - 1e-9 <= t0 < s1 - 1e-9:
+                        note(part, keys[i % len(keys)], t0, hold * step,
+                             dyn(t0) + float(h.get("vel", 0)) + (ACCENT if acc else 0), legato)
+            elif h.get("pattern"):
                 # the pattern counts from the harmony's own start, so it carries across chords
                 for t0, hold, acc in _pattern_hits(h["pattern"], a, b, step):
                     if s0 - 1e-9 <= t0 < s1 - 1e-9:
@@ -1303,7 +1331,8 @@ def describe(seed: str, mode: str = "major", cls: str = "", stage: int = 1, dark
         tune = {**tune, "key": pitch(key)}
     h0, hn = tune.get("hook") or (0, 0)
     bar = tune["bar"]
-    lines = [f"{seed} ({mode}{', ' + cls if cls else ''}, stage {stage}, dark {dark}): "
+    made = "written" if written else f"{mode}{', ' + cls if cls else ''}, stage {stage}, dark {dark}"
+    lines = [f"{seed} ({made}): "
              f"tonic {name_of(tune['key'])}, {tune['meter']} ({'eighths' if tune['meter'] == '6/8' else 'beats'}), "
              f"{tune['scale'] if isinstance(tune['scale'], str) else 'scale ' + str(tune['scale'])}, "
              f"{tune['kind']}, {sum(b for _, b in tune['notes']):g} units = "
