@@ -148,7 +148,10 @@ def test_a_boss_stage_states_its_tune_whole():
 def test_the_tune_listing_shows_every_note():
     text = A.describe("Test Hero", cls="Fighter")
     tune = music_compose.leitmotif("Test Hero", "major", "Fighter")
-    assert len(text.splitlines()) == 2 + len(tune["notes"])
+    notes = [l for l in text.splitlines() if not l.startswith(("chords", "  bar"))]
+    assert len(notes) == 2 + len(tune["notes"])
+    menu = [l for l in text.splitlines() if l.startswith("  bar")]          # a chord menu per bar
+    assert menu and all(len(l.split(":", 1)[1].split()) >= 1 for l in menu)
 
 
 def test_a_loop_has_no_seam(tmp_path):
@@ -421,3 +424,13 @@ def test_steady_pieces_written_to_their_recipe_pass_the_critic():
     # a theme loop with a played-once intro is not a stage either
     intro = steady("theme", start=-4, loop_from=0)
     assert not [m for _, m in A.check(intro, listen=False) if "loop body is" in m]
+
+
+def test_several_parts_and_several_hits_are_written_once():
+    sp = spec(harmony=[{"parts": ["strings", "horns"], "play": "chord", "range": ["G3", "G4"], "from": 0, "to": 8}],
+              hits=[{"parts": ["timpani", "trombones"], "at": [0, 8, 16], "note": "root", "len": 1}])
+    out = A.expand_figures(sp)
+    assert [h["part"] for h in out["harmony"]] == ["strings", "horns"]
+    assert sorted((h["part"], h["at"]) for h in out["hits"]) == [("timpani", 0), ("timpani", 8), ("timpani", 16),
+                                                                 ("trombones", 0), ("trombones", 8), ("trombones", 16)]
+    A.build(sp)

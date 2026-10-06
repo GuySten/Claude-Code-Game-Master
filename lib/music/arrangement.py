@@ -309,6 +309,30 @@ def expand_figures(spec: Dict[str, Any]) -> Dict[str, Any]:
     "spans" instead of from/to (the same entry in several sections)."""
     figures = spec.get("figures") or {}
     keys = ("harmony", "patterns", "rolls")
+    # Several parts at once: "parts": [...] on any harmony / patterns / rolls / hits entry, and
+    # "at": [...] on a hit (a tutti written once, played as often as wanted).
+    many = {}
+    for k in keys + ("hits",):
+        out_k, touched = [], False
+        for e in spec.get(k) or []:
+            if isinstance(e, dict) and isinstance(e.get("parts"), list) and k != "melody":
+                touched = True
+                out_k += [{**{x: v for x, v in e.items() if x != "parts"}, "part": pt} for pt in e["parts"]]
+            else:
+                out_k.append(e)
+        if k == "hits":
+            spread = []
+            for e in out_k:
+                if isinstance(e, dict) and isinstance(e.get("at"), list):
+                    touched = True
+                    spread += [{**e, "at": a} for a in e["at"]]
+                else:
+                    spread.append(e)
+            out_k = spread
+        if touched:
+            many[k] = out_k
+    if many:
+        spec = {**spec, **many}
     if not figures and not any("spans" in e or "figure" in e for k in keys for e in spec.get(k) or []
                                if isinstance(e, dict)):
         return spec
@@ -791,11 +815,15 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
         add("warn", f"the tune isn't played at {_where(ctx, silent[0])} ({len(silent)} notes): "
                     "no \"melody\" entry covers it")
     rubs = []
+    fit, total = 0.0, 0.0                 # the tune's time on a chord tone (or a 9th / 6th colour)
     for u0, d, k in ctx["played"]:
         c = ctx["chord_at"](u0)
         if c is None:
             add("error", f"no chord at {_where(ctx, u0)}, under the tune")
             break
+        total += d
+        if k % 12 in c["pcs"] or (k - c["root"]) % 12 in (2, 9):
+            fit += d
         if d * unit < 0.45 or k % 12 in c["pcs"]:
             continue
         above = [p for p in c["pcs"] if (k - p) % 12 == 1]
@@ -1262,7 +1290,33 @@ def describe(seed: str, mode: str = "major", cls: str = "", stage: int = 1, dark
     for st, b in tune["notes"]:
         lines.append(f"{u:<7g} {int(u // bar) + 1:>3}.{u % bar:<4g} {name_of(tune['key'] + st):<6} {b:g}")
         u += b
+    lines.append("chords that hold each bar's main notes (a menu, not an answer - chromatic ones included):")
+    lines += [f"  bar {i + 1}: {' '.join(cs)}" for i, cs in enumerate(fitting_chords(tune))]
     return "\n".join(lines)
+
+
+def fitting_chords(tune: Dict[str, Any]) -> List[List[str]]:
+    """For each bar of the tune, every chord in a wide palette (diatonic, borrowed and
+    chromatic-mediant) that holds the bar's main notes (the long and strong ones) - a menu
+    for a composer, never one answer: a single suggestion would steer every piece to the
+    plain choice (the host: "won't the suggested chord hurt creativity?")."""
+    palette = ["i", "I", "ii", "iiø", "bII", "III", "bIII", "iv", "IV", "v", "V", "vi", "bVI",
+               "VI", "bVII", "vii°"]
+    bar, key = tune["bar"], tune["key"]
+    weight: Dict[int, Dict[int, float]] = {}
+    u = 0.0
+    for st, b in tune["notes"]:
+        strong = 1.5 if abs(u % bar) < 1e-6 else 1.0
+        w = weight.setdefault(int(u // bar), {})
+        w[(key + st) % 12] = w.get((key + st) % 12, 0.0) + b * strong
+        u += b
+    out = []
+    for bi in range(int(-(-u // bar))):
+        w = weight.get(bi) or {}
+        total = sum(w.values()) or 1.0
+        held = [(sum(v for pc, v in w.items() if pc in chord(c, key)["pcs"]) / total, c) for c in palette]
+        out.append([c for f, c in sorted(held, key=lambda x: -x[0]) if f >= 0.7] or ["(passing notes: any)"])
+    return out
 
 
 def main() -> None:
@@ -1302,11 +1356,21 @@ def main() -> None:
         path = Path(a.file)
         try:
             spec = json.loads(path.read_text(encoding="utf-8"))
-            found = check(spec)
-            fixed, changes = fix(spec, found=found)
+            # The score alone first (seconds): a range, a doubling, a missing chord... are
+            # reported before the slow part - listening to the layers, then the render.
+            quick = check(spec, listen=False)
+            fixed, changes = fix(spec, listen=False, found=quick)
+            quick = check(fixed, listen=False) if changes else quick
+            if any(lv in ("error", "warn") for lv, _ in quick):
+                found = quick
+            else:
+                found = check(fixed)
+                more_fixed, more = fix(fixed, found=found)
+                if more:
+                    fixed, changes = more_fixed, changes + more
+                    found = check(fixed)
             if changes:
                 path.write_text(json.dumps(fixed, indent=1, ensure_ascii=False), encoding="utf-8")
-                found = check(fixed)
         except (ArrangementError, KeyError, TypeError, ValueError) as e:
             sys.exit(f"[arrangement] {a.file}: {e}")
         for c in changes:

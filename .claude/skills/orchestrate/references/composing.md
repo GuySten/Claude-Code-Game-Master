@@ -18,8 +18,10 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
    one bar; keep the piece's pulse or bass running through it. [H "the climax did not go with
    what was before"] (critic)
 4. After a stage change the music starts strong and stays strong: the body after an entry
-   keeps its energy - level and rhythm within ~3 dB - while one part and the top register
-   wait for the peak; dips come later. [H "start strong"; "it dies after the
+   keeps its energy - level and rhythm within ~3 dB (body `dynamics` within ~10 of the
+   entry's) - while one part and the top register wait for the peak; dips come later. The
+   entry has most of the stage's parts (the critic counts them against the body's), and
+   parts carry across the entry-body join. [H "start strong"; "it dies after the
    transformation"] (critic)
 5. The tune is recognisable in every form: state it whole, as written (a `"statements"`
    entry from its start to its end), in every boss stage loop and every theme; vary its
@@ -61,12 +63,13 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
     centred, low and heavy. Wonder: chromatic third relations, used sparingly. [R]
 20. Long loops change something audible every 8-16 bars and state the tune twice in
     different colours with a contrasting section; loops have no seams - the end meets the
-    start (a stage: the body's start). [r] (critic: seam; `make` fixes the dynamics)
-21. Slow speakers (violins, violins2, strings, tremolo, cellos, english_horn, organ, the
-    choirs) need held notes; their quick notes, the tune's too, need a quick double at the
-    same moment and pitch (flutes, clarinets, bassoons, horns). A part never restarts a
-    pitch still sounding: use a second part. [r, the sound set] (critic; `make` doubles
-    `lines` only)
+    start (a stage: the body's start): end on a swell, a pickup or a roll into bar 1, not on
+    a quiet offbeat. [r] (critic: seam; `make` fixes the dynamics)
+21. Slow speakers (the strings, oboe, english_horn, organ, the choirs) need held notes; a
+    quick note of theirs - the tune's too - needs a quick double at the same moment and
+    pitch (the critic names one: flutes, clarinets, bassoons, horns, trumpets, pizzicato;
+    `make` adds it to `lines`, you add it to `melody`). A part never restarts a pitch
+    still sounding - a second choir at the peak goes on another choir part. [r] (critic)
 
 ## 3. Recipes (length · form · what must be there)
 - **Theme** (a character, a villain's scenes): 40-75 s; a loop if it holds under scenes.
@@ -102,7 +105,8 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
 
 ## 4. Writing it
 - See the tune first: `python lib/arrangement.py tune "<who>" --written music/tunes/<who>.json`
-  (every note, its time and the tune's length - you place statements and size loops by it).
+  (every note, its time, the tune's length, and per bar a menu of chords that hold it -
+  chromatic ones included; the choice, and its surprise, are yours).
 - The tune: `"tune": {"seed": "<who>", "written": <the tune file's object>, "key": "F4"}`
   (`key` moves tune and chords together). Statements: `{"at": 32}`; a statement's
   `"shift": 2` needs `"keys": [{"from": 32, "to": 64, "shift": 2}]` too, or the chords stay
@@ -112,17 +116,22 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
   symbol]; they sound only through `"harmony"` parts. Every tune note needs a chord under
   it (critic: error).
 - Repeated material ONCE: `"motifs"` placed in `"lines"` (`at`, `shift`, `octave`,
-  `stretch`, `repeat`/`every`; `invert`/`retro`/`alter` only for a story reason, after the
-  tune was heard straight - and a motif never counts as the tune stated whole);
-  accompaniment ONCE: `"figures"` played with `"spans"`; `"double"` for doublings. No
-  helper scripts.
+  `stretch`, `repeat`/`every`; `invert`/`retro`/`alter` only for a story reason, once the
+  tune has been heard straight - here or in an earlier piece - and a motif never counts as
+  the tune stated whole); accompaniment ONCE: `"figures"` played with `"spans"`; any
+  harmony / patterns / rolls / hits entry takes `"parts": [...]`, a hit `"at": [...]` (a
+  tutti written once); `"double"` for doublings. Timpani on the chord's root or fifth:
+  `"patterns"` or `"hits"` with `"note": "root"`, not `"harmony"`. No helper scripts.
 - `"dynamics"`: the velocity curve, [[time, velocity], ...] - the critic finds the peak at
   its top; `make` edits its last point for the seam.
 - Parts: violins, violins2 (also the viola register - there is no viola), strings, tremolo,
   pizzicato, cellos, basses, flutes, piccolo, oboe, english_horn, clarinets, bassoons,
   horns, trumpets, trombones, tuba, brass, harp, celesta, glockenspiel, bells, organ,
   timpani, solo_violin; voices choir, chorus, men_choir, choir_oo, choir_oh; drums kit,
-  taiko, toms, reverse_cymbal (`"patterns"`). Ranges: `orchestra.RANGES` (critic).
+  taiko, toms, reverse_cymbal (`"patterns"`). Ranges: violins G3-E7, violins2 G3-C7, cellos
+  C2-E5, basses E1-C4, flutes C4-C7, piccolo D5-C8, oboe A#3-G6, english_horn E3-A5,
+  clarinets D3-G6, bassoons A#1-C5, horns F2-F5, trumpets F#3-A#5, trombones E2-C5, tuba
+  E1-A#3, timpani D2-G3, men_choir E2-A4, chorus E2-E6, choir_oo/oh A2-D#6 (critic).
 - Title: `"<who>: <its real name> (<what it is>)"`. Scores: `music/arrangements/<who>-
   <version>.json`; a boss's cues render to `music/<boss>-<cue>--<title>.ogg`.
 - Anything else in the format: the docstring at the top of `lib/music/arrangement.py` -

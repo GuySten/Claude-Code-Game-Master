@@ -51,7 +51,8 @@ Ordinary fights share one campaign battle cue and get none of this.
 6. **A stage may reveal rather than escalate.** When the second stage shows the boss's
    grief, madness or former self, its cue may be sparser, slower or sacred. Mark it
    `reveal` so the GM knows the drop is meant.
-7. **How a stage is written** - its strong entry, a body that keeps that energy, the breakdown,
+7. **The stage plan names each stage's score `"role": "stage"`** (a turn cue `"turn"`, the
+   pre-end `"pre_end"`). **How a stage is written** - its strong entry, a body that keeps that energy, the breakdown,
    the one peak that brings something new, the length - is the composer's recipe:
    `composing.md` ("Boss stage"). This file plans the fight; that one writes it.
 
