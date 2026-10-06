@@ -234,8 +234,38 @@ _MODEL: Dict[str, Any] = {}
 
 
 def _model() -> Dict[str, Any]:
+    """The trained model and the corpus's reference values: learned once from the corpus
+    (about 25 s), then kept on disk next to it - it was relearned on every critic run,
+    95% of a score-only check."""
     if _MODEL:
         return _MODEL
+    import hashlib
+    import pickle
+    corpus()                                      # (downloads it the first time)
+    key = hashlib.sha1(Path(__file__).read_bytes()).hexdigest()[:12]
+    if CACHE.is_file():
+        st = CACHE.stat()
+        key += f"-{st.st_size}-{int(st.st_mtime)}"
+    saved = CACHE.with_name(f"tune-model-{key}.pkl")
+    if saved.is_file():
+        try:
+            _MODEL.update(pickle.loads(saved.read_bytes()))
+            return _MODEL
+        except Exception:
+            _MODEL.clear()
+    _learn()
+    try:
+        for old in CACHE.parent.glob("tune-model-*.pkl"):
+            old.unlink(missing_ok=True)
+        tmp = saved.with_suffix(".tmp")
+        tmp.write_bytes(pickle.dumps(dict(_MODEL)))
+        tmp.replace(saved)
+    except OSError:
+        pass
+    return _MODEL
+
+
+def _learn() -> None:
     tunes = corpus()
     pitch, rhythm = Markov(), Markov()
     for t in tunes:
@@ -264,7 +294,6 @@ def _model() -> Dict[str, Any]:
         for k, v in features(t).items():
             ref[k].append(v)
     _MODEL["ref"] = {k: sorted(v) for k, v in ref.items()}
-    return _MODEL
 
 
 def _pct(sorted_vals: List[float], v: float) -> float:

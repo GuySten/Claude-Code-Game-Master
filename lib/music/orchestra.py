@@ -661,6 +661,22 @@ def play(score: Score, seconds: float, sf2: Path = SF2, rate: int = RATE,
     return out
 
 
+def _fast_len(n: int) -> int:
+    """The smallest 2^a 3^b 5^c >= n: an FFT size about as fast as a power of two."""
+    best = 1 << int(math.ceil(math.log2(max(1, n))))
+    p5 = 1
+    while p5 < best:
+        p35 = p5
+        while p35 < best:
+            q = p35
+            while q < n:
+                q *= 2
+            best = min(best, q)
+            p35 *= 3
+        p5 *= 5
+    return best
+
+
 def hall(dry, rate: int = RATE, rt60: float = 2.3, wet: float = 0.28, seed: int = 7,
          loop_at: Optional[int] = None, loop_from: int = 0):
     """A concert hall: the dry orchestra (its hall send, when play() made it: see
@@ -694,7 +710,7 @@ def hall(dry, rate: int = RATE, rt60: float = 2.3, wet: float = 0.28, seed: int 
     ir = np.vstack([np.zeros((pre, 2)), ir])
     ir /= np.sqrt((ir ** 2).sum(axis=0))
     tail = len(ir)
-    size = 1 << int(math.ceil(math.log2(len(dry) + tail)))
+    size = _fast_len(len(dry) + tail)                      # (5-smooth: up to 2x smaller than a power of two)
     out = np.zeros((len(dry) + tail, 2))
     send = getattr(dry, "send", None)
     send = dry if send is None else send
