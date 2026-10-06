@@ -63,9 +63,10 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
 ## 2. What the research adds
 14. Themes the table can learn: short, distinct in rhythm and timbre, on a clear type
     (march, lament, waltz...), the same skeleton every return. [R]
-15. Escalate by 2-3 audible dimensions at once - density, register, key (a step or a minor
-    third up), choir, tempo (+8-15 bpm, or double the motion) - while separate pieces stay
-    level-matched; volume alone is not a stage. Chained key lifts turn into parody. [R]
+15. Inside a piece, escalate by 2-3 audible dimensions at once - density, register, key (a
+    step or a minor third up), choir, tempo or double the motion; volume alone is not a
+    build, and chained key lifts turn into parody. [R] A boss's later stage is more than an
+    escalation: a new world sharing only the tune (`boss-music.md` 2-3). [H]
 16. Every climax: a build, a peak above the earlier peaks, a release; one peak per loop
     cycle. [r]
 17. Under talk, sit back: steady level, no big tutti; music meant to play under scenes and
@@ -122,7 +123,8 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
   signature figure, ff. Then the BODY, at least 150 s: the full drive (rule 4), the tune
   whole at least once (rule 5), a breakdown a third to halfway through (never silent),
   waves to one peak that brings something new (rule 2), back to the opening drive for the
-  seam. Each later stage changes 2-3 things (rule 15) on the same core sound. A stage the
+  seam. A later stage shares only the tune with the one before: its own carrying concept,
+  pulse, leading instruments and harmony (`boss-music.md` 2-3); give it `"stage": N`. A stage the
   plan marks `reveal` may be sparser, slower or sacred; its entry and body stay level.
 - **Turn cue** (`"role": "turn"`, no `loop_from`): a loop as long as the plan says; the
   boss's identity under, the answer on top (`"lead": true`). **Pre-end** (`"role":

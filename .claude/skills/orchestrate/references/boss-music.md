@@ -15,18 +15,20 @@ Ordinary fights share one campaign battle cue and get none of this.
    the GM plays it when the boss is one blow from falling or the last countdown starts). Each stage cue answers a
    trigger the GM can name in one line (bloodied, the transformation, the lair
    collapsing). A stage the table can't read is noise.
-2. **One identity throughout.** Every stage carries the boss's motif and its concepts,
-   on a shared core sound (low strings, timpani...) and the same tempo grid or a simple
-   ratio of it. The tune enters through `"tune"` and `"statements"` (only a
-   statement counts as stated whole, `composing.md` 5); its hook may also be a motif. Game scores almost always vary the boss's theme across phases; an unrelated
-   new theme only when the boss turns out to be someone else.
-3. **Change two or three things a stage, audibly**: tempo (+8 to 15 a minute, or the
-   same tempo with double the motion), key (up a step or a minor third), choir (one
-   option: entering at stage 2 or 3 is the common escalation; a finale, or a boss whose
-   concepts call for voices, may have it from stage 1 at pad level and open it up later),
-   density of percussion and ostinato, register (the theme an octave up, brass taking it
-   from strings). Loudness or one instrument alone is not a stage; everything at once
-   breaks the identity.
+2. **The tune is the one thread.** Every stage carries the boss's tune (through `"tune"` and
+   `"statements"`; only a statement counts as stated whole, `composing.md` 5) - and only the
+   tune. Everything else belongs to the stage: a later stage feels like nothing before it
+   except the tune [H, the Ashen Saint: "stage 2 should feel nothing like stage 1 except
+   the tune"]. An unrelated new theme only when the boss turns out to be someone else.
+3. **A later stage is a new world, built on its new concepts.** What changed in the story
+   (the flame takes her, the mask falls) carries the stage; the earlier stage's concepts sit
+   in the background or drop out [H: "it should focus on the new concepts; the old ones
+   should be in the background or maybe even not at all"]. Change the pulse (a new rhythm,
+   not the same drive faster), the instruments that lead, the harmony, the register, the
+   choir's role - and the tune's setting with them. Turning dials on stage 1's sound is
+   not a stage [H, the Saint v6: a step up, +12 bpm and a choir on the same march - "the
+   second stage does not have more emotion; the change is minimal"]. The engine masters
+   each later stage louder than the one before (`"stage": N`).
 4. **The table must know the tune first; hold back its grandest form, not its notes.**
    A leitmotif is recognised in a reprise far more easily than in a variation, and stage 1
    is where the players learn the boss (the host could not tell whether a stage 2 had
@@ -58,7 +60,7 @@ Ordinary fights share one campaign battle cue and get none of this.
 
 ## The order of work
 
-First the **stage plan**: every stage's key, tempo and core sound, decided together, and each stage's **bar map** - its entry and body sections as bar ranges (drive, statements, breakdown, rebuild, peak, fall-back), laid out on `arrangement.py grid` - so the composer fills a map instead of designing one (a
+First the **stage plan**: every stage's key, tempo, carrying concept and own sound, decided together, and each stage's **bar map** - its entry and body sections as bar ranges (drive, statements, breakdown, rebuild, peak, fall-back), laid out on `arrangement.py grid` - so the composer fills a map instead of designing one (a
 stage may move its key - up a step, a minor third). The plan is the composer's whole brief:
 one role and one length (the bar map's), rule numbers from `composing.md`, and every sound it
 names ("the engine", "the pedal") said in parts and notes, with the double a quick string
@@ -90,10 +92,10 @@ workflow - you cannot override on a whim").
 
 The GM may promote a boss whose fight is already scored - a lieutenant who escaped returns
 as the arc boss (`gm-craft/references/boss-fights.md` 1). The new stage is planned like the
-first ones (the stage plan first: its key, tempo, core sound, entry), with three things the
+first ones (the stage plan first: its key, tempo, its own sound and concept, entry), with three things the
 earlier stages already decided:
-- **What the table has heard stays.** The tune, the core sound and stages 1-2 as played are
-  the boss's identity now; the new stage grows from them (rule 2).
+- **What the table has heard stays.** The tune and stages 1-2 as played are the boss's
+  identity now; the new stage carries the tune into its own new world (rules 2-3).
 - **The arc is re-planned with the new stage at its top** (rule 4 and `composing.md` 18: the fight's biggest
   moment is the last stage's). If the old last stage spent everything - full brass, the open
   choir, the tune's top register - either re-score that stage's peak to hold something back

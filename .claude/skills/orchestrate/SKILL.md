@@ -104,10 +104,10 @@ Colours and devices, With / against, Intensity, Not). Write the composer's brief
    where the fighting is the subject (a war, a siege, a defining duel). Identity, not
    moment: heroism is in a paladin's or a champion's portrait, not every adventurer's; a
    bard battling a dragon gets the bard's theme turned heroic for that scene. For a boss in
-   stages, decide the concepts **per stage**: what changed in the story is that stage's
-   **strong** concept - its own layer or moment and two or three dials - while the boss's
-   identity keeps carrying; it carries only when the boss becomes someone or something
-   else (concepts.md section 1, "A stage... is its own moment"). Always decide **stature** (how much they weigh in the
+   stages, decide the concepts **per stage**: what changed in the story **carries** that stage,
+   and the earlier stage's concepts go to the background or out - only the tune ties the
+   stages together (`boss-music.md` 2-3; the host: "stage 2 should feel nothing like stage 1
+   except the tune"). Always decide **stature** (how much they weigh in the
    story: a king or archvillain gets one grand climax, a minor figure stays small). A
    **player character** is a protagonist, never a minor figure: their story stage (seed,
    theme, heroic, legendary) sets the forces, and at every stage the theme makes a strong
