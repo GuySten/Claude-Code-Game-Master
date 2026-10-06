@@ -35,9 +35,10 @@ from, never where the brief starts.
    the verdicts strictly. It is a check before the host's ears, never instead of them.
    Review again after every fix - a round costs about a minute, a composition 10-15 - until a
    round has no blocking finding about the feel (up to five rounds). The GM decides a point
-   instead, and writes the decision in the brief, when it comes back after a fix (the reviewer
-   and the brief disagree) or when it pulls against a host verdict or a piece the host liked
-   (a reviewer can always find one more thing; the host's ears outrank it).
+   instead, and writes the decision in the brief, when it comes back after a fix or swings
+   between opposite poles (then look for what both rounds missed - the Margrave's reviews went
+   from "stomps" to "too light"; the missing thing was dark *and* driving), or when it contradicts
+   something the host said (a reviewer can always find one more thing; the host's ears outrank it).
 6. **Store it** in the campaign: `music/briefs/<cue stem>.md` (the brief, the review, and later
    the host's verdict on the piece), so a verdict traces to the brief line behind it.
 
@@ -94,7 +95,13 @@ moor; not sad-romantic"), never a bare adjective.
   one, restate the Job and ask which feeling was missing ("the change is minimal" asked for a
   new world of the same enemy, not for brightness; "leashed" asked for conviction, not for
   noise; "not dark enough" asked for evil, not for gloom).
-- **P7. Recipes, research examples and lexicon entries give means.** A means that doesn't serve
+- **P7. Pieces the host liked are references, not ceilings** (the host: "you cannot rely on what
+  I liked, because then we cannot arrive at something I will like better"). What the host *said*
+  - a fault named, a quality praised - is a verdict and holds; everything else in a liked piece is
+  open. A new idea may depart from it (its tempo, its form, its colours); a blind A/B against it
+  decides. Never copy a liked piece's recipe onto another subject (Izrin's brief copied Kestrel's
+  rising rebel and read as heroic for a killer).
+- **P7b. Recipes, research examples and lexicon entries give means.** A means that doesn't serve
   the Job is dropped however well sourced; the host's verdicts override all of them. A lexicon
   entry has several readings (fire as light or as destruction); the Job picks the reading.
 - **P8. Every prescriptive instruction carries its reason,** so the composer can keep the
@@ -154,7 +161,7 @@ entry in `table-feedback.md`.
   the tune's speed as heard, its carriers, its register, the harmony under it.
 
 **Player-character themes**
-- The liked model (Kestrel's original, 34 s): a deep low bass alone at the start, the tune once,
+- Kestrel's original (34 s), liked - a reference, not a template (P7): a deep low bass alone at the start, the tune once,
   passed round the orchestra and growing every phrase, a hope chord, the peak at about two-thirds
   ("exceptional": the tune in three octaves over the choir), trumpets saved for the climb, a
   release and a decided close. "It's not always good to start strong."
