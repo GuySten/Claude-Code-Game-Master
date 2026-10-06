@@ -180,8 +180,9 @@ once, then its body loops (`"loop_from"`).
     entered, a ritual interrupted, words exchanged), their theme can play before initiative as the
     suspense, and the stage-1 entry lands when the fight begins. Not every boss gets one (the host: "not
     every boss should have a suspenseful introduction"): an ambush, a brawl or a boss who strikes first
-    goes straight into the stage-1 entry. Either way, from initiative on every stage is dark and exciting,
-    never only dread.
+    goes straight into the stage-1 entry. From initiative on, a stage is dark and exciting, never only
+    dread - unless the story says otherwise and the Job names it (the host: "most fights should be
+    energetic unless for example the party avenge a fallen comrade": grief turned to resolve).
 15. **Switch on the narration of the trigger**, not on the dice. A stage that grows
     out of the last: **rise** into the new loop. A transformation: **break**, the
     pause under the GM's words, then the new loop. A turn the party caused: switch at
