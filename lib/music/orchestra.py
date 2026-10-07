@@ -1860,7 +1860,11 @@ def _setbfree_stem(exe: Path, events: list, total: int, rate: int, organ: Option
     times = [e[0] for e in ons]
     first = max(0, int((ons[0][0] - 0.01) * rate))
     start = max(0, first - int(SETBFREE_PREROLL * rate))
-    lines = [f"bars {organ.get('drawbars', ORGAN_DRAWBARS)}", "cc vibrato.upper 0",
+    # (the bass rotor heard by one mic, both sides: setBfree's two drum mics come out in opposite
+    # phase below ~800 Hz - a hollow, phasey low end that cancels in mono, which the host heard as
+    # "it does not render correctly"; the horn keeps its two mics, the swirl wide)
+    lines = ["cfg whirl.drum.width=1",
+             f"bars {organ.get('drawbars', ORGAN_DRAWBARS)}", "cc vibrato.upper 0",
              "cc overdrive.enable 127", f"cc overdrive.character {SETBFREE_DRIVE}"]
     harm = {"second": 127, "third": 0}.get(organ.get("percussion") or "")
     lines += [f"cc percussion.enable {0 if harm is None else 127}", "cc percussion.volume 0",

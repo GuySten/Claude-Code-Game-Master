@@ -741,6 +741,23 @@ def test_setbfree_plays_a_riff_on_time_and_as_loud_as_the_synthesized_organ(setb
     assert np.argmax(e > full / 8) / rate - 0.5 < 0.02                # heard on the beat: no advance needed
 
 
+def test_setbfrees_low_end_is_in_phase_and_its_swirl_stays_wide(setbfree):
+    np = pytest.importorskip("numpy")
+    rate = 44100
+    ev = [e for k in (48, 55, 60) for e in ((0.0, 1, "rock_organ", k, 110), (3.0, 0, "rock_organ", k, 0))]
+    s = orchestra._setbfree_stem(setbfree, ev, int(3.5 * rate), rate, {})[1].astype("float64")[int(0.5 * rate):]
+    F = np.fft.rfft(s, axis=0)
+    fr = np.fft.rfftfreq(len(s), 1 / rate)
+
+    def coherence(lo, hi):
+        a, b = F[(fr >= lo) & (fr < hi), 0], F[(fr >= lo) & (fr < hi), 1]
+        return float(np.real((a * np.conj(b)).sum()) / np.sqrt((abs(a) ** 2).sum() * (abs(b) ** 2).sum()))
+    assert coherence(30, 300) > 0.9                     # (the host: "it does not render correctly" -
+    assert coherence(300, 800) > 0.5                    #  the drum's two mics in opposite phase)
+    assert coherence(800, 5000) < 0.8                   # the horn's two mics: still a wide swirl
+    assert float(np.corrcoef(s[:, 0], s[:, 1])[0, 1]) > 0.5
+
+
 def _guitar_solo():
     sc = orchestra.Score()
     for i, (k, d) in enumerate([(66, 0.33), (66, 0.17), (66, 0.17), (67, 1.2), (78, 0.33), (79, 1.6)]):
