@@ -1,0 +1,750 @@
+#!/usr/bin/env python3
+"""Composed music for the moments that matter: main villains, bosses, and each
+player character's heroic anthem.
+
+The composing happens in a separate environment (.compose-venv, see
+lib/music_compose.py and `bash tools/gm-music-compose.sh setup`) so the game
+itself keeps its small CPU-only install. Without that environment (or with
+MUSIC_COMPOSE=off) nothing here runs and the game keeps its other music:
+the library, and the generated themes in the players' browsers.
+
+Composed pieces live in the campaign, in music/themes/ and music/anthems/
+(subfolders, so mood matching never picks a villain's theme for a random
+fight), listed in music-composed.json:
+    {"themes": {"Grimaldi": {"normal": "grimaldi-theme.ogg", "boss": "grimaldi-boss.ogg"}},
+     "anthems": {"Pip": {"file": "anthem-pip.ogg", "seconds": 20}}}
+"""
+
+import atexit
+import base64
+import hashlib
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+import threading
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from gpu_turn import gpu_turn  # noqa: E402
+import gpu_remote  # noqa: E402
+import character_arcs  # noqa: E402
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+COMPOSE_VENV = PROJECT_ROOT / ".compose-venv"
+SCRIPT = Path(__file__).resolve().parent / "music_compose.py"
+THEME_SECONDS = 30
+ANTHEM_SECONDS = 20
+
+
+class ComposeError(Exception):
+    pass
+
+
+def _turned_off() -> bool:
+    return os.environ.get("MUSIC_COMPOSE", "").strip().lower() in ("off", "0", "no", "false")
+
+
+def remote() -> bool:
+    """Composing on the host laptop's GPU server (lib/gpu_remote.py) instead of here:
+    MUSIC_COMPOSE=remote, or a GPU server is set and there's no composer here."""
+    if _turned_off() or not gpu_remote.enabled():
+        return False
+    chosen = os.environ.get("MUSIC_COMPOSE", "").strip().lower()
+    return chosen == "remote" or _local_python() is None
+
+
+def composer_python() -> Optional[Path]:
+    """The composer environment's Python, or None (not set up, turned off, or
+    composing on the host's laptop instead)."""
+    if _turned_off() or remote():
+        return None
+    return _local_python()
+
+
+def _python(local: bool = False) -> Optional[Path]:
+    """composer_python(), or with ``local`` this machine's composer even when a GPU
+    server is set (the GPU server itself composes with this)."""
+    if not local:
+        return composer_python()
+    return None if _turned_off() else _local_python()
+
+
+def _local_python() -> Optional[Path]:
+    for p in (COMPOSE_VENV / "Scripts" / "python.exe", COMPOSE_VENV / "bin" / "python"):
+        if p.is_file():
+            return p
+    return None
+
+
+def available() -> bool:
+    if remote():
+        h = gpu_remote.health()
+        return bool(h and h.get("composer"))
+    return composer_python() is not None
+
+
+from music import slug  # noqa: E402,F401  (a piece's file-name stem; the music package's)
+
+
+def flavor(campaign_dir) -> str:
+    """The campaign's genre and tone, as a few words for the music prompt."""
+    try:
+        o = json.loads((Path(campaign_dir) / "campaign-overview.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return ""
+    bits = []
+    for k in ("genre", "tone"):
+        v = o.get(k)
+        if isinstance(v, str) and v.strip():
+            bits.append(v.strip().rstrip(".")[:80])
+    return ", ".join(bits)
+
+
+def theme_prompt(name: str, look: str, style: str, boss: bool) -> str:
+    who = f"{name}" + (f" ({look.strip().rstrip('.')[:120]})" if look else "")
+    setting = f", {style}" if style else ""
+    if boss:
+        return (f"epic orchestral boss battle theme for {who}{setting}, thundering war drums, "
+                "roaring brass, dark choir, driving strings, intense and relentless, 150 bpm")
+    return (f"ominous villain leitmotif for {who}{setting}, low strings, menacing brass, "
+            "dark and brooding, slow build, cinematic")
+
+
+def anthem_prompt(sheet: Dict[str, Any], style: str, arc: Optional[Dict[str, Any]] = None) -> str:
+    """The anthem's description, for where the character's story is (``arc``: their
+    stage, dark notes, wound and bonds; lib/character_arcs.py). No arc: the theme as written."""
+    arc = arc or {"stage": 1, "dark": 0, "wound": False, "warm": False}
+    name = sheet.get("name", "the hero")
+    who = " ".join(str(sheet.get(k) or "") for k in ("race", "class")).strip()
+    concept = str(sheet.get("concept") or "").strip().rstrip(".")
+    setting = f", {style}" if style else ""
+    who_bits = (f", a {who}" if who else "") + (f", {concept[:100]}" if concept else "") + setting
+    stage = arc.get("stage", 1)
+    tempo = "around 70 bpm" if arc.get("wound") else ("around 90 bpm" if stage == 0 else
+                                                      "around 100 bpm" if stage == 3 else "around 110 bpm")
+    if stage <= 0:
+        body = (f"a quiet, simple character theme for {name}{who_bits}, {tempo}, the melody alone on a "
+                "single solo french horn over soft sustained strings, intimate and hopeful, a promise "
+                "of something more, ending on a gentle held note")
+    elif stage == 1:
+        body = (f"heroic character theme for {name}{who_bits}, {tempo}, a memorable melody first "
+                "stated by a solo french horn, then taken up by the full orchestra, soaring brass, "
+                "uplifting strings, pounding timpani, building steadily to one powerful climax, "
+                "ending on a long held triumphant final chord")
+    elif stage == 2:
+        body = (f"grand heroic character theme for {name}{who_bits}, {tempo}, the melody proclaimed "
+                "by the full brass section over the whole orchestra, confident and soaring, pounding "
+                "timpani, building to a towering climax, ending on a long held triumphant final chord")
+    else:
+        body = (f"epic legendary character theme for {name}{who_bits}, {tempo}, a massive orchestra "
+                "and a full choir, thundering timpani, majestic and monumental, the melody sung by "
+                "the whole choir at its climax, ending on a long, enormous final chord")
+    shade = []
+    if arc.get("wound"):
+        shade.append("as a lament: tender and grieving, a solo cello carrying the melody, soft strings")
+    dark = arc.get("dark", 0)
+    if dark:
+        shade.append(["with an undercurrent of shadow", "darker and conflicted, minor-key shadows",
+                      "tormented, darkness overtaking it, dissonant low brass"][min(dark, 3) - 1])
+    if arc.get("warm"):
+        shade.append("warm and heartfelt, close harmonies")
+    return body + "".join(", " + x for x in shade)
+
+
+def anthem_seconds(arc: Optional[Dict[str, Any]] = None) -> float:
+    """A lone voice is short; the legend is long; a lament takes its time."""
+    arc = arc or {"stage": 1}
+    secs = {0: 16, 1: ANTHEM_SECONDS, 2: 22, 3: 28}.get(arc.get("stage", 1), ANTHEM_SECONDS)
+    return min(30.0, secs * (1.25 if arc.get("wound") else 1))
+
+
+JUDGMENT = "⚖ Judgment"           # the music of a punishment (composed once per campaign)
+
+
+def judgment_prompt(style: str) -> str:
+    setting = f", {style}" if style else ""
+    return ("doom-laden judgment music: a tolling funeral bell, dissonant low brass, a grim choir "
+            f"chord, pounding slow drums, cold and merciless{setting}, the sound of a terrible fate")
+
+
+def dark_anthem_prompt(sheet: Dict[str, Any], style: str) -> str:
+    """A fallen hero's anthem, turned into the villain theme they now are."""
+    name = sheet.get("name", "the hero")
+    setting = f", {style}" if style else ""
+    return (f"the heroic anthem of {name} turned dark and corrupted: the same melody in a minor key, "
+            f"slow and heavy, around 70 bpm, deep low brass, pounding timpani, a heavy deep bass, "
+            f"dissonant strings, a grim choir{setting}, menace growing with every bar, "
+            "the leitmotif of a fallen hero become a villain")
+
+
+# --- the composer process: started once, keeps the model in RAM ---
+SERVER_LOG = Path(tempfile.gettempdir()) / "gm-composer.log"
+_server: Optional[subprocess.Popen] = None
+_server_device = ""
+_server_lock = threading.RLock()
+
+
+# No console window for it on Windows: the table runs in the background, so Windows
+# would open one, and closing that window kills the composer without a word.
+NO_WINDOW = {"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0)} if os.name == "nt" else {}
+# After composing on the graphics card crashed, the rest of the session composes on
+# the CPU (slower, but the music comes).
+_cpu_only = False
+
+
+def _spawn(local: bool = False) -> Optional[subprocess.Popen]:
+    global _server, _server_device
+    if _server is not None and _server.poll() is None:
+        return _server
+    py = _python(local)
+    if py is None:
+        return None
+    env = {**os.environ, "PYTHONUTF8": "1", "PYTHONFAULTHANDLER": "1"}
+    if _cpu_only:
+        env["COMPOSE_DEVICE"] = "cpu"
+    with open(SERVER_LOG, "w", encoding="utf-8", errors="replace") as log:
+        _server = subprocess.Popen([str(py), str(SCRIPT), "--serve"], stdin=subprocess.PIPE,
+                                   stdout=subprocess.PIPE, stderr=log, text=True, encoding="utf-8",
+                                   errors="replace", env=env, **NO_WINDOW)
+    _server_device = ""
+    return _server
+
+
+# How a process that died says why (Windows exit codes, and signals elsewhere).
+EXIT_MEANINGS = {
+    3221225477: "it crashed inside a native library (access violation, 0xC0000005)",
+    3221226505: "it crashed inside a native library (0xC0000409: often CUDA / the graphics driver)",
+    3221225495: "Windows refused it memory (0xC0000017: RAM and page file full)",
+    3221225725: "it crashed (stack overflow, 0xC00000FD)",
+    3221225786: "it was stopped (its window was closed, or Ctrl+C, 0xC000013A)",
+    1: "it stopped with an error (see the composer's log)",
+    -9: "it was killed (out of memory?)", 137: "it was killed (out of memory?)",
+    -11: "it crashed inside a native library (segmentation fault)",
+}
+
+
+def _why_it_died(proc: subprocess.Popen) -> str:
+    code = proc.poll()
+    if code is None:
+        return "it stopped answering"
+    return EXIT_MEANINGS.get(code, f"it stopped (exit code {code})")
+
+
+def _log_tail() -> str:
+    try:
+        return " | ".join(SERVER_LOG.read_text(encoding="utf-8", errors="replace").strip().splitlines()[-3:])
+    except OSError:
+        return ""
+
+
+def _read(proc: subprocess.Popen, want, timeout: float) -> Optional[Dict[str, Any]]:
+    """The composer's next JSON line that ``want(line)`` accepts; None if it died
+    or took longer than ``timeout`` (then it's stopped)."""
+    watchdog = threading.Timer(timeout, proc.kill)
+    watchdog.daemon = True
+    watchdog.start()
+    try:
+        for line in proc.stdout:
+            if line.strip().startswith("{"):
+                try:
+                    r = json.loads(line)
+                except ValueError:
+                    continue
+                if want(r):
+                    return r
+        return None
+    finally:
+        watchdog.cancel()
+
+
+def start_server(timeout: float = 1800, local: bool = False) -> bool:
+    """Start the composer and let it read the model into RAM (once). Blocks until
+    it's ready; True if it is. The table calls this in the background at start."""
+    global _server_device
+    if not local and remote():
+        try:
+            return bool(gpu_remote.run("compose-start", timeout=timeout).get("ok"))
+        except gpu_remote.GpuRemoteError:
+            return False
+    with _server_lock:
+        proc = _spawn(local)
+        if proc is None:
+            return False
+        if _server_device:
+            return True
+        r = _read(proc, lambda r: "ready" in r, timeout)
+        if r is None:
+            stop_server()
+            return False
+        _server_device = r.get("device") or "cpu"
+        return True
+
+
+def stop_server() -> None:
+    global _server, _server_device
+    with _server_lock:
+        proc, _server, _server_device = _server, None, ""
+    if proc is None:
+        return
+    try:
+        proc.stdin.close()               # it finishes when its input ends
+        proc.wait(timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        proc.kill()
+        proc.wait()
+
+
+atexit.register(stop_server)
+
+
+def _free_the_card() -> None:
+    """Pictures' model off the graphics card (into RAM) before music uses it."""
+    try:
+        import image_gen
+        image_gen.release_gpu()
+    except Exception:
+        pass
+
+
+def compose_many(jobs: List[Dict[str, Any]], on_piece: Optional[Callable[[int, Dict[str, Any]], None]] = None,
+                 timeout_each: int = 1800, local: bool = False) -> List[Optional[Dict[str, Any]]]:
+    """Compose pieces ({prompt, seconds, out, loop}) with the running composer: its
+    model stays in RAM, so it's read from disk only once. Each piece takes its turn
+    on the graphics card (pictures wait for it, and it for them), with Forge's model
+    moved off the card first. ``on_piece(index, result)`` is called as each one
+    lands. Returns one result per job (None where that piece failed)."""
+    global _cpu_only
+    if not jobs:
+        return []
+    if not local and remote():
+        return _compose_remote(jobs, on_piece, timeout_each)
+    if _python(local) is None:
+        raise ComposeError("the composer isn't set up (bash tools/gm-music-compose.sh setup)")
+    results: List[Optional[Dict[str, Any]]] = [None] * len(jobs)
+    errors: List[str] = []
+    with _server_lock:
+        for i, job in enumerate(jobs):
+            if not start_server(local=local):        # (re)started if it isn't running
+                errors.append(_log_tail() or "it didn't start")
+                break
+            proc = _server
+            with gpu_turn("music"):
+                if _server_device != "cpu":
+                    _free_the_card()
+                try:
+                    proc.stdin.write(json.dumps({**job, "id": i}, ensure_ascii=False) + "\n")
+                    proc.stdin.flush()
+                    r = _read(proc, lambda r: r.get("id") == i, timeout_each)
+                except OSError:
+                    r = None
+            if r is None:                            # it died, or hung and was stopped
+                why = "it took too long" if proc.poll() is None else _why_it_died(proc)
+                errors.append(f"the composer stopped: {why}. Its log ends: {_log_tail()}")
+                print(f"[compose] the composer stopped while composing piece {i + 1}: {why}"
+                      f" (log: {SERVER_LOG})", file=sys.stderr, flush=True)
+                gpu = _server_device not in ("", "cpu")
+                stop_server()
+                if gpu and not _cpu_only:            # crashed on the graphics card: CPU from now on
+                    _cpu_only = True
+                    print("[compose] composing on the CPU from now on (slower)", file=sys.stderr, flush=True)
+                    try:
+                        retry = compose_many([job], timeout_each=timeout_each, local=local)[0]
+                    except ComposeError as e:
+                        errors.append(str(e))
+                        retry = None
+                    if retry:
+                        results[i] = retry
+                        if on_piece is not None:
+                            on_piece(i, retry)
+                continue
+            if not r.get("ok"):
+                errors.append(r.get("error") or "that piece failed")
+                continue
+            results[i] = r
+            if on_piece is not None:
+                on_piece(i, r)
+    if not any(results):
+        raise ComposeError("the composer failed: " + (errors[-1] if errors else "no answer"))
+    return results
+
+
+def _compose_remote(jobs: List[Dict[str, Any]], on_piece, timeout_each: int
+                    ) -> List[Optional[Dict[str, Any]]]:
+    """compose_many() on the host laptop's GPU server: the piece comes back as
+    bytes and is written where the job asked, the same as a local one."""
+    results: List[Optional[Dict[str, Any]]] = [None] * len(jobs)
+    errors: List[str] = []
+    for i, job in enumerate(jobs):
+        out = Path(job["out"])
+        try:
+            payload = {"prompt": job["prompt"], "seconds": job.get("seconds", 30),
+                       "loop": bool(job.get("loop")), "ext": out.suffix or ".ogg"}
+            if job.get("twin"):
+                payload["twin_prompt"] = job["twin"]["prompt"]
+                if job["twin"].get("leitmotif"):
+                    payload["twin_leitmotif"] = job["twin"]["leitmotif"]
+            if job.get("leitmotif"):
+                payload["leitmotif"] = job["leitmotif"]
+            if job.get("heavy"):
+                payload["heavy"] = True
+            if job.get("melody_from"):
+                payload["melody_audio"] = base64.b64encode(Path(job["melody_from"]).read_bytes()).decode("ascii")
+                payload["melody_ext"] = Path(job["melody_from"]).suffix
+            r = gpu_remote.run("compose", payload, timeout=timeout_each)
+            path = out.with_suffix(r.get("ext") or out.suffix)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(base64.b64decode(r["audio"]))
+            twin = None
+            if job.get("twin") and r.get("twin_audio"):
+                t_out = Path(job["twin"]["out"]).with_suffix(r.get("twin_ext") or ".ogg")
+                t_out.parent.mkdir(parents=True, exist_ok=True)
+                t_out.write_bytes(base64.b64decode(r["twin_audio"]))
+                twin = {"path": str(t_out), "seconds": r.get("twin_seconds"), "how": r.get("twin_how")}
+        except (gpu_remote.GpuRemoteError, KeyError, ValueError, OSError) as e:
+            errors.append(str(e))
+            continue
+        results[i] = {"ok": True, "path": str(path), "seconds": r.get("seconds"),
+                      "device": r.get("device"), "elapsed": r.get("elapsed"), "id": i,
+                      **({"twin": twin} if twin else {}), **({"how": r["how"]} if r.get("how") else {})}
+        if on_piece is not None:
+            on_piece(i, results[i])
+    if not any(results):
+        raise ComposeError("the host's composer failed: " + (errors[-1] if errors else "no answer"))
+    return results
+
+
+def compose(prompt: str, seconds: float, out: Path, loop: bool = False,
+            timeout: int = 3600, local: bool = False, twin: Optional[Dict[str, Any]] = None,
+            melody_from: Optional[str] = None, leitmotif: Optional[Dict[str, Any]] = None,
+            heavy: bool = False) -> Dict[str, Any]:
+    """Compose one piece (blocking: a minute or two on a GPU, several on a CPU).
+    ``local``: on this machine's composer even when a GPU server is set. ``twin``
+    ({prompt, out}): also its dark twin, from the same music. ``melody_from``: this
+    piece is the dark twin of that (already composed) file."""
+    job: Dict[str, Any] = {"prompt": prompt, "seconds": seconds, "out": str(out), "loop": loop}
+    if twin:
+        job["twin"] = twin
+    if melody_from:
+        job["melody_from"] = str(melody_from)
+    if leitmotif:
+        job["leitmotif"] = leitmotif
+    if heavy:
+        job["heavy"] = True
+    return compose_many([job], timeout_each=timeout, local=local)[0]
+
+
+# --- what has been composed for this campaign ---
+def registry_path(campaign_dir) -> Path:
+    return Path(campaign_dir) / "music-composed.json"
+
+
+def load_registry(campaign_dir) -> Dict[str, Any]:
+    try:
+        data = json.loads(registry_path(campaign_dir).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    data.setdefault("themes", {})
+    data.setdefault("anthems", {})
+    return data
+
+
+def save_registry(campaign_dir, data: Dict[str, Any]) -> None:
+    path = registry_path(campaign_dir)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(path)
+
+
+def _key(table: Dict[str, Any], name: str) -> Optional[str]:
+    return next((k for k in table if k.strip().lower() == str(name).strip().lower()), None)
+
+
+def theme_file(campaign_dir, name: str, boss: bool) -> Optional[str]:
+    """The composed theme for this foe (the boss one when asked, else the other) - in
+    the version for how far they have fallen ("versions": {"normal": {"d1": file}}: the
+    deepest one their darkness has reached), else the one they have."""
+    reg = load_registry(campaign_dir)["themes"]
+    rec = reg.get(_key(reg, name)) or {}
+    folder = Path(campaign_dir) / "music" / "themes"
+    dark = character_arcs.state_of(campaign_dir, name)["dark"]
+    order = ("boss", "normal") if boss else ("normal", "boss")
+    for kind in order:
+        versions = {int(v[1:]): f for v, f in ((rec.get("versions") or {}).get(kind) or {}).items()
+                    if v[1:].isdigit() and (folder / f).is_file()}
+        reached = [d for d in versions if d <= dark]
+        if versions:
+            return versions[max(reached)] if reached else versions[min(versions)]
+        f = rec.get(kind)
+        if f and (folder / f).is_file():
+            return f
+    return None
+
+
+def has_theme(campaign_dir, name: str, boss: bool) -> bool:
+    reg = load_registry(campaign_dir)["themes"]
+    f = (reg.get(_key(reg, name)) or {}).get("boss" if boss else "normal")
+    return bool(f and (Path(campaign_dir) / "music" / "themes" / f).is_file())
+
+
+def anthem(campaign_dir, name: str) -> Optional[Dict[str, Any]]:
+    """This PC's anthem, in the version for where their story is now (if that one is
+    composed yet; else the one they had). None: no anthem yet."""
+    reg = load_registry(campaign_dir)["anthems"]
+    rec = reg.get(_key(reg, name))
+    folder = Path(campaign_dir) / "music" / "anthems"
+    if not rec or not (folder / rec.get("file", "")).is_file():
+        return None
+    now = character_arcs.version(character_arcs.spec(character_arcs.state_of(campaign_dir, name)))
+    got = (rec.get("versions") or {}).get(now)
+    if got and (folder / got.get("file", "")).is_file():
+        return {**rec, "file": got["file"], "seconds": got.get("seconds", rec.get("seconds")), "version": now}
+    return rec
+
+
+LEGACY = "s1-d0-w0-b0"     # what an anthem composed before story arcs is
+
+
+def has_version(campaign_dir, name: str, arc: Dict[str, Any]) -> bool:
+    """Is this PC's anthem composed for that point of their story?"""
+    reg = load_registry(campaign_dir)["anthems"]
+    rec = reg.get(_key(reg, name)) or {}
+    got = (rec.get("versions") or {}).get(character_arcs.version(arc))
+    if not got and not rec.get("versions") and rec.get("file") and character_arcs.version(arc) == LEGACY:
+        got = rec                                # (an anthem from before story arcs: the full theme)
+    return bool(got and (Path(campaign_dir) / "music" / "anthems" / got.get("file", "")).is_file())
+
+
+def dark_anthem(campaign_dir, name: str) -> Optional[Path]:
+    """The dark twin of this PC's anthem, if it was composed with it."""
+    rec = anthem(campaign_dir, name) or {}
+    path = Path(campaign_dir) / "music" / "anthems" / rec.get("dark", "")
+    return path if rec.get("dark") and path.is_file() else None
+
+
+def villain_theme_from_anthem(campaign_dir, name: str) -> Optional[str]:
+    """A PC turned villain: their anthem's dark twin becomes their theme, at once."""
+    dark = dark_anthem(campaign_dir, name)
+    if dark is None:
+        return None
+    out = Path(campaign_dir) / "music" / "themes" / f"{slug(name)}-theme{dark.suffix}"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_bytes(dark.read_bytes())
+    reg = load_registry(campaign_dir)
+    key = _key(reg["themes"], name) or name
+    reg["themes"].setdefault(key, {})["normal"] = out.name
+    save_registry(campaign_dir, reg)
+    return out.name
+
+
+def compose_pieces(campaign_dir, pieces: List[Dict[str, Any]],
+                   on_piece: Optional[Callable[[Dict[str, Any], str], None]] = None) -> List[Optional[str]]:
+    """Compose themes ({kind: theme, name, boss, look}) and anthems ({kind: anthem,
+    sheet}) together, with ONE model load. Each is registered (and ``on_piece(piece,
+    file)`` called) as soon as it lands. Returns the file names (None where a piece failed)."""
+    camp = Path(campaign_dir)
+    style = flavor(camp)
+    jobs = []
+    for p in pieces:
+        if p["kind"] == "theme":
+            out = camp / "music" / "themes" / f"{slug(p['name'])}-{'boss' if p['boss'] else 'theme'}.ogg"
+            jobs.append({"prompt": theme_prompt(p["name"], p.get("look", ""), style, p["boss"]),
+                         "seconds": THEME_SECONDS, "out": str(out), "loop": True})
+        elif p["kind"] in ("judgment", "dark_anthem"):       # (registered as themes: they play as one)
+            out = camp / "music" / "themes" / f"{slug(p['name'])}-theme.ogg"
+            prompt = judgment_prompt(style) if p["kind"] == "judgment" else dark_anthem_prompt(p["sheet"], style)
+            job = {"prompt": prompt, "seconds": THEME_SECONDS, "out": str(out), "loop": True,
+                   "heavy": p["kind"] == "dark_anthem"}
+            heroic = anthem(camp, p["name"]) if p["kind"] == "dark_anthem" else None
+            if heroic:                      # the twin of the anthem they had: the same music, dark
+                job["melody_from"] = str(camp / "music" / "anthems" / heroic["file"])
+            if p["kind"] == "dark_anthem":  # (with the melody model: their own tune, in the minor)
+                job["leitmotif"] = {"seed": p["name"], "mode": "minor", "cls": str((p.get("sheet") or {}).get("class") or "")}
+            jobs.append(job)
+        elif p["kind"] == "anthem_version":             # where the character's story is now
+            name = p["sheet"].get("name", "hero")
+            arc = p["spec"]
+            out = camp / "music" / "anthems" / f"anthem-{slug(name)}-{character_arcs.version(arc)}.ogg"
+            jobs.append({"prompt": anthem_prompt(p["sheet"], style, arc), "seconds": anthem_seconds(arc),
+                         "out": str(out), "loop": False,
+                         "leitmotif": {"seed": name, "mode": "major", "cls": str(p["sheet"].get("class") or ""),
+                                       "stage": arc["stage"], "dark": arc["dark"], "wound": arc["wound"]}})
+        else:
+            name = p["sheet"].get("name", "hero")
+            out = camp / "music" / "anthems" / f"anthem-{slug(name)}.ogg"
+            cls = str(p["sheet"].get("class") or "")       # (the class picks the kind of theme)
+            arc = p.get("spec") or {"stage": 1, "dark": 0, "wound": False, "warm": False}
+            # With its dark twin, from the same music: the villain theme they'd become.
+            jobs.append({"prompt": anthem_prompt(p["sheet"], style, arc), "seconds": anthem_seconds(arc),
+                         "out": str(out), "loop": False,
+                         "leitmotif": {"seed": name, "mode": "major", "cls": cls, "stage": arc["stage"],
+                                       "dark": arc["dark"], "wound": arc["wound"]},
+                         "twin": {"prompt": dark_anthem_prompt(p["sheet"], style), "loop": True,
+                                  "seconds": THEME_SECONDS,
+                                  "leitmotif": {"seed": name, "mode": "minor", "cls": cls},
+                                  "out": str(camp / "music" / "anthems" / f"anthem-{slug(name)}-dark.ogg")}})
+    files: List[Optional[str]] = [None] * len(pieces)
+
+    def landed(i: int, r: Dict[str, Any]) -> None:
+        p, f = pieces[i], Path(r["path"]).name
+        reg = load_registry(camp)
+        if p["kind"] in ("theme", "judgment", "dark_anthem"):
+            key = _key(reg["themes"], p["name"]) or p["name"]
+            reg["themes"].setdefault(key, {})["boss" if p.get("boss") else "normal"] = f
+        elif p["kind"] == "anthem_version":
+            name = p["sheet"].get("name", "hero")
+            key = _key(reg["anthems"], name) or name
+            rec = reg["anthems"].setdefault(key, {"file": f, "seconds": r.get("seconds")})
+            rec.setdefault("versions", {})[character_arcs.version(p["spec"])] = {
+                "file": f, "seconds": r.get("seconds", ANTHEM_SECONDS)}
+        else:
+            name = p["sheet"].get("name", "hero")
+            key = _key(reg["anthems"], name) or name
+            version = character_arcs.version(p.get("spec") or {"stage": 1, "dark": 0, "wound": False})
+            reg["anthems"][key] = {"file": f, "seconds": r.get("seconds", ANTHEM_SECONDS), "version": version,
+                                   "versions": {version: {"file": f, "seconds": r.get("seconds", ANTHEM_SECONDS)}}}
+            if r.get("twin"):
+                reg["anthems"][key].update(dark=Path(r["twin"]["path"]).name, dark_how=r["twin"].get("how"))
+        save_registry(camp, reg)
+        files[i] = f
+        if on_piece is not None:
+            on_piece(p, f)
+
+    compose_many(jobs, landed)
+    return files
+
+
+def compose_theme(campaign_dir, name: str, boss: bool, look: str = "") -> str:
+    out = Path(campaign_dir) / "music" / "themes" / f"{slug(name)}-{'boss' if boss else 'theme'}.ogg"
+    got = compose(theme_prompt(name, look, flavor(campaign_dir), boss), THEME_SECONDS, out, loop=True)
+    reg = load_registry(campaign_dir)
+    key = _key(reg["themes"], name) or name
+    reg["themes"].setdefault(key, {})["boss" if boss else "normal"] = Path(got["path"]).name
+    save_registry(campaign_dir, reg)
+    return Path(got["path"]).name
+
+
+def compose_anthem(campaign_dir, sheet: Dict[str, Any]) -> Dict[str, Any]:
+    name = sheet.get("name", "hero")
+    out = Path(campaign_dir) / "music" / "anthems" / f"anthem-{slug(name)}.ogg"
+    style = flavor(campaign_dir)
+    arc = character_arcs.spec(character_arcs.state_of(campaign_dir, name))
+    got = compose(anthem_prompt(sheet, style, arc), anthem_seconds(arc), out,
+                  twin={"prompt": dark_anthem_prompt(sheet, style), "loop": True, "seconds": THEME_SECONDS,
+                        "leitmotif": {"seed": name, "mode": "minor", "cls": str(sheet.get("class") or "")},
+                        "out": str(out.with_name(f"anthem-{slug(name)}-dark.ogg"))},
+                  leitmotif={"seed": name, "mode": "major", "cls": str(sheet.get("class") or ""),
+                             "stage": arc["stage"], "dark": arc["dark"], "wound": arc["wound"]})
+    reg = load_registry(campaign_dir)
+    key = _key(reg["anthems"], name) or name
+    version = character_arcs.version(arc)
+    f, secs = Path(got["path"]).name, got.get("seconds", ANTHEM_SECONDS)
+    reg["anthems"][key] = {"file": f, "seconds": secs, "version": version,
+                           "versions": {**(reg["anthems"].get(key) or {}).get("versions", {}),
+                                        version: {"file": f, "seconds": secs}},
+                           **({"how": got["how"]} if got.get("how") else {})}
+    if got.get("twin"):
+        reg["anthems"][key].update(dark=Path(got["twin"]["path"]).name, dark_how=got["twin"].get("how"))
+    save_registry(campaign_dir, reg)
+    return reg["anthems"][key]
+
+
+def normalize_files(campaign_dir) -> List[Dict[str, Any]]:
+    """Bring this campaign's composed pieces to the standard loudness (pieces
+    composed before the composer did that by itself are often very quiet)."""
+    py = composer_python()
+    if py is None:
+        raise ComposeError("the composer isn't set up (bash tools/gm-music-compose.sh setup)")
+    music = Path(campaign_dir) / "music"
+    files = sorted(str(f) for sub in ("themes", "anthems") for f in (music / sub).glob("*")
+                   if f.suffix.lower() in (".ogg", ".wav"))
+    if not files:
+        return []
+    done = subprocess.run([str(py), str(SCRIPT), "--normalize", *files], capture_output=True, text=True, **NO_WINDOW,
+                          encoding="utf-8", errors="replace", timeout=600, env={**os.environ, "PYTHONUTF8": "1"})
+    got = [json.loads(l) for l in done.stdout.splitlines() if l.strip().startswith("{")]
+    if not got:
+        tail = (done.stderr or done.stdout or "").strip().splitlines()[-3:]
+        raise ComposeError("the composer failed: " + " | ".join(tail))
+    return got
+
+
+def main() -> None:
+    """CLI behind tools/gm-music-compose.sh (theme / anthem / normalize / status)."""
+    import argparse
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from campaign_manager import CampaignManager
+    ap = argparse.ArgumentParser(description="Composed music for villains, bosses and heroes")
+    sub = ap.add_subparsers(dest="action", required=True)
+    t = sub.add_parser("theme", help="Compose a villain's theme (--boss: their boss battle theme)")
+    t.add_argument("name")
+    t.add_argument("--boss", action="store_true")
+    t.add_argument("--look", default="", help="What they're like (shapes the music)")
+    a = sub.add_parser("anthem", help="Compose a player character's heroic anthem")
+    a.add_argument("name")
+    sub.add_parser("normalize", help="Bring this campaign's composed music up to the standard loudness")
+    cl = sub.add_parser("class-of", help="A player character's class (prints nothing if none)")
+    cl.add_argument("name")
+    sub.add_parser("status", help="Is the composer set up? What has been composed?")
+    args = ap.parse_args()
+    if args.action == "class-of":
+        import party_roster
+        from character_schema import to_flat
+        from campaign_manager import CampaignManager
+        camp = CampaignManager(os.environ.get("GM_WORLD_STATE_BASE", "world-state")).get_active_campaign_dir()
+        path = party_roster.find_pc(camp, args.name) if camp else None
+        print(str(to_flat(json.loads(path.read_text(encoding="utf-8"))).get("class") or "") if path else "")
+        return
+
+    camp = CampaignManager(os.environ.get("GM_WORLD_STATE_BASE", "world-state")).get_active_campaign_dir()
+    if args.action == "status":
+        print(f"Composer: {'ready (' + str(composer_python()) + ')' if available() else 'not set up'}")
+        if camp:
+            reg = load_registry(camp)
+            for n, rec in reg["themes"].items():
+                print(f"  theme  {n}: {', '.join(f'{k} {v}' for k, v in rec.items())}")
+            for n, rec in reg["anthems"].items():
+                print(f"  anthem {n}: {rec['file']} ({rec.get('seconds')} s)")
+        return
+    if camp is None:
+        sys.exit("[ERROR] No active campaign.")
+    try:
+        if args.action == "normalize":
+            got = normalize_files(camp)
+            if not got:
+                print("Nothing composed in this campaign yet.")
+            for r in got:
+                name = Path(r["path"]).name
+                print(f"  [SUCCESS] {name}: {r['before_db']} -> {r['after_db']} dB" if r.get("ok")
+                      else f"  [FAILED]  {name}: {r.get('error')}")
+            return
+        if args.action == "theme":
+            f = compose_theme(camp, args.name, args.boss, args.look)
+            print(f"[SUCCESS] {args.name}'s {'boss ' if args.boss else ''}theme: music/themes/{f}")
+        else:
+            import party_roster
+            from character_schema import to_flat
+            path = party_roster.find_pc(camp, args.name)
+            if path is None:
+                names = ", ".join(party_roster.pc_names(camp)) or "none"
+                sys.exit(f"[ERROR] No player character named {args.name} in the active campaign "
+                         f"({camp.name}, in {camp.parent.parent}). Its player characters: {names}. "
+                         f"(Campaigns kept elsewhere? Set GM_WORLD_STATE_BASE in .env.)")
+            rec = compose_anthem(camp, to_flat(json.loads(path.read_text(encoding="utf-8"))))
+            how = {"leitmotif": "on their own tune", "melody": "on their own tune", "darkened": "the anthem darkened"}
+            print(f"[SUCCESS] {args.name}'s anthem: music/anthems/{rec['file']} ({rec['seconds']} s, "
+                  f"{how.get(rec.get('how'), 'composed freely (no melody model)')})")
+            if rec.get("dark"):
+                print(f"[SUCCESS] its dark twin: music/anthems/{rec['dark']} "
+                      f"({how.get(rec.get('dark_how'), rec.get('dark_how') or '')})")
+    except ComposeError as e:
+        sys.exit(f"[ERROR] {e}")
+
+
+if __name__ == "__main__":
+    main()
