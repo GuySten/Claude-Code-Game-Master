@@ -181,8 +181,9 @@ only ("root5", "root", "octaves": a third turns to mud). A surprise held back fo
 stage, never a bed for every piece. guitar_lead: a lead guitar of its own (overdriven, singing,
 near centre; one note at a time, legato, a delayed vibrato on held notes; E2-G5, best E4-E5) -
 a short solo in a later stage, where the chant rests (no falling slides: comic).
-A rock organ, synthesized: rock_organ, a tonewheel organ (888800000) overdriven through a
-rotating speaker, fast by default ("organ" switches it) - the church organ gone wild: riffs,
+A rock organ: rock_organ, a Hammond B3 (888800000) overdriven through a Leslie - setBfree's
+model of both (a synthesized one if it can't be built) - the speaker fast by default ("organ"
+switches it; it accelerates and brakes as a real one does) - the church organ gone wild: riffs,
 stabbed and held chords, C2-C7. Rarer still than the guitar: a boss's third stage or later.
 """
 

@@ -38,3 +38,23 @@ recordings given crossfaded loops; levels set to match the rest of the orchestra
 | `choir_oo`, `choir_oh` | Vowel Ensemble | Mihai Sorohan | free to render music with; the recordings not to be passed on |
 | `gong`, `bass_drum`, `anvil`, `brake_drum` | VSCO 2 Community Edition, Versilian Community Sample Library | Versilian Studios | CC0 1.0 |
 | `guitar`, `guitar_mute` | Standard Guitar | Unreal Instruments | licence free, no credit required |
+
+## The rock organ
+
+`rock_organ` is played by **setBfree** (Fredrik Kilander, Robin Gareus and Will Panther,
+<https://github.com/pantherb/setBfree>): a model of a Hammond B3 tonewheel organ, its preamp
+and its Leslie rotating speaker - code, not recordings. Version 0.8.12, its source fetched
+from Ubuntu's copy of the release,
+<https://archive.ubuntu.com/ubuntu/pool/universe/s/setbfree/setbfree_0.8.12+ds.orig.tar.xz>
+(SHA-256 `7a414b7ce8654fcc935c52465cac9a68d102811acb39d552c44daf5cbec4e087`, the checksum
+Ubuntu's `setbfree_0.8.12+ds-2build2.dsc` gives). Licence: the
+[GNU General Public License, version 2 or later](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html).
+
+`fetch_setbfree` compiles setBfree's tone generator, overdrive and rotating speaker (its
+reverb, JACK and LV2 parts left out) with `lib/music/setbfree_render.c` - a small program that
+plays the score's notes and speaker switches through them offline - into one program in
+`~/.cache/gm-orchestra/`, which the engine runs as a separate process. That file is licensed
+under the GPL, version 2 or later, like the code it is built with (not under this
+repository's licence); nothing else here links to setBfree. The synthesized organ in
+`orchestra.py` (`_organ_synth_stem`) is this repository's own, and plays when setBfree
+can't be built.

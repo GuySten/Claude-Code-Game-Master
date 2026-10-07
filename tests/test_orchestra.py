@@ -497,7 +497,7 @@ def test_the_guitar_falls_back_to_the_gm_guitar_through_a_cabinet(monkeypatch, c
 # --- the rock organ ---
 def test_the_rock_organ_is_a_tonewheel_organ_with_its_own_tuning_and_foldback():
     assert "rock_organ" in orchestra.PARTS and orchestra.ORGAN == {"rock_organ"}
-    assert len(orchestra.PARTS["rock_organ"]) == 4                     # (no sound set to fetch: synthesized)
+    assert len(orchestra.PARTS["rock_organ"]) == 4                     # (no sound set: setBfree, or synthesized)
     assert orchestra.RANGES["rock_organ"] == (36, 96)                  # a manual: C2-C7
     assert orchestra.send_db(orchestra.ROOM["rock_organ"]) == -12.0    # in front, mostly dry
     assert orchestra._organ_hz(69) == pytest.approx(440.0)             # A: the gears give 440 exactly
@@ -531,7 +531,7 @@ def test_the_rock_organ_turns_in_its_rotating_speaker():
     np = pytest.importorskip("numpy")
     rate = 44100
     for speed, horn, drum, lo, hi in (("fast", 6.7, 5.8, 3.0, 9.0), ("slow", 0.80, 0.67, 0.5, 1.5)):
-        first, stem = orchestra._organ_stem(_organ_chord(), int(7 * rate), rate, {"speaker": speed})
+        first, stem = orchestra._organ_synth_stem(_organ_chord(), int(7 * rate), rate, {"speaker": speed})
         s = stem.astype("float64")[int(0.5 * rate):int(5.9 * rate)]
         assert stem.shape[1] == 2 and float(abs(s).max()) > 0.01
         assert float(np.corrcoef(s[:, 0], s[:, 1])[0, 1]) < 0.9        # two mics: the speaker decorrelates them
@@ -547,7 +547,7 @@ def test_the_rock_organ_speaker_eases_from_slow_to_fast_where_the_score_says():
     np = pytest.importorskip("numpy")
     rate = 44100
     ev = _organ_chord(0.0, 9.0) + [(0.0, 3, "rock_organ", 0, 0), (4.0, 3, "rock_organ", 0, 1)]
-    first, stem = orchestra._organ_stem(ev, int(10 * rate), rate)
+    first, stem = orchestra._organ_synth_stem(ev, int(10 * rate), rate)
     s = stem.astype("float64")
     assert _mod_peak(np, s[int(0.2 * rate):int(3.9 * rate), 0], rate, (1500, 5000), 0.3, 9) < 1.2
     assert _mod_peak(np, s[int(5.5 * rate):int(8.9 * rate), 0], rate, (1500, 5000), 0.3, 9) > 5.5
@@ -562,14 +562,14 @@ def test_the_rock_organ_clicks_at_key_down_and_its_percussion_is_single_triggere
     np = pytest.importorskip("numpy")
     rate = 44100
     note = lambda t0, t1, k=62: [(t0, 1, "rock_organ", k, 100), (t1, 0, "rock_organ", k, 0)]   # noqa: E731
-    first, stem = orchestra._organ_stem(note(0.5, 1.5), int(2.5 * rate), rate)
+    first, stem = orchestra._organ_synth_stem(note(0.5, 1.5), int(2.5 * rate), rate)
     m = orchestra._filter(stem.astype("float64").mean(axis=1), [("hp", 2500, 0.7, 0)] * 2, rate)
     on, w = int(0.5 * rate) - first, int(0.008 * rate)
     steady = np.median([(m[on + i:on + i + w] ** 2).mean() for i in range(int(0.1 * rate), int(0.9 * rate), w)])
     assert (m[on:on + w] ** 2).mean() > 10 * steady                    # the click
     # percussion (the third harmonic, decaying): on a note from all keys up, not on one played legato
     ev = note(0.5, 2.5) + note(1.5, 2.5, 69)
-    upper = lambda o: orchestra._filter(orchestra._organ_stem(ev, int(3.5 * rate), rate, o)[1].astype("float64")   # noqa: E731
+    upper = lambda o: orchestra._filter(orchestra._organ_synth_stem(ev, int(3.5 * rate), rate, o)[1].astype("float64")   # noqa: E731
                                         .mean(axis=1), [("hp", 600, 0.7, 0)] * 2, rate)
     plain, perc = upper({}), upper({"percussion": "third"})
     level = lambda x, t: float((x[int(t * rate) - first:int((t + 0.08) * rate) - first] ** 2).mean())   # noqa: E731
@@ -596,6 +596,149 @@ def test_the_rock_organ_plays_in_the_orchestra_beside_the_guitar(monkeypatch):
     assert float(np.corrcoef(body[:, 0], body[:, 1])[0, 1]) < 0.95
     assert float(abs(out.send).max()) < 0.3 * float(abs(out).max())  # mostly dry, like the guitar
     assert orchestra.level_db("rock_organ") == orchestra.level_db("guitar")
+
+
+# --- the rock organ, played by setBfree ---
+def test_setbfree_is_fetched_once_from_its_pinned_source_and_kept_a_program_apart():
+    assert orchestra.EXTRA_FONTS["setbfree"] is orchestra.fetch_setbfree
+    assert orchestra.SETBFREE_URL.startswith("https://") and orchestra.SETBFREE_VERSION in orchestra.SETBFREE_URL
+    assert re.fullmatch(r"[0-9a-f]{64}", orchestra.SETBFREE_SHA256)
+    assert "GPL-2.0-or-later" in orchestra.SETBFREE_DRIVER.read_text()[:600]   # (GPL-2, like setBfree)
+    credits = (orchestra.SETBFREE_DRIVER.parent / "CREDITS.md").read_text()
+    assert "setBfree" in credits and orchestra.SETBFREE_SHA256 in credits
+
+
+def test_setbfree_wont_download_what_it_cant_build(tmp_path, monkeypatch):
+    import shutil
+    monkeypatch.delenv("CC", raising=False)
+    monkeypatch.setattr(shutil, "which", lambda name: None)
+    def no_download(*a, **k):
+        raise AssertionError("downloaded setBfree it then couldn't build")
+    monkeypatch.setattr(orchestra.urllib.request, "urlopen", no_download)
+    with pytest.raises(OSError, match="C compiler"):
+        orchestra.fetch_setbfree(dest=tmp_path / "setbfree_render", quiet=True)
+    assert not list(tmp_path.iterdir())
+
+
+def test_setbfree_wont_build_from_anything_but_its_pinned_source(tmp_path, monkeypatch):
+    monkeypatch.setenv("CC", "cc")
+    bad = tmp_path / "setbfree.tar.xz"
+    bad.write_bytes(b"not setBfree")
+    with pytest.raises(OSError, match="SHA-256"):
+        orchestra.fetch_setbfree(dest=tmp_path / "out" / "setbfree_render", quiet=True, src=bad)
+    assert not (tmp_path / "out" / "setbfree_render").exists()
+
+
+def _fake_setbfree(monkeypatch):
+    """setbfree_render stood in for: the events it is sent kept, a quiet tone played back."""
+    import subprocess
+    np = pytest.importorskip("numpy")
+    sent = []
+
+    def run(cmd, input=None, **kw):
+        sent.append(input.splitlines())
+        n = int(sent[-1][-1].split()[1])                             # ("end N": the last line)
+        tone = 0.1 * np.sin(2 * np.pi * 220 * np.arange(n) / int(cmd[1]))
+        np.stack([tone, tone], 1).astype("float32").tofile(cmd[2])
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+    monkeypatch.setattr(subprocess, "run", run)
+    monkeypatch.setattr(orchestra, "_SETBFREE", {"exe": Path("setbfree_render")})
+    return sent
+
+
+def test_the_scores_speaker_drawbars_and_percussion_reach_setbfree(monkeypatch):
+    sent = _fake_setbfree(monkeypatch)
+    rate = 44100
+    switch = lambda t, fast: (t, 3, "rock_organ", 0, int(fast))      # noqa: E731
+    ev = _organ_chord(12.0, 20.0, vel=127) + [switch(0.0, True), switch(1.0, False), switch(15.0, True),
+                                              switch(17.5, False)]
+    first, stem = orchestra._organ_stem(ev, int(21 * rate), rate, {"drawbars": "888000000", "percussion": "second"})
+    lines = sent[0]
+    assert first == int(11.99 * rate) and len(stem) == int(20.3 * rate) - first
+    start = first - int(orchestra.SETBFREE_PREROLL * rate)            # (it plays from here, the speaker turning)
+    assert lines[-1] == f"end {int(20.3 * rate) - start}"
+    for want in ("bars 888000000", "cc percussion.enable 127", "cc percussion.harmonic 127",
+                 "cc overdrive.enable 127", "speed 0", "swell 1.0000"):
+        assert want in lines, want                                   # (slow: as the switch before it left it)
+    assert not [line for line in lines if "reverb" in line]           # (the hall is the engine's)
+    at = lines.index("fast 1")
+    assert lines[at - 1] == f"at {int(15.0 * rate) - start}"           # switched where the score says,
+    assert lines[lines.index("fast 0", at) - 1] == f"at {int(17.5 * rate) - start}"   # setBfree easing it there
+    assert lines.index("on 50") < at < lines.index("off 50")
+
+
+def test_without_setbfree_the_synthesized_organ_plays_and_says_so_once(monkeypatch, capsys):
+    np = pytest.importorskip("numpy")
+    monkeypatch.setattr(orchestra, "_SETBFREE", {})
+    def offline(**kw):
+        raise OSError("offline")
+    monkeypatch.setattr(orchestra, "fetch_setbfree", offline)
+    rate = 22050
+    want = orchestra._organ_synth_stem(_organ_chord(0.0, 1.0), int(2 * rate), rate)
+    for _ in range(2):
+        first, stem = orchestra._organ_stem(_organ_chord(0.0, 1.0), int(2 * rate), rate)
+        assert first == want[0] and np.array_equal(stem, want[1])
+    err = capsys.readouterr().err
+    assert err.count("\n") == 1 and "no setBfree (offline)" in err and "synthesized rock organ plays" in err
+
+
+def test_a_failing_setbfree_gives_way_to_the_synthesized_organ(monkeypatch, capsys, tmp_path):
+    np = pytest.importorskip("numpy")
+    monkeypatch.setattr(orchestra, "_SETBFREE", {"exe": tmp_path / "not-there"})
+    rate = 22050
+    first, stem = orchestra._organ_stem(_organ_chord(0.0, 1.0), int(2 * rate), rate)
+    assert np.array_equal(stem, orchestra._organ_synth_stem(_organ_chord(0.0, 1.0), int(2 * rate), rate)[1])
+    assert "setBfree failed" in capsys.readouterr().err and orchestra._SETBFREE["exe"] is None
+
+
+@pytest.fixture
+def setbfree():
+    pytest.importorskip("numpy")
+    if not orchestra.SETBFREE.is_file():
+        pytest.skip("setBfree isn't built here (orchestra.fetch_setbfree)")
+    try:
+        return orchestra.fetch_setbfree(quiet=True)                  # (rebuilt if the driver changed)
+    except OSError as e:
+        pytest.skip(f"setBfree can't be rebuilt here: {e}")
+
+
+def test_setbfree_eases_its_speaker_from_slow_to_fast_where_the_score_says(setbfree):
+    np = pytest.importorskip("numpy")
+    rate = 44100
+    ev = [(0.0, 1, "rock_organ", 74, 105), (9.0, 0, "rock_organ", 74, 0), (0.0, 3, "rock_organ", 0, 0),
+          (4.0, 3, "rock_organ", 0, 1)]
+    # (one 8' wheel: no two wheels beating through the drive to swing the level too)
+    first, stem = orchestra._setbfree_stem(setbfree, ev, int(10 * rate), rate, {"drawbars": "008000000"})
+    s = stem.astype("float64")
+    assert stem.shape[1] == 2 and float(abs(s).max()) > 0.01
+    assert _mod_peak(np, s[int(0.2 * rate):int(3.9 * rate), 0], rate, (1500, 5000), 0.3, 9) < 1.0
+    assert 1.5 < _mod_peak(np, s[int(4.0 * rate):int(4.4 * rate), 0], rate, (1500, 5000), 0.3, 9) < 6.6   # speeding up
+    assert _mod_peak(np, s[int(5.5 * rate):int(8.9 * rate), 0], rate, (1500, 5000), 0.3, 9) > 6.6
+    P = np.abs(np.fft.rfft(s.mean(axis=1))) ** 2
+    assert P[np.fft.rfftfreq(len(s), 1 / rate) > 8000].sum() / P.sum() < 0.02
+
+
+def test_setbfree_plays_a_riff_on_time_and_as_loud_as_the_synthesized_organ(setbfree):
+    np = pytest.importorskip("numpy")
+    rate = 44100
+    ev = []
+    for bar in (0.5, 2.5):                                            # C, C-C, D-flat: power chords
+        for at, dur, keys, vel in ((0, 0.41, (48, 55, 60), 114), (0.5, 0.2, (48, 55, 60), 114),
+                                   (0.75, 0.2, (48, 55, 60), 114), (1.0, 0.92, (49, 56, 61), 118)):
+            ev += [e for k in keys for e in ((bar + at, 1, "rock_organ", k, vel), (bar + at + dur, 0, "rock_organ", k, 0))]
+    n = int(5 * rate)
+
+    def placed(first, stem):
+        y = np.zeros((n, 2))
+        y[first:first + len(stem)] = stem[:n - first]
+        return y
+    real = placed(*orchestra._setbfree_stem(setbfree, ev, n, rate, {}))
+    synth = placed(*orchestra._organ_synth_stem(ev, n, rate, {}))
+    loud = lambda y: orchestra.loudness(y, rate)["integrated"]        # noqa: E731
+    assert loud(real) == pytest.approx(loud(synth), abs=1.0)
+    e = np.convolve((real ** 2).sum(axis=1), np.ones(int(0.005 * rate)) / int(0.005 * rate), "same")
+    full = float(np.median(e[int(0.6 * rate):int(0.9 * rate)]))
+    assert np.argmax(e > full / 8) / rate - 0.5 < 0.02                # heard on the beat: no advance needed
 
 
 def _guitar_solo():

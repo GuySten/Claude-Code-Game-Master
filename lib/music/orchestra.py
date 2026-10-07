@@ -1488,7 +1488,8 @@ def _guitar_stem(syn, sfid, fonts, events: list, total: int, rate: int):
 # spinning all the time, a key connecting nine of them (its drawbars' footages) to the
 # output through nine busbar contacts. Then a tube preamp driven hard (the growl) and a
 # rotating speaker (a treble horn and a bass drum, spinning slow or fast), miked left and
-# right: the sound of 70s heavy rock and of Dancing Mad's last movement. No download.
+# right: the sound of 70s heavy rock and of Dancing Mad's last movement. setBfree plays it
+# when it can be built (below: a model of the real organ and speaker); this is its stand-in.
 ORGAN = {"rock_organ"}
 # The tonewheel generator's gears (C..B: driving / driven teeth) on a 20 rev/s shaft: its
 # tuning, within a cent or so of equal temperament - A is 440 exactly, the rest a little off.
@@ -1644,13 +1645,14 @@ def _leslie(x, rate: int, first: int, changes, fast: bool = True):
     return out
 
 
-def _organ_stem(events: list, total: int, rate: int, organ: Optional[dict] = None):
-    """The rock organ -> (first sample, stereo stem). Each key connects its drawbars' wheels
-    (free-running: a wheel two keys share is one sine, its phase its own since the organ was
-    switched on), each through a contact that closes a moment apart from the others and
-    chatters (the key click); single-triggered percussion if asked for; the swell (velocity)
-    into the overdriven preamp, then the rotating speaker - fast unless the score says slow
-    (``events`` with is_on 3: the speaker switched there, its "vel" 1 fast, 0 slow)."""
+def _organ_synth_stem(events: list, total: int, rate: int, organ: Optional[dict] = None):
+    """The synthesized rock organ (setBfree's stand-in) -> (first sample, stereo stem). Each
+    key connects its drawbars' wheels (free-running: a wheel two keys share is one sine, its
+    phase its own since the organ was switched on), each through a contact that closes a
+    moment apart from the others and chatters (the key click); single-triggered percussion if
+    asked for; the swell (velocity) into the overdriven preamp, then the rotating speaker -
+    fast unless the score says slow (``events`` with is_on 3: the speaker switched there, its
+    "vel" 1 fast, 0 slow)."""
     import numpy as np
     organ = organ or {}
     levels = _drawbar_levels(organ.get("drawbars", ORGAN_DRAWBARS))
@@ -1737,6 +1739,186 @@ def _organ_stem(events: list, total: int, rate: int, organ: Optional[dict] = Non
     stem = _leslie(driven, rate, first, changes, fast)
     stem = _studio_room(stem, rate) * 10 ** (ORGAN_LEVEL_DB / 20)
     return first, stem.astype("float32")
+
+
+# The real thing, modelled: setBfree (Fredrik Kilander and Robin Gareus; GPL-2) - a Hammond
+# B3's tone generator (its 91 wheels, their leakage and crosstalk, the key click), its preamp
+# overdriven and a Leslie (setBfree's whirl: the horn and the drum each accelerating and
+# braking as a real one's do), the reverb left out (the hall is the engine's). Played offline
+# by setbfree_render.c beside this file: a separate program, GPL-2 like the code it is built
+# with, compiled once in the cache from setBfree's pinned source (fetch_setbfree; a C compiler
+# needed) and run as a process. Missing or failing, the synthesized organ above plays.
+SETBFREE_VERSION = "0.8.12"
+SETBFREE_URL = ("https://archive.ubuntu.com/ubuntu/pool/universe/s/setbfree/"
+                "setbfree_0.8.12+ds.orig.tar.xz")      # (Ubuntu's copy of the release: 3.8 MB)
+SETBFREE_SHA256 = "7a414b7ce8654fcc935c52465cac9a68d102811acb39d552c44daf5cbec4e087"
+SETBFREE = Path(os.environ.get("ORCHESTRA_SETBFREE") or SF2.parent / f"setbfree-{SETBFREE_VERSION}"
+                / ("setbfree_render.exe" if os.name == "nt" else "setbfree_render"))
+SETBFREE_DRIVER = Path(__file__).resolve().parent / "setbfree_render.c"
+SETBFREE_SOURCES = ("src/midi.c", "src/state.c", "src/vibrato.c", "src/tonegen.c", "src/program.c",
+                    "src/pgmParser.c", "src/cfgParser.c", "b_reverb/reverb.c", "b_whirl/whirl.c",
+                    "b_whirl/eqcomp.c", "b_overdrive/overdrive.c")
+# Its preamp: setBfree's overdrive on, its "character" (0..127) at 96 - the bass pushed into
+# the tube and taken out after: one note ~20% distortion, a power chord ~45%, a full chord
+# ~55% at full swell (the synthesized organ's growl, measured the same way). The swell pedal
+# follows the velocity, (vel / 127) ** 1.5, eased over 30 ms: a harder chord drives harder.
+SETBFREE_DRIVE = 96
+SETBFREE_LEVEL_DB = -8.9    # its output: as loud as the synthesized organ (LUFS, the same riff)
+SETBFREE_PREROLL = 10.0     # s it plays before the first note: the speaker turning as it should
+_SETBFREE: Dict[str, object] = {}
+
+
+def fetch_setbfree(dest: Path = None, quiet: bool = False, src: Optional[Path] = None) -> Path:
+    """The rock organ's renderer: setBfree's source (SETBFREE_URL, its SHA-256 checked - or
+    ``src`` / ORCHESTRA_SETBFREE_SRC: the archive, or a folder it was unpacked to) compiled
+    with setbfree_render.c into one program (``dest``), once; rebuilt when the driver changes.
+    Needs a C compiler (CC, cc, gcc or clang)."""
+    import hashlib
+    import shutil
+    import subprocess
+    import tarfile
+    import tempfile
+    dest = Path(dest or SETBFREE)
+    driver = SETBFREE_DRIVER.read_bytes()
+    stamp = dest.with_name(dest.name + ".built")
+    built = hashlib.sha256(driver + SETBFREE_SHA256.encode()).hexdigest()
+    if dest.is_file() and stamp.is_file() and stamp.read_text().strip() == built:
+        return dest
+    cc = os.environ.get("CC") or next(filter(None, map(shutil.which, ("cc", "gcc", "clang"))), None)
+    if not cc:
+        raise OSError("no C compiler here (cc, gcc or clang; or CC) to build setBfree with")
+    src = src or os.environ.get("ORCHESTRA_SETBFREE_SRC")
+    src = Path(src) if src else None
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=dest.parent) as tmp:
+        root = Path(tmp) / "src"
+        if src is not None and src.is_dir():
+            root = src
+        else:
+            archive = src or dest.parent / SETBFREE_URL.rpartition("/")[2]   # (kept: 3.8 MB)
+            if not archive.is_file():
+                if not quiet:
+                    print(f"[orchestra] downloading setBfree {SETBFREE_VERSION} (3.8 MB, once): {SETBFREE_URL}",
+                          file=sys.stderr, flush=True)
+                part = archive.with_suffix(".part")
+                with urllib.request.urlopen(SETBFREE_URL, timeout=60) as r, open(part, "wb") as f:
+                    f.write(r.read())
+                part.replace(archive)
+            got = hashlib.sha256(archive.read_bytes()).hexdigest()
+            if got != SETBFREE_SHA256:
+                raise OSError(f"{archive.name} is not setBfree {SETBFREE_VERSION}'s source (SHA-256 {got})")
+            wanted = set(SETBFREE_SOURCES) | {"src", "b_reverb", "b_whirl", "b_overdrive"}
+            with tarfile.open(archive) as tar:                  # (its sources and headers: nothing else)
+                for m in tar.getmembers():
+                    parts = Path(m.name).parts
+                    rel = "/".join(parts[1:])
+                    if (m.isfile() and len(parts) == 3 and parts[1] in wanted and ".." not in parts
+                            and (rel in wanted or rel.endswith(".h"))):
+                        out = root / parts[1] / parts[2]
+                        out.parent.mkdir(parents=True, exist_ok=True)
+                        out.write_bytes(tar.extractfile(m).read())
+        exe = Path(tmp) / dest.name
+        cmd = [cc, "-O2", "-ffast-math", "-fno-finite-math-only", f'-DVERSION="{SETBFREE_VERSION}"',
+               *(f"-I{root / d}" for d in ("src", "b_overdrive", "b_whirl", "b_reverb")),
+               "-o", str(exe), str(SETBFREE_DRIVER), *(str(root / f) for f in SETBFREE_SOURCES), "-lm"]
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        if r.returncode != 0 or not exe.is_file():
+            raise OSError(f"setBfree didn't build: {(r.stderr or r.stdout).strip()[-300:]}")
+        exe.replace(dest)
+    stamp.write_text(built + "\n")
+    return dest
+
+
+def _setbfree() -> Optional[Path]:
+    """setBfree's renderer, built (once a process) - or None, said once: the synthesized organ."""
+    if "exe" not in _SETBFREE:
+        try:
+            _SETBFREE["exe"] = fetch_setbfree(quiet=True)
+        except Exception as e:                                  # (offline, no compiler: the stand-in)
+            _SETBFREE["exe"] = None
+            print(f"[orchestra] no setBfree ({e}): the synthesized rock organ plays "
+                  f"(orchestra.fetch_setbfree builds the real one)", file=sys.stderr)
+    return _SETBFREE["exe"]
+
+
+def _setbfree_stem(exe: Path, events: list, total: int, rate: int, organ: Optional[dict] = None):
+    """The rock organ played by setBfree -> (first sample, stereo stem): the notes on its upper
+    manual (the drawbars and percussion the score asks for), the swell following the velocity,
+    the speaker switched where the score says (``events`` with is_on 3, "vel" 1 fast, 0 slow:
+    setBfree accelerates and brakes it) - started SETBFREE_PREROLL early, the speaker already
+    turning as the earlier switches left it."""
+    import bisect
+    import subprocess
+    import tempfile
+    import numpy as np
+    organ = organ or {}
+    fast = organ.get("speaker", "fast") != "slow"
+    evs = sorted(events, key=lambda e: (e[0], e[1]))
+    ons = [e for e in evs if e[1] == 1]
+    if not ons:
+        return total, np.zeros((0, 2), dtype="float32")
+    times = [e[0] for e in ons]
+    first = max(0, int((ons[0][0] - 0.01) * rate))
+    start = max(0, first - int(SETBFREE_PREROLL * rate))
+    lines = [f"bars {organ.get('drawbars', ORGAN_DRAWBARS)}", "cc vibrato.upper 0",
+             "cc overdrive.enable 127", f"cc overdrive.character {SETBFREE_DRIVE}"]
+    harm = {"second": 127, "third": 0}.get(organ.get("percussion") or "")
+    lines += [f"cc percussion.enable {0 if harm is None else 127}", "cc percussion.volume 0",
+              "cc percussion.decay 127", f"cc percussion.harmonic {harm or 0}"]
+    for t, is_on, _, _, vel in evs:                             # (the speaker as it turns at the start)
+        if is_on == 3 and int(t * rate) <= start:
+            fast = bool(vel)
+    lines.append(f"speed {int(fast)}")
+    held: Dict[int, int] = {}
+    end, last = first, None
+    for t, is_on, _, key, vel in evs:
+        at = max(0, int(t * rate) - start)
+        if is_on == 3:
+            if at > 0:
+                lines += [f"at {at}", f"fast {int(bool(vel))}"]
+            continue
+        if is_on == 1:
+            if last is None or t - last > 0.02:                 # (a chord's notes: one swell, its loudest)
+                last = t
+                loud = max(e[4] for e in ons[bisect.bisect_left(times, t):bisect.bisect_right(times, t + 0.02)])
+                lines += [f"at {at}", f"swell {(max(1, min(127, loud)) / 127) ** 1.5:.4f}"]
+            held[key] = held.get(key, 0) + 1
+            if held[key] == 1:
+                lines += [f"at {at}", f"on {key}"]
+        elif is_on == 0 and held.get(key):
+            held[key] -= 1
+            if not held[key]:
+                lines += [f"at {at}", f"off {key}"]
+            end = max(end, int(t * rate))
+    if any(held.values()):
+        end = total
+    end = min(total, end + int(0.3 * rate))                     # (the speaker's own ring: short)
+    if end <= first:
+        return total, np.zeros((0, 2), dtype="float32")
+    lines.append(f"end {end - start}")
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "organ.f32"
+        r = subprocess.run([str(exe), str(rate), str(out)], input="\n".join(lines) + "\n", text=True,
+                           capture_output=True, timeout=120 + (end - start) / rate)
+        if r.returncode != 0:
+            raise OSError(f"setbfree_render failed: {r.stderr.strip()[-200:]}")
+        stem = np.fromfile(out, dtype="float32").reshape(-1, 2)[first - start:end - start].astype("float64")
+    if len(stem) < end - first:
+        raise OSError(f"setbfree_render played {len(stem)} of {end - first} samples")
+    return first, (_studio_room(stem, rate) * 10 ** (SETBFREE_LEVEL_DB / 20)).astype("float32")
+
+
+def _organ_stem(events: list, total: int, rate: int, organ: Optional[dict] = None):
+    """The rock organ -> (first sample, stereo stem): setBfree when it is built here (or can
+    be), the synthesized organ when not, or when setBfree fails (said once)."""
+    exe = _setbfree()
+    if exe:
+        try:
+            return _setbfree_stem(exe, events, total, rate, organ)
+        except Exception as e:
+            _SETBFREE["exe"] = None
+            print(f"[orchestra] setBfree failed ({e}): the synthesized rock organ plays", file=sys.stderr)
+    return _organ_synth_stem(events, total, rate, organ)
 
 
 # The lead guitar (guitar_lead): a solo line, the classic overdriven lead voice. The same amp
@@ -1855,7 +2037,8 @@ def _guitar_lead_stem(syn, sfid, fonts, events: list, total: int, rate: int):
 
 EXTRA_FONTS = {"chorus": fetch_choir, "vowels": fetch_vowels, "perc": fetch_percussion,
                "guitar": fetch_guitar, "strings_short": fetch_strings_short, "brass": fetch_brass,
-               "horn_solo": fetch_horn_solo}
+               "horn_solo": fetch_horn_solo,
+               "setbfree": fetch_setbfree}      # (the rock organ's: a program, not a sound set - _setbfree)
 
 
 def available() -> bool:
@@ -1886,7 +2069,7 @@ LOUDNESS = {
     # a distorted guitar is dense (its peaks barely over its body): heard well there
     "guitar": 0.0, "guitar_mute": 0.0,
     "guitar_lead": 0.0,     # (its LEAD_LEVEL_DB: a held line ~3 LU over the rhythm guitar's chords)
-    # the rock organ through its speaker (ORGAN_LEVEL_DB): set where the guitar sits
+    # the rock organ through its speaker (ORGAN_LEVEL_DB, SETBFREE_LEVEL_DB): set where the guitar sits
     "rock_organ": 0.0,
 }
 # (The parts that play their own recordings - OWN, STRINGS_SHORT's short notes - are evened out
@@ -2019,7 +2202,7 @@ def _stem(syn, sfid, fonts, name: str, events: list, total: int, rate: int, shor
         return _guitar_lead_stem(syn, sfid, fonts, events, total, rate)
     if part in GUITAR:                                      # (the guitar: its own player, an amp)
         return _guitar_stem(syn, sfid, fonts, events, total, rate)
-    if part in ORGAN:                                       # (the rock organ: synthesized)
+    if part in ORGAN:                                       # (the rock organ: setBfree, or synthesized)
         return _organ_stem(events, total, rate, organ)
     if short:
         return _sampled_stem(syn, fonts["strings_short"], part, STRINGS_SHORT[part], events, total, rate)
@@ -2111,6 +2294,8 @@ def play_layers(score: Score, seconds: float, layer_of, sf2: Path = SF2, rate: i
         if k is not None and part in STRINGS_SHORT:
             need.add("strings_short")
     syn, sfid, fonts = _synth(rate, sf2, sorted(need))
+    if any(k is not None and name.partition(":")[0] in ORGAN for name, k in wanted.items()):
+        _setbfree()                                     # (built - or its stand-in said - before the workers)
     organ = dict(getattr(score, "organ", None) or {})
     for name, events in groups.items():
         k = wanted[name]
