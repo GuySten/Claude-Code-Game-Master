@@ -415,6 +415,18 @@ def test_the_guitar_wont_download_what_it_cant_unpack(tmp_path, monkeypatch):
     assert not (tmp_path / "guitar.sf2").exists()
 
 
+
+def test_the_guitar_unpacks_with_bsdtar_into_a_folder_not_made_yet(tmp_path, monkeypatch):
+    # bsdtar's -C fails when its folder doesn't exist (it doesn't make it): the real guitar
+    # then fell back to the General MIDI one on a machine whose only unpacker was bsdtar.
+    fake = tmp_path / "bsdtar"
+    fake.write_text('#!/bin/sh\nwhile [ "$1" != "-C" ]; do shift; done\n[ -d "$2" ] || exit 1\n')
+    fake.chmod(0o755)
+    monkeypatch.setattr(orchestra, "_rar_tools", lambda: [str(fake)])
+    out = tmp_path / "guitar-src" / "new"
+    orchestra._unpack_rar(tmp_path / "guitar.rar", out, ["*.wav"])
+    assert out.is_dir()
+
 def test_a_third_on_the_distorted_guitar_is_flagged_power_chords_are_not():
     import arrangement as A
     s = {"tune": {"seed": "Test Hero", "cls": "Fighter"}, "tempo": 120, "statements": [],

@@ -56,10 +56,14 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
     riffs of cellos, basses and bassoons in bare fifths. Carry the tune in a blend (flutes +
     clarinets, horns + violins, violins in octaves + flutes); brass and bassoons go with
     strings or underneath, for weight. A start can be quiet - it can't be made of the weak
-    sounds. A deep floor needs a key whose tonic sits in the basses' lowest octave (E1-D#2;
-    their B1 is thin). [H, Kestrel: "a weak start and weaker instruments, and weaker combination"; "it's
-    not always good to start strong"; the brass "really weak" as a lead] (critic: the tune on
-    brass or low reeds alone)
+    sounds, nor of sounds the table can't hear: within 4 s something plays at C3 or above (or a
+    snare, cymbal or gong). A pulse of basses and big drums alone is heard as silence on the
+    laptop speakers and earbuds the table plays on. A deep floor needs a key whose tonic sits in
+    the basses' lowest octave (E1-D#2; their B1 is thin) - under the opening, never instead of
+    it. [H, Kestrel: "a weak start and weaker instruments, and weaker combination"; "it's not
+    always good to start strong"; the brass "really weak" as a lead; the Heartstone's E1
+    heartbeat, 6 s before its tune: "why is the theme silent at the start?"] (critic: the tune
+    on brass or low reeds alone; an opening only low drums and notes under C3 play for 4 s+)
     The voices can't run: a sampled choir or the solo voice changing notes faster than every 1 s
     sounds wrong [H, the Saint's hymn on eighths at 126: "the choir cannot do fast changes, they sound
     like an instrument"; again of a men's choir at 0.56 s a note; of her solo voice: "she cannot do fast
