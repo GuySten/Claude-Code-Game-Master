@@ -473,3 +473,10 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   density (both stages are as busy as the Margrave's "great" ones): the briefs aimed at dark-but-calm
   (suspense) instead of dark-and-energised (a fight), and banned the dark grandeur that makes a villain
   thrilling to face. Now briefs.md P1, a reviewer check, boss-music.md 14a.
+- **The Saint's fight rebuilt for excitement** (stage 1 a dark rock drive at 144 with drops and crashes;
+  stage 2 a 12/8 gallop at 84 under the chant): "the transformation from stage 1 to stage 2 is not exciting
+  enough... and then stage 2 is not that exciting... the problem is that stage 2 should be a lot more exciting
+  than stage 1." Measured: the wounding blow no louder than stage 1, the quiet under the narration dying into
+  2 s of silence, the entry no louder than either stage; and stage 2's body below stage 1 on every drive
+  measure (the slow tempo chosen so the choir could sing every note). Now boss-music.md 3a; the choir takes
+  the long notes and the strings and brass the quick ones (the Margrave's stage 2 model).

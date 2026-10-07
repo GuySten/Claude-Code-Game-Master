@@ -38,6 +38,12 @@ Ordinary fights share one campaign battle cue and get none of this.
    the story says [H, the Saint's 6/8 fire-dance in F# major colours, piccolo and high choir
    over a thinned bass: "read as playful... certainly not boss music"]. A recipe or a
    research example never overrides a host verdict.
+3a. **Each later stage is a lot more exciting than the one before** (the host, of the Saint: "stage 2
+   should be a lot more exciting than stage 1"; her first stage 2 had *less* drive than stage 1 - 17.5
+   notes and 2.3 drum hits a second against 29.9 and 4.0 - and "the transformation... is not exciting
+   enough"). Measure it against the earlier stage's render: clearly more notes and drum hits per second,
+   a louder body, forces the earlier stage held back - and a transformation that climbs under the
+   narration (never dying into quiet or silence) into an entry that is the loudest moment of the fight so far.
 4. **The table must know the tune first; hold back its grandest form, not its notes.**
    A leitmotif is recognised in a reprise far more easily than in a variation, and stage 1
    is where the players learn the boss (the host could not tell whether a stage 2 had
