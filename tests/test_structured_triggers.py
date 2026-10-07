@@ -64,3 +64,57 @@ def test_expiry_matches_whole_words_not_substrings(dcc_world):
 
     at_dawn = {"location": "camp", "time": "dawn", "present_npcs": [], "events": []}
     assert cm._is_expired({"expiry": "dawn"}, at_dawn)
+
+
+def _campaign(tmp_path, name="The Striding Keep"):
+    ws = tmp_path / "world-state"
+    camp = ws / "campaigns" / "k"
+    camp.mkdir(parents=True)
+    (ws / "active-campaign.txt").write_text("k")
+    (camp / "campaign-overview.json").write_text(json.dumps({"campaign_name": name}))
+    return str(ws), camp
+
+
+def test_free_text_trigger_needs_the_real_time_not_the_campaign_name(tmp_path):
+    # A playtest's "Dawn in the Keep" fired two seconds after it was written, at
+    # "before dawn": the matcher looked for substrings, and "keep" is in the
+    # campaign's own name.
+    ws, _ = _campaign(tmp_path)
+    cm = ConsequenceManager(ws)
+    cm.add_consequence("The Stone reaches for Kestrel", "Dawn in the Keep")
+    before = {"location": "The Keep's lower ward", "time": "an hour before dawn", "present_npcs": []}
+    assert cm.check_pending(before, limit=10) == []
+    at_dawn = {"location": "The Hip", "time": "Dawn", "present_npcs": []}
+    assert [c["consequence"] for c in cm.check_pending(at_dawn, limit=10)] == ["The Stone reaches for Kestrel"]
+
+
+def test_free_text_and_structured_triggers_match_whole_words(tmp_path):
+    ws, _ = _campaign(tmp_path, name="Ashes")
+    cm = ConsequenceManager(ws)
+    cm.add_consequence("The ferryman wants paying", "back at the ship")
+    cm.add_consequence("Smugglers wait", "harbour", trigger_type="on_location", match="hip")
+    at = {"location": "The Hip of the Worship hall", "time": "noon", "present_npcs": []}
+    assert [c["consequence"] for c in cm.check_pending(at, limit=10)] == ["Smugglers wait"]
+    ship = {"location": "On the ship", "time": "noon", "present_npcs": []}
+    assert [c["consequence"] for c in cm.check_pending(ship, limit=10)] == ["The ferryman wants paying"]
+    # A structured on_time "dawn" no longer fires at "before dawn" either.
+    cm.add_consequence("Tithe due", "dawn", trigger_type="on_time", match="dawn")
+    assert not any(c["consequence"] == "Tithe due" for c in cm.check_pending(
+        {"location": "x", "time": "before dawn", "present_npcs": []}, limit=10))
+
+
+def test_void_strikes_a_mistake_instead_of_resolving_it(tmp_path):
+    ws, camp = _campaign(tmp_path)
+    cm = ConsequenceManager(ws)
+    wrong = cm.add_consequence("[Clock — Kell Ford] The Keep crushes the holdfast", "clock ran out")
+    real = cm.add_consequence("Guards hunt the party", "next time")
+    cm.resolve(real)
+    assert cm.void(wrong, reason="clock ticked by small time steps")
+    assert cm.void(real)                      # a mistaken resolve can be voided too
+    data = json.loads((camp / "consequences.json").read_text(encoding="utf-8"))
+    assert data["active"] == [] and data["resolved"] == []
+    voided = {c["id"]: c for c in data["voided"]}
+    assert voided[wrong]["void_reason"] == "clock ticked by small time steps"
+    assert voided[wrong]["voided_from"] == "active" and voided[real]["voided_from"] == "resolved"
+    assert "resolved" not in voided[real]
+    assert not cm.void("nope")

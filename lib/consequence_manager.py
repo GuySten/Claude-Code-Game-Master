@@ -4,6 +4,7 @@ Consequence management module for GM tools
 Handles tracking future events and consequences
 """
 
+import re
 import sys
 import uuid
 from typing import Dict, List, Optional, Any
@@ -13,6 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from entity_manager import EntityManager, npcs_present
+from time_manager import time_period
 
 
 class ConsequenceManager(EntityManager):
@@ -151,35 +153,80 @@ class ConsequenceManager(EntityManager):
         pattern = r'\b' + re.escape(str(expiry).lower()) + r'\b'
         return re.search(pattern, self._world_text(world_state)) is not None
 
+    # Free-text trigger words that carry no meaning of their own.
+    STOP_WORDS = {'the', 'a', 'an', 'or', 'and', 'if', 'when', 'party', 'to', 'in', 'on',
+                  'at', 'of', 'for', 'more', 'than', 'again', 'next', 'with', 'makes'}
+
+    @staticmethod
+    def _words(text: Any) -> List[str]:
+        return re.findall(r"[a-z0-9]+", str(text or '').lower())
+
+    @staticmethod
+    def _has_phrase(phrase: str, text: str) -> bool:
+        """`phrase` as whole words in `text` ("hip" is in "the hip", not in "ship")."""
+        phrase = ' '.join(ConsequenceManager._words(phrase))
+        return bool(phrase) and re.search(
+            r'(?<![a-z0-9])' + re.escape(phrase) + r'(?![a-z0-9])',
+            ' '.join(ConsequenceManager._words(text))) is not None
+
+    @staticmethod
+    def _time_matches(wanted: str, world_time: str) -> bool:
+        """A time word matches the time of day it is, not the text: "before dawn"
+        is not dawn. A plain "night" covers the deep night too."""
+        want, now = time_period(wanted), time_period(world_time)
+        if want is None:
+            return ConsequenceManager._has_phrase(wanted, world_time)
+        return want == now or (want == 'night' and now == 'deep night')
+
+    def _campaign_words(self, world_state: Dict[str, Any]) -> set:
+        """The campaign's own name ("The Striding Keep"): every scene is in it, so
+        its words say nothing about whether a trigger has come."""
+        name = world_state.get('campaign')
+        if name is None:
+            overview = self.json_ops.load_json("campaign-overview.json") or {}
+            name = overview.get('campaign_name') or overview.get('name') or ''
+        return set(self._words(name))
+
     def _evaluate_trigger(self, consequence: Dict[str, Any], world_state: Dict[str, Any]):
-        """Return (score, reason). 0 = ignore; >= 0.3 near-miss; >= 0.5 match. Structured = 1.0."""
+        """Return (score, reason). 0 = ignore; >= 0.3 near-miss; >= 0.5 match. Structured = 1.0.
+
+        Words match whole (never inside another word), time words match the time
+        of day it actually is, and the campaign's own name never counts.
+        """
         ttype = consequence.get('trigger_type')
         match = str(consequence.get('match', '')).lower()
 
         if ttype and match:
-            if ttype == 'on_location' and match in str(world_state.get('location', '')).lower():
+            if ttype == 'on_location' and self._has_phrase(match, world_state.get('location', '')):
                 return 1.0, f"at location matching '{consequence['match']}'"
             if ttype == 'on_npc':
-                npcs = ' '.join(str(x) for x in world_state.get('present_npcs', []) or []).lower()
-                if match in npcs:
+                npcs = ' '.join(str(x) for x in world_state.get('present_npcs', []) or [])
+                if self._has_phrase(match, npcs):
                     return 1.0, f"NPC matching '{consequence['match']}' present"
-            if ttype == 'on_time' and match in str(world_state.get('time', '')).lower():
+            if ttype == 'on_time' and self._time_matches(match, str(world_state.get('time', ''))):
                 return 1.0, f"time matching '{consequence['match']}'"
             if ttype == 'on_event':
-                events = ' '.join(str(x) for x in world_state.get('events', []) or []).lower()
-                if match in events:
+                events = ' '.join(str(x) for x in world_state.get('events', []) or [])
+                if self._has_phrase(match, events):
                     return 1.0, f"event matching '{consequence['match']}'"
             return 0.0, ''
 
         # Legacy free-text: score word overlap between the trigger phrase and world.
-        world_text = self._world_text(world_state)
-        stop = {'the', 'a', 'an', 'or', 'and', 'if', 'when', 'party', 'to', 'in', 'on',
-                'at', 'of', 'for', 'more', 'than', 'again', 'next', 'with', 'makes'}
-        words = {w.strip('.,;:\'"') for w in str(consequence.get('trigger', '')).lower().split()}
-        words = {w for w in words if w and w not in stop and len(w) > 2}
+        world_words = set(self._words(self._world_text(world_state)))
+        world_time = str(world_state.get('time', ''))
+        ignore = self.STOP_WORDS | self._campaign_words(world_state)
+        words = {w for w in self._words(consequence.get('trigger', ''))
+                 if w not in ignore and len(w) > 2}
         if not words:
             return 0.0, ''
-        hits = [w for w in words if w in world_text]
+
+        def hit(w: str) -> bool:
+            if time_period(w) is not None:
+                return self._time_matches(w, world_time)
+            return (w in world_words or (w.endswith('s') and w[:-1] in world_words)
+                    or w + 's' in world_words)
+
+        hits = [w for w in words if hit(w)]
         score = len(hits) / len(words)
         if score >= self.FIRE_SCORE:
             return score, f"fuzzy match on: {', '.join(sorted(hits))}"
@@ -305,6 +352,7 @@ class ConsequenceManager(EntityManager):
             "date": overview.get("current_date", ""),
             "present_npcs": present,
             "events": [],
+            "campaign": overview.get("campaign_name") or overview.get("name") or "",
         }
         return self.tick(world_state, limit=limit)
 
@@ -335,6 +383,36 @@ class ConsequenceManager(EntityManager):
         else:
             print(f"[ERROR] Consequence '{consequence_id}' not found")
 
+        return False
+
+    def void(self, consequence_id: str, reason: str = None) -> bool:
+        """Strike a consequence that was a mistake (a clock that filled by error, a
+        beat that fired at the wrong time). Unlike resolve, it is not recorded as
+        having happened: it leaves active (or resolved) for 'voided', with why."""
+        data = self.json_ops.load_json(self.consequences_file)
+        found = None
+        for section in ('active', 'resolved'):
+            keep = []
+            for c in data.get(section, []):
+                if found is None and c.get('id') == consequence_id:
+                    found = dict(c)
+                    found['voided_from'] = section
+                else:
+                    keep.append(c)
+            if found is not None:
+                data[section] = keep
+                break
+        if found is None:
+            print(f"[ERROR] Consequence '{consequence_id}' not found")
+            return False
+        found.pop('resolved', None)
+        found['voided'] = self.json_ops.get_timestamp()
+        if reason:
+            found['void_reason'] = reason
+        data.setdefault('voided', []).append(found)
+        if self.json_ops.save_json(self.consequences_file, data):
+            print(f"[SUCCESS] Voided (never happened): {found['consequence']}")
+            return True
         return False
 
     def list_resolved(self) -> List[Dict[str, Any]]:
@@ -411,6 +489,11 @@ def main():
     resolve_parser = subparsers.add_parser('resolve', help='Resolve a consequence')
     resolve_parser.add_argument('id', help='Consequence ID')
 
+    # Void: a mistake, struck from the record (not "it happened")
+    void_parser = subparsers.add_parser('void', help='Void a mistaken consequence (never happened)')
+    void_parser.add_argument('id', help='Consequence ID')
+    void_parser.add_argument('--reason', help='Why it was a mistake')
+
     # List resolved
     subparsers.add_parser('list-resolved', help='List resolved consequences')
 
@@ -477,6 +560,10 @@ def main():
 
     elif args.action == 'resolve':
         if not manager.resolve(args.id):
+            sys.exit(1)
+
+    elif args.action == 'void':
+        if not manager.void(args.id, reason=args.reason):
             sys.exit(1)
 
     elif args.action == 'list-resolved':
