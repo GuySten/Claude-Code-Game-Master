@@ -195,9 +195,24 @@ once, then its body loops (`"loop_from"`).
    lead solo (`guitar_lead`: overdriven, singing, near centre) is allowed in a later stage where the chant
    rests or only holds - a few bars built from the boss's hook, climbing (the host: "a short solo guitar
    to higher notes could lift it up"); never a falling bend.
-3c. **The rock organ is a third stage's surprise** - rarer still (the host: "rock organ sounds cool"): an
-   overdriven tonewheel organ through a rotating speaker (Dancing Mad's last movement), held back for a
-   stage 3 or later, heard first at its entry. For a sacred villain it is the church organ gone wild.
+3c. **A third stage's surprise is the boss's own voice** - the sound that *is* this boss, held back the
+   whole fight and revealed at stage 3's entry, chosen from the boss's story (its fable), never one
+   instrument for every boss (the host, after the rock organ: "I also am not sure rock organ is surprising
+   enough for stage 3... we need to think what we will do for other bosses"). The brief names it; the
+   review checks the table has not heard it earlier in this fight, and no two bosses of one campaign share
+   it. A palette (the boss's kind -> its stage-3 voice):
+   - a singer, priest or siren -> a solo human voice singing the tune (the Ashen Saint, its first use:
+     "she sings the dawn hymn while the pyre is lit"; Malenia's second phase);
+   - a boss with a signature instrument (the Margrave's solo violin) -> that instrument breaking loose;
+   - a cult leader, god or demon -> a choir chanting words or the boss's name (One-Winged Angel);
+   - a false god or mad worshippers -> the rock organ (`rock_organ`: Dancing Mad's last movement; the host:
+     "rock organ sounds cool");
+   - a smith, machine or forge-lord -> industrial metal percussion (`anvil`, `brake_drum`);
+   - a warlord or an army -> a war-drum ensemble (`taiko`, `bass_drum`, `toms`);
+   - a bell tower or the sea's depths -> bells gone wild;
+   - a child, doll or fey thing -> a music box or celesta turned sinister;
+   - an eldritch thing, an aberration, something from outside the world -> electronic / synth sounds.
+   Whatever it is, stage 3 is heavier and develops (3a), it is never just faster.
 14a. **An introduction only where the encounter has one.** When the boss is revealed slowly (a chapel
     entered, a ritual interrupted, words exchanged), their theme can play before initiative as the
     suspense, and the stage-1 entry lands when the fight begins. Not every boss gets one (the host: "not
