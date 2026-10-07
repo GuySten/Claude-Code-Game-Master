@@ -527,3 +527,8 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   loudness mastering, short strings and VPO brass): "it is the best 'boss' music so far. But I feel like the
   guitar is not present enough" - the guitar sat 5-11 dB under the orchestra and the choir, kept low so it
   would never cover the voices. A held-back surprise must be heard as one: present, not a texture.
+- **The guitar's level in the Saint's stage 2** (A/B, 25 s from the eruption; the guitar now plays her hook as power
+  chords at the eruption and leads each slam): "forward [about 1 dB over the orchestra in the drive] is better
+  overall but in the start it made the fact that the guitar is bad more obvious". The level is right; the
+  sound is not good enough exposed - clip 8 passed under the orchestra. Fix the guitar's tone at the source
+  (a real amp model and cabinet), and until then never expose it alone.
