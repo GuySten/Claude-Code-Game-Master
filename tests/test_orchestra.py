@@ -136,6 +136,117 @@ def test_mastering_keeps_a_climax_above_what_led_to_it():
     assert np.abs(out).max() <= 0.9
 
 
+def _chord(np, rate, seconds, amp, seed=1):
+    """A sustained stereo chord with a little noise: dense, low crest."""
+    t = np.arange(int(rate * seconds)) / rate
+    rng = np.random.default_rng(seed)
+    x = sum(np.sin(2 * np.pi * f * t + p) for f, p in ((220, 0), (277, 1), (330, 2), (440, 3)))
+    x = np.stack([x, np.roll(x, 37)], 1) + 0.3 * rng.standard_normal((len(t), 2))
+    return (amp * x / np.abs(x).max()).astype("float32")
+
+
+def _hits(np, rate, seconds, amp, every=0.5, seed=2):
+    """Drum hits: short bursts that die away fast - peaky, a high crest."""
+    rng = np.random.default_rng(seed)
+    n = int(rate * seconds)
+    x = np.zeros((n, 2))
+    k = int(rate * 0.25)
+    burst = rng.standard_normal((k, 2)) * np.exp(-np.arange(k) / (rate * 0.03))[:, None]
+    for at in range(0, n - k, int(rate * every)):
+        x[at:at + k] += burst
+    return (amp * x / np.abs(x).max()).astype("float32")
+
+
+def _peaky(np, rate, chord=0.4, hits=0.6, every=1.5):
+    """Music with drum hits on it: about 12 dB from its loudness to its peaks."""
+    return _chord(np, rate, 12, chord) + _hits(np, rate, 12, hits, every=every)
+
+
+def _tp_db(np, x, loop=True):
+    return 20 * np.log10(orchestra.loop_peak(x, loop))
+
+
+@pytest.mark.parametrize("loop", [False, True])
+def test_mastering_brings_a_piece_to_its_loudness_under_the_true_peak_ceiling(loop):
+    np = pytest.importorskip("numpy")
+    rate = 8000
+    for x in (_chord(np, rate, 12, 0.05), _chord(np, rate, 12, 0.9), _peaky(np, rate),
+              _peaky(np, rate, 0.2, 0.3, 0.75)):
+        rep = {}
+        out = orchestra.master(x, rate, loop=loop, report=rep)
+        assert abs(rep["loud_lufs"] - orchestra.MASTER_LUFS) < 0.5, rep
+        assert abs(orchestra.loudness(out, rate, loop)["loud"] - orchestra.MASTER_LUFS) < 0.5
+        assert _tp_db(np, out, loop) <= orchestra.TRUE_PEAK_DB + 0.05       # never past the ceiling
+        assert rep["max_reduction_db"] <= orchestra.LIMIT_DB + 1e-6
+        assert len(out) == len(x)                         # (a loop's LOOPSTART still points home)
+
+
+def test_a_peaky_piece_is_limited_not_turned_down_so_it_matches_a_dense_one():
+    np = pytest.importorskip("numpy")
+    rate = 8000
+    dense = _chord(np, rate, 12, 0.5)
+    peaky = _peaky(np, rate)
+    a, b = {}, {}
+    da, pb = orchestra.master(dense, rate, loop=True, report=a), orchestra.master(peaky, rate, loop=True, report=b)
+    assert abs(a["loud_lufs"] - b["loud_lufs"]) < 0.5
+    assert 1.0 < b["max_reduction_db"] <= orchestra.LIMIT_DB                # the hits were limited
+    for out in (da, pb):
+        assert _tp_db(np, out) <= orchestra.TRUE_PEAK_DB + 0.05
+    # The old way (gain from the loudest sample) left the peaky piece far quieter:
+    old = lambda x: orchestra.loudness(x * (0.89 / np.abs(x).max()), rate, True)["loud"]
+    assert old(dense) - old(peaky) > 3
+
+
+def test_a_hotter_master_is_louder_by_its_step_under_the_same_ceiling():
+    np = pytest.importorskip("numpy")
+    rate = 8000
+    x = _peaky(np, rate)
+    one, two = {}, {}
+    a = orchestra.master(x, rate, loop=True, report=one)
+    b = orchestra.master(x, rate, loop=True, hot_db=2.0, limit_db=8.0, report=two)
+    assert abs(two["loud_lufs"] - one["loud_lufs"] - 2.0) < 0.3
+    assert two["max_reduction_db"] > one["max_reduction_db"]
+    assert max(_tp_db(np, a), _tp_db(np, b)) <= orchestra.TRUE_PEAK_DB + 0.05
+
+
+def test_a_lone_transient_is_not_limited_past_limit_db_the_piece_is_turned_down():
+    np = pytest.importorskip("numpy")
+    rate = 8000
+    x = _chord(np, rate, 12, 0.02)
+    x[rate * 6:rate * 6 + 40] += 0.9                       # one click, 30 dB over the music
+    rep = {}
+    out = orchestra.master(x, rate, report=rep)
+    assert abs(rep["max_reduction_db"] - orchestra.LIMIT_DB) < 0.05
+    assert rep["loud_lufs"] < orchestra.MASTER_LUFS - 1
+    assert _tp_db(np, out, False) <= orchestra.TRUE_PEAK_DB + 0.05
+
+
+@pytest.mark.parametrize("entry", [0, 3])
+def test_a_loop_is_limited_as_it_plays_over_and_over_no_jump_at_its_seam(entry):
+    np = pytest.importorskip("numpy")
+    rate = 8000
+    x = _chord(np, rate, 10, 0.3)
+    x[-int(rate * 0.12):-int(rate * 0.1)] *= 3.5           # a hit just before the end: still letting go at the seam
+    m = rate * entry
+    rep = {}
+    out = orchestra.master(x, rate, loop=True, loop_from=m, report=rep)
+    assert rep["max_reduction_db"] > 2
+    gain = lambda o, i: float(np.median(np.abs(o[i]) / np.maximum(np.abs(x[i, 0]), 1e-9)))
+    big = np.abs(x[:, 0]) > 0.1
+    end = [i for i in range(len(x) - 40, len(x)) if big[i]]
+    head = [i for i in range(m, m + 40) if big[i]]
+    jump = 20 * np.log10(gain(out[:, 0], head) / gain(out[:, 0], end))
+    assert abs(jump) < 0.05                                 # the gain runs on over the seam
+    # ... exactly as in the middle of the loop played three times over:
+    body = x[m:]
+    long = np.concatenate([x, body, body])
+    three = orchestra.master(long, rate, loop=True, loop_from=m)
+    assert float(np.abs(three[len(x):len(x) + len(body)] - out[m:]).max()) < 2e-3
+    # A piece that ends (no wrap) starts at full gain: the jump a loop must not have.
+    once = orchestra.master(x, rate)
+    assert gain(once[:, 0], head) / gain(out[:, 0], head) > 1.1 if m == 0 else True
+
+
 def test_a_loop_with_an_entry_rings_over_its_loop_point_not_its_first_sample():
     np = pytest.importorskip("numpy")
     rate = 8000

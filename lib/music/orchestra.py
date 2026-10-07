@@ -1352,35 +1352,267 @@ def hall(dry, rate: int = RATE, rt60: float = 2.3, wet: float = 0.28, seed: int 
     return mix[:end].astype("float32")
 
 
-LIMIT_DB = 1.5         # the most the limiter may take off a piece's loudest moment
+# --- mastering: by loudness, not by the loudest sample -----------------------------------
+# A piece used to be turned up until its loudest sample sat 1.5 dB over the ceiling, so its
+# level was set by its peakiest moment: a dense, sustained passage and a peaky one ended up
+# far apart, and a later boss stage (busier, its climax no peakier) could not be made louder
+# than the one before by its step (the Ashen Saint's stage 2, 2 dB "hotter": its full
+# passages 1.5 LU over stage 1's, and only as far as the composer pushed it). Now a piece is brought to a loudness (ITU-R BS.1770 K-weighted, in LUFS)
+# and a true-peak look-ahead limiter takes the few peaks that would pass the ceiling.
+#
+# What is measured: the loudness of a piece's FULL passages - the power mean of its loudest
+# fifth of 3-second (short-term) windows - not its integrated loudness. A loop is heard at
+# full tilt in its big sections and is compared there (stage 1's loudest against stage 2's),
+# and a loop with a long hushed passage would, by its integrated loudness, be raised until
+# its climax hit the limiter ("a climax without the climax"); measured on its full passages
+# its climax sits at the same level as any other piece's and its quiet parts keep the
+# distance below it they were written with. (A fifth, not the single loudest window: one
+# drum roll does not set the level.) A loop is measured as it plays, its windows running on
+# over its loop point.
+MASTER_LUFS = -8.7          # a piece's full passages (the Saint's theme as it was: -8.3; integrated ~-13)
+LOUD_SHARE = 0.2            # ... its loudest fifth of 3 s windows
+SHORT_TERM_S = 3.0
+TRUE_PEAK_DB = -1.5         # the ceiling, true peak (4x oversampled): the OGG never clips
+                            # (Vorbis adds up to ~0.7 dB to a dense, limited peak: measured)
+LOOKAHEAD_S = 0.005         # the limiter sees a peak 5 ms ahead and is down by the time it comes
+RELEASE_S = 0.15            # ... and lets go over ~150 ms
+LIMIT_DB = 6.0              # the most the limiter may take off any peak; a piece that would
+                            # need more is turned down as a whole (a transient, not the music)
+STING_HOT_DB = 1.5          # a short one-shot (a hit, a break, a victory tag) over the loops: hotter
+STING_LIMIT_DB = 4.0        # (but its hit keeps its punch: a sting that would need more is quieter)
 
 
-STING_HOT_DB = 3.0      # a short one-shot (a hit, a break, a victory tag) over the loops: hotter
-STING_LIMIT_DB = 4.0    # (a transient takes more limiting than a climax can)
+def _k_filters(rate: int):
+    """The two BS.1770 K-weighting biquads (a high shelf, then a high pass) for ``rate``."""
+    f0, gain, q = 1681.974450955533, 3.999843853973347, 0.7071752369554196
+    k = math.tan(math.pi * f0 / rate)
+    vh, vb = 10 ** (gain / 20), 10 ** (gain / 20) ** 0.4996667741545416
+    a0 = 1 + k / q + k * k
+    shelf = ([(vh + vb * k / q + k * k) / a0, 2 * (k * k - vh) / a0, (vh - vb * k / q + k * k) / a0],
+             [1.0, 2 * (k * k - 1) / a0, (1 - k / q + k * k) / a0])
+    f0, q = 38.13547087602444, 0.5003270373238773
+    k = math.tan(math.pi * f0 / rate)
+    a0 = 1 + k / q + k * k
+    high = ([1.0, -2.0, 1.0], [1.0, 2 * (k * k - 1) / a0, (1 - k / q + k * k) / a0])
+    return shelf, high
 
 
-def master(x, rate: int = RATE, loop: bool = False, hot_db: float = 0.0, limit_db: float = LIMIT_DB):
-    """Loudness like the rest of the table's music (``hot_db`` above it: a sting), no
-    clipped peaks, a soft fade."""
+def _k_weight(y, rate: int):
+    """``y`` (samples, channels) K-weighted (by FFT: the biquads' own response)."""
     import numpy as np
-    mono = x.mean(axis=1)
-    now = music_compose.loudness_db(mono, rate)
-    # Never raise a piece so far that the limiter must flatten its loudest moment by more
-    # than LIMIT_DB: a climax written 6 dB above what led to it came out 1 dB above it,
-    # the limiter taking 5 dB from that one bar (the host: "a climax without the climax").
-    # A dynamic piece is quieter overall; its peak keeps its size.
-    peak = float(np.abs(x).max()) or 1e-9
-    room = 20 * math.log10(music_compose.CEILING / peak) + limit_db
-    gain = 10 ** (min(music_compose.LOUDNESS_DB + hot_db - now, music_compose.MAX_GAIN_DB + hot_db, room) / 20)
-    x = x * np.float32(gain)
-    peak = np.abs(x).max(axis=1)
-    limited = music_compose.limit(peak, rate)
-    g = np.where(peak > 1e-9, limited / np.maximum(peak, 1e-9), 1.0).astype("float32")
-    x = x * g[:, None]
+    n = len(y)
+    size = _fast_len(n + rate // 2)                       # (room for the filters' ring)
+    z = np.exp(-2j * np.pi * np.arange(size // 2 + 1) / size)
+    h = np.ones(len(z), dtype=complex)
+    for b, a in _k_filters(rate):
+        h *= (b[0] + b[1] * z + b[2] * z * z) / (a[0] + a[1] * z + a[2] * z * z)
+    return np.stack([np.fft.irfft(np.fft.rfft(y[:, c], size) * h, size)[:n] for c in range(y.shape[1])], 1)
+
+
+def _tile(body, count: int, from_end: bool = False):
+    """``count`` samples of a loop's body played over and over (its last ones: ``from_end``)."""
+    import numpy as np
+    if count <= 0:
+        return body[:0]
+    reps = -(-count // len(body))
+    t = np.concatenate([body] * reps) if reps > 1 else body
+    return t[-count:] if from_end else t[:count]
+
+
+def _k_power(x, rate: int, loop: bool, m: int):
+    """Per sample, the K-weighted power (summed over the channels) of ``x`` as it plays: a
+    loop runs on SHORT_TERM_S past its end, into where it loops back to (``m``)."""
+    import numpy as np
+    x = np.asarray(x, dtype="float64")
+    if x.ndim == 1:
+        x = x[:, None]
+    pre = rate // 2                                        # (what came before: the filters settle)
+    if loop:
+        head = _tile(x, pre, True) if m == 0 else np.zeros((pre, x.shape[1]))
+        y = np.concatenate([head, x, _tile(x[m:], int(SHORT_TERM_S * rate))])
+    else:
+        y = np.concatenate([np.zeros((pre, x.shape[1])), x])
+    return (_k_weight(y, rate)[pre:] ** 2).sum(axis=1)
+
+
+def _measure(p, n: int, rate: int, loop: bool) -> Dict[str, float]:
+    """loudness() from _k_power()'s ``p`` (a piece ``n`` samples long)."""
+    import numpy as np
+    c = np.concatenate([[0.0], np.cumsum(p)])
+    lufs = lambda e: -0.691 + 10 * math.log10(max(float(e), 1e-20))
+    silent = 10 ** ((-70 + 0.691) / 10)                    # the absolute gate: -70 LUFS
+
+    def windows(size):
+        size = size if loop else min(size, n)
+        s = np.arange(0, (n - 1 if loop else n - size) + 1, max(1, rate // 10))
+        e = (c[s + size] - c[s]) / size
+        return e[e > silent]
+
+    block = windows(int(0.4 * rate))                       # integrated: 400 ms blocks, gated
+    if not len(block):
+        return {"integrated": float("-inf"), "loud": float("-inf"), "short_max": float("-inf")}
+    block = block[block > block.mean() * 0.1]              # (the relative gate: -10 LU)
+    short = np.sort(windows(int(SHORT_TERM_S * rate)))[::-1]
+    if not len(short):
+        short = np.array([block.mean()])
+    top = short[:max(1, int(round(len(short) * LOUD_SHARE)))]
+    return {"integrated": lufs(block.mean()), "loud": lufs(top.mean()), "short_max": lufs(short[0])}
+
+
+def loudness(x, rate: int = RATE, loop: bool = False, loop_from: int = 0) -> Dict[str, float]:
+    """How loud a stereo piece is, BS.1770 (K-weighted, LUFS): "integrated" (gated, the whole
+    piece), "loud" (its full passages: the loudest LOUD_SHARE of its 3 s windows - what
+    master() sets), "short_max" (its loudest 3 s). A loop is measured as it plays: its
+    windows run on over its end into where it loops back to (``loop_from``)."""
+    n = len(x)
+    m = max(0, min(int(loop_from or 0), n - 1)) if loop else 0
+    return _measure(_k_power(x, rate, loop, m), n, rate, loop)
+
+
+def true_peaks(y, over: int = 4, block: int = 1 << 15, margin: int = 256):
+    """Per sample, the loudest point (any channel) between it and the next, 4x oversampled:
+    the peaks a DAC or an encoder sees between the samples."""
+    import numpy as np
+    y = np.asarray(y, dtype="float64")
+    if y.ndim == 1:
+        y = y[:, None]
+    n, ch = y.shape
+    out = np.empty(n)
+    pad = np.concatenate([np.zeros((margin, ch)), y, np.zeros((margin, ch))])
+    ramp = 0.5 - 0.5 * np.cos(np.pi * np.arange(margin) / margin)    # (no wrap-around ringing)
+    for a in range(0, n, block):
+        k = min(block, n - a)
+        taper = np.concatenate([ramp, np.ones(k), ramp[::-1]])
+        seg = pad[a:a + k + 2 * margin] * taper[:, None]
+        size = len(seg)
+        spec = np.fft.rfft(seg, axis=0)
+        if size % 2 == 0:
+            spec[-1] *= 0.5
+        up = np.zeros((size * over // 2 + 1, ch), dtype=complex)
+        up[:len(spec)] = spec
+        u = np.fft.irfft(up, size * over, axis=0) * over
+        out[a:a + k] = np.abs(u[margin * over:(margin + k) * over]).reshape(k, over * ch).max(axis=1)
+    return np.maximum(out, np.abs(y).max(axis=1))
+
+
+def loop_peak(x, loop: bool = False, loop_from: int = 0) -> float:
+    """The true peak of a piece as it plays: a loop's end runs on into its loop point."""
+    import numpy as np
+    if not loop:
+        return float(true_peaks(x).max())
+    k, body = 1024, x[int(loop_from or 0):]
+    return float(true_peaks(np.concatenate([_tile(body, k, True), x, _tile(body, k)])).max())
+
+
+def _limit_gain(tp, rate: int, ceiling: float, g0: float = 1.0):
+    """A look-ahead limiter's gain, from a signal's true_peaks() ``tp`` -> (gain per sample,
+    the gain each sample may be at most). The gain is down, along a straight ramp, by the time
+    a peak arrives, so no (true) peak passes ``ceiling``; it lets go smoothly (RELEASE_S);
+    ``g0``: where it starts."""
+    import numpy as np
+    tp = np.maximum(tp, np.r_[0.0, tp[:-1]])               # (a sample's gain shapes both sides of it)
+    need = np.minimum(1.0, ceiling / np.maximum(tp, 1e-12))
+    n = len(need)
+    blk = max(1, rate // 1378)                             # ~0.7 ms blocks (32 at 44.1 kHz)
+    nb = -(-n // blk)
+    r = np.ones(nb * blk)
+    r[:n] = need
+    r = r.reshape(nb, blk).min(axis=1)
+    r = np.minimum(r, np.minimum(np.r_[r[1:], 1.0], np.r_[1.0, r[:-1]]))   # (safe to interpolate)
+    look = max(1, int(round(LOOKAHEAD_S * rate / blk)))
+    held = r.copy()
+    for i in range(1, look + 1):                           # the least gain needed in the next 5 ms...
+        held[:-i] = np.minimum(held[:-i], r[i:])
+    c = np.concatenate([[0.0], np.cumsum(np.r_[np.ones(look), held])])
+    ramp = (c[look + 1:] - c[:-look - 1]) / (look + 1)     # ...reached along a ramp, never late
+    rel = 1 - math.exp(-blk / (RELEASE_S * rate))
+    g = ramp.tolist()
+    prev = g0
+    for i, s in enumerate(g):
+        prev = s if s <= prev else prev + (s - prev) * rel
+        g[i] = prev
+    centres = np.arange(nb) * blk + (blk - 1) / 2
+    gain = np.interp(np.arange(n), centres, np.asarray(g))
+    return np.minimum(gain, need), need
+
+
+def master(x, rate: int = RATE, loop: bool = False, hot_db: float = 0.0, limit_db: float = LIMIT_DB,
+           loop_from: int = 0, report: Optional[Dict[str, float]] = None):
+    """Loudness like the rest of the table's music: the piece's full passages brought to
+    MASTER_LUFS (``hot_db`` above it: a sting, a later boss stage), its peaks taken by a
+    true-peak look-ahead limiter (never more than ``limit_db``: past that the piece is
+    turned down), a soft fade at the end of a piece that ends. A loop (``loop``, looping
+    back to ``loop_from``) is measured and limited as it plays, over and over: no jump at
+    its seam. ``report`` (a dict) is filled in: what was measured and done."""
+    import numpy as np
+    x = np.asarray(x, dtype="float32")
+    n = len(x)
+    m = max(0, min(int(loop_from or 0), n - 1)) if loop else 0
+    power = _k_power(x, rate, loop, m)
+    now = _measure(power, n, rate, loop)
+    if now["loud"] == float("-inf"):
+        return x.copy()
+    ceiling = 10 ** (TRUE_PEAK_DB / 20)
+    # The streams the limiter reads, as they play: a loop's body with its own end before it
+    # (long enough for the release to forget where it started) and its start after it, so
+    # its gain runs on over the seam; an entry with the body after it; a piece with silence.
+    pad, settle = int(0.05 * rate), int(3 * rate)
+    if loop:
+        body = x[m:]
+        streams = [np.concatenate([_tile(body, settle, True), body, _tile(body, pad)])]
+        if m:
+            streams.append(np.concatenate([x[:m], _tile(body, pad)]))
+    else:
+        streams = [np.concatenate([x, np.zeros((pad, x.shape[1]), dtype=x.dtype)])]
+    peaks = [true_peaks(z) for z in streams]
+    # The most gain the limiter allows: past it, it would take more than limit_db off a peak.
+    most = limit_db - 20 * math.log10(max(max(float(p.max()) for p in peaks), 1e-12) / ceiling)
+    target = MASTER_LUFS + hot_db
+    most = min(most, music_compose.MAX_GAIN_DB + hot_db)
+    gain_db = min(target - now["loud"], most)
+
+    def limited(gain_db):
+        gain = 10 ** (gain_db / 20)
+        if not loop:
+            return _limit_gain(peaks[0] * gain, rate, ceiling)[0][:n]
+        g = _limit_gain(peaks[0] * gain, rate, ceiling)[0][settle:settle + len(body)]
+        if m:                                              # the entry, heard once, into the body
+            ge, need = (a[:m] for a in _limit_gain(peaks[1] * gain, rate, ceiling))
+            j = min(m, pad)                                # its last 50 ms meet the body's gain
+            w = np.linspace(0, 1, j + 1)[1:]
+            ge[-j:] = np.minimum(need[-j:], ge[-j:] + (g[0] - ge[-j:]) * w)
+            g = np.concatenate([ge, g])
+        return g
+
+    # What the limiter takes off the full passages is made up (a little more gain, limited
+    # again) until they reach the target. (K-weighting a slowly changing gain: the gain
+    # times the K-weighted signal.)
+    tried = []
+    for tries in range(5):
+        g = limited(gain_db)
+        g2 = g.astype("float64") ** 2
+        if loop:
+            g2 = np.concatenate([g2, _tile(g2[m:], len(power) - n)])
+        got = _measure(power * g2 * 10 ** (gain_db / 10), n, rate, loop)["loud"]
+        short = target - got
+        if short < 0.05 or gain_db >= most - 1e-6 or tries == 4:
+            break
+        tried.append((gain_db, got))
+        slope = 1.0                                        # (dB out per dB in: under 1 where it limits)
+        if len(tried) > 1 and tried[-1][0] - tried[-2][0] > 1e-3:
+            slope = max(0.25, min(1.0, (tried[-1][1] - tried[-2][1]) / (tried[-1][0] - tried[-2][0])))
+        gain_db = min(gain_db + short / slope, most)
+    gain = 10 ** (gain_db / 20)
+    out = x * (g * gain).astype("float32")[:, None]
     if not loop:                                            # (a loop has no ends)
-        n = int(rate * 1.2)
-        x[-n:] *= np.linspace(1, 0, n, dtype="float32")[:, None] ** 2
-    return x
+        k = min(n, int(rate * 1.2))
+        out[-k:] *= np.linspace(1, 0, k, dtype="float32")[:, None] ** 2
+    if report is not None:
+        report.update({"before_lufs": now["loud"], "gain_db": gain_db, "target_lufs": target,
+                       "max_reduction_db": -20 * math.log10(max(float(g.min()), 1e-12)),
+                       "true_peak_db": 20 * math.log10(max(float(loop_peak(out, loop, m)), 1e-12))})
+        report.update({k + "_lufs": v for k, v in loudness(out, rate, loop, m).items()})
+    return out
 
 
 def render(seed: str, cls: str = "", stage: int = 3, dark: int = 0, rate: int = RATE,

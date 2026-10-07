@@ -586,16 +586,20 @@ def test_a_later_boss_stage_is_mastered_louder_than_the_one_before():
     if not orchestra.SF2.is_file():
         pytest.skip("the SoundFont isn't downloaded here")
     import arrangement
-    from music import music_compose
     spec = {"tune": {"seed": "sketch", "key": "D4", "meter": "4/4"}, "statements": [], "length": 16,
             "tempo": 120, "loop": True, "role": "stage", "chords": [[0, 16, "i"]],
             "harmony": [{"part": "strings", "from": 0, "to": 16, "play": "chord", "range": ["D3", "D5"],
-                         "pattern": "xxxx"}],
+                         "pattern": "xxxx"},
+                        {"part": "brass", "from": 0, "to": 16, "play": "chord", "range": ["D3", "D4"],
+                         "pattern": "x-x-"}],
             "hits": [{"part": "timpani", "note": "D2", "at": 8, "len": 1, "vel": 120}]}
     one, rate = arrangement.render({**spec, "stage": 1})
     two, _ = arrangement.render({**spec, "stage": 2})
-    level = lambda x: music_compose.loudness_db(x.mean(axis=1), rate)
-    assert level(two) > level(one) + 1.0
+    level = lambda x: orchestra.loudness(x, rate, loop=True)["loud"]
+    assert abs(level(one) - orchestra.MASTER_LUFS) < 0.5
+    assert abs(level(two) - level(one) - arrangement.STAGE_STEP_DB) < 0.3   # the step, all of it
+    for x in (one, two):                                                     # under the same ceiling
+        assert 20 * np.log10(orchestra.loop_peak(x, True)) <= orchestra.TRUE_PEAK_DB + 0.05
 
 
 def test_a_choir_on_quick_notes_is_flagged_but_held_choir_notes_are_not():

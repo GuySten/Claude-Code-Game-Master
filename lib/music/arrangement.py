@@ -758,7 +758,7 @@ def loop_start(spec: Dict[str, Any], rate: int = orchestra.RATE) -> Optional[int
 
 STING_SECONDS = 15.0    # a one-shot shorter than this is a sting (boss-music.md: a little louder)
 STAGE_STEP_DB = 2.0     # each later boss stage ("stage": 2, 3) plays this much louder than the last
-STAGE_LIMIT_DB = 4.0    # (and may limit its peak harder to get there - as much as a sting)
+STAGE_LIMIT_DB = 8.0    # (and may limit its peaks harder to get there: the Saint's stage 2 takes 6.3 dB)
 # The host, of a stage 2 mastered 1.6 dB quieter than stage 1 (its bigger climax left the
 # limiter less room): "the second stage does not have more emotion; the change is minimal".
 
@@ -770,13 +770,13 @@ def render(spec: Dict[str, Any], rate: int = orchestra.RATE, sf2: Path = orchest
     mix = spec.get("mix") or {}
     if loop:
         dry = orchestra.play(score, seconds + 3.0, sf2, rate, mix)  # (what rings past the end)
-        wet = orchestra.hall(dry, rate, loop_at=int(round(seconds * rate)),
-                             loop_from=loop_start(spec, rate) or 0)
+        at = loop_start(spec, rate) or 0
+        wet = orchestra.hall(dry, rate, loop_at=int(round(seconds * rate)), loop_from=at)
         later = max(0, int(spec.get("stage", 1)) - 1) if spec.get("role") == "stage" else 0
         if later:                          # a later boss stage: louder than the one before
-            return orchestra.master(wet, rate, loop=True, hot_db=STAGE_STEP_DB * later,
+            return orchestra.master(wet, rate, loop=True, loop_from=at, hot_db=STAGE_STEP_DB * later,
                                     limit_db=STAGE_LIMIT_DB), rate
-        return orchestra.master(wet, rate, loop=True), rate
+        return orchestra.master(wet, rate, loop=True, loop_from=at), rate
     dry = orchestra.play(score, seconds, sf2, rate, mix)
     if seconds < STING_SECONDS:            # a sting plays over the loops: a little hotter
         return orchestra.master(orchestra.hall(dry, rate), rate, hot_db=orchestra.STING_HOT_DB,
