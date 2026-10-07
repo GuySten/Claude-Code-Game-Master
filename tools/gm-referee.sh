@@ -3,7 +3,7 @@
 # never from the GM's say-so (lib/referee.py). Every roll is public at the open table
 # and every decision goes to the campaign's referee log.
 #
-#   gm-referee.sh enemy '<stat block JSON>'          # a foe, locked (from the monster-manual agent)
+#   gm-referee.sh enemy '<stat block JSON>' [--zone "by the grate"]   # a foe, locked (from the monster-manual agent)
 #   gm-referee.sh initiative                          # everyone in the fight + every PC
 #   gm-referee.sh attack "Pip" "Grak" "Shortsword" [--long-range]
 #   gm-referee.sh check "Pip" stealth --dc hard       # very-easy easy medium hard very-hard nearly-impossible

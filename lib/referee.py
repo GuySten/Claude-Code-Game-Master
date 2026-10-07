@@ -358,7 +358,7 @@ class Referee:
         return Combatant(entry["name"], self._sheet(entry["name"]) or {}, "pc", entry)
 
     # --- foes: locked stat blocks ---
-    def add_enemy(self, block: Dict[str, Any], side: str = "enemy") -> Dict[str, Any]:
+    def add_enemy(self, block: Dict[str, Any], side: str = "enemy", zone: Optional[str] = None) -> Dict[str, Any]:
         for key in ("name", "ac", "hp", "abilities", "attacks"):
             if key not in block:
                 raise RefereeError(f"a stat block needs {key} (name, ac, hp, abilities, attacks)")
@@ -374,6 +374,8 @@ class Referee:
         entry = {"name": block["name"], "side": side, "kind": "enemy", "locked": True,
                  "hp_current": int(block["hp"]), "hp_max": int(block["hp"]), "ac": int(block["ac"]),
                  "initiative": 0, "conditions": [], "states": {}, "block": block}
+        if zone:
+            entry["zone"] = " ".join(str(zone).split())
         data["combatants"].append(entry)
         self._save(data)
         self._log("enemy", name=block["name"], block=block)
@@ -787,7 +789,7 @@ class Referee:
         for i, c in enumerate(data["combatants"]):
             who = self.who(data, c["name"])
             entry = {"name": c["name"], "side": c.get("side", "party"), "kind": who.kind,
-                     "initiative": c.get("initiative"), "ac": who.ac(),
+                     "initiative": c.get("initiative"), "ac": who.ac(), "zone": c.get("zone"),
                      "conditions": who.conditions(), "states": dict(c.get("states") or {})}
             if who.kind == "enemy":
                 entry.update(hp=c["hp_current"], hp_max=c["hp_max"],
@@ -992,6 +994,7 @@ def main() -> None:
     p = sub.add_parser("end-field"); p.add_argument("name")
     p = sub.add_parser("enemy", help="Add a foe with a locked stat block (JSON file or text)")
     p.add_argument("block"); p.add_argument("--side", default="enemy")
+    p.add_argument("--zone", help='where it stands ("on the Stone\'s curve"); gm-combat.sh zone moves it')
     sub.add_parser("initiative", help="Roll initiative for everyone in the fight and every PC")
     sub.add_parser("status", help="The fight as JSON (what the combat referee agent reads)")
     p = sub.add_parser("log", help="Every referee decision and free roll, for people to check")
@@ -1062,7 +1065,7 @@ def main() -> None:
             ref.end_field(args.name); print(f"→ {args.name} is over")
         elif args.cmd == "enemy":
             text = Path(args.block).read_text(encoding="utf-8") if Path(args.block).is_file() else args.block
-            e = ref.add_enemy(json.loads(text), args.side)
+            e = ref.add_enemy(json.loads(text), args.side, zone=args.zone)
             print(f"→ {e['name']} joins the fight: {e['hp_max']} HP, AC {e['ac']} (locked)")
         elif args.cmd == "initiative":
             for x in ref.initiative():

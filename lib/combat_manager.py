@@ -41,7 +41,8 @@ class CombatManager(EntityManager):
         return data
 
     def add_combatant(self, name: str, hp: int, ac: int = 10,
-                      initiative: int = 0, side: str = 'enemy') -> Dict[str, Any]:
+                      initiative: int = 0, side: str = 'enemy',
+                      zone: Optional[str] = None) -> Dict[str, Any]:
         data = self._load()
         if not data.get('active'):
             data = self.start()
@@ -49,6 +50,8 @@ class CombatManager(EntityManager):
             'name': name, 'hp_current': int(hp), 'hp_max': int(hp),
             'ac': int(ac), 'conditions': [], 'initiative': int(initiative), 'side': side,
         }
+        if zone:
+            combatant['zone'] = " ".join(str(zone).split())
         data.setdefault('combatants', []).append(combatant)
         data['combatants'].sort(key=lambda c: c.get('initiative', 0), reverse=True)
         self._save(data)
@@ -82,6 +85,29 @@ class CombatManager(EntityManager):
         self._save(data)
         return c
 
+    def set_zone(self, name: str, zone: Optional[str]) -> Optional[Dict[str, Any]]:
+        """Where a combatant is ("on the chain, 15 ft up", "at the grate"): reach and
+        range are judged from it. A PC not yet in the fight joins it (while one is
+        on). An empty zone clears it."""
+        data = self._load()
+        c = self._find(data, name)
+        if c is None:
+            import party_roster
+            path = party_roster.find_pc(self.campaign_dir, name) if data.get('active') else None
+            if path is None:
+                return None
+            sheet = party_roster._read(path) or {}
+            c = {'name': sheet.get('name', name), 'side': 'party', 'kind': 'pc',
+                 'initiative': 0, 'conditions': [], 'states': {}}
+            data.setdefault('combatants', []).append(c)
+        zone = " ".join(str(zone or "").split())
+        if zone:
+            c['zone'] = zone
+        else:
+            c.pop('zone', None)
+        self._save(data)
+        return c
+
     def next_turn(self) -> Dict[str, Any]:
         data = self._load()
         n = len(data.get('combatants', []))
@@ -111,8 +137,13 @@ class CombatManager(EntityManager):
         for i, c in enumerate(data['combatants']):
             marker = '>' if i == data.get('turn_index', 0) else ' '
             dead = ' 💀' if c.get('hp_current', 1) <= 0 else ''
-            cond = f" [{', '.join(c['conditions'])}]" if c.get('conditions') else ""
-            lines.append(f"{marker} {c['name']}: {c['hp_current']}/{c['hp_max']} HP, AC {c['ac']}{cond}{dead}")
+            cond = f" [{', '.join(map(str, c['conditions']))}]" if c.get('conditions') else ""
+            if 'hp_current' in c:
+                hp = f"{c['hp_current']}/{c['hp_max']} HP, AC {c.get('ac', '?')}"
+            else:                      # a PC (the referee's): HP lives on the sheet
+                hp = "PC (HP on the sheet)"
+            zone = f" @ {c['zone']}" if c.get('zone') else ""
+            lines.append(f"{marker} {c['name']}: {hp}{cond}{zone}{dead}")
         return "\n".join(lines)
 
 
@@ -126,6 +157,9 @@ def main():
     sub.add_parser('start')
     p = sub.add_parser('add-enemy'); p.add_argument('name'); p.add_argument('hp', type=int)
     p.add_argument('--ac', type=int, default=10); p.add_argument('--init', type=int, default=0)
+    p.add_argument('--zone', help='where it stands ("on the chain, 15 ft up")')
+    p = sub.add_parser('zone', help='set where a combatant (or a PC) is; no zone clears it')
+    p.add_argument('name'); p.add_argument('zone', nargs='?', default='')
     p = sub.add_parser('hp'); p.add_argument('name'); p.add_argument('delta', type=int)
     p = sub.add_parser('condition'); p.add_argument('name'); p.add_argument('op', choices=['add', 'remove']); p.add_argument('condition')
     sub.add_parser('next-turn')
@@ -143,7 +177,9 @@ def main():
     if args.action == 'start':
         out = m.start()
     elif args.action == 'add-enemy':
-        out = m.add_combatant(args.name, args.hp, ac=args.ac, initiative=args.init)
+        out = m.add_combatant(args.name, args.hp, ac=args.ac, initiative=args.init, zone=args.zone)
+    elif args.action == 'zone':
+        out = m.set_zone(args.name, args.zone)
     elif args.action == 'hp':
         locked = m._find(m._load(), args.name)
         if locked and locked.get('locked'):
