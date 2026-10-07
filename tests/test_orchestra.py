@@ -493,6 +493,110 @@ def test_the_guitar_falls_back_to_the_gm_guitar_through_a_cabinet(monkeypatch, c
     _heard_like_a_rhythm_guitar(np, out, 44100)
 
 
+# --- the rock organ ---
+def test_the_rock_organ_is_a_tonewheel_organ_with_its_own_tuning_and_foldback():
+    assert "rock_organ" in orchestra.PARTS and orchestra.ORGAN == {"rock_organ"}
+    assert len(orchestra.PARTS["rock_organ"]) == 4                     # (no sound set to fetch: synthesized)
+    assert orchestra.RANGES["rock_organ"] == (36, 96)                  # a manual: C2-C7
+    assert orchestra.send_db(orchestra.ROOM["rock_organ"]) == -12.0    # in front, mostly dry
+    assert orchestra._organ_hz(69) == pytest.approx(440.0)             # A: the gears give 440 exactly
+    for key in range(36, 97):                                          # the rest: near, not exactly, tempered
+        cents = 1200 * __import__("math").log2(orchestra._organ_hz(key) / (440 * 2 ** ((key - 69) / 12)))
+        assert abs(cents) < 1.5
+    assert any(abs(orchestra._organ_hz(k) / (440 * 2 ** ((k - 69) / 12)) - 1) > 1e-4 for k in range(60, 72))
+    assert orchestra._organ_wheel(96 + 36) <= 114 and orchestra._organ_wheel(96 + 36) % 12 == 0   # 1' on C7: folded
+    assert orchestra._organ_wheel(36 - 12) == 24                       # 16' on C2: the lowest wheel
+    assert orchestra._drawbar_levels("888000000")[:4] == [1.0, 1.0, 1.0, 0.0]
+    assert orchestra._drawbar_levels("000000006")[8] == pytest.approx(10 ** (-6 / 20))
+
+
+def _mod_peak(np, x, rate, band, lo, hi):
+    """The rate (Hz) the level of ``band`` of x swings at most, between lo and hi Hz."""
+    y = orchestra._filter(x, [("hp", band[0], 0.7, 0)] * 2 + [("lp", band[1], 0.7, 0)] * 2, rate)
+    k = int(0.01 * rate)
+    e = np.convolve(y ** 2, np.ones(k) / k, mode="same")[::rate // 200]
+    e = (e - e.mean()) * np.hanning(len(e))
+    E = np.abs(np.fft.rfft(e, 8 * len(e)))
+    f = np.fft.rfftfreq(8 * len(e), 1 / 200)
+    m = (f >= lo) & (f <= hi)
+    return float(f[m][np.argmax(E[m])])
+
+
+def _organ_chord(start=0.0, end=6.0, vel=105):
+    return [ev for k in (50, 57, 62, 69) for ev in ((start, 1, "rock_organ", k, vel), (end, 0, "rock_organ", k, 0))]
+
+
+def test_the_rock_organ_turns_in_its_rotating_speaker():
+    np = pytest.importorskip("numpy")
+    rate = 44100
+    for speed, horn, drum, lo, hi in (("fast", 6.7, 5.8, 3.0, 9.0), ("slow", 0.80, 0.67, 0.5, 1.5)):
+        first, stem = orchestra._organ_stem(_organ_chord(), int(7 * rate), rate, {"speaker": speed})
+        s = stem.astype("float64")[int(0.5 * rate):int(5.9 * rate)]
+        assert stem.shape[1] == 2 and float(abs(s).max()) > 0.01
+        assert float(np.corrcoef(s[:, 0], s[:, 1])[0, 1]) < 0.9        # two mics: the speaker decorrelates them
+        assert _mod_peak(np, s[:, 0], rate, (1500, 5000), lo, hi) == pytest.approx(horn, abs=0.15 * horn)
+        if speed == "fast":                                            # (the drum: slower, under the horn)
+            assert _mod_peak(np, s[:, 1], rate, (60, 400), lo, hi) == pytest.approx(drum, abs=0.4)
+        P = np.abs(np.fft.rfft(s.mean(axis=1))) ** 2
+        f = np.fft.rfftfreq(len(s), 1 / rate)
+        assert P[f > 8000].sum() / P.sum() < 0.02                     # the horn rolls the top off
+
+
+def test_the_rock_organ_speaker_eases_from_slow_to_fast_where_the_score_says():
+    np = pytest.importorskip("numpy")
+    rate = 44100
+    ev = _organ_chord(0.0, 9.0) + [(0.0, 3, "rock_organ", 0, 0), (4.0, 3, "rock_organ", 0, 1)]
+    first, stem = orchestra._organ_stem(ev, int(10 * rate), rate)
+    s = stem.astype("float64")
+    assert _mod_peak(np, s[int(0.2 * rate):int(3.9 * rate), 0], rate, (1500, 5000), 0.3, 9) < 1.2
+    assert _mod_peak(np, s[int(5.5 * rate):int(8.9 * rate), 0], rate, (1500, 5000), 0.3, 9) > 5.5
+    f = orchestra._rotor_speed([(4 * rate, True)], 6 * rate, rate, orchestra.LESLIE["horn"], False)
+    assert f[4 * rate - 1] == pytest.approx(orchestra.LESLIE["horn"]["slow"])
+    assert f[int(5.1 * rate)] > 0.9 * orchestra.LESLIE["horn"]["fast"]    # the horn: there in ~1 s
+    d = orchestra._rotor_speed([(4 * rate, True)], 6 * rate, rate, orchestra.LESLIE["drum"], False)
+    assert d[int(5.1 * rate)] < 0.75 * orchestra.LESLIE["drum"]["fast"]   # the heavy drum: still getting there
+
+
+def test_the_rock_organ_clicks_at_key_down_and_its_percussion_is_single_triggered():
+    np = pytest.importorskip("numpy")
+    rate = 44100
+    note = lambda t0, t1, k=62: [(t0, 1, "rock_organ", k, 100), (t1, 0, "rock_organ", k, 0)]   # noqa: E731
+    first, stem = orchestra._organ_stem(note(0.5, 1.5), int(2.5 * rate), rate)
+    m = orchestra._filter(stem.astype("float64").mean(axis=1), [("hp", 2500, 0.7, 0)] * 2, rate)
+    on, w = int(0.5 * rate) - first, int(0.008 * rate)
+    steady = np.median([(m[on + i:on + i + w] ** 2).mean() for i in range(int(0.1 * rate), int(0.9 * rate), w)])
+    assert (m[on:on + w] ** 2).mean() > 10 * steady                    # the click
+    # percussion (the third harmonic, decaying): on a note from all keys up, not on one played legato
+    ev = note(0.5, 2.5) + note(1.5, 2.5, 69)
+    upper = lambda o: orchestra._filter(orchestra._organ_stem(ev, int(3.5 * rate), rate, o)[1].astype("float64")   # noqa: E731
+                                        .mean(axis=1), [("hp", 600, 0.7, 0)] * 2, rate)
+    plain, perc = upper({}), upper({"percussion": "third"})
+    level = lambda x, t: float((x[int(t * rate) - first:int((t + 0.08) * rate) - first] ** 2).mean())   # noqa: E731
+    assert level(perc, 0.52) > 1.5 * level(plain, 0.52)               # struck: the first note
+    assert level(perc, 1.52) < 1.3 * level(plain, 1.52)               # legato: not again
+
+
+def test_the_rock_organ_plays_in_the_orchestra_beside_the_guitar(monkeypatch):
+    np = pytest.importorskip("numpy")
+    pytest.importorskip("tinysoundfont")
+    if not orchestra.SF2.is_file():
+        pytest.skip("the SoundFont isn't downloaded here")
+    monkeypatch.setenv("GM_ORCHESTRA_WORKERS", "1")
+    sc = orchestra.Score()
+    for k in (50, 57, 62):
+        sc.note("rock_organ", k, 0.2, 2.5, 112)
+        sc.note("rock_organ:3", k, 3.0, 0.4, 112)                      # (a layer: the same speaker)
+    sc.rotate(0.0, False)
+    sc.organ = {"drawbars": "888800000"}
+    layers = orchestra.play_layers(sc, 4.0, lambda name: name.partition(":")[0], rate=44100)
+    out = layers["rock_organ"]
+    assert out.shape[1] == 2 and float(abs(out).max()) > 0.01
+    body = np.asarray(out[int(0.4 * 44100):int(2.6 * 44100)], dtype="float64")
+    assert float(np.corrcoef(body[:, 0], body[:, 1])[0, 1]) < 0.95
+    assert float(abs(out.send).max()) < 0.3 * float(abs(out).max())  # mostly dry, like the guitar
+    assert orchestra.level_db("rock_organ") == orchestra.level_db("guitar")
+
+
 # --- the real strings' short notes, the real brass ---
 SHORT_PARTS = ["violins", "violins2", "cellos", "basses"]
 

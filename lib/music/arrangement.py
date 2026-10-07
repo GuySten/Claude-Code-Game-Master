@@ -118,6 +118,11 @@ except in "hits" and "rolls", where it is the velocity itself (1-127).
                "wobble": 0.3}],    # those parts waver and drift off pitch, each its own way,
                          # and come back true by the end
   "hits": [{"part": "kit", "note": "crash", "at": 60, "len": 6, "vel": 124}],
+  "organ": {"speaker": [[0, "slow"], [32, "fast"]], "drawbars": "888800000", "percussion": "third"},
+                         # the rock organ's: its rotating speaker switched slow / fast there (it
+                         # eases into it: the horn in ~1 s, the drum in ~4; default "fast" all
+                         # through - "speaker": "slow" for all of it), its drawbars (16' to 1',
+                         # default 888800000) and percussion ("second", "third"; default none)
   "mix": {"choir": 3},   # dB up or down for a part in this piece (all parts are already
                          # evened out: the same velocity is the same loudness)
   "lead": 4              # the tune's notes are mixed this many dB over the rest (default 4);
@@ -174,6 +179,9 @@ chords, ringing to the next pick) and guitar_mute (palm-muted chugs) - one instr
 amp: a new pick stops what rang, and "mix": {"guitar": dB} sets both. B1-E5; power chords
 only ("root5", "root", "octaves": a third turns to mud). A surprise held back for a later
 stage, never a bed for every piece.
+A rock organ, synthesized: rock_organ, a tonewheel organ (888800000) overdriven through a
+rotating speaker, fast by default ("organ" switches it) - the church organ gone wild: riffs,
+stabbed and held chords, C2-C7. Rarer still than the guitar: a boss's third stage or later.
 """
 
 import argparse
@@ -502,6 +510,34 @@ def progression_chords(spec: Dict[str, Any], bar: float) -> List[list]:
     return out
 
 
+def _organ(spec: Dict[str, Any], sc: "orchestra.Score", T) -> None:
+    """The rock organ's settings ("organ"): its drawbars, its percussion, its rotating speaker
+    ("slow", "fast", or [[time, "slow" | "fast"], ...]: switched there, easing into it)."""
+    org = spec.get("organ")
+    if not org:
+        return
+    if not isinstance(org, dict):
+        raise ArrangementError('"organ" is {"speaker": ..., "drawbars": "888000000", "percussion": ...}')
+    bars = org.get("drawbars")
+    if bars is not None:
+        if not re.fullmatch(r"[0-8]{9}", str(bars)):
+            raise ArrangementError(f'"drawbars" {bars!r}: nine digits 0-8, 16\' to 1\' (e.g. "888000000")')
+        sc.organ["drawbars"] = str(bars)
+    perc = org.get("percussion")
+    if perc:
+        if perc not in orchestra.ORGAN_PERC:
+            raise ArrangementError(f'"percussion" {perc!r}: "second", "third" or none')
+        sc.organ["percussion"] = perc
+    speaker = org.get("speaker", "fast")
+    for at, speed in ([[None, speaker]] if isinstance(speaker, str) else speaker):
+        if speed not in ("slow", "fast"):
+            raise ArrangementError(f'the speaker\'s {speed!r}: "slow" or "fast"')
+        if at is None:
+            sc.organ["speaker"] = speed
+        else:
+            sc.rotate(max(0.0, T(float(at))), speed == "fast")
+
+
 def _build(spec: Dict[str, Any]) -> Dict[str, Any]:
     """build(), with what the score critic needs too: the tune, the chords, the clock."""
     spec = expand_motifs(spec)
@@ -572,6 +608,7 @@ def _build(spec: Dict[str, Any]) -> Dict[str, Any]:
 
     sc = orchestra.Score()
     used = set()
+    _organ(spec, sc, T)
 
     def part_ok(part: str) -> str:
         if part not in orchestra.PARTS:
@@ -905,6 +942,11 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
     if any(by_part.get(part) for part in orchestra.GUITAR) and int(spec.get("stage", 1) or 1) < 2:
         add("warn", "guitar: the electric guitar is kept for a boss's later stages (a \"stage\" of 2 or "
                     "more, or a cue of one) - a special surprise, never a theme, a place or a first stage")
+    # The rock organ is a rarer surprise still, held back for a boss's third stage (the host:
+    # "rock organ sounds cool"): a stage 3+ or a cue of one ("stage": 3).
+    if any(by_part.get(part) for part in orchestra.ORGAN) and int(spec.get("stage", 1) or 1) < 3:
+        add("warn", "rock_organ: the rock organ is a rare surprise held back for a boss's third stage (a "
+                    "\"stage\" of 3 or more, or a cue of one) - never a theme, a place or an earlier stage")
     # The tune: all played, and against its chords.
     melody = spec.get("melody") or []
     silent = [u0 for u0, _, _ in ctx["played"]

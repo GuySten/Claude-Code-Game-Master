@@ -112,6 +112,9 @@ PARTS = {
     # two articulations - the same strings, the same amp (a new pick stops what rang)
     "guitar": (0, 0, 64, 100, "guitar"),      # open, ringing: power chords, held or picked
     "guitar_mute": (0, 6, 64, 100, "guitar"), # palm-muted chugs: the chug between the open chords
+    # a rock organ: a tonewheel organ, overdriven, through a rotating speaker - synthesized
+    # (_organ_stem), not sampled: its bank and preset (GM's Rock Organ) are only its name
+    "rock_organ": (0, 18, 64, 100),
 }
 # Where a part's own sound set can't be had: the sound set's choir; for the percussion, the
 # GM kit's nearest (bank, preset, its key): a crash cymbal for the gong, the cowbell, an agogo.
@@ -263,6 +266,12 @@ class Score:
     def __init__(self):
         self.events: List[Tuple[float, int, str, int, int]] = []   # (seconds, on?, part, key, vel)
         self.bends: List[Tuple[float, str, float]] = []             # (seconds, part, semitones)
+        self.organ: Dict[str, str] = {}         # the rock organ's "drawbars", "percussion", "speaker"
+        self.speaker: List[Tuple[float, bool]] = []     # (seconds, fast?): its rotating speaker switched
+
+    def rotate(self, at: float, fast: bool) -> None:
+        """The rock organ's rotating speaker switched to fast (or slow) here: it eases there."""
+        self.speaker.append((at, bool(fast)))
 
     def bend(self, part: str, at: float, semitones: float) -> None:
         """The part's pitch, bent from here on (a slide, a wavering): -12 .. 12."""
@@ -1468,6 +1477,262 @@ def _guitar_stem(syn, sfid, fonts, events: list, total: int, rate: int):
     return first, stem.astype("float32")
 
 
+# --- the rock organ: a tonewheel organ, overdriven, through a rotating speaker ---
+# Synthesized, not sampled: a tonewheel organ IS additive synthesis - 91 near-sine wheels
+# spinning all the time, a key connecting nine of them (its drawbars' footages) to the
+# output through nine busbar contacts. Then a tube preamp driven hard (the growl) and a
+# rotating speaker (a treble horn and a bass drum, spinning slow or fast), miked left and
+# right: the sound of 70s heavy rock and of Dancing Mad's last movement. No download.
+ORGAN = {"rock_organ"}
+# The tonewheel generator's gears (C..B: driving / driven teeth) on a 20 rev/s shaft: its
+# tuning, within a cent or so of equal temperament - A is 440 exactly, the rest a little off.
+ORGAN_GEARS = (85 / 104, 71 / 82, 67 / 73, 105 / 108, 103 / 100, 84 / 77,
+               74 / 64, 98 / 80, 96 / 74, 88 / 64, 67 / 46, 108 / 70)
+ORGAN_WHEELS = (24, 114)    # the 91 wheels: C1 (32.7 Hz) to F#8 (5.9 kHz); higher footages fold back
+# The drawbars' footages, as semitones from the key: 16', 5 1/3', 8', 4', 2 2/3', 2', 1 3/5',
+# 1 1/3', 1' (each a wheel of its own: the fifths and the third are the tempered ones).
+DRAWBARS = (-12, 7, 0, 12, 19, 24, 28, 31, 36)
+# The rock registration: 888800000 - the four lowest drawbars full out (16', 5 1/3', 8', 4'):
+# the fat 888 of 70s rock with the octave that cuts. 888000000 alone, measured through this
+# drive, puts 0.1-0.6% of a chord's energy above the 800 Hz crossover: the horn - where the
+# speaker's swirl and the organ's bite live - has almost nothing to spin, and under an
+# orchestra (strings, brass, choir all in 100-400 Hz) the organ reads as a dull bass pad. The
+# 4' gives the horn ~2.5% (a sampled GM rock organ: 13%, brighter than a tonewheel's 888).
+# Nothing above the 4' is drawn: no fizz through the drive (the "drawbars" option changes it).
+ORGAN_DRAWBARS = "888800000"
+ORGAN_LOW, ORGAN_HIGH = 36, 96          # a manual: C2-C7, 61 keys
+ORGAN_CLICK_MS = (0.0, 3.0)             # the nine contacts close this far apart as a key goes down
+ORGAN_PERC = {"second": (12, 0.20), "third": (19, 0.20)}   # percussion: its footage, its decay (s, fast)
+ORGAN_PERC_LEVEL = 1.4  # (its "normal" volume: struck over a full drawbar)
+# The tonewheels into the preamp: one note 20-30% distortion (warm), a power chord 35-45%
+# (the growl) - the swell (velocity) drives it harder.
+ORGAN_DRIVE = 1.0
+ORGAN_BIAS = 0.3        # (the tube's asymmetry: one side clips softer - even harmonics, the growl)
+ORGAN_LEVEL_DB = -29.5  # the speaker's output: the organ, at no "mix", as loud as the guitar (LUFS, the same riff)
+# The rotating speaker (a Leslie 122's): its horn and its drum, their slow (chorale) and fast
+# (tremolo) speeds in rev/s, how fast they get there (a time constant, s: the light horn in
+# ~1 s, the heavy drum in ~4), the radius that moves the sound (Doppler) and how much louder
+# it is facing a mic than facing away. They turn in opposite directions.
+LESLIE = {"horn": {"slow": 0.80, "fast": 6.7, "up": 0.33, "down": 0.5, "radius": 0.15,
+                   "am": 0.45, "am_hi": 0.75, "spin": 1.0},
+          "drum": {"slow": 0.67, "fast": 5.8, "up": 1.3, "down": 1.6, "radius": 0.10,
+                   "am": 0.28, "spin": -1.0}}
+LESLIE_MICS = (math.radians(75), math.radians(-75))   # left and right of the cabinet, 150 degrees apart
+LESLIE_CROSSOVER = 800.0
+
+
+def _organ_hz(key: int) -> float:
+    """A tonewheel's frequency (its gears, not equal temperament)."""
+    return 20.0 * ORGAN_GEARS[key % 12] * 2 ** (key // 12 - 1)
+
+
+def _organ_wheel(key: int) -> int:
+    """The wheel a key's footage plays: the generator's top octave folds back, its bottom up."""
+    while key > ORGAN_WHEELS[1]:
+        key -= 12
+    while key < ORGAN_WHEELS[0]:
+        key += 12
+    return key
+
+
+def _drawbar_levels(reg: str) -> List[float]:
+    """A registration ("888000000") -> each drawbar's level: 8 full, each step 3 dB down, 0 off."""
+    reg = (str(reg) + "000000000")[:9]
+    return [0.0 if c == "0" else 10 ** (-3 * (8 - int(c)) / 20) for c in reg]
+
+
+def _oversampled(x, fn, k: int = 4, rate: int = RATE):
+    """``fn`` (a waveshaper) on x (mono) run at k times the rate, block by block, so its
+    harmonics don't fold back as fizz."""
+    import numpy as np
+    out = np.zeros_like(x)
+    blk, pad = 4 * rate, 4096
+    for i in range(0, len(x), blk):
+        a, b = max(0, i - pad), min(len(x), i + blk + pad)
+        seg = x[a:b]
+        n = len(seg)
+        U = np.zeros(n * k // 2 + 1, dtype=complex)
+        U[:n // 2 + 1] = np.fft.rfft(seg)
+        u = fn(np.fft.irfft(U, n * k) * k)
+        d = np.fft.irfft(np.fft.rfft(u)[:n // 2 + 1], n) / k
+        m = min(blk, len(x) - i)
+        out[i:i + m] = d[i - a:i - a + m]
+    return out
+
+
+def _organ_drive(x, rate: int):
+    """The speaker's tube preamp, driven hard: an asymmetric soft clip (one side gives
+    sooner - even harmonics), 4x oversampled, its DC taken out."""
+    import numpy as np
+    b = ORGAN_BIAS
+
+    def tube(u):
+        return (np.tanh(u + b) - math.tanh(b)) / (1 - math.tanh(b) ** 2)
+    y = _oversampled(np.asarray(x, dtype="float64") * ORGAN_DRIVE, tube, 4, rate)
+    return _filter(y, [("hp", 30, 0.7, 0.0)], rate)
+
+
+def _rotor_speed(changes, n: int, rate: int, rotor: dict, fast: bool):
+    """A rotor's speed (rev/s) at every sample from the start: ``changes`` [(sample, fast?)],
+    each a switch it eases into (slow to fast in its "up" time constant, down in "down")."""
+    import numpy as np
+    f = np.empty(n)
+    for s, v in sorted(changes):
+        if s <= 0:                                              # (switched from the start: so it starts)
+            fast = v
+    cur = rotor["fast" if fast else "slow"]
+    marks = [(0, fast)] + [(max(0, min(n, s)), v) for s, v in sorted(changes)] + [(n, None)]
+    for (a, want), (b, _) in zip(marks, marks[1:]):
+        if b <= a:
+            continue
+        tgt = rotor["fast" if want else "slow"]
+        tau = rotor["up"] if tgt > cur else rotor["down"]
+        f[a:b] = tgt + (cur - tgt) * np.exp(-np.arange(b - a) / (rate * tau))
+        cur = float(f[b - 1])
+    return f
+
+
+def _delayed(x, d):
+    """x read d samples late (d varying, >= 1), linearly interpolated."""
+    import numpy as np
+    pos = np.arange(len(x)) - d
+    i = np.floor(pos).astype(np.int64)
+    fr = pos - i
+    xp = np.concatenate([x, [0.0]])
+    ok = i >= 0
+    i0 = np.where(ok, i, len(x))
+    i1 = np.where(ok, np.minimum(i + 1, len(x) - 1), len(x))
+    return xp[i0] * (1 - fr) + xp[i1] * fr
+
+
+def _leslie(x, rate: int, first: int, changes, fast: bool = True):
+    """The rotating speaker: x (mono, from sample ``first`` of the piece) split at 800 Hz
+    to a horn and a drum, each turning (the speed eased between slow and fast at each of
+    ``changes`` [(sample, fast?)]), heard by two mics: each rotor's sound moving toward and
+    away from a mic (a Doppler delay) and facing it and turning away (louder, and brighter
+    for the horn), with the cabinet's back wall a second, later path. -> stereo (n, 2)."""
+    import numpy as np
+    n = len(x)
+    lo = _filter(x, [("lp", LESLIE_CROSSOVER, 0.7071, 0.0)] * 2, rate)
+    hi = _filter(x, [("hp", LESLIE_CROSSOVER, 0.7071, 0.0)] * 2 + [("peak", 2000, 0.8, 2.0),
+                                                                   ("lp", 6000, 0.7, 0.0), ("lp", 7500, 0.7, 0.0)], rate)
+    out = np.zeros((n, 2))
+    c = 343.0
+    for name, sig in (("horn", hi), ("drum", lo)):
+        r = LESLIE[name]
+        f = _rotor_speed(changes, first + n, rate, r, fast)
+        theta = r["spin"] * 2 * np.pi * np.cumsum(f)[first:] / rate + (0.0 if name == "horn" else 1.3)
+        del f
+        if name == "horn":                                      # (the horn's highs beam: more swing)
+            split = _filter(sig, [("lp", 3000, 0.7071, 0.0)] * 2, rate)
+            bands = ((split, r["am"]), (sig - split, r["am_hi"]))
+        else:
+            bands = ((sig, r["am"]),)
+        reach = r["radius"] / c * rate
+        for ch, mic in enumerate(LESLIE_MICS):
+            for turn, gain, late in ((0.0, 1.0, 0.0), (np.pi, 0.35, 0.0009 * rate)):   # (direct, the back wall)
+                cosv = np.cos(theta - mic + turn)
+                d = 1.0 + late + reach * (1.0 - cosv)            # (nearer as it faces the mic)
+                heard = sum(band * (1.0 + am * cosv) / math.sqrt(1.0 + am * am / 2) for band, am in bands)
+                out[:, ch] += gain * _delayed(heard, d)
+    return out
+
+
+def _organ_stem(events: list, total: int, rate: int, organ: Optional[dict] = None):
+    """The rock organ -> (first sample, stereo stem). Each key connects its drawbars' wheels
+    (free-running: a wheel two keys share is one sine, its phase its own since the organ was
+    switched on), each through a contact that closes a moment apart from the others and
+    chatters (the key click); single-triggered percussion if asked for; the swell (velocity)
+    into the overdriven preamp, then the rotating speaker - fast unless the score says slow
+    (``events`` with is_on 3: the speaker switched there, its "vel" 1 fast, 0 slow)."""
+    import numpy as np
+    organ = organ or {}
+    levels = _drawbar_levels(organ.get("drawbars", ORGAN_DRAWBARS))
+    perc = ORGAN_PERC.get(organ.get("percussion") or "")
+    if perc:
+        levels[8] = 0.0                                         # (the percussion takes the 1' bus)
+    fast = organ.get("speaker", "fast") != "slow"
+    ons: Dict[int, list] = {}
+    notes, changes = [], []
+    for t, is_on, _, key, vel in sorted(events, key=lambda e: (e[0], e[1])):
+        if is_on == 3:
+            changes.append((int(t * rate), bool(vel)))
+        elif is_on == 1:
+            ons.setdefault(key, []).append((t, vel))
+        elif is_on == 0 and ons.get(key):
+            t0, v = ons[key].pop(0)
+            notes.append((t0, t, key, v))
+    notes += [(t0, total / rate, key, v) for key, left in ons.items() for t0, v in left]
+    if not notes:
+        return total, np.zeros((0, 2), dtype="float32")
+    notes.sort()
+    first = max(0, int((notes[0][0] - 0.01) * rate))
+    end = min(total, int((max(n[1] for n in notes) + 0.45) * rate))
+    if end <= first:
+        return total, np.zeros((0, 2), dtype="float32")
+    n = end - first
+    rng = np.random.default_rng(1935)                           # (the year it was patented)
+    phase = rng.uniform(0, 2 * np.pi, ORGAN_WHEELS[1] + 1)
+    gates: Dict[int, list] = {}                                 # wheel -> [(start, end, level)]
+    decays: Dict[int, list] = {}                                # wheel -> [(start, end, level, decay)]: percussion
+    for i, (t0, t1, key, vel) in enumerate(notes):
+        swell = (max(1, min(127, vel)) / 127) ** 1.5
+        a, b = int(t0 * rate) - first, int(t1 * rate) - first
+        for off, lvl in zip(DRAWBARS, levels):
+            if not lvl:
+                continue
+            w = _organ_wheel(key + off)
+            close = a + int(rng.uniform(*ORGAN_CLICK_MS) * rate / 1000)
+            opens = max(close + 1, b + int(rng.uniform(0.0, 2.0) * rate / 1000))
+            g = gates.setdefault(w, [])
+            for edge in (close, opens):                         # (the contact chatters: 1-3 bounces)
+                for _ in range(int(rng.integers(1, 4))):
+                    s = edge + int(rng.uniform(0.05, 0.6) * rate / 1000)
+                    e = s + max(1, int(rng.uniform(0.05, 0.25) * rate / 1000))
+                    if edge == close and e < opens:             # (closing: it opens again a moment)
+                        g.append((s, e, -lvl * swell))
+                    elif edge == opens:                         # (opening: it touches again a moment)
+                        g.append((s, e, lvl * swell))
+            g.append((close, opens, lvl * swell))
+        if perc:                                                # single trigger: only from all keys up
+            held = any(o0 < t0 - 0.012 and o1 > t0 for o0, o1, _, _ in notes[:i])
+            if not held:
+                decays.setdefault(_organ_wheel(key + perc[0]), []).append((a, b, ORGAN_PERC_LEVEL * swell, perc[1]))
+    tone = np.zeros(n)
+    for w in sorted(set(gates) | set(decays)):
+        spans = gates.get(w, []) + [(s, e, 0.0) for s, e, _, _ in decays.get(w, [])]
+        lo = max(0, min(s for s, _, _ in spans))
+        hi = min(n, max(e for _, e, _ in spans))
+        if hi <= lo:
+            continue
+        env = np.zeros(hi - lo + 1)
+        for s, e, lvl in gates.get(w, []):
+            s, e = max(lo, min(hi, s)), max(lo, min(hi, e))
+            env[s - lo] += lvl
+            env[e - lo] -= lvl
+        env = np.cumsum(env)[:-1]
+        np.maximum(env, 0.0, out=env)                           # (a bounce can't go below open)
+        for s, e, lvl, tau in decays.get(w, []):
+            s, e = max(lo, s), min(hi, e)
+            if e > s:
+                env[s - lo:e - lo] += lvl * np.exp(-np.arange(e - s) / (tau * rate))
+        f = _organ_hz(w)
+        ph = 2 * np.pi * f * (np.arange(lo, hi) + first) / rate + phase[w]
+        # a tonewheel is a near-sine: a trace of 2nd and 3rd harmonic (the low wheels more)
+        impure = 0.03 if w < 48 else 0.012
+        wave = np.sin(ph)
+        if 2 * f < rate / 2.2:
+            wave += 0.4 * impure * np.sin(2 * ph)
+        if 3 * f < rate / 2.2:
+            wave += impure * np.sin(3 * ph)
+        tone[lo:hi] += env * wave
+    tone = _filter(tone, [("hp", 35, 0.7, 0.0)], rate)
+    driven = _organ_drive(tone, rate)
+    stem = _leslie(driven, rate, first, changes, fast)
+    stem = _studio_room(stem, rate) * 10 ** (ORGAN_LEVEL_DB / 20)
+    return first, stem.astype("float32")
+
+
 EXTRA_FONTS = {"chorus": fetch_choir, "vowels": fetch_vowels, "perc": fetch_percussion,
                "guitar": fetch_guitar, "strings_short": fetch_strings_short, "brass": fetch_brass,
                "horn_solo": fetch_horn_solo}
@@ -1500,6 +1765,8 @@ LOUDNESS = {
     # the guitar through its amp (AMP_LEVEL_DB): at no "mix", ~6 dB under a forte orchestra -
     # a distorted guitar is dense (its peaks barely over its body): heard well there
     "guitar": 0.0, "guitar_mute": 0.0,
+    # the rock organ through its speaker (ORGAN_LEVEL_DB): set where the guitar sits
+    "rock_organ": 0.0,
 }
 # (The parts that play their own recordings - OWN, STRINGS_SHORT's short notes - are evened out
 # to these, the sound set's, by their "trim_db": the same velocity, the same loudness.)
@@ -1522,6 +1789,8 @@ RANGES = {
     **{part: (p["lo"], p["hi"]) for part, p in PERC.items()},
     # the guitar: B1 (a 7-string's low B, a drop tuning's D2) to E5; power chords sit B1-D4
     "guitar": (GUITAR_LOW, GUITAR_KEYS[1]), "guitar_mute": (GUITAR_LOW, GUITAR_KEYS[1]),
+    # the rock organ: a manual's 61 keys, C2-C7
+    "rock_organ": (ORGAN_LOW, ORGAN_HIGH),
 }
 # How late each instrument's recording is heard after its note starts (seconds to come
 # within 9 dB of its full level, measured from MuseScore_General, less the ~20 ms a
@@ -1547,7 +1816,8 @@ ROOM = {"flutes": -20.8, "horns": -17.5, "horn_solo": -17.5, "trumpets": -39.3, 
         "brass": -20.9, "organ": -15.4, "pizzicato": -24.9, "taiko": -20.9, "toms": -28.9,
         # the guitar: close-miked in a small room of its own (_studio_room), sent to the hall
         # only a little (-12 dB) - a rhythm guitar is heard dry, in front, not across a hall
-        "guitar": HALL_ROOM_GUITAR}
+        "guitar": HALL_ROOM_GUITAR,
+        "rock_organ": HALL_ROOM_GUITAR}     # (the rock organ's speaker too: in its room, in front)
 HALL_ROOM = -12.8
 # (A part playing its own recordings is sent as OWN says; the brass BRASS_DRY_DB drier:
 # part_send_db.)
@@ -1614,15 +1884,18 @@ def _synth(rate: int, sf2: Path, need=()):
     return syn, sfid, fonts
 
 
-def _stem(syn, sfid, fonts, name: str, events: list, total: int, rate: int, short: bool = False):
+def _stem(syn, sfid, fonts, name: str, events: list, total: int, rate: int, short: bool = False,
+          organ: Optional[dict] = None):
     """One part (or one layer of one) played alone -> (first sample, stereo float32 stem
     from there): nothing is played before its first note or after its last note has rung
     out (most parts are silent most of a piece). ``short``: a string part's short notes, from
-    their own recordings (STRINGS_SHORT)."""
+    their own recordings (STRINGS_SHORT). ``organ``: the rock organ's settings (Score.organ)."""
     import numpy as np
     part = name.partition(":")[0]
     if part in GUITAR:                                      # (the guitar: its own player, an amp)
         return _guitar_stem(syn, sfid, fonts, events, total, rate)
+    if part in ORGAN:                                       # (the rock organ: synthesized)
+        return _organ_stem(events, total, rate, organ)
     if short:
         return _sampled_stem(syn, fonts["strings_short"], part, STRINGS_SHORT[part], events, total, rate)
     if _plays_own(part, fonts):
@@ -1712,6 +1985,7 @@ def play_layers(score: Score, seconds: float, layer_of, sf2: Path = SF2, rate: i
         if k is not None and part in STRINGS_SHORT:
             need.add("strings_short")
     syn, sfid, fonts = _synth(rate, sf2, sorted(need))
+    organ = dict(getattr(score, "organ", None) or {})
     for name, events in groups.items():
         k = wanted[name]
         if k is None:
@@ -1720,6 +1994,8 @@ def play_layers(score: Score, seconds: float, layer_of, sf2: Path = SF2, rate: i
             keys.append(k)
         part = name.partition(":")[0]
         bends = [(t, 2, name, 0, sem) for t, p, sem in getattr(score, "bends", []) if p == part]
+        if part in ORGAN:                                   # (3: its speaker switched, "vel" 1 fast)
+            bends = [(t, 3, name, 0, int(f)) for t, f in getattr(score, "speaker", [])]
         arts = [(False, events)]
         if part in STRINGS_SHORT and fonts.get("strings_short") is not None:
             short, long_ = _split_short(events)             # (a short note: its own recordings)
@@ -1740,10 +2016,11 @@ def play_layers(score: Score, seconds: float, layer_of, sf2: Path = SF2, rate: i
 
     def run(slot: int, mine) -> None:
         for name, k, events, short in mine:
-            first, stem = _stem(syn, sfid, fonts, name, events, total, rate, short)
+            part, _, layer = name.partition(":")
+            first, stem = _stem(syn, sfid, fonts, name, events, total, rate, short,
+                                **({"organ": organ} if part in ORGAN else {}))
             if not len(stem):
                 continue
-            part, _, layer = name.partition(":")
             gain = level_db(part, mix) + (float(layer) if layer else 0.0)
             span = slice(first, first + len(stem))
             acc[slot, k, 0, span] += stem * np.float32(10 ** (gain / 20))

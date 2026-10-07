@@ -655,3 +655,28 @@ def test_a_mens_choir_above_e4_is_flagged():
     low = {**base, "lines": [{"part": "men_choir", "notes": [[0, "D3", 4], [4, "D#4", 4]]}]}
     flagged = lambda sp: [m for _, m in arrangement.check(sp, listen=False) if "above E4" in m]
     assert flagged(high) and not flagged(low)
+
+
+def test_the_rock_organ_is_held_back_for_a_bosss_third_stage():
+    s = {"tune": {"seed": "Test Hero", "cls": "Fighter"}, "tempo": 120, "statements": [],
+         "key": "D4", "meter": "4/4", "length": 8, "chords": [[0, 8, "i"]],
+         "harmony": [{"part": "rock_organ", "play": "root5", "range": ["D3", "D4"], "pattern": "x-oo", "step": 0.5}]}
+    held = lambda sp: [m for lvl, m in A.check(sp, listen=False) if lvl == "warn" and "third stage" in m]   # noqa: E731
+    assert held(s)                                            # a theme: no
+    assert held(dict(s, role="stage", stage=2))               # a second stage: not yet
+    assert not held(dict(s, role="stage", stage=3))           # a third stage: the surprise
+    assert not held(dict(s, role="hit", stage=3))             # a cue of one: yes
+
+
+def test_the_rock_organ_speaker_and_registration_are_written_in_the_score():
+    s = {"tune": {"seed": "Test Hero", "cls": "Fighter"}, "tempo": 120, "statements": [],
+         "key": "D4", "meter": "4/4", "length": 8, "chords": [[0, 8, "i"]], "stage": 3,
+         "harmony": [{"part": "rock_organ", "play": "chord", "range": ["D3", "D4"], "from": 0, "to": 8}],
+         "organ": {"speaker": [[0, "slow"], [4, "fast"]], "drawbars": "888800000", "percussion": "third"}}
+    sc, _, _ = A.build(s)
+    assert sc.speaker == [(0.0, False), (2.0, True)]          # (beat 4 at 120: 2 s)
+    assert sc.organ == {"drawbars": "888800000", "percussion": "third"}
+    assert A.build(dict(s, organ={"speaker": "slow"}))[0].organ == {"speaker": "slow"}
+    for bad in ({"drawbars": "999"}, {"percussion": "fifth"}, {"speaker": "medium"}):
+        with pytest.raises(A.ArrangementError):
+            A.build(dict(s, organ=bad))
