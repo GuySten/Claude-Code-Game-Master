@@ -182,6 +182,10 @@ once, then its body loops (`"loop_from"`).
 
 ## At the table
 
+3b. **The electric guitar is a later stage's surprise** (the host: "electric guitar will only be used on
+   bosses' later stages. It is a special surprise"): held back through stage 1, heard first at a later
+   stage's entry (the Saint's eruption), then driving that stage - and never in themes, places or players'
+   themes (an acoustic guitar is an ordinary instrument). The critic warns on it anywhere else.
 14a. **An introduction only where the encounter has one.** When the boss is revealed slowly (a chapel
     entered, a ritual interrupted, words exchanged), their theme can play before initiative as the
     suspense, and the stage-1 entry lands when the fight begins. Not every boss gets one (the host: "not

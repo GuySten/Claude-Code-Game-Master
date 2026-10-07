@@ -899,6 +899,12 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
         add("warn", f"guitar: {len(muddy)} chord(s) with a third, sixth, seventh or second (first at "
                     f"{muddy[0]:.1f} s) - through its distortion that turns to mud: power chords only "
                     "(\"play\": \"root5\", \"root\", \"octaves\"; root, fifth, octave)")
+    # The electric guitar is a special surprise, kept for a boss's later stages (the host: "electric
+    # guitar will only be used on bosses' later stages. It is a special surprise"): a stage 2+ or a
+    # cue of one ("stage": 2), never a theme, a place, a player's theme or a first stage.
+    if any(by_part.get(part) for part in orchestra.GUITAR) and int(spec.get("stage", 1) or 1) < 2:
+        add("warn", "guitar: the electric guitar is kept for a boss's later stages (a \"stage\" of 2 or "
+                    "more, or a cue of one) - a special surprise, never a theme, a place or a first stage")
     # The tune: all played, and against its chords.
     melody = spec.get("melody") or []
     silent = [u0 for u0, _, _ in ctx["played"]

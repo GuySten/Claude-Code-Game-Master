@@ -417,7 +417,7 @@ def test_the_guitar_wont_download_what_it_cant_unpack(tmp_path, monkeypatch):
 def test_a_third_on_the_distorted_guitar_is_flagged_power_chords_are_not():
     import arrangement as A
     s = {"tune": {"seed": "Test Hero", "cls": "Fighter"}, "tempo": 120, "statements": [],
-         "key": "D4", "meter": "4/4", "length": 8, "chords": [[0, 4, "i"], [4, 8, "bVI"]],
+         "key": "D4", "meter": "4/4", "length": 8, "stage": 2, "chords": [[0, 4, "i"], [4, 8, "bVI"]],
          "harmony": [{"part": "guitar", "play": "root5", "range": ["D2", "D3"], "pattern": "x-  ", "step": 0.5,
                       "legato": 1.0},
                      {"part": "guitar_mute", "play": "root5", "range": ["D2", "D3"], "pattern": "  oo", "step": 0.5}]}
@@ -449,6 +449,18 @@ def _heard_like_a_rhythm_guitar(np, out, rate):
     P = np.abs(np.fft.rfft(m)) ** 2
     f = np.fft.rfftfreq(len(m), 1 / rate)
     assert P[(f >= 2000) & (f < 4000)].sum() / P.sum() < 0.15          # no buzz (GM sample alone: 28%)
+
+
+def test_the_guitar_is_kept_for_a_bosss_later_stages():
+    import arrangement as A
+    s = {"tune": {"seed": "Test Hero", "cls": "Fighter"}, "tempo": 120, "statements": [],
+         "key": "D4", "meter": "4/4", "length": 8, "chords": [[0, 8, "i"]],
+         "harmony": [{"part": "guitar", "play": "root5", "range": ["D2", "D3"], "pattern": "x-  ", "step": 0.5}]}
+    kept = lambda sp: [m for lvl, m in A.check(sp, listen=False) if lvl == "warn" and "later stages" in m]
+    assert kept(s)                                            # a theme: no
+    assert kept(dict(s, role="stage", stage=1))               # a first stage: no
+    assert not kept(dict(s, role="stage", stage=2))           # a later stage: yes
+    assert not kept(dict(s, role="hit", stage=2))             # a cue of one: yes
 
 
 def test_the_guitar_sounds_through_its_amp_double_tracked(monkeypatch):
