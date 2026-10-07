@@ -57,16 +57,14 @@ Enumerated from `os.environ.get` across `lib/` and `tools/`:
 |---|---|---|
 | `OPENAI_API_KEY` | `image_gen`, `session_manager` | turns scene images on through OpenAI. With neither this nor `IMAGE_BACKEND=forge` the session brief says DISABLED |
 | `IMAGE_BACKEND` | `image_gen`, `session_manager`, `gpu_server` | `openai` · `forge` (a local Stable Diffusion WebUI Forge / AUTOMATIC1111 with `--api`, free) · `comfyui` (a local ComfyUI, `lib/comfy.py`) · `remote` (Forge or ComfyUI on the host's GPU machine, through `GPU_SERVER_URL`; that machine's own `IMAGE_BACKEND` and settings decide how) · `off`. Default: `remote` when `GPU_SERVER_URL` is set, else `openai` when a key is set, else `off` |
-| `GPU_SERVER_URL`, `GPU_SERVER_PASSWORD` | `gpu_remote`, `image_gen`, `composer` | the host laptop's `gm-gpu-server.sh` behind a tunnel: pictures and composed music are made there (GAME-NIGHT.md). On the laptop, `GPU_SERVER_PASSWORD` is the password the server accepts |
+| `GPU_SERVER_URL`, `GPU_SERVER_PASSWORD` | `gpu_remote`, `image_gen` | the host laptop's `gm-gpu-server.sh` behind a tunnel: pictures are made there (GAME-NIGHT.md). On the laptop, `GPU_SERVER_PASSWORD` is the password the server accepts |
 | `GPU_SERVER_PORT` | `gpu_server` | the laptop server's port (default `7861`) |
 | `COMFY_URL`, `COMFY_MODEL`, `COMFY_STEPS`, `COMFY_CFG`, `COMFY_SAMPLER`, `COMFY_SCHEDULER`, `COMFY_GUIDANCE`, `COMFY_NEGATIVE`, `COMFY_LANDSCAPE`/`PORTRAIT`/`SQUARE`, `COMFY_TIMEOUT` | `comfy` | ComfyUI tuning; defaults suit DreamShaper XL Lightning; `COMFY_GUIDANCE` adds Flux's guidance node |
 | `COMFY_WORKFLOW` | `comfy` | your own ComfyUI workflow (Export (API) JSON) with `{{prompt}}`, `{{negative}}`, `{{seed}}`, `{{width}}`, `{{height}}`… placeholders, instead of the built-in graph |
 | `FORGE_URL`, `FORGE_MODEL`, `FORGE_STEPS`, `FORGE_CFG`, `FORGE_SAMPLER`, `FORGE_SCHEDULER`, `FORGE_LANDSCAPE`/`PORTRAIT`/`SQUARE`, `FORGE_TIMEOUT` | `image_gen` | local Forge tuning; defaults suit DreamShaper XL Lightning (GAME-NIGHT.md → 5. Pictures) |
 | `NARRATOR_MODEL`, `NARRATOR_API_MODEL` | `narrator` | the model behind the online table's hover cards, Narrator answers, sheet translations and name spotting: `claude -p --model` alias (default `sonnet`) · API model id when using an API key (default `claude-sonnet-5-5`) |
-| `MUSIC_COMPOSE` | `composer` | `off` turns composing off · `remote` composes on the GPU server even when `.compose-venv` exists here (default: here when `.compose-venv` exists, else on the GPU server when `GPU_SERVER_URL` is set) |
-| `COMPOSE_MODEL`, `COMPOSE_DEVICE` | `music_compose` | MusicGen model (default `facebook/musicgen-small`) · `auto`/`cuda`/`cpu` |
-| `COMPOSE_LOUDNESS` | `music_compose` | loudness composed pieces are brought to, dB (default `-14`) |
-| `COMPOSE_RAM_HALF` | `music_compose` | `0` keeps the waiting music model in full precision in RAM (default: half, with a GPU) |
+| `MUSIC_ORCHESTRA`, `ORCHESTRA_PYTHON`, `ORCHESTRA_SF2` | `score_music` | `off` turns the orchestra off · a Python with its packages (default `.music-venv`, made by `gm-music.sh setup`) · its SoundFont |
+| `COMPOSE_LOUDNESS` | `music_compose` | loudness rendered pieces are brought to, dB (default `-14`) |
 | `GPU_LOCK_FILE`, `GPU_TURN_WAIT` | `gpu_turn` | the shared one-model-on-the-GPU lock (default in the temp folder) · max seconds to wait for it (900) |
 | `OPENAI_IMAGE_MODEL` | `image_gen` | default `gpt-image-2` |
 | `OPENAI_IMAGE_QUALITY` | `image_gen` | default `medium` |

@@ -2,7 +2,7 @@
 # gm-gpu-server.sh - Lend this computer's GPU to a game hosted elsewhere
 # (thin wrapper for lib/gpu_server.py; see GAME-NIGHT.md)
 #
-# Run it on the host's laptop, next to Forge (and the music composer, if set up),
+# Run it on the host's laptop, next to Forge (or ComfyUI),
 # then expose it with a tunnel and give the GM the link and the password:
 #
 #   bash tools/gm-gpu-server.sh [--port 7861] [--password PW]

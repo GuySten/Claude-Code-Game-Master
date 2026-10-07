@@ -52,8 +52,8 @@ Display all available commands and tools.
   gm-image.sh       Pictures: scenes, portraits, places, foes, treasures
                     (OpenAI or a local Forge)
   gm-music-library.sh  Download the mood music library
-  gm-music-compose.sh  Local AI composer: villain/boss themes, hero anthems
-                    (normalize: make older composed pieces louder)
+  gm-music.sh       The orchestra: the GM's written themes, hero anthems
+                    (setup, scores, wanted, orchestra "<PC>")
   gm-models.sh      Which Claude models run the game (also /models)
 
 ================================================================

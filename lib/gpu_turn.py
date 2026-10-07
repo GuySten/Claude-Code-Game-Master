@@ -1,13 +1,10 @@
 """One AI model on the graphics card at a time.
 
-Pictures (Forge) and composed music (MusicGen) both keep their models in RAM
-and use the GPU in turns: whoever wants the card takes this lock, which every
-process of the game shares (the table's background painter and composer, and
-the GM's own picture commands). Before a music piece, Forge is asked to move
-its model off the card (into RAM); after the piece, the composer moves its
-model back to RAM too. A picture after that brings Forge's model back by itself.
+Pictures (Forge or ComfyUI) keep their model in RAM and use the GPU in turns:
+whoever wants the card takes this lock, which every process of the game shares
+(the table's background painter and the GM's own picture commands).
 
-    with gpu_turn("music"):
+    with gpu_turn("pictures"):
         ...
 """
 

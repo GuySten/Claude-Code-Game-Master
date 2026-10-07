@@ -15,7 +15,7 @@ reads the notes and measures what can be measured; this listens to the finished
 sound. It judges recordings, not compositions - a real orchestra will outscore the
 sampled one on PQ whatever the notes - so compare like with like, and trust the
 host's ears over both. Needs torch, torchaudio, soundfile and audiobox_aesthetics
-(gm-music-compose.sh setup --rater); the model (~1 GB) downloads on first use.
+(gm-music.sh setup --rater); the model (~1 GB) downloads on first use.
 """
 
 import argparse

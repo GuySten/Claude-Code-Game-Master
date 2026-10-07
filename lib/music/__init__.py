@@ -1,7 +1,7 @@
 """The music engine: written scores for a sampled orchestra, and everything that makes,
 checks and judges them. It imports nothing from the game; the game reaches it through
-lib/score_music.py (campaign music: themes, anthems, places, a boss's stages) and
-lib/composer.py (generated pieces), and the table plays the files they write.
+lib/score_music.py (campaign music: themes, anthems, places, a boss's stages), and the
+table plays the files it writes.
 
     arrangement   the score format (JSON), its critic (check), fix, play
     orchestra     the sampled orchestra: parts, ranges, levels, the real choirs

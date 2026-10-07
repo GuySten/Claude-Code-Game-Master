@@ -245,16 +245,13 @@ def test_forge_is_warmed_up_at_the_start_of_the_game(forge, monkeypatch, tmp_pat
     assert image_gen.forge_warm_up() is False and len(forge["seen"]["requests"]) == 1
 
 
-def test_the_table_loads_the_picture_model_then_the_music_model(monkeypatch):
-    import composer
+def test_the_table_loads_the_picture_model_at_start(monkeypatch):
     import image_gen as ig                             # the module the table imports
     import table_server
     order = []
     monkeypatch.setattr(ig, "forge_warm_up", lambda: order.append("pictures") or True)
-    monkeypatch.setattr(composer, "available", lambda: True)
-    monkeypatch.setattr(composer, "start_server", lambda: order.append("music") or True)
     table_server.warm_up()
-    assert order == ["pictures", "music"]              # one after the other, not both at once
+    assert order == ["pictures"]
 
 
 def test_a_creature_is_painted_as_a_creature_whatever_its_name(forge):

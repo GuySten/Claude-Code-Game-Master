@@ -4,7 +4,8 @@ The host's reactions to the music, newest last. Read before writing; add to it
 whenever the host says how a piece sounded. Their ears are the final judge.
 
 - They want a **real orchestra, not AI-generated audio**: the sampled orchestra
-  playing written notes, not MusicGen.
+  playing written notes. (The AI music generator was removed: "why the Heartstone
+  sound is so bad?")
 - The **hand-written arrangement** of a legendary theme sounded "a lot better"
   than the rule-based one: the tune passed around the orchestra, a
   countermelody, a harmonic surprise at the climax, a real ending.
@@ -18,7 +19,7 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   to the critic. First ranking (enjoyment CE): the game's professional library
   6.2-8.0 (light, melodic tracks highest; boss tracks 7.2-7.3); our villain theme
   7.3, bard tests 7.4-7.6, wounded tests 7.0-7.2, our boss fights 6.4-6.8, the
-  legendary theme 6.5 (rule-based 6.2, MusicGen 6.1). Weakest areas: boss fights
+  legendary theme 6.5 (rule-based 6.2, the old AI generator's 6.1). Weakest areas: boss fights
   and the heroic legendary - the denser, more developed versions scored higher.
 - **Tunes (a blind-ish "tune only" test: the same clarinet, tempo, key and drone,
   only the notes different):** "v2 is clearly better than v1, but you clearly beat

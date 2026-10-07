@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Pictures and composed music made on ANOTHER computer's graphics card.
+"""Pictures made on ANOTHER computer's graphics card.
 
 When the game runs somewhere without a GPU (a computer without a graphics card),
-the host's own laptop can still do the painting and the composing: it runs
+the host's own laptop can still do the painting: it runs
 ``bash tools/gm-gpu-server.sh`` (lib/gpu_server.py) next to Forge, behind an
 https tunnel, and this machine sends it jobs.
 
@@ -11,7 +11,7 @@ https tunnel, and this machine sends it jobs.
 
 A job is submitted, then fetched when it's done (``run``): a tunnel drops any
 single request that takes longer than about 100 seconds, and a picture on a
-laptop GPU, or a piece of music, can take longer than that.
+laptop GPU can take longer than that.
 """
 
 import json
@@ -65,7 +65,7 @@ _health: Dict[str, Any] = {"at": 0.0, "value": None}
 
 
 def health(max_age: float = 30) -> Optional[Dict[str, Any]]:
-    """What the laptop can do now ({forge, forge_why, composer, device}); None if it
+    """What the laptop can do now ({pictures, pictures_why, forge, forge_why}); None if it
     doesn't answer. Cached for ``max_age`` seconds: the table asks often."""
     if not enabled():
         return None

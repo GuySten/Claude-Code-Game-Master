@@ -36,9 +36,9 @@ def test_the_old_script_paths_still_run():
 
 
 def test_a_piece_has_one_file_name_stem_everywhere():
-    import composer
+    import score_music
     from music import slug
-    assert composer.slug is slug and slug("Ashen Saint") == "ashen-saint" and slug("קסטרל").startswith("piece-")
+    assert score_music.slug is slug and slug("Ashen Saint") == "ashen-saint" and slug("קסטרל").startswith("piece-")
 
 
 def test_a_rendered_score_keeps_its_real_title_in_its_file_name(tmp_path):

@@ -44,11 +44,10 @@ or play without pictures (`IMAGE_BACKEND=off`; the game plays fine in words).
 
 ## 4. Music (optional)
 
-Check the composer: `bash tools/gm-music-compose.sh check` (which GPU it would use; it
-says when the composer isn't installed). If it isn't set up and this
-computer has an NVIDIA GPU (`nvidia-smi`), offer `bash tools/gm-music-compose.sh setup`
-(a few GB, takes a while; the game picks music from its library without it). Don't run
-it without a yes.
+Check the orchestra: `bash tools/gm-music.sh scores` (its last line says whether it is set
+up). If it isn't, offer `bash tools/gm-music.sh setup` (about 215 MB of recorded
+instruments, no GPU; the game picks music from its library without it). Don't run it
+without a yes.
 
 ## 5. The tunnel (friends outside your home network)
 

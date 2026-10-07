@@ -264,8 +264,8 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
   look things up, don't read it through.
 
 ## 5. The loop
-Python: the orchestra's (`.compose-venv/bin/python`, set up by `gm-music-compose.sh setup
---orchestra`), or the one your brief names.
+Python: the orchestra's (`.music-venv/bin/python`, set up by `gm-music.sh setup`), or the
+one your brief names.
 1. Plan in words: one line per section (who carries the tune, what builds, the peak).
 2. Write the score.
 3. `python lib/arrangement.py make score.json --out piece.ogg`: applies the mechanical fixes

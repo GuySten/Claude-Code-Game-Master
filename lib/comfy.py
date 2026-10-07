@@ -224,7 +224,7 @@ def generate(prompt: str, quality: str, size: str, avoid: str = "") -> Tuple[byt
 
 
 def release_gpu() -> bool:
-    """Models off the graphics card before music is composed (ComfyUI's /free)."""
+    """Models off the graphics card, so something else can use it (ComfyUI's /free)."""
     try:
         _call("/free", {"unload_models": True, "free_memory": True}, timeout=30)
         return True

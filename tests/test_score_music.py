@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from lib import score_music, character_arcs, composer
+from lib import score_music, character_arcs
 from tests.test_table_server import table, CODE  # noqa: F401  (the fixture)
 
 TUNE = {"seed": "Pip", "meter": "4/4", "mode": "dorian", "kind": "test", "hook": 3, "pickup": [],
@@ -66,8 +66,8 @@ def test_rendered_pieces_are_registered_where_the_table_looks(tmp_path):
         out.write_bytes(b"OggS")
         score_music.register(camp, use, out, 40.0, "score", "abc")
         assert score_music.registered(camp, use)["hash"] == "abc"
-    assert composer.theme_file(camp, "Grimaldi", True) == "grimaldi-boss-score.ogg"
-    assert composer.anthem(camp, "Pip")["file"] == "anthem-pip-s1-d0-w0-b0-score.ogg"
+    assert score_music.theme_file(camp, "Grimaldi", True) == "grimaldi-boss-score.ogg"
+    assert score_music.anthem(camp, "Pip")["file"] == "anthem-pip-s1-d0-w0-b0-score.ogg"
     assert score_music.place_file(camp, "the hip") == "place-the-hip.ogg"
 
 
@@ -151,16 +151,14 @@ def _orchestra(camp, made):
     return maker
 
 
-def test_a_written_villain_theme_plays_instead_of_the_ai(table):  # noqa: F811
+def test_a_written_villain_theme_plays(table):  # noqa: F811
     call, state, camp = table["call"], table["state"], table["camp"]
-    made, composed = [], []
+    made = []
     state.orchestra_maker = _orchestra(camp, made)
-    state.music_maker = lambda *a: composed.append(a) or "x.ogg"
     _score(camp, "grimaldi-theme", {"as": "theme", "who": "Grimaldi"})
     call("/api/gm/say", {"text": "Grimaldi bows.", "theme": "Grimaldi", "villain": True}, host=True)
     state.music_pass()
     assert state.music["track"] == "grimaldi-theme-score.ogg" and state.music["theme"] == "Grimaldi"
-    assert not [c for c in composed if c[0] == "theme"]              # (no AI theme for a written one)
     # A boss nobody has written yet: the GM is asked for it.
     call("/api/gm/say", {"text": "Dobbin roars.", "theme": "Dobbin", "boss": True}, host=True)
     assert ("boss", "Dobbin") in [(w["what"], w.get("who")) for w in score_music.wanted(camp)]
@@ -169,18 +167,16 @@ def test_a_written_villain_theme_plays_instead_of_the_ai(table):  # noqa: F811
 def test_pc_anthems_follow_their_story_on_the_orchestra(table):  # noqa: F811
     call, state, camp = table["call"], table["state"], table["camp"]
     call("/api/claim", {"code": CODE, "pc": "Pip"})
-    made, composed = [], []
+    made = []
     state.orchestra_maker = _orchestra(camp, made)
-    state.music_maker = lambda *a: composed.append(a) or "x.ogg"
     state.music_pass()
     assert made == ["theme", "theme"]                 # now (s0) and the next growth (s1), by rule
-    assert composer.anthem(camp, "Pip")["file"].startswith("anthem-pip-s0-d0-w0-b0")
-    assert not [c for c in composed if c[0] in ("anthem", "anthem_version")]
+    assert score_music.anthem(camp, "Pip")["file"].startswith("anthem-pip-s0-d0-w0-b0")
     # The GM writes Pip's theme as their story reached it: it replaces the rule's.
     (camp / "music" / "tunes").mkdir(parents=True, exist_ok=True)
     _score(camp, "pip-seed", {"as": "anthem", "who": "Pip", "stage": 0}, {"seed": "Pip", "stage": 0})
     state.music_pass()
-    assert composer.anthem(camp, "Pip")["file"] == "anthem-pip-s0-d0-w0-b0-score.ogg"
+    assert score_music.anthem(camp, "Pip")["file"] == "anthem-pip-s0-d0-w0-b0-score.ogg"
     call("/api/gm/say", {"text": "Pip leaps!", "heroic": "Pip"}, host=True)
     assert state.music["track"] == "anthem-pip-s0-d0-w0-b0-score.ogg"
 
@@ -241,14 +237,14 @@ def test_a_villains_theme_follows_their_descent_unannounced(table):  # noqa: F81
     _score(camp, "grim-0", {"as": "theme", "who": "Grimaldi", "dark": 0})
     _score(camp, "grim-1", {"as": "theme", "who": "Grimaldi", "dark": 1})
     state.music_pass()
-    assert composer.theme_file(camp, "Grimaldi", False) == "grimaldi-theme-d0-score.ogg"
+    assert score_music.theme_file(camp, "Grimaldi", False) == "grimaldi-theme-d0-score.ogg"
     before = len(state.messages)
     _, body = call("/api/gm/grow", {"pc": "grimaldi", "kind": "darkness", "what": "He tithed the children."}, host=True)
     assert body["ok"] and body["npc"] == "Grimaldi" and body["arc"]["dark"] == 1
     assert len(state.messages) == before                                  # (the table isn't told)
-    assert composer.theme_file(camp, "Grimaldi", False) == "grimaldi-theme-d1-score.ogg"
+    assert score_music.theme_file(camp, "Grimaldi", False) == "grimaldi-theme-d1-score.ogg"
     call("/api/gm/grow", {"pc": "Grimaldi", "kind": "darkness", "what": "And more."}, host=True)
-    assert composer.theme_file(camp, "Grimaldi", False) == "grimaldi-theme-d1-score.ogg"   # (the deepest written)
+    assert score_music.theme_file(camp, "Grimaldi", False) == "grimaldi-theme-d1-score.ogg"   # (the deepest written)
     call("/api/gm/say", {"text": "Grimaldi bows.", "theme": "Grimaldi"}, host=True)
     assert state.music["track"] == "grimaldi-theme-d1-score.ogg"
     assert score_music.has_score(camp, "theme", "Grimaldi")

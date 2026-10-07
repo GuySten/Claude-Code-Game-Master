@@ -172,16 +172,14 @@ asides to the GM, whispers back, and live HP bars for the party.
   travel, mystery, dread, combat, boss, sad, victory…) and the table switches to fitting
   music on its own, for everyone at once — quieter while narration is read aloud, with a
   volume control per player.
-- **Every special enemy has their own theme**, and **bosses get exciting music**: the same
-  leitmotif, but fast and thundering. Assign a real track to a villain
-  (`gm-table.sh music theme "Grimaldi" clown-waltz.mp3`), name a file after them, or let the
-  table generate a tune from their name.
-- **Composed music for the big moments (optional, local AI).** With MusicGen set up on the
-  host (`bash tools/gm-music-compose.sh setup`; an NVIDIA GPU helps), main villains and
-  bosses get their own composed themes, and each player character gets a heroic anthem that
-  plays when they do something heroic. All of it is composed in the background during play,
-  at the same loudness as the rest of the music. The music and picture models are loaded
-  into RAM once, when the table starts, and take turns on the graphics card.
+- **Every special enemy has their own theme**, and **bosses get exciting music**. Assign a
+  real track to a villain (`gm-table.sh music theme "Grimaldi" clown-waltz.mp3`), name a file
+  after them, or let the table generate a tune from their name; a boss with no music of their
+  own plays the library's boss music.
+- **Written music for the big moments (optional).** With the sampled orchestra set up on the
+  host (`bash tools/gm-music.sh setup`; real instrument recordings, no GPU), the themes the GM
+  writes for villains and bosses, each player character's heroic anthem (arranged from their
+  own tune) and the music of iconic places are rendered in the background during play.
 - **A starter music library**: `bash tools/gm-music-library.sh fetch` downloads 25 tracks
   by Kevin MacLeod (incompetech.com, CC BY 4.0, credited on screen), already sorted by mood.
   With no files at all, built-in generated soundscapes cover every mood. Same Wi-Fi works out of

@@ -36,8 +36,8 @@ setup step on the host's computer, and the game plays fine without them.
 - **Characters.** Roll one at the table; open your full character sheet, in your own language;
   when the story says you've earned a level, level up from it.
 - **Music.** Mood music for every scene, a theme for every villain, battle music for bosses.
-  *Optional:* composed themes for main villains and bosses, and a heroic anthem for every player
-  character ([step 6](#one-time-setup-host)).
+  *Optional:* a sampled orchestra plays the themes the GM writes for villains and bosses, and a
+  heroic anthem for every player character ([step 6](#one-time-setup-host)).
 - **Pictures** *(optional)*: places, villains, bosses, treasures, a portrait for every character
   and for the NPCs you keep meeting, collected in a gallery ([step 5](#one-time-setup-host)).
 - **Between the players.** A private table-talk chat the GM never sees; a Narrator to ask "what
@@ -68,7 +68,7 @@ claude                                # then type /gm and say "my friends are jo
 ```
 
 Optional extras, any time later: **pictures** (an OpenAI key, or the free local Forge:
-[step 5](#one-time-setup-host)) and **composed music** (`bash tools/gm-music-compose.sh setup`:
+[step 5](#one-time-setup-host)) and **the orchestra** (`bash tools/gm-music.sh setup`:
 [step 6](#one-time-setup-host)).
 
 On **Windows**, the same in PowerShell — no WSL needed:
@@ -229,8 +229,8 @@ Optional `.env` settings for Forge (the defaults suit DreamShaper XL Lightning):
 | `FORGE_TIMEOUT` | `600` | Seconds to wait for one picture |
 
 **Too slow, "out of memory", or only 8 GB of RAM?** Use a smaller SD 1.5 model instead
-(with 8 GB of RAM, use it from the start: the picture and music models both stay in RAM all
-evening, and DreamShaper XL is too big to share): **DreamShaper 8** from
+(with 8 GB of RAM, use it from the start: the picture model stays in RAM all
+evening, and DreamShaper XL is too big to share it): **DreamShaper 8** from
 Civitai (about 2 GB), with:
 ```
 FORGE_MODEL=dreamshaper_8
@@ -303,81 +303,35 @@ arrives look right.
 To keep characters on-model, every PC and NPC needs a stored appearance. Ask the GM *"write
 appearances for everyone in the party"*: characters created on the join page don't have one yet.
 
-**6. Composed music (optional)**
+**6. The orchestra (optional)**
 
-Your own local AI composer (MusicGen) can write music for the moments that matter. It
-needs an NVIDIA graphics card for reasonable speed (a GTX 1060 works); the music on
-every other occasion comes from the library and the built-in sounds as before.
+A sampled orchestra (real instrument recordings, free, no GPU) plays the music the GM writes
+for the moments that matter; the music on every other occasion comes from the library and
+the built-in sounds as before.
 
-- **Main villains** get their own composed theme (the GM marks them).
-- **Bosses** get a composed battle theme: thundering drums, brass, choir.
-- **Every player character** gets a heroic anthem. When they do something truly heroic,
-  it plays for everyone, and then the scene's music comes back. Each anthem is composed with
-  its **dark twin**, the same music made ominous: if that character ever falls (lost to
-  madness, see the GM's judgment), it becomes their villain theme.
-
-Everything is composed in the background while you play: a theme takes a minute or two on
-a GPU. Until it's ready, the built-in theme plays, and then the composed one takes over.
-
-Set it up once, in Git Bash in the game folder (Windows) or a terminal (Mac/Linux):
-
-```bash
-bash tools/gm-music-compose.sh setup     # its own environment, about 3 GB (the game stays CPU-only)
-bash tools/gm-music-compose.sh test      # composes one 30-second piece and times it
-```
-
-`test` also downloads the model the first time (about 2.5 GB), then prints how long your
-computer took and a link to listen. That tells you what to expect: if a 30-second piece took
-90 seconds, a villain's theme takes about a minute and a half.
-
-- **No NVIDIA card?** `setup --cpu` works on any computer, but each piece takes several
-  minutes. The music still arrives, just later.
-- **Dark twins that keep the tune:** without it, a twin is the anthem's own recording made
-  dark (slower, lower, muffled, echoing). `bash tools/gm-music-compose.sh setup --melody`
-  adds MusicGen-Melody (about 3.3 GB more): with a GPU it re-composes each twin on the
-  anthem's melody, in a minor, menacing arrangement. If it ever fails, the darkened recording
-  is used instead.
-- **Each character's own tune:** with the melody model, every anthem is arranged around a
-  leitmotif made from the character's name and class (always the same one), built like a film
-  theme: a fanfare, a driving rhythm, a soaring line, a bugle call or a hymn, in a march, 3/4
-  or a lilting 6/8, and a mode that suits them (a wizard's Lydian "wonder", a rogue's folk
-  Mixolydian...), laid out as a phrase that develops instead of looping. The dark twin is the
-  same tune turned villainous: minor, a march of repeated notes, half-step sighs, a tritone. Hear a motif
-  alone: `bash tools/gm-music-compose.sh motif "<name>"`; compose the real thing:
-  `bash tools/gm-music-compose.sh anthem "<name>"`.
+- **Main villains and bosses** get the theme the GM writes for them (the table asks for it:
+  `bash tools/gm-music.sh wanted`). Until it's written, a villain plays the built-in theme
+  generated from their name; a boss plays the library's boss music (else its combat music).
+- **Every player character** gets a heroic anthem, arranged from their own tune. When they do
+  something truly heroic, it plays for everyone, and then the scene's music comes back.
 - **Themes that grow with the story:** when the story truly changes a character (a fear faced,
   a bond, a loss, a dark deed, atonement, the finale), the GM records it and the table says
   "<name> has changed: ...". Their theme quietly follows: a lone voice at first, the full theme
   as they grow, a lament while they grieve, darker notes creeping in with dark deeds, and the
   legendary version at the campaign's climax. Listen for it at their next heroic moment.
-- **A real orchestra, no AI sound:** `bash tools/gm-music-compose.sh setup --orchestra` (once:
-  ~215 MB of recorded instruments, free, no GPU), then
-  `bash tools/gm-music-compose.sh orchestra "<name>"` plays their own tune with strings, horns,
-  trumpets, choir and timpani, in a concert hall, in seconds (`--stage 0-3`; default legendary).
-- **One bigger composer for everything:** `COMPOSE_MODEL=facebook/musicgen-melody` in `.env`
-  makes the melody model compose all the music (richer, but slower, and about 3 GB of RAM
-  instead of 0.6). Time it first: `COMPOSE_MODEL=facebook/musicgen-melody bash tools/gm-music-compose.sh test`.
-- **Pictures and music take turns on the GPU; both models stay in RAM.** When the table
-  starts, it loads both into RAM in the background, one after the other: first Forge's
-  picture model (Forge paints one tiny throwaway picture), then the music model. After
-  that nothing is read from disk again. The music model is released when the table stops;
-  Forge's when you close Forge's window. Only one model sits on the graphics card at a time: before each music piece, Forge
-  is asked to move its model off the card into RAM. The composer then uses the card and
-  moves its own model back to RAM when the piece is done. The next picture moves Forge's
-  model back by itself, in a few seconds. Pictures wait for a piece in progress, and music
-  waits for a picture.
-- **How much RAM:** the music model takes about 1.2 GB of RAM while it waits. With 8 GB of
-  RAM, use the smaller **DreamShaper 8** picture model (about 2 GB, settings in **5.
-  Pictures**): DreamShaper XL (about 6.5 GB) plus the music model doesn't fit next to
-  Windows, the browser and Claude Code.
-- **Volume:** every composed piece is brought up to the same loudness as ordinary music.
-  Pieces composed before that was added can be very quiet; fix them once with
-  `bash tools/gm-music-compose.sh normalize`.
-- **Compose ahead of time** (optional): `bash tools/gm-music-compose.sh theme "Grimaldi" --boss
-  --look "a rotting circus ringmaster"`, or `anthem "Pip"`. `status` lists what's composed.
-- **Turn it off**: `MUSIC_COMPOSE=off` in `.env`. **Uninstall**: `bash tools/gm-music-compose.sh remove`.
 
-The model's license (CC BY-NC 4.0) allows this for a home game, but not selling the music.
+Everything is rendered in the background while you play, in seconds. Set it up once, in Git
+Bash in the game folder (Windows) or a terminal (Mac/Linux):
+
+```bash
+bash tools/gm-music.sh setup                 # its own environment, ~215 MB of recorded instruments
+bash tools/gm-music.sh orchestra "<name>"    # hear a character's tune played by the orchestra
+```
+
+`orchestra` plays their own tune with strings, horns, trumpets, choir and timpani, in a
+concert hall (`--stage 0-3`; default legendary). `bash tools/gm-music.sh motif "<name>"` plays
+the bare tune. `scores` lists what the GM has written and what is rendered.
+**Uninstall**: `bash tools/gm-music.sh remove`.
 
 ---
 
@@ -397,10 +351,9 @@ claude
 ```
 
 Using local pictures (Forge)? Start Forge's `run.bat` first and wait until its console shows
-the `127.0.0.1:7860` address. The composer, if you set it up, needs nothing: the table starts
-it by itself. When the table opens, it loads Forge's picture model and then the music model
-into RAM, in the background (a minute or so from an SSD). They stay there all evening and
-take turns on the graphics card, so the first portrait doesn't wait on the disk.
+the `127.0.0.1:7860` address. When the table opens, it loads Forge's picture model into RAM,
+in the background (a minute or so from an SSD). It stays there all evening, so the first
+portrait doesn't wait on the disk.
 
 **Check the GM is on Opus:** type `/model`. It should show **Opus**. If it doesn't (a new
 computer, or you switched to try something), run `/models` and pick **Recommended**, or
@@ -455,7 +408,7 @@ that character's card. A seated character can't be removed: free the seat first.
 (characters, the world, what happened, the cliffhanger), says goodbye at the table, and
 closes it. Next time: `/gm` → pick the campaign → *"my friends are joining online"* — and
 everyone takes the same seats again. Close Forge's console window too: that frees the RAM
-its picture model was using (the music model is freed when the table closes).
+its picture model was using.
 
 ---
 
@@ -658,9 +611,9 @@ Copy, fill in the link and code, and send:
 
 ## Pictures from another computer's GPU (optional)
 
-The game makes its pictures and music on the computer it runs on. If that computer has no
+The game makes its pictures on the computer it runs on. If that computer has no
 good graphics card but another one does (a gaming PC, say), the other computer can do that
-work. On it, in the game folder, with Forge (or ComfyUI) and the composer set up as above:
+work. On it, in the game folder, with Forge (or ComfyUI) set up as above:
 
 ```bash
 bash tools/gm-gpu-server.sh                       # prints a password; keep the window open
@@ -678,7 +631,7 @@ GPU_SERVER_PASSWORD=the password gm-gpu-server.sh printed
   `GPU_SERVER_PASSWORD=...` in that computer's `.env` too.
 - **The link changes** each time cloudflared starts a quick tunnel.
 - **Start Forge (or ComfyUI) first**, then `gm-gpu-server.sh`: its first lines say whether
-  pictures and the composer are ready. The picture settings (`FORGE_*` / `COMFY_*`) belong
+  pictures are ready. The picture settings (`FORGE_*` / `COMFY_*`) belong
   in that computer's `.env`.
 
 ## Host cheat sheet
@@ -705,9 +658,7 @@ You rarely need these — Claude runs them — but they're yours to use:
 | `bash tools/gm-image.sh portrait "Name"` · `location "Place"` | Paint a character's portrait (recurring NPCs get one by themselves) · a place, now |
 | `bash tools/gm-image.sh enemy "Name" --boss` · `item "Thing"` | Paint a foe (epic for a boss) · a treasure, now |
 | `bash tools/gm-image.sh log` | Every picture made so far (and the OpenAI spend) |
-| `bash tools/gm-music-compose.sh test` · `status` | Time the local composer · what it has composed |
-| `bash tools/gm-music-compose.sh normalize` | Make this campaign's older, quiet composed music as loud as the rest |
-| `bash tools/gm-music-compose.sh theme "Name" --boss` · `anthem "PC"` | Compose a villain's (boss) theme · a hero's anthem ahead of time |
+| `bash tools/gm-music.sh scores` · `wanted` | The GM's written music and what's rendered · what is still to be written |
 | `bash tools/gm-models.sh [preset]` | Which models run the game (recommended · budget · premium · inherit) |
 | `/model` · `/fast` (inside Claude Code) | Check or switch the GM's model now · faster GM replies |
 
@@ -755,17 +706,10 @@ table waits about 3 minutes for the GM to describe a new character's look, then 
 once, ask the GM to run `bash tools/gm-image.sh portrait "<your character>"`: it paints the
 portrait or says what's wrong (often *"Can't reach Forge"*: start `run.bat`).
 
-**No composed music.** Run `bash tools/gm-music-compose.sh check`. It should name your GPU
-(`"device": "cuda"`). *"no kernel image is available"* means the PyTorch build doesn't support the
-card: run `bash tools/gm-music-compose.sh remove`, then `setup --cpu`. Composing happens in the
-background, so a first theme can take a few minutes to arrive; until then the built-in theme plays.
-If composing on the graphics card crashes, the table switches the composer to the CPU for the
-rest of the session (slower, but the music comes) and writes why in its window and in
-`table/server.log` (lines starting `[compose]`). The composer's own log, with where it crashed,
-is `gm-composer.log` in the temp folder (`cat "$TEMP/gm-composer.log"` in Git Bash).
-
-**Composed music is too quiet.** New pieces come out at a normal loudness. For older ones, run
-`bash tools/gm-music-compose.sh normalize` once (it fixes every composed piece in the campaign).
+**No orchestra music.** Run `bash tools/gm-music.sh scores`: its last line says whether the
+orchestra is set up (`bash tools/gm-music.sh setup` if not). Rendering happens in the
+background, so a new piece can take a moment to arrive; until then the built-in theme (a
+villain), the library's boss music (a boss) or the victory music (a heroic moment) plays.
 
 **No pictures with Forge.** The GM's session notes say why (`Scene images: DISABLED (...)`):
 - *"Forge isn't answering"*: start `run.bat`, wait until the console shows the
@@ -776,19 +720,16 @@ is `gm-composer.log` in the temp folder (`cat "$TEMP/gm-composer.log"` in Git Ba
 - *Out of memory*: close games and browsers using the GPU, plug the laptop in, or switch to
   the SD 1.5 settings in **5. Pictures**.
 
-**The computer strains when the table starts, or pictures and music are very slow.** The
-table reads both AI models into RAM at the start (a few GB). Open Task Manager → Performance
+**The computer strains when the table starts, or pictures are very slow.** The
+table reads the picture model into RAM at the start (a few GB). Open Task Manager → Performance
 while it does:
 - *Disk at 100% for minutes*: the models are on a slow or failing hard drive. Move the game
   folder, Forge and the downloaded models (`C:\Users\<you>\.cache\huggingface`) to an SSD.
   [CrystalDiskInfo](https://crystalmark.info/en/software/crystaldiskinfo/) shows a drive's
   health; back up `world-state/` at once if it says *Caution* or *Bad*.
 - *Memory above 90%*: use DreamShaper 8 (see **5. Pictures**) and close other programs.
-- *"GPU 1" (the NVIDIA card) idle while music composes, CPU at 100%*: the composer isn't
-  using the card; run `bash tools/gm-music-compose.sh check` (it should say `"device": "cuda"`).
-  The Intel graphics never run the AI models, so its setting doesn't matter.
-- The table's window prints `[art] Forge's picture model is loaded` and `[compose] the music
-  model is loaded` when each is ready. `[art] Forge warm-up: ...` means Forge wasn't ready
+- The Intel graphics never run the picture model, so its setting doesn't matter.
+- The table's window prints `[art] Forge's picture model is loaded` when it is ready. `[art] Forge warm-up: ...` means Forge wasn't ready
   yet; the first picture then loads the model instead (slower, nothing breaks).
 
 **Friends can't open the link.** On another network they need the tunnel's `https://…`

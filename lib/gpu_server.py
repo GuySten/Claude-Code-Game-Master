@@ -3,8 +3,8 @@
 
 When the game runs on a computer without a graphics card (GAME-NIGHT.md), another
 machine's can do the work. This small server runs on the host's computer next to its picture
-program (Forge, or ComfyUI with IMAGE_BACKEND=comfyui in this machine's .env) and
-the music composer, and does their work for it (lib/gpu_remote.py is the other
+program (Forge, or ComfyUI with IMAGE_BACKEND=comfyui in this machine's .env),
+and does its work for it (lib/gpu_remote.py is the other
 end). The picture settings (FORGE_* / COMFY_*) are this machine's too: it owns
 the models.
 
@@ -20,8 +20,6 @@ tunnel's ~100 s limit.
                  painted by this machine's Forge or ComfyUI with its own settings
   txt2img        Forge's own txt2img payload -> {"images": [png base64]} (older games)
   warmup         read the picture model into RAM now
-  compose        {prompt, seconds, loop, ext} -> {audio: base64, ext, seconds, device}
-  compose-start  read the music model into RAM now
 
 Every request needs ``Authorization: Bearer <password>``.
 """
@@ -34,7 +32,6 @@ import os
 import queue
 import secrets
 import sys
-import tempfile
 import threading
 import time
 import urllib.error
@@ -46,7 +43,6 @@ from typing import Any, Dict
 sys.path.insert(0, str(Path(__file__).parent))
 
 import comfy  # noqa: E402
-import composer  # noqa: E402
 import image_gen  # noqa: E402
 from gpu_turn import gpu_turn  # noqa: E402
 
@@ -133,40 +129,7 @@ def run_job(kind: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         if pictures_backend() == "comfyui":
             return {"ok": comfy.warm_up()}
         return {"ok": image_gen.forge_warm_up(local=True)}
-    if kind == "compose-start":
-        return {"ok": composer_ready() and composer.start_server(local=True)}
-    if kind == "compose":
-        ext = payload.get("ext") if payload.get("ext") in (".ogg", ".wav", ".mp3") else ".ogg"
-        with tempfile.TemporaryDirectory() as tmp:
-            out = Path(tmp) / ("piece" + ext)
-            twin = ({"prompt": str(payload["twin_prompt"]), "loop": True, "out": str(Path(tmp) / ("twin" + ext)),
-                     **({"leitmotif": payload["twin_leitmotif"]} if isinstance(payload.get("twin_leitmotif"), dict) else {})}
-                    if payload.get("twin_prompt") else None)
-            melody_from = None
-            if payload.get("melody_audio"):
-                melody_from = Path(tmp) / ("melody" + (payload.get("melody_ext") if payload.get("melody_ext")
-                                                       in (".ogg", ".wav", ".mp3") else ".ogg"))
-                melody_from.write_bytes(base64.b64decode(payload["melody_audio"]))
-            more = {**({"twin": twin} if twin else {}),
-                    **({"melody_from": str(melody_from)} if melody_from else {}),
-                    **({"leitmotif": payload["leitmotif"]} if isinstance(payload.get("leitmotif"), dict) else {}),
-                    **({"heavy": True} if payload.get("heavy") else {})}
-            r = composer.compose(str(payload.get("prompt", "")), float(payload.get("seconds", 30)),
-                                 out, loop=bool(payload.get("loop")), local=True, **more)
-            path = Path(r["path"])
-            answer = {"audio": base64.b64encode(path.read_bytes()).decode("ascii"), "ext": path.suffix,
-                      "seconds": r.get("seconds"), "device": r.get("device"), "elapsed": r.get("elapsed"),
-                      "how": r.get("how")}
-            if r.get("twin"):
-                t = Path(r["twin"]["path"])
-                answer.update(twin_audio=base64.b64encode(t.read_bytes()).decode("ascii"), twin_ext=t.suffix,
-                              twin_seconds=r["twin"].get("seconds"), twin_how=r["twin"].get("how"))
-            return answer
     raise ValueError(f"unknown job kind {kind!r}")
-
-
-def composer_ready() -> bool:
-    return not composer._turned_off() and composer._local_python() is not None
 
 
 def health() -> Dict[str, Any]:
@@ -174,7 +137,7 @@ def health() -> Dict[str, Any]:
     ok, why = comfy.status() if backend == "comfyui" else image_gen.forge_status()
     # ("forge"/"forge_why": what games from before ComfyUI support read)
     return {"ok": True, "pictures": ok, "pictures_why": why, "pictures_backend": backend,
-            "forge": ok, "forge_why": why, "composer": composer_ready()}
+            "forge": ok, "forge_why": why}
 
 
 def make_handler(jobs: Jobs, password: str):
@@ -236,8 +199,7 @@ def main() -> None:
     ap.add_argument("--password", default=os.environ.get("GPU_SERVER_PASSWORD", ""))
     args = ap.parse_args()
     password = args.password or secrets.token_urlsafe(18)
-    # This machine paints and composes itself: never forward to another GPU server,
-    # and free its own picture model's card before composing.
+    # This machine paints itself: never forward to another GPU server.
     os.environ.pop("GPU_SERVER_URL", None)
     os.environ["IMAGE_BACKEND"] = pictures_backend()
     server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(Jobs(), password))
@@ -245,7 +207,6 @@ def main() -> None:
     print(f"GPU server listening on http://localhost:{args.port}")
     name = "ComfyUI" if h["pictures_backend"] == "comfyui" else "Forge"
     print(f"  Pictures: {name + ' is ready' if h['pictures'] else h['pictures_why']}")
-    print(f"  Music:    {'the composer is set up' if h['composer'] else 'not set up (bash tools/gm-music-compose.sh setup)'}")
     print()
     print("Give the GM these two lines (the link comes from the tunnel):")
     print("  GPU_SERVER_URL=<the https link cloudflared prints>")

@@ -45,7 +45,7 @@ So the loop below is not optional ceremony; it's how you hear.
 research adds, a recipe for each kind of piece, the format's shortcuts, and the loop
 (plan, write, `arrangement.py make`, report). Read it whole; nothing else is required
 reading for a composer. Run the scripts with a Python that has numpy, soundfile and
-tinysoundfont (the host's `.compose-venv`, set up by `gm-music-compose.sh setup --orchestra`).
+tinysoundfont (the host's `.music-venv`, set up by `gm-music.sh setup`).
 Listen-tool note: `lib/music_rate.py` (Audiobox) hears the sound, not the music - use it to
 compare two mixes of one piece, never to choose a tune or judge the music.
 

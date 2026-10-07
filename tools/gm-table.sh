@@ -18,7 +18,7 @@
 #   gm-table.sh music boss "<boss>" stage 2|pre_end|<event> [--via rise|break] | hit | end victory|requiem|escape|wipe
 #                                                 A named boss's fight in stages (its <boss>-<cue> files)
 #   gm-table.sh track "<name>" <value>[/<max>] [--note ".."] | off   (a clock or a PC's track on every page)
-#   gm-table.sh say "..." --theme "Lich" --villain --look "..."  A main villain (composed theme, portrait)
+#   gm-table.sh say "..." --theme "Lich" --villain --look "..."  A main villain (their theme is wanted, portrait)
 #   gm-table.sh say "..." --heroic "<pc>"  A PC's heroic moment: their anthem, then the scene's music
 #   gm-table.sh say "..." --loot "<item>" --loot-look "..." --loot-for "<pc>"  Important loot, painted
 #   gm-table.sh translate --stdin         Translate players' actions for the rest of the table

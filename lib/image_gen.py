@@ -245,8 +245,8 @@ def _forge_open(req, timeout):
 
 def forge_release_gpu() -> bool:
     """Ask Forge to move its model off the graphics card, into RAM (it stays loaded
-    there; the next picture moves it back by itself). Done before music is composed
-    so only one model is on the card. False if Forge isn't in use or didn't answer."""
+    there; the next picture moves it back by itself), so the card is free for
+    something else. False if Forge isn't in use or didn't answer."""
     if backend() != "forge":
         return False
     req = urllib.request.Request(forge_url() + "/sdapi/v1/unload-checkpoint", data=b"{}",
@@ -292,7 +292,7 @@ def forge_warm_up(local: bool = False) -> bool:
 
 def release_gpu() -> bool:
     """This machine's picture model off the graphics card (Forge or ComfyUI), so
-    music can use it. False when pictures aren't made here."""
+    something else can use it. False when pictures aren't made here."""
     b = backend()
     if b == "forge":
         return forge_release_gpu()
@@ -450,7 +450,7 @@ def _forge_generate(prompt: str, quality: str, size: str, avoid: str = ""):
                                  headers={"Content-Type": "application/json"}, method="POST")
     try:
         # The first image also loads the model: slow on a laptop GPU. The card is
-        # shared with the music composer: wait for our turn on it.
+        # shared (gpu_turn): wait for our turn on it.
         with gpu_turn("pictures"), _forge_open(req, int(os.environ.get("FORGE_TIMEOUT", "600"))) as resp:
             body = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:

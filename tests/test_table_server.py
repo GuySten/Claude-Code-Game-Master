@@ -83,8 +83,6 @@ def test_cruelty_is_warned_once_then_punished(table):
     from lib import party_roster
     call, camp, state = table["call"], table["camp"], table["state"]
     state.set_round_seconds(0)
-    made = []
-    state.music_maker = lambda kind, name, boss, look, sheet: made.append((kind, name)) or f"{kind}.ogg"
     pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
     bram = call("/api/create", {"code": CODE, "name": "Bram", "concept": "a dwarf"})[1]["token"]
     kara = call("/api/create", {"code": CODE, "name": "Kara", "concept": "an elf"})[1]["token"]
@@ -98,8 +96,6 @@ def test_cruelty_is_warned_once_then_punished(table):
                                          "lang": "en", "warn": True}, host=True)
     assert status == 200 and body["message"]["event"] == {"type": "redo", "pc": "Bram", "warn": True}
     assert "Bram" in state.conduct["warnings"] and state.round_state()["waiting_on"] == ["Bram"]
-    state.music_pass()
-    assert ("judgment", "⚖ Judgment") in made                    # ready before it's needed
     # He insists: lost to madness. His seat is freed, he becomes a villain NPC.
     call("/api/say", {"code": CODE, "token": bram, "text": "I kick it again."})
     call("/api/gm/inbox", {}, host=True)
@@ -111,8 +107,6 @@ def test_cruelty_is_warned_once_then_punished(table):
     assert npc["villain"] and npc["former_pc"] and "guilt" in npc["description"]
     assert json.loads(next((camp / "departed").glob("*.json")).read_text())["status"] == "lost to madness"
     assert state.music["mood"] == "dread"                         # the judgment music
-    state.music_pass()
-    assert ("dark_anthem", "Bram") in made
     # His player's next character: Bram is their nemesis.
     call("/api/create", {"code": CODE, "token": bram, "name": "Tamar", "concept": "a paladin"})
     assert json.loads((camp / "npcs.json").read_text())["Bram"]["nemesis_of"] == "Tamar"
@@ -156,11 +150,19 @@ def test_the_gm_records_a_moment_that_changed_a_character(table):
     assert call("/api/gm/grow", {"pc": "Pip", "kind": "levelup", "what": "x"}, host=True)[0] == 409
     assert call("/api/gm/grow", {"pc": "Pip", "kind": "growth", "what": ""}, host=True)[0] == 409
     assert call("/api/gm/grow", {"pc": "Nobody", "kind": "growth", "what": "x"}, host=True)[0] == 409
-    # The music follows in the background: the anthem for now, and the next growth, ahead.
+    # The music follows in the background: the orchestra's anthem for now, and the next growth, ahead.
     made = []
-    state.music_maker = lambda kind, name, boss, look, sheet: made.append((kind, name)) or f"{kind}.ogg"
+
+    def orchestra(job):
+        made.append((job["use"]["who"], job["use"]["version"]))
+        out = Path(job["out"])
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(b"OggS")
+        return out
+
+    state.orchestra_maker = orchestra
     state.music_pass()
-    assert ("anthem", "Pip") in made
+    assert ("Pip", character_arcs.version(character_arcs.spec(character_arcs.state_of(camp, "Pip")))) in made
 
 
 def test_a_wrong_code_is_turned_away(table):
@@ -352,16 +354,19 @@ def test_each_enemy_gets_their_own_theme_that_holds_through_the_fight(table):
 
 
 def test_boss_themes_are_the_exciting_version_and_a_fight_can_escalate(table):
-    call = table["call"]
+    call, state = table["call"], table["state"]
     _, body = call("/api/gm/say", {"text": "The Lich rises.", "theme": "Lich", "boss": True}, host=True)
     assert body["music"]["boss"] is True and body["music"]["mood"] == "boss"
+    assert body["music"]["track"] is None          # no boss music anywhere: never a generated tune
     # Re-mentioning the boss without --boss never calms the music down.
     assert call("/api/gm/say", {"text": "x", "theme": "Lich"}, host=True)[1]["music"] is None
+    assert state.music["boss"] is True and state.music["track"] is None
 
     _, body = call("/api/gm/say", {"text": "A knight blocks the way.", "theme": "Black Knight"}, host=True)
-    assert not body["music"].get("boss")
+    assert not body["music"].get("boss") and body["music"]["track"] == "theme:Black Knight"
     _, body = call("/api/gm/say", {"text": "He reveals his true form!", "mood": "boss"}, host=True)
     assert body["music"]["theme"] == "Black Knight" and body["music"]["boss"] is True
+    assert body["music"]["track"] is None          # (his generated theme stops: no boss version of it)
 
     _, body = call("/api/gm/say", {"text": "Thunder.", "mood": "boss"}, host=True)
     assert body["music"] is None        # still the Black Knight's boss theme
@@ -1237,83 +1242,128 @@ def test_the_game_plays_in_words_without_any_image_source(table, monkeypatch):
     assert state.music.get("theme") == "Lich"                       # the music still works
 
 
-def test_villains_bosses_and_heroes_get_composed_music(table):
+def _stock(table, *names):
+    """Files in the project's stock music library (the fixture's empty one)."""
+    import lib.table_server
+    music = lib.table_server.PROJECT_ROOT / "music"
+    music.mkdir(parents=True, exist_ok=True)
+    for name in names:
+        (music / name).write_bytes(b"\0" * 2048)
+
+
+def test_villains_bosses_and_heroes_get_their_written_music(table):
+    from lib import score_music
     call, state, camp = table["call"], table["state"], table["camp"]
     call("/api/claim", {"code": CODE, "pc": "Pip"})
     made = []
 
-    def maker(kind, name, boss, look, sheet):
-        import composer
-        made.append((kind, name, boss))
-        sub = "themes" if kind == "theme" else "anthems"
-        (camp / "music" / sub).mkdir(parents=True, exist_ok=True)
-        f = f"{composer.slug(name)}-{'boss' if boss else 'theme'}.ogg" if kind == "theme" else "anthem-pip.ogg"
-        (camp / "music" / sub / f).write_bytes(b"OggS")
-        reg = composer.load_registry(camp)
-        if kind == "theme":
-            reg["themes"].setdefault(name, {})["boss" if boss else "normal"] = f
-        else:
-            reg["anthems"][name] = {"file": f, "seconds": 20}
-        composer.save_registry(camp, reg)
-        return f
+    def orchestra(job):
+        made.append(job["use"]["as"])
+        out = Path(job["out"]) if "out" in job else score_music.target(camp, job["use"])
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(b"OggS")
+        return out
 
-    state.music_maker = maker
-    # A main villain: their theme is composed and takes over while they're on stage.
+    state.orchestra_maker = orchestra
+    # A main villain: until their theme is written, the generated one; the GM is asked for it.
     call("/api/gm/say", {"text": "Grimaldi bows.", "theme": "Grimaldi", "villain": True}, host=True)
-    assert state.music["track"] == "theme:Grimaldi"                    # the generated one, meanwhile
-    assert state.music_pass() == ["Grimaldi", "Pip"]                   # + Pip's anthem
-    assert state.music["track"] == "grimaldi-theme.ogg" and state.music["theme"] == "Grimaldi"
-    assert state.find_music("grimaldi-theme.ogg") is not None          # served to the players
+    assert state.music["track"] == "theme:Grimaldi"
+    assert ("theme", "Grimaldi") in [(w["what"], w.get("who")) for w in score_music.wanted(camp)]
+    folder = camp / "music" / "arrangements"
+    folder.mkdir(parents=True, exist_ok=True)
+    for kind in ("theme", "boss"):
+        (folder / f"grimaldi-{kind}.json").write_text(json.dumps(
+            {"title": f"grimaldi-{kind}", "use": {"as": kind, "who": "Grimaldi"},
+             "tune": {"seed": "Grimaldi", "mode": "minor"}, "tempo": 80}))
+    state.music_pass()                                                 # + Pip's anthem, by rule
+    assert sorted(made) == ["anthem", "anthem", "boss", "theme"]
+    assert state.music["track"] == "grimaldi-theme-score.ogg" and state.music["theme"] == "Grimaldi"
+    assert state.find_music("grimaldi-theme-score.ogg") is not None    # served to the players
 
-    # The fight turns into a boss fight: a boss theme, without asking.
+    # The fight turns into a boss fight: his written boss music, without asking.
     call("/api/gm/say", {"text": "He grows!", "mood": "boss"}, host=True)
-    assert state.music_pass() == ["Grimaldi", "Pip"]                   # (+ Pip's next growth, ahead)
-    assert ("theme", "Grimaldi", True) in made
-    assert state.music["track"] == "grimaldi-boss.ogg" and state.music["boss"] is True
+    assert state.music["track"] == "grimaldi-boss-score.ogg" and state.music["boss"] is True
     assert state.mood_files("boss") == []           # never picked for some other fight
 
-    # Pip does something heroic: the anthem, then back to the boss theme.
+    # Pip does something heroic: the anthem, then back to the boss music.
     call("/api/gm/say", {"text": "Pip leaps onto the beast!", "heroic": "Pip"}, host=True)
-    assert state.music["track"] == "anthem-pip.ogg" and state.music["loop"] is False
+    assert state.music["track"].startswith("anthem-pip-") and state.music["loop"] is False
     state.music_revert["at"] = 0
     call(f"/api/info?code={CODE}")
-    assert state.music["track"] == "grimaldi-boss.ogg"
+    assert state.music["track"] == "grimaldi-boss-score.ogg"
 
 
-def test_the_table_composes_with_the_model_kept_in_ram(table, monkeypatch, tmp_path):
-    import composer
-    from tests.test_composer import fake_composer
+def test_a_boss_without_written_music_gets_the_librarys_boss_music(table):
     call, state, camp = table["call"], table["state"], table["camp"]
-    log, released = fake_composer(tmp_path, monkeypatch, composer)
-    call("/api/claim", {"code": CODE, "pc": "Pip"})
-    call("/api/create", {"code": CODE, "name": "Bram", "concept": "a dwarf"})
-    try:
-        assert composer.start_server()                     # at table start: model into RAM
-        call("/api/gm/say", {"text": "Grimaldi bows.", "theme": "Grimaldi", "villain": True}, host=True)
-        assert sorted(state.music_pass()) == ["Bram", "Grimaldi", "Pip"]
-        assert state.music["track"] == "grimaldi-theme.ogg"    # took over
-        assert composer.anthem(camp, "Bram") and composer.anthem(camp, "Pip")
-        assert sorted(state.music_pass()) == ["Bram", "Pip"]   # their next growth, ready ahead of time
-        assert state.music_pass() == []                        # nothing left
-        call("/api/gm/say", {"text": "He grows!", "mood": "boss"}, host=True)
-        assert state.music_pass() == ["Grimaldi"] and state.music["track"] == "grimaldi-boss.ogg"
-        assert log.read_text() == "load\n"                    # read from disk once, all evening
-        assert len(released) == 6                              # Forge stepped off the card each time
-    finally:
-        composer.stop_server()
+    _stock(table, "boss-dragon-showdown.mp3", "boss-final-climax.mp3", "combat-war-drums.mp3")
+    _, body = call("/api/gm/say", {"text": "The Lich rises.", "theme": "Lich", "boss": True}, host=True)
+    m = body["music"]
+    assert m["src"] in ("boss-dragon-showdown.mp3", "boss-final-climax.mp3")
+    assert m["theme"] == "Lich" and m["boss"] is True and m["mood"] == "boss"
+    assert [(j["name"], j["boss"]) for j in state.art_jobs] == [("Lich", True)]     # (its portrait)
+    # A villain's theme escalates: the library's boss music, never a generated tune.
+    call("/api/gm/say", {"text": "A knight.", "theme": "Black Knight"}, host=True)
+    assert state.music["track"] == "theme:Black Knight"               # (a villain: as before)
+    _, body = call("/api/gm/say", {"text": "His true form!", "mood": "boss"}, host=True)
+    assert body["music"]["src"].startswith("boss-") and body["music"]["theme"] == "Black Knight"
+    # A staged fight with no cues of its own starts on it too.
+    _, body = call("/api/gm/music", {"boss_fight": "Ashen Saint", "stage": 1}, host=True)
+    assert body["music"]["src"].startswith("boss-") and body["music"]["stage"] == 1
+    # No boss music in the library: its combat music.
+    for f in ("boss-dragon-showdown.mp3", "boss-final-climax.mp3"):
+        (state.music_dirs()[1] / f).unlink()
+    call("/api/gm/say", {"text": "Calm.", "mood": "calm"}, host=True)
+    _, body = call("/api/gm/say", {"text": "The Wyrm!", "theme": "Wyrm", "boss": True}, host=True)
+    assert body["music"]["src"] == "combat-war-drums.mp3" and body["music"]["boss"] is True
+    # A file of the boss's own (assigned or named after them) still comes first.
+    _touch_music(camp, "lich-boss.mp3")
+    call("/api/gm/say", {"text": "Calm.", "mood": "calm"}, host=True)
+    _, body = call("/api/gm/say", {"text": "Again!", "theme": "Lich", "boss": True}, host=True)
+    assert body["music"]["src"] == "lich-boss.mp3"
 
 
-def test_heroic_moments_and_bosses_without_a_composer(table, monkeypatch):
-    monkeypatch.setenv("MUSIC_COMPOSE", "off")
+def test_pieces_the_orchestra_didnt_make_are_never_played(table):
+    """Pieces listed in music-composed.json without a "how" (not the orchestra's) stay
+    in the campaign, unplayed; the orchestra's still play."""
+    from lib import score_music
+    call, state, camp = table["call"], table["state"], table["camp"]
+    for sub, f in (("themes", "grimaldi-theme.ogg"), ("themes", "grimaldi-boss.ogg"),
+                   ("anthems", "anthem-pip.ogg"), ("anthems", "anthem-pip-dark.ogg")):
+        (camp / "music" / sub).mkdir(parents=True, exist_ok=True)
+        (camp / "music" / sub / f).write_bytes(b"OggS")
+    (camp / "music-composed.json").write_text(json.dumps({
+        "themes": {"Grimaldi": {"normal": "grimaldi-theme.ogg", "boss": "grimaldi-boss.ogg"}},
+        "anthems": {"Pip": {"file": "anthem-pip.ogg", "seconds": 20, "version": "s1-d0-w0-b0",
+                            "versions": {"s1-d0-w0-b0": {"file": "anthem-pip.ogg", "seconds": 20}},
+                            "dark": "anthem-pip-dark.ogg", "dark_how": "melody"}}}))
+    assert score_music.theme_file(camp, "Grimaldi", False) is None
+    assert score_music.anthem(camp, "Pip") is None and score_music.dark_anthem(camp, "Pip") is None
+    _, body = call("/api/gm/say", {"text": "Grimaldi bows.", "theme": "Grimaldi"}, host=True)
+    assert body["music"]["track"] == "theme:Grimaldi"
+    _, body = call("/api/gm/say", {"text": "He grows!", "mood": "boss"}, host=True)
+    assert body["music"]["track"] is None and body["music"]["boss"] is True
+    call("/api/gm/say", {"text": "Pip strikes!", "heroic": "Pip"}, host=True)
+    assert state.music["mood"] == "victory"                      # the victory music, not the old anthem
+    assert (camp / "music" / "anthems" / "anthem-pip.ogg").is_file()   # (left where it is)
+    # An orchestra-rendered theme registered for him plays.
+    use = {"as": "theme", "who": "Grimaldi"}
+    out = score_music.target(camp, use)
+    out.write_bytes(b"OggS")
+    score_music.register(camp, use, out, 30.0, "score", "abc")
+    assert score_music.theme_file(camp, "Grimaldi", False) == "grimaldi-theme-score.ogg"
+    assert state.theme_track("Grimaldi", boss=True) == "grimaldi-theme-score.ogg"   # (his only music)
+
+
+def test_heroic_moments_and_bosses_without_written_music(table):
     call, state = table["call"], table["state"]
     call("/api/gm/say", {"text": "The lich!", "theme": "Lich", "boss": True, "villain": True}, host=True)
-    assert state.music_jobs == [] and state.music["track"] == "theme:Lich"
+    assert state.music["track"] is None and state.music["boss"] is True and state.music["theme"] == "Lich"
     assert state.music_pass() == []
     call("/api/gm/say", {"text": "Pip strikes true!", "heroic": "Pip"}, host=True)
     assert state.music["mood"] == "victory"                     # the victory music instead
     state.music_revert["at"] = 0
     state.music_tick()
-    assert state.music["track"] == "theme:Lich" and state.music["boss"] is True
+    assert state.music["track"] is None and state.music["boss"] is True and state.music["theme"] == "Lich"
 
 
 def test_the_host_removes_a_character_nobody_plays(table):

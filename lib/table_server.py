@@ -34,11 +34,13 @@ ambience — and switches only when the mood actually changes.
 Enemy themes: a special enemy (named villain, boss, recurring foe) gets their
 own music with ``say --theme "Grimaldi"``: a file assigned to them
 (``music theme "Grimaldi" clown-waltz.mp3``, kept in ``<campaign>/music-themes.json``),
-else a file named after them (``grimaldi.mp3``), else a leitmotif the browser
-generates from their name — the same tune every time they return. The theme
-holds through combat/boss/dread moods and gives way when the scene moves on.
-``--boss`` (or a later ``--mood boss``) plays the boss version of the theme:
-the same tune, but fast and thundering (or ``<name>-boss.mp3`` if there is one).
+else the orchestra's rendering of the theme the GM wrote (lib/score_music.py), else
+a file named after them (``grimaldi.mp3``), else a leitmotif the browser generates
+from their name — the same tune every time they return. The theme holds through
+combat/boss/dread moods and gives way when the scene moves on. ``--boss`` (or a
+later ``--mood boss``) plays their boss music: the same sources (``<name>-boss.mp3``
+preferred), but never a generated tune - without one, a stock boss track from the
+library (else its combat music; else the music playing goes on).
 
 The server is the ONLY writer of the table log, so the GM-side commands talk
 to it over localhost (authenticated with a host key kept in
@@ -77,7 +79,6 @@ from urllib.parse import parse_qs, urlparse
 sys.path.insert(0, str(Path(__file__).parent))
 
 import character_arcs
-import composer
 import score_music
 import languages
 import party_roster
@@ -456,10 +457,8 @@ class TableState:
         self.sheet_tr: Dict[str, Dict[str, str]] = {}
         self.sheet_tr_busy: set = set()
         self.sheet_tr_failed: Dict[str, float] = {}
-        # Composed music: villains' and bosses' themes and the PCs' anthems are
-        # composed in the background (lib/composer.py) when the composer is set up.
-        self.music_jobs: List[Dict[str, Any]] = []
-        self.music_maker = None              # tests: (kind, name, boss, look, sheet) -> file
+        # Written music (lib/score_music.py): the GM's scores and the PCs' anthems,
+        # rendered by the orchestra in the background.
         self.orchestra_maker = None          # tests: (a score_music job) -> the rendered file
         self.music_revert: Optional[Dict[str, Any]] = None   # a heroic anthem, then back
         # Each PC's money and belongings as last told to their player: a change
@@ -595,7 +594,7 @@ class TableState:
         """A boss's staged-fight cue: a file named <boss>-<tag> (stage1..3, pre_end, rise,
         break, hit, victory, requiem, escape, wipe) in the music folders - optionally with
         the piece's real title after "--" (<boss>-<tag>--<title>), never shown at the table."""
-        for stem in (f"{composer.slug(name)}-{tag}", f"{name}-{tag}"):
+        for stem in (f"{score_music.slug(name)}-{tag}", f"{name}-{tag}"):
             found = self.find_music(stem)
             if found is not None:
                 return found
@@ -603,7 +602,7 @@ class TableState:
             if d.is_dir():
                 for f in sorted(d.iterdir()):
                     if f.is_file() and f.suffix.lower() in AUDIO_TYPES and \
-                            f.stem.lower().startswith(f"{composer.slug(name)}-{tag}--".lower()):
+                            f.stem.lower().startswith(f"{score_music.slug(name)}-{tag}--".lower()):
                         return f
         return None
 
@@ -618,7 +617,7 @@ class TableState:
         def cue(tag):
             f = self.boss_cue(name, tag)
             if f is None:
-                raise ValueError(f"no {tag} cue for {name}: a file named {composer.slug(name)}-{tag}.ogg "
+                raise ValueError(f"no {tag} cue for {name}: a file named {score_music.slug(name)}-{tag}.ogg "
                                  f"in music/ (orchestrate/references/boss-music.md)")
             return f
         if hit:                                           # (the current stage's own accent, if it has one)
@@ -636,7 +635,7 @@ class TableState:
             return self.set_music(f.name, 0.75, False, f"{name}: {end}", mood="boss", theme=name)
         if stage is not None and not str(stage).strip().isdigit():
             # pre_end, or a turn the party caused (rule 5a: "the unwinding"): its own loop
-            stage = composer.slug(str(stage)).replace("pre-end", "pre_end")
+            stage = score_music.slug(str(stage)).replace("pre-end", "pre_end")
             tag = stage
         else:
             stage = int(stage or 1)
@@ -645,12 +644,14 @@ class TableState:
         if loop is None and stage == 1:
             track = self.theme_track(name, True)               # (their boss version)
         elif loop is None:
-            raise ValueError(f"no {tag} cue for {name}: {composer.slug(name)}-{tag}.ogg in music/")
+            raise ValueError(f"no {tag} cue for {name}: {score_music.slug(name)}-{tag}.ogg in music/")
         else:
             track = loop.name
         sting = cue(via) if via else None
         if via and via not in ("rise", "break"):
             raise ValueError("a stage is entered through a rise or a break")
+        if track is None:                                 # (no boss music anywhere: the music goes on)
+            return self._boss_goes_on(name, stage=stage)
         self.set_music(track, 0.7, True, f"{name}, " + ("the end nears" if stage == "pre_end" else
                                                        f"stage {stage}" if isinstance(stage, int) else stage),
                        mood="boss", theme=name, boss=True)
@@ -770,28 +771,18 @@ class TableState:
     def warn(self, pc: str, text: str, lang: Optional[str] = None) -> Dict[str, Any]:
         """The GM warns a player whose action is cruelty to clear innocents: the
         action is taken back and they choose again (once, on a fresh clock). The
-        warning is recorded: only a warned player can be punished. The judgment
-        music is composed now, so it's ready if they insist."""
+        warning is recorded: only a warned player can be punished."""
         msg = self.ask_redo(pc, text, lang, warn=True)
         with self.lock:
             if pc not in self.conduct["warnings"]:
                 self.conduct["warnings"][pc] = {"t": _now(), "warning": text}
                 self.conduct["log"].append({"t": _now(), "pc": pc, "kind": "warn", "text": text})
                 self._save_conduct()
-        if (self.music_maker is not None or composer.available()) and not composer.has_theme(
-                self.campaign_dir, composer.JUDGMENT, False) and not any(
-                j["kind"] == "judgment" for j in self.music_jobs):
-            self.music_jobs.append({"kind": "judgment", "name": composer.JUDGMENT, "boss": False, "look": ""})
-            self.portrait_wake.set()
         return msg
 
     def judgment_music(self) -> Optional[Dict[str, Any]]:
-        """The punishment's music: the composed judgment piece, else the darkest mood."""
-        track = composer.theme_file(self.campaign_dir, composer.JUDGMENT, False)
-        if track:
-            music = self.set_music(track, 0.8, True, composer.JUDGMENT, mood="dread", theme=composer.JUDGMENT)
-        else:
-            music = self.apply_mood("dread", force=True)
+        """The punishment's music: the darkest mood."""
+        music = self.apply_mood("dread", force=True)
         if music:
             self.announce_music(music)
         return music
@@ -876,12 +867,7 @@ class TableState:
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
         tmp.replace(path)
-        if composer.villain_theme_from_anthem(self.campaign_dir, name):
-            return                          # the anthem's dark twin was ready: their theme now
-        if self.music_maker is not None or composer.available():
-            self.music_jobs.append({"kind": "dark_anthem", "name": name, "boss": False, "look": "",
-                                    "sheet": sheet})
-            self.portrait_wake.set()
+        score_music.villain_theme_from_anthem(self.campaign_dir, name)   # (the GM's dark twin, if written)
 
     def link_nemesis(self, token: str, new_pc: str) -> Optional[str]:
         """The player of a character lost to madness made a new one: the old one is
@@ -926,7 +912,7 @@ class TableState:
              what_tr: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """The GM records a moment in the story that changed this character. The
         table says so ("Kestrel has changed: ..."), it joins the story on their sheet,
-        and their theme follows, unannounced (composed in the background; it plays
+        and their theme follows, unannounced (rendered in the background; it plays
         from their next heroic moment)."""
         if kind not in character_arcs.KINDS:
             return {"ok": False, "error": f"a moment is one of: {', '.join(character_arcs.KINDS)}"}
@@ -1467,16 +1453,18 @@ class TableState:
         tmp.write_text(json.dumps(themes, indent=2, ensure_ascii=False), encoding="utf-8")
         tmp.replace(self.themes_path)
 
-    def theme_track(self, name: str, boss: bool = False) -> str:
-        """The track that is this enemy's theme: an assigned one, else a music
-        file named after them (``<name>-boss.*`` preferred for a boss fight),
-        else their generated leitmotif (theme:<name>)."""
+    def theme_track(self, name: str, boss: bool = False) -> Optional[str]:
+        """The track that is this enemy's theme: an assigned one, else the orchestra's
+        rendering of their written theme, else a music file named after them
+        (``<name>-boss.*`` preferred for a boss fight), else their generated leitmotif
+        (theme:<name>). A boss never gets a generated one: a stock boss track from the
+        library, else its combat music, else None (the music playing goes on)."""
         for key, track in self.themes().items():
             if party_roster._same_name(key, name):
                 return track
-        composed = composer.theme_file(self.campaign_dir, name, boss)
-        if composed:
-            return composed
+        written = score_music.theme_file(self.campaign_dir, name, boss)
+        if written:
+            return written
         wanted = self._tokens(name + ".x") - NAME_STOPWORDS
         if wanted:
             named = [f["track"] for f in self.list_music() if wanted <= self._tokens(f["track"])]
@@ -1484,19 +1472,43 @@ class TableState:
             calm = [f for f in named if f not in bossy]
             if named:
                 return (bossy or calm)[0] if boss else (calm or bossy)[0]
+        if boss:
+            return self.stock_boss_track()
         return "theme:" + name
+
+    def _boss_goes_on(self, name: str, **more: Any) -> Dict[str, Any]:
+        """A boss with no music of their own and none in the library: what is playing
+        goes on (a generated tune stops: silence), as their boss fight."""
+        with self.lock:
+            playing = self.music.get("track")
+            if not playing or playing.startswith("theme:"):
+                self.music = {"id": int(self.music.get("id", 0)) + 1, "track": None}
+            self.music.update(mood="boss", theme=name, boss=True, **more)
+            self._save_music()
+            return dict(self.music)
+
+    def stock_boss_track(self) -> Optional[str]:
+        """A boss with no music of their own: the library's boss music (picked as a
+        mood's is), else its combat music; None when the library has neither."""
+        for mood in ("boss", "combat"):
+            files = self.mood_files(mood)
+            if files:
+                fresh = [f for f in files if f != self.music.get("src")] or files
+                return secrets.choice(fresh)
+        return None
 
     def battle_track(self, name: str) -> Optional[str]:
         """This foe's battle music (their boss version), if they have one: it plays
         in any fight they're in - their theme is for their scenes, not a battle."""
-        f = composer.theme_file(self.campaign_dir, name, True)
-        return f if f and f != composer.theme_file(self.campaign_dir, name, False) else None
+        f = score_music.theme_file(self.campaign_dir, name, True)
+        return f if f and f != score_music.theme_file(self.campaign_dir, name, False) else None
 
     def apply_theme(self, name: str, boss: bool = False, battle: bool = False) -> Optional[Dict[str, Any]]:
         name = " ".join(str(name).split())
         if boss:
-            self.queue_theme(name, True)   # a boss earns a composed battle theme
-        same = party_roster._same_name(self.music.get("theme"), name) and self.music.get("track")
+            self.queue_theme(name, True)   # a boss earns battle music (for the GM to write)
+        same = party_roster._same_name(self.music.get("theme"), name) and (
+            self.music.get("track") or self.music.get("boss"))
         fight = self.battle_track(name) if battle and not boss else None
         if fight:                          # a fight with them on stage: their battle music
             if same and self.music.get("track") == fight:
@@ -1507,8 +1519,12 @@ class TableState:
         if same and (bool(self.music.get("boss")) == boss or not boss):
             return None       # already playing (a plain re-mention never calms a boss down)
         track = self.theme_track(name, boss)
+        if track is None:                  # a boss, and no music for them anywhere
+            music = self._boss_goes_on(name)
+            self.show_foe(name, True)
+            return music
         if same and track == self.music.get("track") and not track.startswith("theme:"):
-            # No separate boss version (yet: one may be being composed). It IS a boss
+            # No separate boss version (yet: the orchestra may render one). It IS a boss
             # fight now, so a boss theme that lands takes over.
             if boss:
                 with self.lock:
@@ -1521,20 +1537,11 @@ class TableState:
         self.show_foe(name, boss)          # and their portrait (the boss one when it escalates)
         return music
 
-    # --- composed music (lib/composer.py): villains, bosses, heroes ---
-    def queue_theme(self, name: str, boss: bool, look: str = "") -> None:
+    # --- written music (lib/score_music.py): villains, bosses, heroes, places ---
+    def queue_theme(self, name: str, boss: bool) -> None:
+        """A villain's theme or a boss's battle music is wanted: the GM is asked to write it."""
         name = " ".join(str(name).split())
-        score_music.request(self.campaign_dir, "boss" if boss else "theme", name)   # (for the GM to write)
-        if self.music_maker is None and not composer.available():
-            return
-        if self.orchestra_on() and score_music.has_score(self.campaign_dir, "boss" if boss else "theme", name):
-            return                                       # (written: the orchestra plays it)
-        if composer.has_theme(self.campaign_dir, name, boss) or any(
-                j["kind"] == "theme" and j["name"] == name and j["boss"] == boss for j in self.music_jobs):
-            return
-        self.music_jobs.append({"kind": "theme", "name": name, "boss": boss,
-                                "look": look or self.enemy_looks.get(name, "")})
-        self.portrait_wake.set()
+        score_music.request(self.campaign_dir, "boss" if boss else "theme", name)
 
     def orchestra_on(self) -> bool:
         return self.orchestra_maker is not None or score_music.available()
@@ -1603,75 +1610,15 @@ class TableState:
         return done
 
     def music_pass(self) -> List[str]:
-        """Compose what's queued (villain/boss themes) and the missing PC anthems, all
-        in one go: the model loads once per batch, not once per piece (it's the slow,
-        memory-hungry part). When a theme lands while its foe's music is playing, it
-        takes over at once, while the rest are still being composed. The orchestra
-        goes first (orchestra_pass): with it, the AI composes only villains' and
-        bosses' music nobody has written yet."""
-        orchestrated = self.orchestra_pass()
-        if self.music_maker is None and not composer.available():
-            self.music_jobs.clear()
-            return orchestrated
-        pieces = []
-        while self.music_jobs:
-            pieces.append(self.music_jobs.pop(0))
-        for path, raw in party_roster.all_pcs(self.campaign_dir):
-            sheet = to_flat(raw)
-            name = sheet.get("name") or path.stem
-            base = composer.anthem(self.campaign_dir, name)
-            if base and not base.get("version") and not character_arcs.load(self.campaign_dir).get(name):
-                # (an anthem from before story arcs: it was the full theme; their arc starts there)
-                character_arcs.save(self.campaign_dir, {**character_arcs.load(self.campaign_dir),
-                                                        name: {"stage": 1, "milestones": []}})
-            arc = character_arcs.spec(character_arcs.state_of(self.campaign_dir, name))
-            if self.orchestra_on():
-                continue                                 # (the orchestra plays their anthems)
-            wanted = ([("anthem", arc)] if not base else
-                      [("anthem_version", a) for a in (arc, character_arcs.next_growth(arc))
-                       if a and not composer.has_version(self.campaign_dir, name, a)])
-            for kind, a in wanted:                   # now, and the next growth: ready when earned
-                tried = f"anthem:{name}:{character_arcs.version(a)}"
-                if time.time() - self.portrait_tried.get(tried, -PORTRAIT_RETRY) < PORTRAIT_RETRY:
-                    continue
-                self.portrait_tried[tried] = time.time()
-                pieces.append({"kind": kind, "name": name, "boss": False, "look": "", "sheet": sheet, "spec": a})
-        if not pieces:
-            return orchestrated
-        done: List[str] = list(orchestrated)
-
-        def landed(job: Dict[str, Any], f: str) -> None:
-            done.append(job["name"])
-            playing = self.music
-            if (job["kind"] == "theme" and party_roster._same_name(playing.get("theme"), job["name"])
-                    and bool(playing.get("boss")) == job["boss"] and playing.get("track") != f):
-                music = self.set_music(f, playing.get("volume", 0.6), True, playing.get("title"),
-                                       mood=playing.get("mood"), theme=job["name"], boss=job["boss"])
-                self.announce_music(music)
-
-        if self.music_maker is not None:
-            for job in pieces:
-                try:
-                    landed(job, self.music_maker(job["kind"], job["name"], job["boss"], job["look"],
-                                                 job.get("sheet")))
-                except Exception as e:
-                    print(f"[compose] {job['name']}: {e}", flush=True)
-            return done
-        try:
-            files = composer.compose_pieces(self.campaign_dir, pieces, landed)
-            for job, f in zip(pieces, files):
-                if not f:
-                    print(f"[compose] {job['name']}: that piece failed", flush=True)
-        except Exception as e:
-            print(f"[compose] {', '.join(j['name'] for j in pieces)}: {e}", flush=True)
-        return done
+        """The table's music, in the background: the orchestra's pass (orchestra_pass)."""
+        return self.orchestra_pass()
 
     def heroic_moment(self, pc: str) -> Optional[Dict[str, Any]]:
-        """A PC does something heroic: their anthem plays (or, before it's composed,
-        the victory music), then the scene's music comes back."""
+        """A PC does something heroic: their anthem plays (or, before the orchestra has
+        rendered it, the victory music), then the scene's music comes back."""
         pc = " ".join(str(pc).split())
         before = (self.music_revert or {}).get("music") or dict(self.music)
-        rec = composer.anthem(self.campaign_dir, pc)
+        rec = score_music.anthem(self.campaign_dir, pc)
         if rec:
             track, seconds, title, loop = rec["file"], float(rec.get("seconds") or 20), f"{pc}'s anthem", False
         else:
@@ -1692,7 +1639,13 @@ class TableState:
             self.music_revert = None
         prev = r["music"]
         if not prev.get("track"):
-            return self.set_music(None, mood=prev.get("mood"))
+            music = self.set_music(None, mood=prev.get("mood"))
+            if prev.get("theme"):                      # (a boss fight with no music of its own)
+                with self.lock:
+                    self.music.update({k: prev[k] for k in ("theme", "boss", "stage") if k in prev})
+                    self._save_music()
+                    music = dict(self.music)
+            return music
         return self.set_music(prev["track"], prev.get("volume", 0.5), prev.get("loop", True),
                               prev.get("title"), mood=prev.get("mood"), theme=prev.get("theme"),
                               boss=bool(prev.get("boss")))
@@ -1733,7 +1686,7 @@ class TableState:
         if not force and not self.auto_music:
             return None
         current = self.music if self.music.get("track") or self.music.get("mood") else {}
-        if current.get("theme") and current.get("track") and mood in THEME_HOLDS_THROUGH:
+        if current.get("theme") and (current.get("track") or current.get("boss")) and mood in THEME_HOLDS_THROUGH:
             if mood == "boss" and not current.get("boss"):
                 # The fight escalates: same enemy, their theme's boss version.
                 return self.apply_theme(current["theme"], boss=True)
@@ -3239,7 +3192,7 @@ class TableState:
             self.portrait_wake.wait(30)
             self.portrait_wake.clear()
             self.music_tick()
-            # The scene first; composing (minutes each) last, so pictures don't wait on it.
+            # The scene first; the orchestra's rendering last, so pictures don't wait on it.
             for job in (self.place_pass, self.art_pass, self.portrait_pass, self.npc_pass, self.music_pass):
                 try:
                     job()
@@ -3364,18 +3317,14 @@ def _held_note(rnd: Dict[str, Any]) -> str:
 
 
 def warm_up() -> None:
-    """At the start of the game, read the AI models into RAM, one after the other
-    (not both at once from the disk): the picture model, then the music model.
-    They wait there all evening, each on the graphics card only while it works;
-    the music model is released when the table stops, Forge's when Forge is closed."""
+    """At the start of the game, read the picture model into RAM: it waits there all
+    evening, on the graphics card only while it works (released when Forge is closed)."""
     try:
         import image_gen
         if image_gen.warm_up():
             print("[art] the picture model is loaded (in RAM)", flush=True)
     except Exception as e:
         print(f"[art] picture warm-up: {e}", flush=True)
-    if composer.available() and composer.start_server():
-        print("[compose] the music model is loaded (in RAM)", flush=True)
 
 
 # ============================================================ HTTP layer =====
@@ -3760,7 +3709,7 @@ def make_handler(state: TableState, code: str, host_key: str):
                 elif not to and mood:
                     music = state.apply_mood(mood)
                 if not to and theme and data.get("villain"):
-                    state.queue_theme(theme, False)      # a main villain: compose their theme
+                    state.queue_theme(theme, False)      # a main villain: their theme is wanted
                 hero = " ".join(str(data.get("heroic") or "").split())[:60]
                 if not to and hero:
                     music = state.heroic_moment(hero)    # their anthem, then back to the scene
@@ -4255,7 +4204,6 @@ def serve(port: int, bind: str, code: Optional[str]) -> None:
         pass
     finally:
         httpd.server_close()
-        composer.stop_server()
         current = _server_info(campaign_dir)
         if current and current.get("pid") == os.getpid():
             info_path.unlink(missing_ok=True)
@@ -4425,7 +4373,7 @@ def main() -> None:
                    help="With --theme: this is a boss — play the fast, thundering version")
     s.add_argument("--look", help="With --theme: what the foe looks like (for their portrait)")
     s.add_argument("--villain", action="store_true",
-                   help="With --theme: a MAIN villain — compose them a theme (if the composer is set up)")
+                   help="With --theme: a MAIN villain — ask for their theme (gm-music.sh wanted)")
     s.add_argument("--heroic", metavar="PC",
                    help="This PC just did something heroic: their anthem plays, then the scene's music")
     s.add_argument("--loot", metavar="ITEM", help="Important loot is found: paint it for the table")

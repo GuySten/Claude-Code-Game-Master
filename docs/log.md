@@ -15,6 +15,10 @@ Swap `check` for `drift` / `noise` / `index` as needed; the flags never change.
 
 ---
 
+## 2026-10-07 — AI music generator removed
+
+- The MusicGen composer (`lib/composer.py`, `gm-music-compose.sh`, `.compose-venv`, `MUSIC_COMPOSE`/`COMPOSE_MODEL`) is gone; the table plays only the orchestra's written music (`gm-music.sh`, `.music-venv`).
+
 ## 2026-08-15 — play pack (kit + primer + one room)
 
 - `docs/conventions/the-dream.md`, `docs/schema-reference.md`, `docs/modules/scene-context.md` — `play_pack` on the overview; PRIMER in context; `gm-playpack.sh` set / stage / from-book.

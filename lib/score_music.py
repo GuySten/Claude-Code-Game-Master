@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Written music at the table: the GM's scores (lib/arrangement.py), played by the
-sampled orchestra (lib/orchestra.py), take the place of AI-composed audio.
+sampled orchestra (lib/orchestra.py): the music the table plays for its characters.
 
 A score in the campaign's music/arrangements/ says what it is for with "use":
     {"use": {"as": "anthem", "who": "Kestrel", "stage": 2}}   # a PC at a point of their story
@@ -10,18 +10,18 @@ A score in the campaign's music/arrangements/ says what it is for with "use":
     {"use": {"as": "boss", "who": "Dobbin Rusk"}}             # a boss fight (a loop)
     {"use": {"as": "place", "place": "The Hip"}}              # a place's music (a quiet loop)
 The table renders each one (again whenever it changes) into music/anthems/,
-music/themes/ or music/places/ and lists it in music-composed.json, where the rest of
-the table already looks: an anthem plays at a heroic moment, a theme when its foe
-appears, a place's music while the party is there.
+music/themes/ or music/places/ and lists it in music-composed.json (with "how": score
+or orchestra), where the table looks: an anthem plays at a heroic moment, a theme when
+its foe appears, a place's music while the party is there. The table plays only the
+pieces listed that way (theme_file, anthem): nothing else in those folders.
 
 Until the GM has written a piece, the orchestra still plays: a PC's anthem in the
 version their story has reached, arranged by rule from their tune (music/tunes/, the
 GM's hand-written tunes; else the generator's), and a place's music from a sketch
 (place_sketch: the adventure's signature motif, in the place's colour). What is
-still waiting to be written is listed by wanted() (gm-music-compose.sh wanted).
+still waiting to be written is listed by wanted() (gm-music.sh wanted).
 
-The orchestra needs numpy, soundfile and tinysoundfont (gm-music-compose.sh setup
---orchestra): rendering runs in that environment (lib/orchestra_render.py), here or
+The orchestra needs numpy, soundfile and tinysoundfont (gm-music.sh setup): rendering runs in that environment (lib/orchestra_render.py), here or
 on the host laptop's GPU server; this module itself needs nothing but Python.
 """
 
@@ -39,9 +39,12 @@ from typing import Any, Callable, Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import character_arcs  # noqa: E402
-import composer  # noqa: E402
 import gpu_remote  # noqa: E402
+from music import slug  # noqa: E402,F401  (a piece's file-name stem; the music package's)
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+MUSIC_VENV = PROJECT_ROOT / ".music-venv"   # the orchestra's own environment (gm-music.sh setup)
+OLD_VENV = PROJECT_ROOT / ".compose-venv"   # (where it lived with the old AI composer: still used if there)
 RENDERER = Path(__file__).resolve().parent / "orchestra_render.py"
 SF2 = Path(os.environ.get("ORCHESTRA_SF2") or Path.home() / ".cache" / "gm-orchestra" / "MuseScore_General.sf2")
 USES = ("anthem", "dark", "theme", "boss", "place")
@@ -49,6 +52,11 @@ WANTED = "music-wanted.json"
 SIGNATURE = "signature.json"          # music/tunes/: the adventure's own motif
 PLACE_MINUTES = 10                    # play at a place before it earns its music
 NO_WINDOW = {"creationflags": 0x08000000} if os.name == "nt" else {}
+MADE = ("score", "orchestra")         # how a piece the table plays was made: a score, or by rule
+
+
+class OrchestraError(Exception):
+    pass
 
 
 def _read(path: Path, default: Any) -> Any:
@@ -67,10 +75,6 @@ def _write(path: Path, data: Any) -> None:
 
 def _same(a: Any, b: Any) -> bool:
     return " ".join(str(a or "").split()).casefold() == " ".join(str(b or "").split()).casefold()
-
-
-def slug(name: str) -> str:
-    return composer.slug(name)
 
 
 # --- the tunes and the scores ---
@@ -191,21 +195,110 @@ def target(campaign_dir, use: Dict[str, Any], how: str = "score", title: Optiona
     return music / "themes" / f"{who}-{'boss' if use['as'] == 'boss' else 'theme'}{d}-score{named}.ogg"
 
 
+def registry_path(campaign_dir) -> Path:
+    return Path(campaign_dir) / "music-composed.json"
+
+
 def registry(campaign_dir) -> Dict[str, Any]:
-    reg = composer.load_registry(campaign_dir)
-    reg.setdefault("places", {})
-    return reg
+    data = _read(registry_path(campaign_dir), {})
+    data = data if isinstance(data, dict) else {}
+    for k in ("themes", "anthems", "places"):
+        data.setdefault(k, {})
+    return data
+
+
+def save_registry(campaign_dir, data: Dict[str, Any]) -> None:
+    path = registry_path(campaign_dir)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(path)
+
+
+def _named(table: Dict[str, Any], name: str) -> Optional[str]:
+    return next((k for k in table if k.strip().lower() == str(name).strip().lower()), None)
+
+
+def _theme_files(rec: Dict[str, Any], kind: str, folder: Path) -> tuple:
+    """(versions {descent: file}, plain file or None) of a foe's theme of this kind
+    ("normal" or "boss") that the orchestra made and that are there."""
+    scores = rec.get("scores") or {}
+    versions = {int(v[1:]): f for v, f in ((rec.get("versions") or {}).get(kind) or {}).items()
+                if v[1:].isdigit() and (scores.get(f"{kind}:{v}") or {}).get("how") in MADE
+                and (folder / f).is_file()}
+    f = rec.get(kind)
+    made = (scores.get(kind) or {}).get("how") in MADE or f in versions.values()
+    return versions, (f if f and made and (folder / f).is_file() else None)
+
+
+def theme_file(campaign_dir, name: str, boss: bool) -> Optional[str]:
+    """This foe's rendered theme (the boss one when asked, else the other) - in the
+    version for how far they have fallen ("versions": {"normal": {"d1": file}}: the
+    deepest one their darkness has reached), else the one they have. None: nothing
+    rendered for them."""
+    reg = registry(campaign_dir)["themes"]
+    rec = reg.get(_named(reg, name)) or {}
+    folder = Path(campaign_dir) / "music" / "themes"
+    dark = character_arcs.state_of(campaign_dir, name)["dark"]
+    for kind in (("boss", "normal") if boss else ("normal", "boss")):
+        versions, plain = _theme_files(rec, kind, folder)
+        reached = [d for d in versions if d <= dark]
+        if versions:
+            return versions[max(reached)] if reached else versions[min(versions)]
+        if plain:
+            return plain
+    return None
+
+
+def anthem(campaign_dir, name: str) -> Optional[Dict[str, Any]]:
+    """This PC's rendered anthem, in the version for where their story is now (if that
+    one is rendered yet; else the one they had). None: no anthem yet."""
+    reg = registry(campaign_dir)["anthems"]
+    rec = reg.get(_named(reg, name)) or {}
+    folder = Path(campaign_dir) / "music" / "anthems"
+    made = {v: got for v, got in (rec.get("versions") or {}).items()
+            if isinstance(got, dict) and got.get("how") in MADE and (folder / got.get("file", "")).is_file()}
+    now = character_arcs.version(character_arcs.spec(character_arcs.state_of(campaign_dir, name)))
+    if now in made:
+        return {**rec, "file": made[now]["file"], "seconds": made[now].get("seconds", rec.get("seconds")),
+                "version": now}
+    had = next((got for got in made.values() if got["file"] == rec.get("file")), None)
+    return {**rec, "seconds": had.get("seconds", rec.get("seconds"))} if had else None
+
+
+def dark_anthem(campaign_dir, name: str) -> Optional[Path]:
+    """The GM's dark twin of this PC's anthem (the villain they'd become), if rendered."""
+    reg = registry(campaign_dir)["anthems"]
+    rec = reg.get(_named(reg, name)) or {}
+    path = Path(campaign_dir) / "music" / "anthems" / str(rec.get("dark") or "")
+    return path if rec.get("dark") and rec.get("dark_how") in MADE and path.is_file() else None
+
+
+def villain_theme_from_anthem(campaign_dir, name: str) -> Optional[str]:
+    """A PC turned villain: their anthem's dark twin becomes their theme, at once."""
+    dark = dark_anthem(campaign_dir, name)
+    if dark is None:
+        return None
+    out = Path(campaign_dir) / "music" / "themes" / f"{slug(name)}-theme-dark-score{dark.suffix}"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_bytes(dark.read_bytes())
+    reg = registry(campaign_dir)
+    rec = reg["themes"].setdefault(_named(reg["themes"], name) or name, {})
+    rec["normal"] = out.name
+    rec.setdefault("scores", {})["normal"] = {"how": "score"}
+    save_registry(campaign_dir, reg)
+    return out.name
 
 
 def registered(campaign_dir, use: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """What the registry holds for this use, if its file is there: {file, how, hash, ...}."""
+    """What the registry holds for this use, if the orchestra made it and its file is
+    there: {file, how, hash, ...}."""
     reg = registry(campaign_dir)
     music = Path(campaign_dir) / "music"
     if use["as"] == "place":
         rec = reg["places"].get(next((k for k in reg["places"] if _same(k, use["place"])), ""), None)
         folder = music / "places"
     elif use["as"] in ("theme", "boss"):
-        rec = reg["themes"].get(composer._key(reg["themes"], use["who"]) or "", {})
+        rec = reg["themes"].get(_named(reg["themes"], use["who"]) or "", {})
         kind = "boss" if use["as"] == "boss" else "normal"
         if use.get("descent") is not None:
             v = f"d{use['descent']}"
@@ -215,14 +308,14 @@ def registered(campaign_dir, use: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             rec = {"file": rec.get(kind), **(rec.get("scores") or {}).get(kind, {})} if rec.get(kind) else None
         folder = music / "themes"
     else:
-        rec = reg["anthems"].get(composer._key(reg["anthems"], use["who"]) or "", {})
+        rec = reg["anthems"].get(_named(reg["anthems"], use["who"]) or "", {})
         if use["as"] == "dark":
             rec = {"file": rec.get("dark"), "how": rec.get("dark_how"), "hash": rec.get("dark_hash")} \
                 if rec.get("dark") else None
         else:
             rec = (rec.get("versions") or {}).get(use["version"])
         folder = music / "anthems"
-    if rec and rec.get("file") and (folder / rec["file"]).is_file():
+    if rec and rec.get("file") and rec.get("how") in MADE and (folder / rec["file"]).is_file():
         return rec
     return None
 
@@ -237,7 +330,7 @@ def register(campaign_dir, use: Dict[str, Any], path: Path, seconds: float, how:
         key = next((k for k in reg["places"] if _same(k, use["place"])), use["place"])
         reg["places"][key] = {"file": f, "seconds": seconds, **extra}
     elif use["as"] in ("theme", "boss"):
-        key = composer._key(reg["themes"], use["who"]) or use["who"]
+        key = _named(reg["themes"], use["who"]) or use["who"]
         kind = "boss" if use["as"] == "boss" else "normal"
         rec = reg["themes"].setdefault(key, {})
         if use.get("descent") is not None:
@@ -250,15 +343,16 @@ def register(campaign_dir, use: Dict[str, Any], path: Path, seconds: float, how:
             rec[kind] = f
             rec.setdefault("scores", {})[kind] = extra
     else:
-        key = composer._key(reg["anthems"], use["who"]) or use["who"]
+        key = _named(reg["anthems"], use["who"]) or use["who"]
         rec = reg["anthems"].setdefault(key, {})
         if use["as"] == "dark":
             rec.update(dark=f, dark_how=how, dark_hash=fp)
         else:
             rec.setdefault("versions", {})[use["version"]] = {"file": f, "seconds": seconds, **extra}
-            if not rec.get("file") or not (Path(campaign_dir) / "music" / "anthems" / rec["file"]).is_file():
+            made = [v.get("file") for v in rec["versions"].values() if isinstance(v, dict) and v.get("how") in MADE]
+            if rec.get("file") not in made or not (Path(campaign_dir) / "music" / "anthems" / rec["file"]).is_file():
                 rec.update(file=f, seconds=seconds)
-    composer.save_registry(campaign_dir, reg)
+    save_registry(campaign_dir, reg)
 
 
 # --- rendering: in the orchestra's environment, here or on the host's laptop ---
@@ -278,11 +372,13 @@ def _has_module(py: Path, module: str) -> bool:
 
 
 def orchestra_python() -> Optional[Path]:
-    """A Python with the orchestra's packages (ORCHESTRA_PYTHON, else .compose-venv)."""
+    """A Python with the orchestra's packages (ORCHESTRA_PYTHON, else .music-venv, else an
+    existing .compose-venv: a host's setup from before the AI composer's removal keeps working)."""
     if os.environ.get("MUSIC_ORCHESTRA", "").strip().lower() in ("off", "0", "no", "false"):
         return None
     for p in [os.environ.get("ORCHESTRA_PYTHON")] + [str(x) for x in (
-            composer.COMPOSE_VENV / "Scripts" / "python.exe", composer.COMPOSE_VENV / "bin" / "python")]:
+            MUSIC_VENV / "Scripts" / "python.exe", MUSIC_VENV / "bin" / "python",
+            OLD_VENV / "Scripts" / "python.exe", OLD_VENV / "bin" / "python")]:
         if p and Path(p).is_file() and _has_module(Path(p), "tinysoundfont") and _has_module(Path(p), "numpy"):
             return Path(p)
     return None
@@ -310,7 +406,7 @@ def render_local(jobs: List[Dict[str, Any]], on_piece: Optional[Callable[[int, D
     wound, out}) in the orchestra's environment, one process for the lot."""
     py = orchestra_python()
     if py is None:
-        raise composer.ComposeError("the orchestra isn't set up (bash tools/gm-music-compose.sh setup --orchestra)")
+        raise OrchestraError("the orchestra isn't set up (bash tools/gm-music.sh setup)")
     results: List[Optional[Dict[str, Any]]] = [None] * len(jobs)
     proc = subprocess.Popen([str(py), str(RENDERER)], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                             stderr=subprocess.DEVNULL, text=True, encoding="utf-8", **NO_WINDOW,
@@ -389,7 +485,7 @@ def anthem_job(campaign_dir, name: str, arc: Dict[str, Any], cls: str = "") -> D
 
 
 def needs_orchestra(campaign_dir, name: str, arc: Dict[str, Any]) -> bool:
-    """Is this version of a PC's anthem still missing, or only the AI's?"""
+    """Is this version of a PC's anthem still to be rendered?"""
     rec = registered(campaign_dir, {"as": "anthem", "who": name, "version": character_arcs.version(arc)})
     return not rec or rec.get("how") not in ("score", "orchestra")
 
@@ -700,7 +796,7 @@ def place_file(campaign_dir, name: str) -> Optional[str]:
     return rec["file"] if rec else None
 
 
-# --- the CLI behind gm-music-compose.sh scores / wanted / place ---
+# --- the CLI behind gm-music.sh scores / render / wanted / place / class-of ---
 def main() -> None:
     import argparse
     from campaign_manager import CampaignManager
@@ -713,8 +809,14 @@ def main() -> None:
     sub.add_parser("wanted", help="What is still waiting to be written")
     p = sub.add_parser("place", help="Sketch a place's music now (the table does it once a place earns it)")
     p.add_argument("name")
+    cl = sub.add_parser("class-of", help="A player character's class (prints nothing if none)")
+    cl.add_argument("name")
     args = ap.parse_args()
     camp = CampaignManager(os.environ.get("GM_WORLD_STATE_BASE", "world-state")).get_active_campaign_dir()
+    if args.action == "class-of":
+        path = party_roster.find_pc(camp, args.name) if camp else None
+        print(str(to_flat(json.loads(path.read_text(encoding="utf-8"))).get("class") or "") if path else "")
+        return
     if camp is None:
         sys.exit("[ERROR] No active campaign.")
     if args.action == "scores":
@@ -724,7 +826,7 @@ def main() -> None:
             rec = registered(camp, u)
             state = it["problem"] or ("rendered" if rec and rec.get("hash") == it["hash"] else "to render")
             print(f"  {it['file'].name:34} {what:44} {state}{' (sketch)' if it['spec'].get('sketch') else ''}")
-        print(f"Orchestra: {'ready' if available() else 'not set up (gm-music-compose.sh setup --orchestra)'}")
+        print(f"Orchestra: {'ready' if available() else 'not set up (gm-music.sh setup)'}")
     elif args.action == "render":
         made = sync(camp)
         print("\n".join(f"  [SUCCESS] {f}" for f in made) or "Nothing new to render.")
