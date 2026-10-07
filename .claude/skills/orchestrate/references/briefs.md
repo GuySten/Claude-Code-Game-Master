@@ -131,7 +131,7 @@ moor; not sad-romantic"), never a bare adjective.
   brief without the host hearing it first; where a card and a host *taste* verdict disagree, follow
   the card and let the host hear the result. Two things stay above any card: the host's verdicts on
   what *our sampled instruments* can't do (a choir changing notes under 0.7 s, the men's choir above E4,
-  repeated brass-section stabs, constant dissonance in this render) - a masterwork written for a real
+  repeated brass-section stabs, constant dissonance in this render, the sampled electric guitar) - a masterwork written for a real
   orchestra can't overrule the sound set - and the rule to take the means, never the piece.
 - **P7b. Recipes, research examples and lexicon entries give means.** A means that doesn't serve
   the Job is dropped however well sourced; the host's verdicts override all of them. A lexicon

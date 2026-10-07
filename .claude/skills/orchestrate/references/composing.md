@@ -70,6 +70,8 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
     Dissonance is a spice, not a bed: a semitone clash sounding most of the time is "painful to hear"
     [H, the Saint's violated hymn, a clash 97% of the time; the liked pieces 11-21%] - keep the grind for
     cadences, cracks and the peak, over chords that otherwise sound clean. (critic)
+    No electric guitar: the sound set's General MIDI distortion guitar, chugging power chords under the
+    Saint's stage 1, "sounds off" [H] - rock drive comes from the orchestra (low strings, drums, low brass).
 
 ## 2. What the research adds
 14. Themes the table can learn: short, distinct in rhythm and timbre, on a clear type
