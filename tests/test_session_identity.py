@@ -41,3 +41,26 @@ def test_cliffhanger_and_threads_surface_in_context(dcc_world):
 def test_legacy_log_without_footer_still_works(dcc_world):
     # Before any structured end, context still assembles (best-effort cliffhanger).
     assert "PREVIOUSLY ON" in SessionManager(dcc_world).get_full_context()
+
+
+def test_end_numbers_the_session_it_ends_even_without_a_start(tmp_path):
+    # A playtest never ran `start`: its two sessions were numbered 0 and 1 and
+    # session_count stayed 0.
+    import json
+    ws = tmp_path / "world-state"
+    camp = ws / "campaigns" / "k"
+    camp.mkdir(parents=True)
+    (ws / "active-campaign.txt").write_text("k")
+    (camp / "campaign-overview.json").write_text(json.dumps({"campaign_name": "K", "session_count": 0}))
+    (camp / "session-log.md").write_text("# Session Log - K\n\n---\n")
+    sm = SessionManager(str(ws))
+    sm.end_session("The lottery night.", cliffhanger="An hour before dawn.")
+    sm.end_session("Dawn; the Keep knelt.")
+    text = (camp / "session-log.md").read_text(encoding="utf-8")
+    assert "**Session:** 1\n" in text and "**Session:** 2\n" in text and "**Session:** 0" not in text
+    assert json.loads((camp / "campaign-overview.json").read_text())["session_count"] == 2
+    summaries = sm._recent_session_summaries()
+    assert len(summaries) == 2 and summaries[0].startswith("The lottery night.")
+    sm.start_session()
+    sm.end_session("Third.")
+    assert "**Session:** 3\n" in (camp / "session-log.md").read_text(encoding="utf-8")

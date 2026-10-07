@@ -157,7 +157,10 @@ class SessionManager(EntityManager):
         on the exact dramatic beat (see _latest_session_meta + get_full_context).
         """
         timestamp = self.get_timestamp()
-        session_num = self._get_session_number()
+        # The session being ended is the one after every session already ended,
+        # whether or not `start` wrote its opening line.
+        content = self.session_log.read_text(encoding='utf-8') if self.session_log.exists() else ''
+        session_num = content.count('### Session Ended:') + 1
 
         campaign = self.json_ops.load_json(self.campaign_file) or {}
         pos = campaign.get('player_position', {})
@@ -174,6 +177,10 @@ class SessionManager(EntityManager):
             if threads_str:
                 f.write(f"**Open threads:** {threads_str}\n")
             f.write("\n---\n\n")
+
+        if campaign and int(campaign.get('session_count') or 0) < session_num:
+            campaign['session_count'] = session_num
+            self.json_ops.save_json(self.campaign_file, campaign)
 
         print(f"[SUCCESS] Session {session_num} ended and logged")
 
@@ -1138,10 +1145,9 @@ class SessionManager(EntityManager):
         except (IOError, ValueError):
             return []
         summaries = []
-        for block in text.split("## Session Started:"):
-            if "### Session Ended:" not in block:
-                continue
-            after = block.split("### Session Ended:", 1)[1]
+        # Every '### Session Ended:' closes one session, with or without a
+        # '## Session Started:' line before it.
+        for after in text.split("### Session Ended:")[1:]:
             body = []
             for ln in after.splitlines()[1:]:  # skip the 'Session Ended' timestamp line
                 if ln.strip() == "---":
