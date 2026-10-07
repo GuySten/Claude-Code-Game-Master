@@ -2144,7 +2144,10 @@
   const tx = (s) => {
     if (txOff || typeof s !== "string") return s;
     const k = s.trim();
-    return heDice(sheetTr.get(k) || (lang === "he" && HE_TERMS[k.toLowerCase()]) || s);
+    // (a "translation" that came back as the same English loses to the game's own Hebrew word)
+    const got = sheetTr.get(k);
+    const own = lang === "he" && HE_TERMS[k.toLowerCase()];
+    return heDice((got && !(own && got.trim().toLowerCase() === k.toLowerCase()) ? got : own) || s);
   };
   const prettyKey = (k) => String(k).replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
   function label(k) {
