@@ -490,3 +490,9 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   chain (5% at 2-4 kHz), double-tracked, under the orchestra: "8 is great". Planned as the Saint's stage-2
   surprise (the host's idea), entering at the eruption. Lesson: a verdict on a sample is not a verdict on the
   instrument - find out why before ruling it out.
+- **Real percussion** (Oct 2026: CC0 recordings from VSCO-2-CE and VCSL, the `gong`, `bass_drum`, `anvil` and
+  `brake_drum` parts): the new bass drum, anvil and brake drum against the kit's bass drum - "the second clip is
+  great". The real gong (soft strokes swelling into a full stroke under low strings and brass, then its 25 s
+  ring alone) - "ok but it is silent most of the time": the demo left the gong's ring fading alone for 20 s.
+  Judge the gong inside music (a transformation's eruption), not bare. The kit's old "gong" was a GM crash
+  cymbal - up to 31% of its energy above 8 kHz.
