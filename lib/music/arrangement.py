@@ -159,6 +159,11 @@ timpani, taiko, toms, reverse_cymbal, kit (bd, snare, cymbals): as many as wante
 Real percussion (struck, let ring): gong (a big tam-tam, ~25 s ring: transformations and
 the biggest arrivals); anvil and brake_drum (metal hits, sparingly: a forge, a machine);
 bass_drum (the orchestral one: weight under a tutti or a march).
+A real electric guitar, through an amp, double-tracked left and right: guitar (open power
+chords, ringing to the next pick) and guitar_mute (palm-muted chugs) - one instrument, one
+amp: a new pick stops what rang, and "mix": {"guitar": dB} sets both. B1-E5; power chords
+only ("root5", "root", "octaves": a third turns to mud). A surprise held back for a later
+stage, never a bed for every piece.
 """
 
 import argparse
@@ -847,8 +852,8 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
                             f"pizzicato), or give it held notes")
     # The same note started again while it still sounds (the second cuts the first).
     for name in notes:
-        if name.partition(":")[0] in PERCUSSIVE:
-            continue                                         # (a drum is struck again: that's fine)
+        if name.partition(":")[0] in PERCUSSIVE or name.partition(":")[0] in orchestra.GUITAR:
+            continue                                         # (a drum struck again, a string picked again)
         active: Dict[int, int] = {}
         clash = 0
         for t, is_on, n, key, _ in sorted((e for e in sc.events if e[2] == name), key=lambda e: (e[0], e[1])):
@@ -860,6 +865,19 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
         if clash:
             add("warn", f"{name.partition(':')[0]}: {clash} note(s) restart a note already sounding "
                         "(the second cuts the first): move one to another part")
+    # The distorted guitar plays power chords: root, fifth, octave (a fourth: a fifth inverted).
+    # A third, sixth, seventh or second through its amp turns to mud - the distortion's own
+    # difference tones beat against the chord.
+    struck: Dict[float, set] = {}
+    for part in orchestra.GUITAR:
+        for a, b, k in by_part.get(part, []):
+            struck.setdefault(round(a, 3), set()).add(k)
+    muddy = sorted(t for t, ks in struck.items()
+                   if any((y - x) % 12 not in (0, 5, 7) for x in ks for y in ks))
+    if muddy:
+        add("warn", f"guitar: {len(muddy)} chord(s) with a third, sixth, seventh or second (first at "
+                    f"{muddy[0]:.1f} s) - through its distortion that turns to mud: power chords only "
+                    "(\"play\": \"root5\", \"root\", \"octaves\"; root, fifth, octave)")
     # The tune: all played, and against its chords.
     melody = spec.get("melody") or []
     silent = [u0 for u0, _, _ in ctx["played"]

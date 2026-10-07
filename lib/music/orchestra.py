@@ -48,6 +48,21 @@ VOWEL_URL = "https://www.mediafire.com/file/bhdzds4tgtsocdp/Vowel_Choir_SFZ.zip"
 PERC_SF2 = Path(os.environ.get("ORCHESTRA_PERC_SF2") or SF2.parent / "perc.sf2")
 VSCO2 = "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/440300901dfe9275fd84e0b7763af1f8443ae62e/"
 VCSL = "https://raw.githubusercontent.com/sgossner/VCSL/c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e/"
+# A real electric guitar: Unreal Instruments' "Standard Guitar" (a humbucker recorded DI -
+# straight from the guitar, no amp - every note B1-E5 in stereo, its left and right separate
+# takes: double-tracked; up to 16 round-robins; sustain and palm-mute, down and up strokes).
+# Its readme's terms: "ライセンスフリーです / クレジット表記は不要です" - license free, no
+# credit required (and no liability). The sampled GM distortion guitar was heard as "someone
+# trying to hurt the guitar": a recording of a distortion with no speaker cabinet, its buzz at
+# 2.5-3 kHz as loud as its fundamental, 9 dB over the orchestra there. Here the DI goes
+# through an amp and a cabinet in the engine (_guitar_stem), on the whole chord as a real amp
+# does, two passes panned hard left and right - the host: "great". Its sustain and palm-mute
+# down strokes (3 takes a note, each channel a take of its own) are built once into a
+# SoundFont (fetch_guitar); the recordings are fetched, never kept in the repo.
+GUITAR_SF2 = Path(os.environ.get("ORCHESTRA_GUITAR_SF2") or SF2.parent / "guitar.sf2")
+GUITAR_PAGE = "https://unreal-instruments.wixsite.com/unreal-instruments/standard-guitar"
+GUITAR_URL = ("https://drive.usercontent.google.com/download?id=1uoV7icZV1_IjiOGKM7Wm5_K5UkF41Fm3"
+              "&export=download&confirm=t")             # (UI_Standard_Guitar.rar, 716 MB)
 SSO = "https://raw.githubusercontent.com/peastman/sso/32bbdb169aef636b8216029a2e056424ba7c2abb/Sonatina%20Symphonic%20Orchestra/"
 
 # channel: (bank, preset, pan 0..127, volume 0..127)   (General MIDI numbering)
@@ -91,11 +106,16 @@ PARTS = {
     "bass_drum": (0, 1, 58, 112, "perc"),     # the orchestral bass drum (the kit's is a pop kick)
     "anvil": (0, 2, 80, 100, "perc"),         # struck metal: a forge, a machine
     "brake_drum": (0, 3, 48, 100, "perc"),    # a car's brake drum hit with a hammer: dry, clanging metal
+    # a real electric guitar through an amp, double-tracked (power chords only): one instrument,
+    # two articulations - the same strings, the same amp (a new pick stops what rang)
+    "guitar": (0, 0, 64, 100, "guitar"),      # open, ringing: power chords, held or picked
+    "guitar_mute": (0, 6, 64, 100, "guitar"), # palm-muted chugs: the chug between the open chords
 }
 # Where a part's own sound set can't be had: the sound set's choir; for the percussion, the
 # GM kit's nearest (bank, preset, its key): a crash cymbal for the gong, the cowbell, an agogo.
 FALLBACK = {"men_choir": (0, 52), "chorus": (0, 52), "choir_oo": (0, 52), "choir_oh": (0, 52),
-            "gong": (128, 48, 57), "bass_drum": (128, 48, 35), "anvil": (128, 48, 67), "brake_drum": (128, 48, 56)}
+            "gong": (128, 48, 57), "bass_drum": (128, 48, 35), "anvil": (128, 48, 67), "brake_drum": (128, 48, 56),
+            "guitar": (0, 30), "guitar_mute": (0, 30)}   # (the GM distortion guitar, through a cabinet)
 DRUMS = {"kit"}
 LEAD_DB = 4.0          # the tune's notes, mixed this much over the rest
 BASS_DRUM, CRASH = 35, 49
@@ -611,7 +631,336 @@ def fetch_percussion(dest: Path = None, quiet: bool = False) -> Path:
     return dest
 
 
-EXTRA_FONTS = {"chorus": fetch_choir, "vowels": fetch_vowels, "perc": fetch_percussion}
+# --- the electric guitar ---
+GUITAR = {"guitar": 0, "guitar_mute": 1}        # its parts: the articulation (0 sustain, 1 palm mute)
+GUITAR_TAKES = 3        # takes (round-robins) kept a note, each a stereo pair: its left and right
+                        # channels are separate takes, one for each pass of the double-tracking
+GUITAR_KEYS = (40, 76)  # the recordings kept: E2-E5 (one a semitone; E2's also plays B1-D#2)
+GUITAR_LOW = 35         # B1: the lowest note it plays (a 7-string's low B)
+GUITAR_RELEASE = 0.08   # a note let go: the hand damps the strings
+HALL_ROOM_GUITAR = -13.0  # (its own room as ROOM counts it: as much as the hall's, so the least send)
+_GUITAR_ARTS = (("Sus_Down", 4.0, 120, 0.0), ("Mute_Down", 1.0, 104, 6.0))
+#               (folder, seconds kept, the velocity its tone is baked at, dB over the sustain)
+
+
+def _unpack_rar(archive: Path, out: Path, patterns: List[str]) -> None:
+    """Extract the files matching ``patterns`` from a RAR archive with whatever can: 7-Zip
+    (7zz / 7z / 7za, or the program ORCHESTRA_7Z names), unar, or bsdtar (libarchive)."""
+    import subprocess
+    tried = []
+    for exe in _rar_tools():
+        kind = Path(exe).name
+        if kind.startswith("unar"):
+            cmd = [exe, "-q", "-f", "-o", str(out), str(archive)]           # (all of it)
+        elif kind.startswith("bsdtar"):
+            cmd = [exe, "-xf", str(archive), "-C", str(out), *patterns]
+        else:
+            cmd = [exe, "x", "-y", f"-o{out}", str(archive), *patterns, "-r"]
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        if r.returncode == 0:
+            return
+        tried.append(f"{kind}: {(r.stderr or r.stdout).strip()[-200:]}")
+    raise OSError(NO_UNRAR + (f" (tried: {'; '.join(tried)})" if tried else ""))
+
+
+NO_UNRAR = ("the guitar's recordings come as a RAR archive, and nothing here unpacks one: install "
+            "7-Zip (7zz or 7z: the 7zip or p7zip-full package) or unar, or set ORCHESTRA_7Z to a 7-Zip "
+            "program, or ORCHESTRA_GUITAR_SRC to the archive unpacked")
+
+
+def _rar_tools() -> List[str]:
+    """The programs here that can unpack a RAR archive (7-Zip first)."""
+    import shutil
+    named = os.environ.get("ORCHESTRA_7Z")
+    found = [shutil.which(t) for t in ([named] if named else []) + ["7zz", "7z", "7za", "unar", "bsdtar"]]
+    return [f for f in found if f]
+
+
+def fetch_guitar(dest: Path = None, quiet: bool = False, src: Optional[Path] = None) -> Path:
+    """The real guitar: the Standard Guitar's archive (716 MB, once - or ``src`` /
+    ORCHESTRA_GUITAR_SRC: the archive, or a folder it was unpacked to), its sustain and
+    palm-mute down strokes E2-E5 (GUITAR_TAKES takes each) built into a SoundFont of
+    4 * GUITAR_TAKES mono presets (_guitar_preset: an articulation, a side, a take - each
+    channel of a stereo take is a preset of its own: the left pass plays the left takes, the
+    right pass the right). Each recording keeps the tone the library gives it at the velocity
+    it is baked at (its velocity-tracked low-pass and pickup EQ); played once, not looped."""
+    dest = dest or GUITAR_SF2
+    if dest.is_file() and dest.stat().st_size > 1_000_000:
+        return dest
+    import re
+    import tempfile
+    import numpy as np
+    import soundfile
+    from music import sf2write
+    src = src or os.environ.get("ORCHESTRA_GUITAR_SRC")
+    src = Path(src) if src else None
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    wanted = [f"*_{folder}{i}.flac" for folder, *_ in _GUITAR_ARTS for i in range(1, GUITAR_TAKES + 1)]
+    names = {"c": 0, "d": 2, "e": 4, "f": 5, "g": 7, "a": 9, "b": 11}
+    with tempfile.TemporaryDirectory(dir=dest.parent) as tmp:       # (~1 GB: beside the cache)
+        root = Path(tmp)
+        if src is not None and src.is_dir():
+            root = src
+        else:
+            if not _rar_tools():                        # (before a 716 MB download, not after)
+                raise OSError(NO_UNRAR)
+            archive = src
+            kept = dest.parent / "guitar-download.rar"   # (kept until built: a retry needn't fetch it)
+            if archive is None and kept.is_file():
+                archive = kept
+            if archive is None:
+                archive = kept.with_suffix(".part")
+                if not quiet:
+                    print(f"[orchestra] downloading the guitar (716 MB, once): {GUITAR_PAGE}",
+                          file=sys.stderr, flush=True)
+                with urllib.request.urlopen(GUITAR_URL, timeout=120) as r, open(archive, "wb") as f:
+                    while True:
+                        chunk = r.read(1 << 22)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                if archive.stat().st_size < 100_000_000:
+                    raise OSError(f"the guitar's download is {archive.stat().st_size} bytes, not the "
+                                  f"716 MB archive: see {GUITAR_PAGE}")
+                archive = archive.replace(kept)
+            _unpack_rar(archive, root / "x", wanted)
+            root = root / "x"
+        presets = [[] for _ in range(2 * 2 * GUITAR_TAKES)]
+        peak = 0.0
+        found = []
+        for art, (folder, keep, vel, lift) in enumerate(_GUITAR_ARTS):
+            for path in root.rglob(f"*_{folder}*.flac"):
+                m = re.fullmatch(rf"([a-g])(#?)(\d)_{folder}(\d+)\.flac", path.name, re.IGNORECASE)
+                if not m or not 1 <= int(m.group(4)) <= GUITAR_TAKES:
+                    continue
+                key = 12 * (int(m.group(3)) + 1) + names[m.group(1).lower()] + (1 if m.group(2) else 0)
+                if not GUITAR_KEYS[0] <= key <= GUITAR_KEYS[1]:
+                    continue
+                audio, rate = soundfile.read(str(path), dtype="float32", always_2d=True)
+                if audio.shape[1] == 1:
+                    audio = np.repeat(audio, 2, axis=1)
+                mono = np.abs(audio).max(axis=1)
+                start = max(0, int(np.argmax(mono > 0.02 * mono.max())) - int(0.002 * rate))
+                x = audio[start:start + int(keep * rate), :2].astype("float64")
+                fade = int(0.25 * rate)
+                x[-fade:] *= np.cos(np.linspace(0, np.pi / 2, fade))[:, None] ** 2
+                x = _guitar_tone(x, rate, vel) * 10 ** (lift / 20)
+                peak = max(peak, float(np.abs(x).max()))
+                found.append((art, int(m.group(4)) - 1, key, x, rate))
+        if len({(a, k) for a, _, k, _, _ in found}) < 2 * (GUITAR_KEYS[1] - GUITAR_KEYS[0] + 1) * 0.9:
+            raise OSError(f"the guitar's recordings weren't found in {root} (its Samples/Sus_Down and "
+                          f"Samples/Mute_Down): see {GUITAR_PAGE}")
+        for art, take, key, x, rate in sorted(found, key=lambda f: (f[0], f[1], f[2])):
+            x = x * (0.95 / peak)
+            for side in (0, 1):
+                a = sf2write.to_int16(x[:, side:side + 1].astype("float32"))
+                presets[_guitar_preset(art, side, take)].append(
+                    {"audio": a, "rate": rate, "key": key, "lo": GUITAR_LOW if key == GUITAR_KEYS[0] else key,
+                     "hi": key, "loop": False, "ls": 8, "le": len(a) - 8, "release_s": GUITAR_RELEASE})
+    part = dest.with_suffix(".part")
+    labels = [f"{('Sus', 'Mute')[i // (2 * GUITAR_TAKES)]} {'LR'[(i // GUITAR_TAKES) % 2]}{i % GUITAR_TAKES + 1}"
+              for i in range(len(presets))]
+    sf2write.write(part, list(zip(labels, presets)), "Unreal Instruments Standard Guitar (license free)")
+    part.replace(dest)
+    (dest.parent / "guitar-download.rar").unlink(missing_ok=True)
+    return dest
+
+
+def _guitar_preset(art: int, side: int, take: int) -> int:
+    """The guitar SoundFont's preset for an articulation (0 sustain, 1 palm mute), a side
+    (0 left pass, 1 right) and a take: PARTS' "guitar" is preset 0, "guitar_mute" preset 6."""
+    return art * 2 * GUITAR_TAKES + side * GUITAR_TAKES + take
+
+
+def _biquad(kind: str, f: float, q: float, gain_db: float, rate: int):
+    """An RBJ biquad's (b, a): low-pass, high-pass or peaking EQ."""
+    A = 10 ** (gain_db / 40)
+    w = 2 * math.pi * min(f, 0.45 * rate) / rate
+    c, s = math.cos(w), math.sin(w)
+    al = s / (2 * q)
+    if kind == "lp":
+        b, a = [(1 - c) / 2, 1 - c, (1 - c) / 2], [1 + al, -2 * c, 1 - al]
+    elif kind == "hp":
+        b, a = [(1 + c) / 2, -(1 + c), (1 + c) / 2], [1 + al, -2 * c, 1 - al]
+    else:
+        b, a = [1 + al * A, -2 * c, 1 - al * A], [1 + al / A, -2 * c, 1 - al / A]
+    return [v / a[0] for v in b], [v / a[0] for v in a]
+
+
+def _filter(x, sections, rate: int):
+    """A cascade of biquads [(kind, f, q, dB)] (or raw (b, a)) applied exactly, in the
+    frequency domain (padded a second, so nothing wraps round); x: (n,) or (n, ch)."""
+    import numpy as np
+    x = np.asarray(x, dtype="float64")
+    n = len(x) + rate
+    N = _fast_len(n)
+    z = np.exp(-1j * np.linspace(0, np.pi, N // 2 + 1))
+    H = np.ones_like(z)
+    for sec in sections:
+        b, a = sec if len(sec) == 2 else _biquad(*sec, rate)
+        H *= (b[0] + b[1] * z + b[2] * z * z) / (a[0] + a[1] * z + a[2] * z * z)
+    X = np.fft.rfft(x, N, axis=0)
+    return np.fft.irfft(X * (H[:, None] if x.ndim == 2 else H), N, axis=0)[:len(x)]
+
+
+def _guitar_tone(x, rate: int, vel: int):
+    """The library's own tone at a velocity, baked in: its velocity-tracked one-pole low-pass
+    (30 Hz + 9600 cents at velocity 127) and its pickup EQ ("Magnet", at its default 64)."""
+    a = math.exp(-2 * math.pi * min(30 * 2 ** (8 * vel / 127), 18000) / rate)
+    k = 64 / 127
+    q = lambda bw: 1 / (2 * math.sinh(math.log(2) / 2 * bw))          # noqa: E731
+    return _filter(x, [([1 - a, 0, 0], [1, -a, 0]), ("peak", 300, q(2.5), -10 * k),
+                       ("peak", 1290, q(1), 6 * k), ("peak", 100, q(3), -9 * k)], rate) * 10 ** (6 * k / 20)
+
+
+# The amp and cabinet the host heard as "great" (a high-gain amp on the whole chord, so its
+# strings intermodulate as in a real one; a 4x12 cabinet's response: a tight low end with
+# the cabinet's resonance near 105 Hz, the box dipped at 420 Hz, a little presence, nothing
+# much past 6 kHz). The guitar's buzz at 2-4 kHz: 28% of the GM sample's energy, 5% here.
+AMP_PRE = (("hp", 110, 0.7, 0.0), ("peak", 750, 0.8, 4.0), ("lp", 6000, 0.7, 0.0))
+AMP_GAIN_DB = 36.0
+GUITAR_DRIVE = 20.6     # the DI into the amp: a forte part's picking (velocity ~110) at 0.1 RMS
+AMP_LEVEL_DB = -30.6    # the amp's output: the guitar, at no "mix", ~6 dB under a forte orchestra
+GUITAR_GM_GAIN = 7.0    # offline, the GM guitar through its cabinet: as loud as the real one (measured)
+CAB = (("hp", 65, 0.7, 0), ("hp", 65, 0.7, 0), ("peak", 105, 1.2, 7.0), ("peak", 420, 1.0, -3.0),
+       ("peak", 2200, 1.0, 2.0), ("peak", 3600, 2.0, -2.0), ("lp", 6000, 0.7, 0), ("lp", 6000, 0.7, 0),
+       ("lp", 10000, 0.7, 0),
+       ("peak", 200, 1.2, 3.0))    # (the body: the synth's DI is 1-2 dB leaner low than the library's
+                                   # own player, which the amp widens - this puts it back, within 1 dB)
+# Offline (no guitar.sf2): the GM distortion guitar - a distortion already - through a
+# cabinet only, which takes its 2.5-3 kHz buzz down from 28% of its energy to 11%.
+CAB_GM = (("hp", 90, 0.7, 0), ("hp", 90, 0.7, 0), ("peak", 120, 1.0, 2.5), ("peak", 3000, 1.2, -5),
+          ("peak", 6500, 1.0, -4), ("lp", 5000, 0.7, 0), ("lp", 5000, 0.7, 0), ("lp", 7000, 0.7, 0))
+
+
+def _amp(di, rate: int):
+    """A DI guitar (mono) through the amp: pre-EQ, two asymmetric tanh stages 4x
+    oversampled (so the distortion doesn't fold back as fizz), then the cabinet."""
+    import numpy as np
+    x = _filter(np.asarray(di, dtype="float64") * GUITAR_DRIVE, AMP_PRE, rate)
+    out = np.zeros_like(x)
+    blk, pad, k = 4 * rate, 4096, 4
+    g = 10 ** (AMP_GAIN_DB / 20)
+    for i in range(0, len(x), blk):
+        a, b = max(0, i - pad), min(len(x), i + blk + pad)
+        seg = x[a:b]
+        n = len(seg)
+        X = np.fft.rfft(seg)
+        U = np.zeros(n * k // 2 + 1, dtype=complex)
+        U[:len(X)] = X
+        u = np.fft.irfft(U, n * k) * k                       # (up 4x)
+        u = np.tanh(g * u + 0.15) - np.tanh(0.15)
+        u = u - np.convolve(u, np.ones(512) / 512, mode="same")
+        u = np.tanh(3.0 * u)
+        d = np.fft.irfft(np.fft.rfft(u)[:n // 2 + 1], n) / k  # (and down)
+        m = min(blk, len(x) - i)
+        out[i:i + m] = d[i - a:i - a + m]
+    return _filter(out, CAB, rate) * 10 ** (AMP_LEVEL_DB / 20)
+
+
+def _studio_room(x, rate: int):
+    """A small dry studio room (RT ~0.25 s, 12%): a close-miked cabinet's own air."""
+    import numpy as np
+    rng = np.random.default_rng(3)
+    n = int(0.3 * rate)
+    t = np.arange(n) / rate
+    ir = rng.standard_normal((n, 2)) * np.exp(-6.91 * t / 0.25)[:, None]
+    ir /= np.sqrt((ir ** 2).sum(axis=0))
+    N = _fast_len(len(x) + n)
+    wet = np.fft.irfft(np.fft.rfft(x, N, axis=0) * np.fft.rfft(ir, N, axis=0), N, axis=0)[:len(x)]
+    return x + 0.12 * wet
+
+
+def _guitar_stem(syn, sfid, fonts, events: list, total: int, rate: int):
+    """The guitar (both its parts: one instrument, one amp) -> (first sample, stereo stem).
+    Played twice - a left and a right pass, the right one a few ms off on each pick (5-15 ms),
+    its velocities varied, its takes others - each pass a DI through the amp, panned hard
+    left and right: a double-tracked rhythm guitar. A new pick stops what was ringing (the
+    same strings). Offline: the GM distortion guitar, through a cabinet instead of the amp."""
+    import numpy as np
+    font = fonts.get("guitar")
+    own = font is not None
+    ons: Dict[Tuple[int, int], list] = {}
+    notes = []                                                  # (on, off, key, vel, art)
+    for t, is_on, name, key, vel in sorted(events, key=lambda e: (e[0], e[1])):
+        art = GUITAR.get(name.partition(":")[0], 0)
+        if is_on == 1:
+            ons.setdefault((art, key), []).append((t, vel))
+        elif is_on == 0 and ons.get((art, key)):
+            t0, v = ons[(art, key)].pop(0)
+            notes.append((t0, t, key, v, art))
+    notes += [(t0, total / rate, key, v, art) for (art, key), left in ons.items() for t0, v in left]
+    if not notes:
+        return total, np.zeros((0, 2), dtype="float32")
+    notes.sort()
+    picks = sorted({round(n[0], 4) for n in notes})
+    nxt = {p: (picks[i + 1] if i + 1 < len(picks) else 1e9) for i, p in enumerate(picks)}
+    first = max(0, int((notes[0][0] - 0.02) * rate))
+    end = min(total, int((max(n[1] for n in notes) + 1.0) * rate))
+    if end <= first:
+        return total, np.zeros((0, 2), dtype="float32")
+    sides = []
+    for side in (0, 1):
+        rng = np.random.default_rng(11 + side)
+        shift = {p: (0.0 if side == 0 else float(rng.uniform(0.005, 0.015)) * (1 if rng.random() < 0.5 else -1))
+                 for p in picks}
+        dvel = {p: (0 if side == 0 else int(round(rng.normal(0, 5)))) for p in picks}
+        turn = {0: side, 1: side}                                 # (the right pass: other takes)
+        took: Dict[Tuple[int, float], int] = {}
+        ev = []
+        for t0, t1, key, vel, art in notes:
+            p = round(t0, 4)
+            if (art, p) not in took:
+                took[(art, p)] = turn[art] % GUITAR_TAKES
+                turn[art] += 1
+            off = min(t1, nxt[p])                               # (a new pick stops it)
+            if not own and art == 1:
+                off = min(off, t0 + 0.16)                       # (offline: a palm mute, short)
+            ch = (art * GUITAR_TAKES + took[(art, p)]) if own else art
+            v = int(max(1, min(127, vel + dvel[p])))
+            ev.append((max(0.0, t0 + shift[p]), 1, ch, key, v))
+            ev.append((max(0.0, off + shift[p]), 0, ch, key, 0))
+        ev.sort(key=lambda e: (e[0], e[1]))
+        streams = (0, 1) if not own else (None,)
+        di = np.zeros(end - first)
+        for only in streams:                                    # (offline: the mutes darker, apart)
+            for c in range(2 * GUITAR_TAKES if own else 2):
+                if own:
+                    syn.program_select(c, font, 0, _guitar_preset(c // GUITAR_TAKES, side, c % GUITAR_TAKES))
+                else:
+                    syn.program_select(c, sfid, *FALLBACK["guitar"])
+                syn.control_change(c, 7, 100)
+                syn.control_change(c, 10, 64)
+            chunks, pos = [], first
+            for t, is_on, ch, key, vel in ev:
+                if only is not None and ch != only:
+                    continue
+                at = min(end, int(t * rate))
+                if at > pos:
+                    chunks.append(np.frombuffer(syn.generate(at - pos), dtype="float32"))
+                    pos = at
+                if is_on:
+                    syn.noteon(ch, key, vel)
+                else:
+                    syn.noteoff(ch, key)
+            if pos < end:
+                chunks.append(np.frombuffer(syn.generate(end - pos), dtype="float32"))
+            for c in range(2 * GUITAR_TAKES if own else 2):
+                syn.sounds_off(c)
+            syn.generate(256)
+            if not chunks:
+                continue
+            x = np.concatenate(chunks).reshape(-1, 2).mean(axis=1).astype("float64")[:end - first]
+            if only == 1:
+                x = _filter(x, [("lp", 2200, 0.7, 0.0)], rate)
+            di[:len(x)] += x
+        sides.append(_amp(di, rate) if own else _filter(di, CAB_GM, rate))
+    stem = _studio_room(np.stack(sides, axis=1) * (1.0 if own else GUITAR_GM_GAIN), rate)
+    return first, stem.astype("float32")
+
+
+EXTRA_FONTS = {"chorus": fetch_choir, "vowels": fetch_vowels, "perc": fetch_percussion,
+               "guitar": fetch_guitar}
 
 
 def available() -> bool:
@@ -638,6 +987,9 @@ LOUDNESS = {
     # kit's: the gong like its crash "gong", the bass drum like its bass drum, the anvil and
     # the brake drum like its snare
     "gong": 8.7, "bass_drum": -5.7, "anvil": -6.1, "brake_drum": -2.3,
+    # the guitar through its amp (AMP_LEVEL_DB): at no "mix", ~6 dB under a forte orchestra -
+    # a distorted guitar is dense (its peaks barely over its body): heard well there
+    "guitar": 0.0, "guitar_mute": 0.0,
 }
 # How long each instrument's recording takes to speak (seconds to half its level), and
 # where it plays (MIDI, its practical range): for the score critic (arrangement.check).
@@ -654,6 +1006,8 @@ RANGES = {
     # the struck percussion: one sound each, on its own key (PERC; "root" or any drum name in a
     # score plays it), pitched a little around it - the gong down to A2, bigger and slower
     **{part: (p["lo"], p["hi"]) for part, p in PERC.items()},
+    # the guitar: B1 (a 7-string's low B, a drop tuning's D2) to E5; power chords sit B1-D4
+    "guitar": (GUITAR_LOW, GUITAR_KEYS[1]), "guitar_mute": (GUITAR_LOW, GUITAR_KEYS[1]),
 }
 # How late each instrument's recording is heard after its note starts (seconds to come
 # within 9 dB of its full level, measured from MuseScore_General, less the ~20 ms a
@@ -675,7 +1029,10 @@ ADVANCE = {"violins": 0.15, "violins2": 0.18, "cellos": 0.09, "tremolo": 0.115, 
 # acoustic: "the difference is mainly in the acoustics").
 ROOM = {"flutes": -20.8, "horns": -17.5, "trumpets": -39.3, "trombones": -25.5, "tuba": -25.6,
         "piccolo": -22.3, "oboe": -24.1, "english_horn": -34.2, "clarinets": -33.4, "bassoons": -25.6,
-        "brass": -20.9, "organ": -15.4, "pizzicato": -24.9, "taiko": -20.9, "toms": -28.9}
+        "brass": -20.9, "organ": -15.4, "pizzicato": -24.9, "taiko": -20.9, "toms": -28.9,
+        # the guitar: close-miked in a small room of its own (_studio_room), sent to the hall
+        # only a little (-12 dB) - a rhythm guitar is heard dry, in front, not across a hall
+        "guitar": HALL_ROOM_GUITAR}
 HALL_ROOM = -12.8
 
 
@@ -732,7 +1089,9 @@ def _synth(rate: int, sf2: Path, need=()):
             try:
                 fonts[font] = syn.sfload(str(EXTRA_FONTS[font](quiet=True)))
             except Exception as e:                              # offline: the sound set's stand-in
-                print(f"[orchestra] no {font} ({e}): the sound set's stand-in plays", file=sys.stderr)
+                instead = ("the GM distortion guitar plays it, through a cabinet (orchestra.fetch_guitar "
+                           "builds the real one)" if font == "guitar" else "the sound set's stand-in plays")
+                print(f"[orchestra] no {font} ({e}): {instead}", file=sys.stderr)
     return syn, sfid, fonts
 
 
@@ -742,6 +1101,8 @@ def _stem(syn, sfid, fonts, name: str, events: list, total: int, rate: int):
     out (most parts are silent most of a piece)."""
     import numpy as np
     part = name.partition(":")[0]
+    if part in GUITAR:                                      # (the guitar: its own player, an amp)
+        return _guitar_stem(syn, sfid, fonts, events, total, rate)
     bank, preset, pan, vol = PARTS[part][:4]
     font, drum, stand_in, own = sfid, part in DRUMS, None, False
     if len(PARTS[part]) > 4:
@@ -813,7 +1174,9 @@ def play_layers(score: Score, seconds: float, layer_of, sf2: Path = SF2, rate: i
     import numpy as np
     groups: Dict[str, list] = {}
     for e in score.events:
-        groups.setdefault(e[2], []).append(e)
+        part, colon, layer = e[2].partition(":")
+        # the guitar's two parts are one instrument through one amp: played together, as "guitar"
+        groups.setdefault("guitar" + colon + layer if part in GUITAR else e[2], []).append(e)
     keys: List = []
     jobs = []
     for name, events in groups.items():

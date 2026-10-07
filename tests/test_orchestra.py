@@ -240,3 +240,130 @@ def test_an_arrangement_plays_the_real_percussion(perc_font):
     assert not [m for lvl, m in A.check(s, listen=False) if lvl == "error"]
     samples, rate = A.render(s, rate=22050)
     assert float(abs(samples).max()) > 0.05
+
+
+# --- the electric guitar ---
+def test_the_guitar_parts_play_one_instrument_from_its_own_soundfont():
+    assert orchestra.EXTRA_FONTS["guitar"] is orchestra.fetch_guitar
+    assert set(orchestra.GUITAR) == {"guitar", "guitar_mute"}
+    for part, art in orchestra.GUITAR.items():
+        assert orchestra.PARTS[part][4] == "guitar"
+        assert orchestra.PARTS[part][1] == orchestra._guitar_preset(art, 0, 0)     # (its left pass, take 1)
+        assert orchestra.FALLBACK[part] == (0, 30)                    # (offline: GM distortion guitar)
+        assert orchestra.RANGES[part] == (35, 76)                     # B1-E5
+        assert orchestra.send_db(orchestra.ROOM["guitar"]) == -12.0   # mostly dry
+    presets = {orchestra._guitar_preset(a, s, t) for a in (0, 1) for s in (0, 1)
+               for t in range(orchestra.GUITAR_TAKES)}
+    assert presets == set(range(4 * orchestra.GUITAR_TAKES))
+    assert orchestra.GUITAR_URL.startswith("https://drive.usercontent.google.com/")
+
+
+def _fake_guitar_library(root, np, soundfile):
+    """A stand-in for the unpacked library: a short stereo tone for every note and take."""
+    names = ["c", "c#", "d", "d#", "e", "f", "f#", "g", "g#", "a", "a#", "b"]
+    rate = 44100
+    t = np.arange(int(0.4 * rate)) / rate
+    for folder in ("Sus_Down", "Mute_Down"):
+        (root / "Samples" / folder).mkdir(parents=True)
+        for key in range(orchestra.GUITAR_KEYS[0], orchestra.GUITAR_KEYS[1] + 1):
+            f = 440 * 2 ** ((key - 69) / 12)
+            for take in range(1, orchestra.GUITAR_TAKES + 2):          # (one more than kept)
+                x = 0.5 * np.sin(2 * np.pi * f * t + take) * np.exp(-3 * t)
+                y = np.stack([x, np.roll(x, 17 * take)], 1)            # (left and right: other takes)
+                name = f"{names[key % 12]}{key // 12 - 1}_{folder}{take}.flac"
+                soundfile.write(str(root / "Samples" / folder / name), y, rate)
+
+
+def test_the_guitar_soundfont_is_built_from_the_unpacked_library(tmp_path):
+    np = pytest.importorskip("numpy")
+    soundfile = pytest.importorskip("soundfile")
+    tsf = pytest.importorskip("tinysoundfont")
+    _fake_guitar_library(tmp_path / "lib", np, soundfile)
+    out = orchestra.fetch_guitar(dest=tmp_path / "guitar.sf2", quiet=True, src=tmp_path / "lib")
+    syn = tsf.Synth(samplerate=44100)
+    sid = syn.sfload(str(out))
+    for preset in range(4 * orchestra.GUITAR_TAKES):
+        syn.program_select(0, sid, 0, preset)
+        syn.noteon(0, 35, 100)                                         # B1: E2's recording, pitched down
+        x = np.frombuffer(syn.generate(4410), dtype="float32").reshape(-1, 2)[:, 0]
+        syn.sounds_off(0)
+        syn.generate(256)
+        assert float(abs(x).max()) > 1e-3, preset
+
+
+def test_the_guitar_wont_download_what_it_cant_unpack(tmp_path, monkeypatch):
+    monkeypatch.setattr(orchestra, "_rar_tools", lambda: [])
+    monkeypatch.delenv("ORCHESTRA_GUITAR_SRC", raising=False)
+    def no_download(*a, **k):
+        raise AssertionError("downloaded 716 MB it then couldn't unpack")
+    monkeypatch.setattr(orchestra.urllib.request, "urlopen", no_download)
+    with pytest.raises(OSError, match="7-Zip"):
+        orchestra.fetch_guitar(dest=tmp_path / "guitar.sf2", quiet=True)
+    assert not (tmp_path / "guitar.sf2").exists()
+
+
+def test_a_third_on_the_distorted_guitar_is_flagged_power_chords_are_not():
+    import arrangement as A
+    s = {"tune": {"seed": "Test Hero", "cls": "Fighter"}, "tempo": 120, "statements": [],
+         "key": "D4", "meter": "4/4", "length": 8, "chords": [[0, 4, "i"], [4, 8, "bVI"]],
+         "harmony": [{"part": "guitar", "play": "root5", "range": ["D2", "D3"], "pattern": "x-  ", "step": 0.5,
+                      "legato": 1.0},
+                     {"part": "guitar_mute", "play": "root5", "range": ["D2", "D3"], "pattern": "  oo", "step": 0.5}]}
+    found = A.check(s, listen=False)
+    assert not [m for lvl, m in found if lvl == "error"]
+    assert not [m for _, m in found if "guitar" in m]
+    s["harmony"].append({"part": "guitar", "play": "chord", "range": ["D3", "D4"], "from": 0, "to": 2})
+    assert [m for lvl, m in A.check(s, listen=False) if lvl == "warn" and "turns to mud" in m]
+
+
+def _guitar_riff():
+    sc = orchestra.Score()
+    for i in range(8):                                                 # open chords, chugs between
+        t = 0.2 + 0.25 * i
+        if i % 4 == 0:
+            sc.note("guitar", 38, t, 0.5, 112); sc.note("guitar", 45, t, 0.5, 112)
+        elif i % 4 > 1:
+            sc.note("guitar_mute", 38, t, 0.18, 96); sc.note("guitar_mute", 45, t, 0.18, 96)
+    return sc
+
+
+def _heard_like_a_rhythm_guitar(np, out, rate):
+    out = np.asarray(out, dtype="float64")
+    assert float(abs(out).max()) > 0.01
+    body = out[int(0.2 * rate): int(2.2 * rate)]
+    corr = float(np.corrcoef(body[:, 0], body[:, 1])[0, 1])
+    assert corr < 0.9                                                  # two passes, left and right
+    m = body.mean(axis=1)
+    P = np.abs(np.fft.rfft(m)) ** 2
+    f = np.fft.rfftfreq(len(m), 1 / rate)
+    assert P[(f >= 2000) & (f < 4000)].sum() / P.sum() < 0.15          # no buzz (GM sample alone: 28%)
+
+
+def test_the_guitar_sounds_through_its_amp_double_tracked(monkeypatch):
+    np = pytest.importorskip("numpy")
+    pytest.importorskip("tinysoundfont")
+    if not orchestra.SF2.is_file():
+        pytest.skip("the SoundFont isn't downloaded here")
+    if not orchestra.GUITAR_SF2.is_file():
+        pytest.skip("the guitar isn't built here (orchestra.fetch_guitar)")
+    monkeypatch.setenv("GM_ORCHESTRA_WORKERS", "1")
+    sc = _guitar_riff()
+    layers = orchestra.play_layers(sc, 3.0, lambda name: name, rate=44100)
+    assert set(layers) == {"guitar"}                                   # one instrument, one amp
+    _heard_like_a_rhythm_guitar(np, layers["guitar"], 44100)
+    assert float(abs(layers["guitar"].send).max()) < 0.3 * float(abs(layers["guitar"]).max())   # mostly dry
+
+
+def test_the_guitar_falls_back_to_the_gm_guitar_through_a_cabinet(monkeypatch, capsys):
+    np = pytest.importorskip("numpy")
+    pytest.importorskip("tinysoundfont")
+    if not orchestra.SF2.is_file():
+        pytest.skip("the SoundFont isn't downloaded here")
+    def offline(**_):
+        raise OSError("offline")
+    monkeypatch.setattr(orchestra, "EXTRA_FONTS", {**orchestra.EXTRA_FONTS, "guitar": offline})
+    monkeypatch.setattr(orchestra, "_SYNTHS", {})
+    monkeypatch.setenv("GM_ORCHESTRA_WORKERS", "1")
+    out = orchestra.play(_guitar_riff(), 3.0, rate=44100)
+    assert "no guitar" in capsys.readouterr().err                      # said, not silent
+    _heard_like_a_rhythm_guitar(np, out, 44100)

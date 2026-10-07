@@ -213,7 +213,10 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
   timpani, solo_violin; voices choir, chorus, men_choir, choir_oo, choir_oh; drums kit,
   taiko, toms, reverse_cymbal (`"patterns"`); real struck percussion, let ring: `gong` (a big
   tam-tam - for transformations and the biggest arrivals; the kit's "gong" is a crash cymbal),
-  `anvil` and `brake_drum` (metal hits, sparingly), `bass_drum` (orchestral: weight). Ranges: violins G3-E7, violins2 G3-C7, cellos
+  `anvil` and `brake_drum` (metal hits, sparingly), `bass_drum` (orchestral: weight);
+  `guitar` / `guitar_mute`: a real electric guitar through an amp, double-tracked L/R (open power
+  chords ringing / palm-muted chugs, B1-E5) - a surprise held back for a later stage, never a bed
+  for every piece; power chords only (root5, root, octaves: a third turns to mud). Ranges: violins G3-E7, violins2 G3-C7, cellos
   C2-E5, basses E1-C4, flutes C4-C7, piccolo D5-C8, oboe A#3-G6, english_horn E3-A5,
   clarinets D3-G6, bassoons A#1-C5, horns F2-F5, trumpets F#3-A#5, trombones E2-C5, tuba
   E1-A#3, timpani D2-G3, men_choir E2-A4, chorus E2-E6, choir_oo/oh A2-D#6 (critic). A
