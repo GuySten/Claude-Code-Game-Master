@@ -515,3 +515,8 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   my headphones are partly to blame" - the same clip measures clearest (the sharpest note changes, -5.0 dB
   dips against -3.1, and the tune no longer buried), so the choice holds beyond one pair of headphones. A
   tune that must cut through goes to a solo horn, not the section; brass takes less hall than strings.
+- **The host's listening setup** (Oct 2026): headphones, checked with eight equal low sine tones (125 Hz down to
+  25 Hz, -18 dBFS): heard down to 32 Hz, not 25 Hz - a full low end. Verdicts on weight and the low register
+  (bass drum, low brass, timpani, a wound's punch) are reliable; nothing in our music depends on 25 Hz. The
+  host's worry ("I am not sure my headphones play bass good") is answered: the brass's lack of clarity was the
+  buried tune and the thick section, not the headphones.
