@@ -19,7 +19,9 @@ from the sheets and the foes' locked stat blocks, never from you, and every deci
    locked in with `gm-referee.sh enemy '<json>'` (two of a kind: "Goblin 1", "Goblin 2").
 2. `gm-referee.sh initiative` (everyone, from the records).
 3. A PC's turn: `gm-referee.sh attack "<pc>" "<foe>" "<weapon on the sheet>"` (or a check, save,
-   `hide`, `help`, `cover`). A foe's turn: spawn the **`combat-referee` agent** with the foe's
+   `hide`, `help`, `cover`). Keep positions: `gm-combat.sh zone "<name>" "on the chain, 15 ft up"`
+   (shown on the table's party panel); judge reach and range from the zones. A ruling made in
+   error (a target out of reach): `gm-referee.sh void <log line> --reason "..."`, never a fake heal. A foe's turn: spawn the **`combat-referee` agent** with the foe's
    name, and narrate the line it returns. `gm-combat.sh next-turn` between turns.
 4. Resolution: `gm-combat.sh end`, award XP, handle loot (persist BEFORE narrating), advance time.
 
@@ -48,5 +50,6 @@ attacked. Crit (nat 20) = double damage dice then add mods. Nat 1 = auto-miss. N
 Hazards for everyone: `gm-referee.sh field "<name>" --effect dis:attack ...`.
 
 ## Death & Dying
-0 HP → unconscious + death saves (`gm-referee.sh death-save "<pc>"`: a flat d20 vs 10 each turn): 3 successes = stable, 3 failures = death. Nat 20 = 1 HP + conscious. Nat 1 = 2 failures. Damage ≥ max HP = instant death.
+0 HP → unconscious + death saves (`gm-referee.sh death-save "<pc>"`: a flat d20 vs 10 each turn, tallied on the sheet): 3 successes = stable, 3 failures = death. Nat 20 = 1 HP + conscious. Nat 1 = 2 failures. Damage at 0 HP = a failure (a crit: two; the referee records it). Damage ≥ max HP = instant death. Healing clears the tally.
+Stabilize: `gm-referee.sh stabilize "<pc>" --by "<who tends them>"` (Medicine DC 10, rolled) or `--source "Spare the Dying"` / a healer's kit (no roll). Never write "stable" as a condition by hand.
 Death is real and reachable — don't fudge saves to keep a doomed PC alive. Telegraph lethal fights first (an over-CR enemy should *read* as deadly), but once the player commits against the odds, let the dice fall. On PC death, run the **Death Protocol** (CLAUDE.md): persist → narrate → offer the character hand-off. The session does not end.
