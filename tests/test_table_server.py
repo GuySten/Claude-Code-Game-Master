@@ -50,6 +50,9 @@ def table(tmp_path, monkeypatch):
     (camp / "table").mkdir(exist_ok=True)
     (camp / "table" / "languages.json").write_text(json.dumps({"languages": ["en", "he"]}))
 
+    # The project's own music folder holds the host's downloaded stock library (gitignored):
+    # each test table gets an empty one, so a machine with the library tests like one without.
+    monkeypatch.setattr(lib.table_server, "PROJECT_ROOT", tmp_path / "project")
     state = TableState(camp, str(world))
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(state, CODE, HOST_KEY))
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)

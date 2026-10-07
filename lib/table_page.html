@@ -802,6 +802,10 @@
   // Dice in Hebrew: 2d6 → 2ק6 (ק for קובייה). Only how it's shown; English stays 2d6.
   // Hebrew dice ("2ק6"), only inside Hebrew text, each in a left-to-right isolate: a Hebrew
   // letter dropped into English text ("1d6+3, 80/320 ft") reordered it into nonsense.
+  // A roll card's notation (2d20kl1+5): in Hebrew every die is ק - 2ק20kl1+5 - shown left to right,
+  // the letter between left-to-right marks: even in a left-to-right isolate a Hebrew letter takes the
+  // digits after it along with it ("1ק20+3" showed as "120+3ק").
+  const rollNotation = (s) => lang === "he" ? String(s).replace(/(\d*)d(\d+)/g, "$1\u200eק\u200e$2") : String(s);
   const heDice = (s) => lang === "he" && /[\u0590-\u05FF]/.test(String(s))
     ? String(s).replace(/(^|[^A-Za-z0-9])(\d*)d(\d+)(?![A-Za-z0-9])/g, "$1\u2066$2ק$3\u2069") : String(s);
   function md(text) {
@@ -2065,6 +2069,17 @@
     human: "אדם", elf: "אלף", dwarf: "גמד", halfling: "זוטון", gnome: "גנום",
     "half-elf": "חצי־אלף", "half-orc": "חצי־אורק", tiefling: "טיפלינג", dragonborn: "בן־דרקון",
     orc: "אורק", goliath: "גוליית", aasimar: "אאסימר",
+    // the standard weapons (a sheet's attacks: the quick-action chips show them before the
+    // host's translation of the sheet has loaded)
+    club: "אלה", dagger: "פגיון", greatclub: "אלה גדולה", handaxe: "גרזן יד", javelin: "כידון",
+    "light hammer": "פטיש קל", mace: "מקבת", quarterstaff: "מטה", sickle: "מגל", spear: "חנית",
+    "light crossbow": "רובה קשת קל", dart: "חץ הטלה", shortbow: "קשת קצרה", sling: "קלע",
+    battleaxe: "גרזן קרב", flail: "מורג", glaive: "גלבה", greataxe: "גרזן ענק", greatsword: "חרב ענק",
+    halberd: "הלברד", lance: "רומח", longsword: "חרב ארוכה", maul: "פטיש ענק", morningstar: "כוכב שחר",
+    pike: "פייק", rapier: "רפייר", scimitar: "חרב מעוקלת", shortsword: "חרב קצרה", trident: "קלשון",
+    "war pick": "מכוש קרב", warhammer: "פטיש קרב", whip: "שוט", blowgun: "צינור נשיפה",
+    "hand crossbow": "רובה קשת יד", "heavy crossbow": "רובה קשת כבד", longbow: "קשת ארוכה", net: "רשת",
+    unarmed: "ללא נשק", "unarmed strike": "מכה ללא נשק",
   };
   const tx = (s) => {
     if (txOff || typeof s !== "string") return s;
@@ -2897,7 +2912,9 @@
     const mod = r.modifier ? ` ${r.modifier > 0 ? "+" : "−"} ${Math.abs(r.modifier)}` : "";
     const math = document.createElement("bdi");
     math.dir = "ltr";
-    math.innerHTML = `🎲 <bdi dir="${isRtl(lang) ? "rtl" : "ltr"}">${esc(heDice(r.notation || ""))}</bdi>: [${esc((r.rolls || []).join("+"))}]`
+    // The notation is math too: left to right in every language (in Hebrew a right-to-left
+    // isolate turned 1ק20+3 into "20+3ק1"), its dice in Hebrew letters, keep-highest/lowest too.
+    math.innerHTML = `🎲 <bdi dir="ltr">${esc(rollNotation(r.notation || ""))}</bdi>: [${esc((r.rolls || []).join("+"))}]`
       + `${esc(mod)} = <span class="total">${esc(r.total)}</span>`;
     line.appendChild(math);
     const word = (text, cls) => {
@@ -3372,8 +3389,13 @@
     const foes = ((fightState && fightState.order) || []).filter((c) => c.foe && c.health !== "down");
     const aim = (aimAt && foes.some((f) => f.name === aimAt) ? aimAt : (foes[0] || {}).name) || null;
     const chips = [];
-    weaponsOf(sheet).forEach((w) => chips.push(["⚔ " + tx(w), aim
-      ? t("qa_attack").replace("{target}", aim).replace("{item}", tx(w)) : t("qa_attackAny").replace("{item}", tx(w))]));
+    weaponsOf(sheet).forEach((w) => {
+      // "Handaxe x2": the name translated, the count after it as "×2" in a left-to-right isolate
+      const [, base, n] = /^(.*?)(?:\s*[x×]\s*(\d+))?$/i.exec(w);
+      const name = tx(base);
+      chips.push(["⚔ " + name + (n ? ` \u2066×${n}\u2069` : ""), aim
+        ? t("qa_attack").replace("{target}", aim).replace("{item}", name) : t("qa_attackAny").replace("{item}", name)]);
+    });
     spellsOf(sheet).forEach((sp) => chips.push(["✨ " + tx(sp), aim
       ? t("qa_castAt").replace("{spell}", tx(sp)).replace("{target}", aim) : t("qa_cast").replace("{spell}", tx(sp))]));
     if (fightState) {
