@@ -588,6 +588,22 @@ def test_hp_changes_wait_for_the_narration_that_explains_them(table):
 
 
 
+
+def test_an_updated_page_reaches_the_players_without_a_restart(table, tmp_path, monkeypatch):
+    import lib.table_server as ts
+    here = tmp_path / "lib"
+    here.mkdir()
+    (here / "table_page.html").write_text("<p>old</p><script>/*TABLE_STRINGS*/{}</script>", encoding="utf-8")
+    (here / "table_strings.json").write_text(json.dumps({"en": {"a": "1"}}), encoding="utf-8")
+    monkeypatch.setattr(ts, "__file__", str(here / "table_server.py"))
+    monkeypatch.setattr(ts, "_PAGE_CACHE", {})
+    monkeypatch.setattr(ts, "_PAGE_STRINGS", {})
+    assert "<p>old</p>" in ts.page_html()
+    (here / "table_page.html").write_text("<p>new page</p><script>/*TABLE_STRINGS*/{}</script>", encoding="utf-8")
+    (here / "table_strings.json").write_text(json.dumps({"en": {"a": "2"}}), encoding="utf-8")   # (a git pull)
+    page = ts.page_html()
+    assert "<p>new page</p>" in page and '"a": "2"' in page and ts.page_strings()["en"]["a"] == "2"
+
 def test_a_rolls_reason_the_gm_left_in_english_is_translated_for_the_table(table):
     call, state, camp = table["call"], table["state"], table["camp"]
     pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]

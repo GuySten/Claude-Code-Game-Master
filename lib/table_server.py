@@ -71,7 +71,7 @@ import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import parse_qs, urlparse
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -3278,20 +3278,40 @@ def _pretty_key(k: Any) -> str:
 
 
 _PAGE_STRINGS: Dict[str, Dict[str, str]] = {}
+_PAGE_CACHE: Dict[str, Any] = {}
+
+
+def _stamp_of(path: Path) -> Tuple[float, int]:
+    st = path.stat()
+    return st.st_mtime, st.st_size
 
 
 def page_strings() -> Dict[str, Dict[str, str]]:
-    """The page's words in the languages it ships with (lib/table_strings.json)."""
-    if not _PAGE_STRINGS:
-        _PAGE_STRINGS.update(json.loads((Path(__file__).parent / "table_strings.json")
-                                        .read_text(encoding="utf-8")))
+    """The page's words in the languages it ships with (lib/table_strings.json),
+    read again when the file changes (a `git pull` while the table is running)."""
+    path = Path(__file__).parent / "table_strings.json"
+    stamp = _stamp_of(path)
+    if not _PAGE_STRINGS or _PAGE_CACHE.get("strings") != stamp:
+        fresh = json.loads(path.read_text(encoding="utf-8"))
+        _PAGE_STRINGS.clear()
+        _PAGE_STRINGS.update(fresh)
+        _PAGE_CACHE["strings"] = stamp
     return _PAGE_STRINGS
 
 
 def page_html() -> str:
-    """table_page.html with its words put in (they live in table_strings.json)."""
-    page = (Path(__file__).parent / "table_page.html").read_text(encoding="utf-8")
-    return page.replace("/*TABLE_STRINGS*/", json.dumps(page_strings(), ensure_ascii=False) + " || ", 1)
+    """table_page.html with its words put in (they live in table_strings.json) -
+    built again whenever either file changed, so players get an updated page on
+    their next load without the server restarting (it used to keep the page it
+    started with: a `git pull` reached nobody until a restart)."""
+    here = Path(__file__).parent
+    stamp = (_stamp_of(here / "table_page.html"), _stamp_of(here / "table_strings.json"))
+    if _PAGE_CACHE.get("page_stamp") != stamp:
+        page = (here / "table_page.html").read_text(encoding="utf-8")
+        _PAGE_CACHE["page"] = page.replace("/*TABLE_STRINGS*/",
+                                           json.dumps(page_strings(), ensure_ascii=False) + " || ", 1)
+        _PAGE_CACHE["page_stamp"] = stamp
+    return _PAGE_CACHE["page"]
 
 
 def sheet_strings(sheet: Dict[str, Any], lang: str = "he") -> List[str]:
@@ -3361,7 +3381,7 @@ def warm_up() -> None:
 # ============================================================ HTTP layer =====
 
 def make_handler(state: TableState, code: str, host_key: str):
-    page = page_html()
+    page_html()                                   # (built now: the first player waits on nothing)
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "GMTable/1.0"
@@ -3410,7 +3430,7 @@ def make_handler(state: TableState, code: str, host_key: str):
             url = urlparse(self.path)
             q = {k: v[0] for k, v in parse_qs(url.query).items()}
             if url.path in ("/", "/index.html"):
-                return self._send(200, page.encode("utf-8"), "text/html; charset=utf-8")
+                return self._send(200, page_html().encode("utf-8"), "text/html; charset=utf-8")
             if url.path.startswith("/music/"):
                 if not self._code_ok(q.get("code")):
                     return self._err("bad table code", 403)
