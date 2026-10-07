@@ -2575,6 +2575,49 @@ class TableState:
         except (OSError, ValueError):
             return []
 
+    def map_for(self, lang: Optional[str] = None) -> Dict[str, Any]:
+        """The party's map: the places they have been, the ones in sight of those
+        (their recorded connections), and the ways between. Nothing further out is
+        sent, so a place the GM has written ahead stays secret. The page lays it out."""
+        here = self._note_visit()
+        locs = self._read_json(self.campaign_dir / "locations.json", {})
+        locs = locs if isinstance(locs, dict) else {}
+        by_lower = {str(k).lower(): str(k) for k in locs}
+
+        def canon(name: Any) -> str:
+            name = " ".join(str(name or "").split())
+            return by_lower.get(name.lower(), name)
+
+        visited = list(dict.fromkeys(canon(v) for v in self.visited if v))
+        known = {v: True for v in visited}
+        ways: Dict[tuple, Dict[str, Any]] = {}
+        for v in visited:
+            rec = locs.get(v) if isinstance(locs.get(v), dict) else {}
+            for c in rec.get("connections") or []:
+                to = canon(c.get("to") if isinstance(c, dict) else c)
+                if not to or to == v:
+                    continue
+                known.setdefault(to, False)
+                ways[tuple(sorted((v, to)))] = {"a": v, "b": to}
+        for w in ways.values():
+            w["walked"] = known[w["a"]] and known[w["b"]]
+        here = canon(here) if here else None
+        sc = languages.script(lang) if lang else "latin"
+        aliases = self.aliases() if sc != "latin" else {}
+        out = []
+        for name, been in known.items():
+            # The name as the reader's language writes it (the longest recorded
+            # spelling in its script: "פיר אבן הלב", not a short form).
+            forms = [a for a, n in aliases.items()
+                     if n.lower() == name.lower() and languages.text_script(a) == sc]
+            place = {"name": name, "label": max(forms, key=len) if forms else name,
+                     "visited": been, "here": name == here}
+            img = (locs.get(name) or {}).get("image") if been else None
+            if img and self._has_image(img):
+                place["image"] = img
+            out.append(place)
+        return {"here": here, "places": out, "ways": list(ways.values())}
+
     def thumbnail(self, path: Path, width: Any) -> Optional[Path]:
         """A small JPEG of a picture (for hover cards, avatars, the gallery's list),
         made once and kept in the table folder: a fraction of the original's size,
@@ -2870,6 +2913,11 @@ def make_handler(state: TableState, code: str, host_key: str):
                     return self._err("Take a seat first.", 403)
                 lang = q.get("lang") if q.get("lang") in state.table_langs() else state.lang_for(me)
                 return self._json(state.recap(me, lang))
+            if url.path == "/api/map":
+                if not me:
+                    return self._err("Take a seat first.", 403)
+                lang = q.get("lang") if q.get("lang") in state.table_langs() else state.lang_for(me)
+                return self._json({"ok": True, **state.map_for(lang)})
             if url.path == "/api/messages":
                 try:
                     after = int(q.get("after", 0))

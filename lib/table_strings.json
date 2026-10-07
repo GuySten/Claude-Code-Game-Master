@@ -286,7 +286,15 @@
   "roundRedo": "⟲ {t} to choose a new action",
   "extend": "+1 min",
   "extendTitle": "Ask for one more minute (once a round)",
-  "ev_extend": "⏳ {pc} asks for one more minute"
+  "ev_extend": "⏳ {pc} asks for one more minute",
+  "mapTitle": "Map",
+  "mapShow": "The map: where you've been",
+  "mapLegend": "Solid: places you've been. Dashed: places seen from there. Tap a place for what you know of it.",
+  "mapHere": "📍 You are here",
+  "mapBeen": "You've been here",
+  "mapSeen": "Seen, not yet visited",
+  "mapEmpty": "Nothing on the map yet.",
+  "fold": "Fold away (the button at the top brings it back)"
  },
  "he": {
   "title": "השולחן",
@@ -575,6 +583,14 @@
   "roundRedo": "⟲ נותרו {t} לבחור פעולה חדשה",
   "extend": "עוד דקה",
   "extendTitle": "בקשו עוד דקה (פעם אחת בסבב)",
-  "ev_extend": "⏳ {pc} מבקש/ת עוד דקה"
+  "ev_extend": "⏳ {pc} מבקש/ת עוד דקה",
+  "mapTitle": "מפה",
+  "mapShow": "המפה: איפה הייתם",
+  "mapLegend": "קו מלא: מקומות שהייתם בהם. קו מקווקו: מקומות שראיתם משם. לחצו על מקום כדי לראות מה אתם יודעים עליו.",
+  "mapHere": "📍 אתם כאן",
+  "mapBeen": "הייתם כאן",
+  "mapSeen": "ראיתם, עוד לא הייתם",
+  "mapEmpty": "עוד אין כלום על המפה.",
+  "fold": "לקפל (הכפתור למעלה מחזיר)"
  }
 }

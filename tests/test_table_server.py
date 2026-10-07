@@ -1928,3 +1928,47 @@ def test_the_host_wrapper_knows_every_table_command():
     case = re.search(r'^\s*("serve"[^)]*)\)', (root / "tools" / "gm-table.sh").read_text(encoding="utf-8"), re.M).group(1)
     allowed = set(re.findall(r'"([a-z-]+)"', case))
     assert commands <= allowed, commands - allowed
+
+
+def test_the_map_shows_where_the_party_has_been_and_what_they_saw_from_there(table):
+    call, state, camp = table["call"], table["state"], table["camp"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    locs = {
+        "The Rusty Tankard": {"position": "town", "connections": [
+            {"to": "The Sunken Crypt", "path": "down the well"}, {"to": "Market Square", "path": "out the door"}]},
+        "The Sunken Crypt": {"position": "under the chapel", "connections": [
+            {"to": "The Rusty Tankard", "path": "up the well"}, {"to": "Dragon's Lair", "path": "a long tunnel"}]},
+        "Market Square": {"position": "town", "connections": [{"to": "The Rusty Tankard"}]},
+        "Dragon's Lair": {"position": "the mountain", "connections": [{"to": "The Sunken Crypt"}]},
+        "Secret Tower": {"position": "far away"},
+    }
+    (camp / "locations.json").write_text(json.dumps(locs))
+    (camp / "table" / "aliases.json").write_text(json.dumps(
+        {"השוק": "Market Square", "כיכר השוק": "Market Square"}, ensure_ascii=False))
+
+    assert call("/api/map?code=" + CODE)[0] == 403                # seated players only
+    _, m = call(f"/api/map?code={CODE}&token={pip}&lang=en")
+    assert m["here"] == "The Rusty Tankard"
+    by = {p["name"]: p for p in m["places"]}
+    # Where they are and what they can see from there; nothing further out.
+    assert set(by) == {"The Rusty Tankard", "The Sunken Crypt", "Market Square"}
+    assert by["The Rusty Tankard"]["here"] and by["The Rusty Tankard"]["visited"]
+    assert not by["Market Square"]["visited"]
+    assert all(not w["walked"] for w in m["ways"]) and len(m["ways"]) == 2
+
+    # They go down the well: the crypt is walked, the tunnel to the lair comes into sight.
+    overview = json.loads((camp / "campaign-overview.json").read_text())
+    overview["player_position"]["current_location"] = "The Sunken Crypt"
+    (camp / "campaign-overview.json").write_text(json.dumps(overview))
+    _, m = call(f"/api/map?code={CODE}&token={pip}&lang=en")
+    by = {p["name"]: p for p in m["places"]}
+    assert set(by) == {"The Rusty Tankard", "The Sunken Crypt", "Market Square", "Dragon's Lair"}
+    assert by["The Sunken Crypt"]["here"] and not by["The Rusty Tankard"]["here"]
+    walked = {tuple(sorted((w["a"], w["b"]))) for w in m["ways"] if w["walked"]}
+    assert walked == {("The Rusty Tankard", "The Sunken Crypt")}
+
+    # In Hebrew, a place is labelled with its full recorded Hebrew spelling.
+    _, m = call(f"/api/map?code={CODE}&token={pip}&lang=he")
+    by = {p["name"]: p for p in m["places"]}
+    assert by["Market Square"]["label"] == "כיכר השוק"
+    assert by["The Sunken Crypt"]["label"] == "The Sunken Crypt"
