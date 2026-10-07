@@ -50,13 +50,18 @@ For each conclusion in play: | Conclusion | Clues delivered | Route (thing, pers
 - Same task, same conditions, same DC across PCs and sessions? Every difference explained in
   the fiction before the roll? (30)
 - Any `--secret` roll that the PCs could have known? Any re-roll without a rule? (32, 33)
+- The same check rolled again for the same task in a scene, or a crossed route rolled again? HP
+  lost to a move whose fall wasn't named as the stake first? (65; CLAUDE.md Dice)
 - Disputes or private challenges: answered, and ruled in public? (35)
 
 ## 4. Information, map and money (V4, V5, V6)
 
 - Did any decision get made blind: a fight joined without a read on the enemy, a risk taken
   without the cost said? Any setback they couldn't explain afterwards? (8, 10, 47)
-- Did any PC go down or die? Was the danger telegraphed, with an exit? (9, 42)
+- Did any PC go down or die? Was the danger telegraphed, with an exit? After a round down, did
+  their player get a channel, and their death saves through the referee? (9, 41, 42)
+- Records true to play: every move through `gm-session.sh move`, dead NPCs marked, clocks matching
+  the fiction, corrections filed as rulings, shared-objective XP to every PC present? (48, 71, 37)
 - Every place visited on the map, its ways out connected, important places described? (72)
 - Every gold and item change narrated with numbers, and persisted? Loot holders recorded? (74, 78)
 

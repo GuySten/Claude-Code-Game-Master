@@ -33,7 +33,9 @@ So the loop below is not optional ceremony; it's how you hear.
      the host isn't asked to choose (host: "a workflow that is similar to the players
      but without me picking from two").
    Do it when they're introduced, in prep - never compose a boss's fight before its
-   tune exists. A boss's finals are arranged as **their theme** - the piece the table
+   tune exists. **A boss's tune finals (`host_judge.py tunes`, then `finals decide`) and its
+   fight brief's review are complete before the session that meets it: no boss without
+   them** (the Heartstone, its finals never run, reached the table with no tune of its own). A boss's finals are arranged as **their theme** - the piece the table
    hears when they appear, before any fight - so the players know the tune before the
    fight varies it (stage 1 is where they learn a boss; a leitmotif is recognised in
    a reprise, not a variation); the stages are built from the winner after. A boss's fight states that tune whole in every stage (`"statements"`):

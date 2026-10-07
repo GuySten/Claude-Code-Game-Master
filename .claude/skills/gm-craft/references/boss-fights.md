@@ -16,6 +16,11 @@ none of this. Numbers refer to `design-directives.md`; sources at the end.
    eight rounds in all): its stages are shorter, not more. For each: its numbers (a stat block or a hit-point
    pool), the **trigger**, what changes, how it shows, and its music cue. No new
    stage and no new numbers are invented at the table (34, T2). [Angry GM; Giffyglyph; Theros mythic]
+   **A music brief is not a stage plan.** Before the session that meets the boss, write each
+   stage's numbers - hit points, AC, attacks, DCs, and every object in the fight (a vein, a
+   grate) with its AC and hit points - sized to the party (4), in the campaign's prep notes
+   (`prep/session-<N>.md`, the campaign's prep notes for that session). Its tune finals and fight-brief review are done by then too
+   (`boss-music.md`). No written numbers, no boss that session.
 2. **Triggers the players can see.** Bloodied (half hit points: a public state in
    the 2024 rules that does nothing by itself), a fixed share of hit points (two
    thirds, one third), an announced round clock (`gm-clock.sh`), or a party action
@@ -29,7 +34,8 @@ none of this. Numbers refer to `design-directives.md`; sources at the end.
 5. **Each stage asks for a different answer.** New movement, range, objective or
    terrain so the last stage's winning tactic stops working; some powers stay. Later
    stages remove defences rather than add them, and the last should feel winnable:
-   the boss desperate, dangerous, beatable. [Angry GM; 13th Age]
+   the boss desperate, dangerous, beatable. Several weak points (veins, seals, anchors)
+   each ask a different answer too: the last one is never broken like the first. [Angry GM; 13th Age]
 
 ## The action economy
 
@@ -66,6 +72,9 @@ none of this. Numbers refer to `design-directives.md`; sources at the end.
     narration: `gm-table.sh music boss "<boss>" stage 2 --via break` (a transformation)
     or `--via rise` (an escalation); `... hit` for a decisive blow; `... end victory|requiem|escape|wipe`
     when it falls, yields, flees or the party falls (`boss-music.md`). [Giffyglyph; Angry GM]
+11a. **The boss takes its turns, and its stages come in order.** Every turn it has is played
+    (by the `combat-referee` agent, like any foe; its legendary or villain actions as planned).
+    Each stage fires on its own trigger, in the written order: never a later stage first.
 12. **No secret numbers, ever.** No hidden hit-point changes, damage bumps or new
     resistances - even where Sly Flourish or Draw Steel suggest a dial. A fight that
     goes too easy or too hard moves only by planned, visible levers: announced
@@ -97,6 +106,9 @@ none of this. Numbers refer to `design-directives.md`; sources at the end.
     describes the blow, the fight's story question is answered, and the music ends
     as the ending deserves (a victory tag, a requiem for a tragic foe, an unresolved
     break for an escape). (37, 66) [Stout; Draw Steel]
+21. **Never two climaxes back to back.** After a boss, a rest beat (a breath, loot, banter, a
+    short rest) before the next set piece; a cliffhanger that brings the next boss to a spent
+    party opens next session on that breath, or on a parley. (58)
 
 ## Sources
 

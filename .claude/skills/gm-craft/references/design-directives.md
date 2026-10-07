@@ -143,7 +143,8 @@ open game texts (SRDs; Apocalypse World via its free reference sheet).
 40. **Keep world logic consistent; give exceptions a visible tell.** The same-looking door, rune
     or creature behaves the same; something different looks different before it bites. [S&Z ch.25; Schell ch.17] V3 V4
 41. **No pile-ons, no sitting out.** Foes don't hunt the weakest PC out of play without a reason
-    in the fiction; a downed or absent PC's player still gets something to decide or see. [S&Z ch.28, Caribbean Star notes] V3
+    in the fiction; a downed or absent PC's player still gets something to decide or see (after one
+    round down: a death's-door scene, an ally NPC to voice, or a choice; CLAUDE.md Multiplayer). [S&Z ch.28, Caribbean Star notes; Dungeon World "Last Breath"] V3
 
 ## 5. Challenge, difficulty and danger
 
@@ -164,7 +165,8 @@ open game texts (SRDs; Apocalypse World via its free reference sheet).
     A punishment that couldn't be foreseen or avoided reads as unfair. [Meier GDC 2010; Schell L#47] V3 V4
 48. **Prefer a ticking clock to a blow from nowhere; never let a complication cancel a success.**
     Trouble that builds (`gm-clock.sh advance`) is fair; if the roll cornered the foe, he stays
-    cornered and the cost lands elsewhere. [Blades SRD clocks, consequences] V3
+    cornered and the cost lands elsewhere. When the fiction outruns a clock, set it to match and say
+    so. [Blades SRD clocks, consequences] V3
 
 ## 6. Spotlight and the players' kinds of fun
 
@@ -220,7 +222,8 @@ open game texts (SRDs; Apocalypse World via its free reference sheet).
     NPC they care about, a change of mood music; an NPC may serve your aim only while pursuing
     its own. [Schell ch.18, L#81-82]
 65. **Say yes, or roll.** If nothing is at stake, it happens; sensible unplanned solutions work;
-    getting from one situation to the next never hangs on one roll or one action. [Baker; Laws p.20; D&D SRD 5.2]
+    getting from one situation to the next never hangs on one roll or one action. A route already
+    crossed needs no new roll; party movement is one group check (CLAUDE.md Dice). [Baker; Laws p.20; D&D SRD 5.2 "Group Checks"]
 66. **Let choices land now and echo later.** Narrate the immediate result clearly, then bring it
     back and point out the link ("the guard you spared opens the gate"). [S&Z ch.3; Meier]
 67. **Hold your plans lightly; hand some decisions to honest devices.** Build on facts the
