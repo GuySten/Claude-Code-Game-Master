@@ -538,3 +538,11 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   beats". The ear kept the current amp; measured "better" is not heard better. The last two beats are where the
   palm-muted chugs begin (G+D dyads, alternating velocity): boomy, then thin - the chug articulation is the weak
   spot, not the amp. Under test: short open power chords vs full-voiced, even palm mutes.
+- **The electric guitar's drive** (8 s from the Saint's eruption: two-note palm mutes alternating loud/soft vs short
+  open power chords, full and even, vs full-voiced even palm mutes): "chug-current is the worst. chug-open is the
+  best and chug-mute-full is better than chug-current but weaker compared to chug-open". This guitar's palm-mute
+  recordings sound boomy and sag wherever they chug; drive with short open power chords (root, fifth, octave,
+  held ~60-70%, even velocity).
+- **A rarer surprise for a third stage**: the host proposed an electric piano; offered a rock organ instead (an
+  overdriven tonewheel organ through a rotating speaker - Dancing Mad's last movement; the church organ gone
+  wild), the host: "rock organ sounds cool".

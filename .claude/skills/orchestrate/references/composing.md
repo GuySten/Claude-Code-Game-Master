@@ -78,8 +78,9 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
     is only for a boss's later stages** (stage 2 and on, and their cues) [H: "electric guitar will only be
     used on bosses' later stages. It is a special surprise"] - never a theme, a place, a player's theme or a
     first stage (critic). An acoustic or classical guitar is an ordinary instrument, fine anywhere [H: "a
-    regular guitar is ok. Only electric is the surprise"]. Exposed alone, its palm-muted two-note chugs
-    sound boomy then thin [H] - keep its riffs full (root, fifth, octave) and even.
+    regular guitar is ok. Only electric is the surprise"]. Its palm-muted chugs (`guitar_mute`) sound boomy
+    and sag [H: "chug-current is the worst"]: drive with short open power chords on `guitar` (root,
+    fifth, octave, held ~60-70%, even velocity) [H: "chug-open is the best"].
 
 ## 2. What the research adds
 14. Themes the table can learn: short, distinct in rhythm and timbre, on a clear type

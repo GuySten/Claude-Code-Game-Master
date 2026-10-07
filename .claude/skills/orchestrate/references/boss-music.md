@@ -186,6 +186,9 @@ once, then its body loops (`"loop_from"`).
    bosses' later stages. It is a special surprise"): held back through stage 1, heard first at a later
    stage's entry (the Saint's eruption), then driving that stage - and never in themes, places or players'
    themes (an acoustic guitar is an ordinary instrument). The critic warns on it anywhere else.
+3c. **The rock organ is a third stage's surprise** - rarer still (the host: "rock organ sounds cool"): an
+   overdriven tonewheel organ through a rotating speaker (Dancing Mad's last movement), held back for a
+   stage 3 or later, heard first at its entry. For a sacred villain it is the church organ gone wild.
 14a. **An introduction only where the encounter has one.** When the boss is revealed slowly (a chapel
     entered, a ritual interrupted, words exchanged), their theme can play before initiative as the
     suspense, and the stage-1 entry lands when the fight begins. Not every boss gets one (the host: "not
