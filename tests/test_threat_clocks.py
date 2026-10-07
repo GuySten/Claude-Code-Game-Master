@@ -7,7 +7,7 @@ from pathlib import Path
 
 from lib.threat_clocks import ThreatClockManager
 from lib.session_manager import SessionManager
-from lib.time_manager import ticks_for_elapsed, ticks_from_duration
+from lib.time_manager import ticks_for_elapsed, ticks_from_duration, time_period
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -104,13 +104,32 @@ def test_duration_days_and_weeks_scale():
     assert ticks_for_elapsed(ticks=3, duration="10 minutes") == 3  # explicit wins
 
 
-def test_duration_minutes_and_default_are_one_tick():
-    assert ticks_from_duration("10 minutes") == 1
-    assert ticks_from_duration("2 hours") == 1
-    assert ticks_from_duration("Dawn to Noon") == 1
+def test_short_durations_are_a_scene_beat_not_a_tick():
+    # Session 2 of a playtest filled two clocks in an hour of game time: every
+    # small step ticked. Minutes, rounds and a couple of hours move no clock.
+    assert ticks_from_duration("10 minutes") == 0
+    assert ticks_from_duration("3 rounds") == 0
+    assert ticks_from_duration("half an hour") == 0
+    assert ticks_from_duration("2 hours") == 0
+    assert ticks_from_duration("6 hours") == 1
+    assert ticks_from_duration("Dawn to Noon") == 1   # no unit: one step
     assert ticks_for_elapsed() == 1
     assert ticks_for_elapsed(ticks=1) == 1
-    assert ticks_for_elapsed(ticks=0) == 0          # a few minutes: no clock moves
+    assert ticks_for_elapsed(ticks=0) == 0
+
+
+def test_default_ticks_only_on_a_new_time_of_day_or_date():
+    same = ("Deep night", "11th day")
+    assert ticks_for_elapsed(before=same, after=("Deep night, minutes later", "11th day")) == 0
+    assert ticks_for_elapsed(before=same, after=("an hour before dawn", "11th day")) == 0
+    assert ticks_for_elapsed(before=("Before dawn", "11th day"), after=("Dawn", "11th day")) == 1
+    assert ticks_for_elapsed(before=("Dusk", "Day 3"), after=("Dusk", "Day 4")) == 1
+    assert ticks_for_elapsed(before=("Noon", "Day 3"), after=("Afternoon", "Day 3")) == 1
+    assert ticks_for_elapsed(ticks=2, before=same, after=same) == 2      # --ticks wins
+    assert time_period("an hour before dawn") == "deep night"
+    assert time_period("after dusk") == "night"
+    assert time_period("Afternoon") == "afternoon" and time_period("noon") == "midday"
+    assert time_period("21:40") == "night" and time_period("Second bell") is None
 
 
 def _gm_time(dcc_world, *args):
@@ -133,6 +152,17 @@ def test_gm_time_default_still_ticks_one(dcc_world):
     r = _gm_time(dcc_world, "Noon", "Day 4")
     assert r.returncode == 0, r.stdout + r.stderr
     assert ThreatClockManager(dcc_world).get_clocks()["Siege"]["current"] == 1
+
+
+def test_gm_time_scene_beat_ticks_nothing(dcc_world):
+    ThreatClockManager(dcc_world).add_clock("Siege", segments=10, advance_on="time")
+    # The fixture stands at "Early Afternoon", "Day 4, Floor 3".
+    r = _gm_time(dcc_world, "Afternoon, a few minutes later", "Day 4, Floor 3")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "no tick" in r.stdout
+    assert ThreatClockManager(dcc_world).get_clocks()["Siege"]["current"] == 0
+    r = _gm_time(dcc_world, "Afternoon", "Day 4, Floor 3", "--ticks", "2")
+    assert ThreatClockManager(dcc_world).get_clocks()["Siege"]["current"] == 2
 
 
 def test_tick_time_stops_at_full(dcc_world):
