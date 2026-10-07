@@ -520,3 +520,10 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   (bass drum, low brass, timpani, a wound's punch) are reliable; nothing in our music depends on 25 Hz. The
   host's worry ("I am not sure my headphones play bass good") is answered: the brass's lack of clarity was the
   buried tune and the thick section, not the headphones.
+- **The Saint's fight, rebuilt for excitement** (Oct 2026: stage 1 a dark rock drive at 144 with drops and crashes;
+  the transformation a wound, a gathering that rises every second under the narration, a one-beat inhale and an
+  eruption 17 LU above it; stage 2 a 6/8 gallop at 136 - +3.4 LU over stage 1, 52 notes a second against 30 -
+  with the chant on its long notes, the guitar first heard at the eruption, a real gong and bass drum; the new
+  loudness mastering, short strings and VPO brass): "it is the best 'boss' music so far. But I feel like the
+  guitar is not present enough" - the guitar sat 5-11 dB under the orchestra and the choir, kept low so it
+  would never cover the voices. A held-back surprise must be heard as one: present, not a texture.
