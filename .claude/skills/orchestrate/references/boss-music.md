@@ -44,6 +44,12 @@ Ordinary fights share one campaign battle cue and get none of this.
    enough"). Measure it against the earlier stage's render: clearly more notes and drum hits per second,
    a louder body, forces the earlier stage held back - and a transformation that climbs under the
    narration (never dying into quiet or silence) into an entry that is the loudest moment of the fight so far.
+   **More exciting is not faster or busier.** The Saint's first stage 3 chased the measure - 160 against
+   stage 2's 136, a third more notes a second, one 7-beat riff restated ~45 times in 2.5 minutes - and the
+   host: "stage 3 is horrible. It is both too repetitive and too fast." Past stage 2, excitement comes from
+   weight (a heavier groove, the low end), new forces, harmony that moves, and a stage that develops: several
+   clearly different sections, something new every 15-20 s, no riff more than four times in a row unchanged.
+   A later stage's felt beat stays near the last one's or below it; its notes per second need not rise.
 4. **The table must know the tune first; hold back its grandest form, not its notes.**
    A leitmotif is recognised in a reprise far more easily than in a variation, and stage 1
    is where the players learn the boss (the host could not tell whether a stage 2 had
