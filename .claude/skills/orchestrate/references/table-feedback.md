@@ -502,3 +502,9 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   MuseScore_General "Strings Fast" - "strings A [the new ones] is clearly better". Measured: a violin note
   reaches full level in 0.05 s against our 0.16 s, and a 0.12-0.2 s note sounds 6-16 dB louder against a long
   one. The limit every fast string engine fought (pizzicato doubling, legato ringing) is the sample.
+- **Brass again, placed in our hall** (Oct 2026, blind A/B on "Ode to Joy", the tune on horns over trombone
+  chords; VPO's horn and trombone sections, single-mic, hall send matched, vs MuseScore_General): "both brass
+  are not that clear, with brass A [VPO] a tad better" - the second blind win for VPO's brass sections (the
+  first: "A is better... but I want more quality"), and the second time the host hears our brass as unclear.
+  The crispness measure did not agree this time (VPO -0.51 dB vs ours -0.34): clarity in brass is something
+  else (articulation, the section's thickness, the hall) - still to find.
