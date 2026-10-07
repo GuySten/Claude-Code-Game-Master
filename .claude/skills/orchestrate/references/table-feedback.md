@@ -547,3 +547,9 @@ whenever the host says how a piece sounded. Their ears are the final judge.
 - **A rarer surprise for a third stage**: the host proposed an electric piano; offered a rock organ instead (an
   overdriven tonewheel organ through a rotating speaker - Dancing Mad's last movement; the church organ gone
   wild), the host: "rock organ sounds cool".
+- **An opening the table can't hear** (the Heartstone's theme, Striding Keep: two bars of a pianissimo E1
+  heartbeat on basses and bass drum, 6 s before the tune): "why is the theme silent at the start?". The pulse
+  was there, but at ~41 Hz and soft it is nothing on laptop speakers and earbuds. Measured against the openings
+  the host liked, no level told them apart (some were as quiet); what did was register: each had a note at C3
+  or above within 3.6 s. Composing rule 13; the critic now flags an opening only low drums and notes under C3
+  play for 4 s or more.

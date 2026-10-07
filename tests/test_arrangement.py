@@ -727,3 +727,20 @@ def test_the_solo_voice_is_a_bosss_third_stage_surprise_held_slow_and_in_her_bes
     assert any(lvl == "error" and "out of its range" in m for lvl, m in A.check(out, listen=False))
     two = dict(s, role="stage", stage=3, lines=[{"part": "solo_voice", "notes": [[0, "C5", 2], [1, "G5", 2]]}])
     assert any("one note at a" in m for m in warns(two))
+
+
+def test_an_opening_only_low_drums_and_bass_play_is_heard_as_silence():
+    # The host, of the Heartstone's theme (two bars of an E1 heartbeat, 6 s before the
+    # tune): "why is the theme silent at the start?" - laptop speakers give nothing that low.
+    pulse = [{"part": "basses", "note": "E1", "from": -8, "to": 1000, "pattern": "xo--", "step": 0.5},
+             {"part": "bass_drum", "note": "bd", "from": -8, "to": 1000, "pattern": "xo--", "step": 0.5}]
+    later = [{"part": "strings", "play": "chord", "range": ["G3", "G4"], "from": 0},
+             {"part": "cellos", "play": "bass", "range": ["C2", "B2"], "pattern": "x-o "}]
+    heartbeat = spec(start=-8, harmony=later, patterns=pulse, hits=[])
+    assert any("heard as silence" in m for _, m in A.check(heartbeat, listen=False))
+    # A note at C3 or above over the same pulse (a plucked E3) is heard from the first beat.
+    plucked = spec(start=-8, harmony=later, hits=[], patterns=pulse + [
+        {"part": "pizzicato", "note": "E3", "from": -8, "to": 0, "pattern": "x---", "step": 0.5}])
+    assert not any("heard as silence" in m for _, m in A.check(plucked, listen=False))
+    # And a piece that starts with its tune is never flagged.
+    assert not any("heard as silence" in m for _, m in A.check(spec(), listen=False))

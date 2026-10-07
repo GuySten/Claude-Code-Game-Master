@@ -837,6 +837,9 @@ def loop_start(spec: Dict[str, Any], rate: int = orchestra.RATE) -> Optional[int
 
 
 STING_SECONDS = 15.0    # a one-shot shorter than this is a sting (boss-music.md: a little louder)
+OPENING_REGISTER = 48   # C3: under it, laptop speakers and earbuds give almost nothing...
+OPENING_LOW_S = 4.0     # ...and an opening only that low (or only big drums) this long is heard as silence
+LOW_DRUMS = {"bass_drum", "taiko", "toms"}   # (and the kit's kick): a thud small speakers barely give
 STAGE_STEP_DB = 2.0     # each later boss stage ("stage": 2, 3) plays this much louder than the last
 STAGE_LIMIT_DB = 8.0    # (and may limit its peaks harder to get there: the Saint's stage 2 takes 6.3 dB)
 # The host, of a stage 2 mastered 1.6 dB quieter than stage 1 (its bigger climax left the
@@ -1332,6 +1335,24 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
             add("warn", f"a semitone (or minor-ninth) clash sounds {clash_t / total:.0%} of the time: constant "
                         "dissonance is painful to sit through (host; the liked pieces: 11-21%) - keep the "
                         "grind for cadences, cracks and the peak, over chords that otherwise sound clean")
+    # The opening is heard at once: the host, of a theme that opened on two bars of a soft
+    # E1 heartbeat (basses and a bass drum, 6 s before the tune), "why is the theme silent
+    # at the start?". The table plays on laptop speakers and earbuds, which give almost
+    # nothing under C3. (Measured: no level told it from the openings the host liked, some
+    # as quiet - but each had a note at C3 or above within 3.6 s.)
+    ons = sorted(e for e in sc.events if e[1])
+    if ons:
+        def heard(part: str, key: int) -> bool:          # (a snare, a cymbal, the gong: heard;
+            if part in LOW_DRUMS or (part == "kit" and key in (35, 36)):        # a kick or a big drum: not)
+                return False
+            return part in DRUMS and part != "timpani" or key >= OPENING_REGISTER
+        heard_at = next((t for t, _, name, key, _ in ons if heard(name.partition(":")[0], key)), None)
+        low = (heard_at if heard_at is not None else ctx["seconds"]) - ons[0][0]
+        if low >= OPENING_LOW_S:
+            add("warn", f"only low drums and notes under {name_of(OPENING_REGISTER)} play for the first {low:.1f} s: on "
+                        f"laptop speakers and earbuds that is heard as silence (the host: \"why is the theme "
+                        f"silent at the start?\"). Bring a part in at {name_of(OPENING_REGISTER)} or above within "
+                        f"{OPENING_LOW_S:g} s - a held cello or horn note over the pulse - or start nearer the tune")
     if not listen:
         return out
     # Listening: render the layers apart and measure them.
@@ -1469,6 +1490,7 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
     if peak_level < -60:
         add("error", "the piece is silent")
     return out
+
 
 
 def surprise_budget(ctx: Dict[str, Any], spec: Dict[str, Any]):
