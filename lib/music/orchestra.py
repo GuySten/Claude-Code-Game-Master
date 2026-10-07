@@ -40,6 +40,14 @@ CHOIR_SF2 = Path(os.environ.get("ORCHESTRA_CHOIR_SF2") or SF2.parent / "sso-chor
 # where the sound set's "oo", stretched between few recordings, was heard as instruments.
 VOWEL_SF2 = Path(os.environ.get("ORCHESTRA_VOWEL_SF2") or SF2.parent / "vowel-choir.sf2")
 VOWEL_URL = "https://www.mediafire.com/file/bhdzds4tgtsocdp/Vowel_Choir_SFZ.zip"
+# Real orchestral percussion: a gong (a big tam-tam, the only real gong here - the kit's
+# "gong" is a General MIDI crash cymbal), an anvil, a brake drum and an orchestral bass
+# drum, from Versilian Studios' VSCO 2 Community Edition and its Versilian Community Sample
+# Library (both CC0 1.0: public domain). Built once from the recordings into its own
+# SoundFont (fetch_percussion), every velocity layer and round-robin they have.
+PERC_SF2 = Path(os.environ.get("ORCHESTRA_PERC_SF2") or SF2.parent / "perc.sf2")
+VSCO2 = "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/440300901dfe9275fd84e0b7763af1f8443ae62e/"
+VCSL = "https://raw.githubusercontent.com/sgossner/VCSL/c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e/"
 SSO = "https://raw.githubusercontent.com/peastman/sso/32bbdb169aef636b8216029a2e056424ba7c2abb/Sonatina%20Symphonic%20Orchestra/"
 
 # channel: (bank, preset, pan 0..127, volume 0..127)   (General MIDI numbering)
@@ -79,8 +87,15 @@ PARTS = {
     "chorus": (0, 2, 64, 100, "chorus"),      # the real chorus, men under women, "ah": present, sacred, epic
     "choir_oo": (0, 0, 66, 100, "vowels"),    # a soft mixed choir on "oo": ethereal, holy, wonder
     "choir_oh": (0, 1, 62, 100, "vowels"),    # the same on "oh": warmer, rounder, a lament
+    "gong": (0, 0, 70, 112, "perc"),          # a real tam-tam: one stroke rings ~25 s
+    "bass_drum": (0, 1, 58, 112, "perc"),     # the orchestral bass drum (the kit's is a pop kick)
+    "anvil": (0, 2, 80, 100, "perc"),         # struck metal: a forge, a machine
+    "brake_drum": (0, 3, 48, 100, "perc"),    # a car's brake drum hit with a hammer: dry, clanging metal
 }
-FALLBACK = {"men_choir": (0, 52), "chorus": (0, 52), "choir_oo": (0, 52), "choir_oh": (0, 52)}   # (the sound set's choir)
+# Where a part's own sound set can't be had: the sound set's choir; for the percussion, the
+# GM kit's nearest (bank, preset, its key): a crash cymbal for the gong, the cowbell, an agogo.
+FALLBACK = {"men_choir": (0, 52), "chorus": (0, 52), "choir_oo": (0, 52), "choir_oh": (0, 52),
+            "gong": (128, 48, 57), "bass_drum": (128, 48, 35), "anvil": (128, 48, 67), "brake_drum": (128, 48, 56)}
 DRUMS = {"kit"}
 LEAD_DB = 4.0          # the tune's notes, mixed this much over the rest
 BASS_DRUM, CRASH = 35, 49
@@ -497,7 +512,106 @@ def fetch_vowels(dest: Path = None, quiet: bool = False) -> Path:
     return dest
 
 
-EXTRA_FONTS = {"chorus": fetch_choir, "vowels": fetch_vowels}
+# The real percussion, a preset each (PARTS' preset numbers): the key it sounds unaltered
+# at (any drum name or "root" in a score plays this key), the keys around it it may be
+# pitched to, the velocity layers (the top velocity each plays to, its round-robins - played
+# in turn, so a repeated stroke is never the same recording twice), how long a stroke is
+# kept ringing, and whether a new stroke stops the last (a drum head struck again). Struck
+# percussion is let ring (l.v.): a note's end doesn't stop it. (A struck metal anvil or brake
+# drum, and the bass drum, ring 1-6 s; the gong ~25 s, pitched down a few semitones bigger.)
+_G, _B = VSCO2 + "Percussion/", VCSL + "Idiophones/Struck%20Idiophones/"
+PERC = {
+    "gong": {"preset": 0, "key": 50, "lo": 45, "hi": 52, "ring": 26.0, "choke": False,
+             "layers": [(50, [_G + "gongHit_p.wav"]), (84, [_G + "gongHit_mf.wav"]),
+                        (112, [_G + "gongHit_f.wav"]), (127, [_G + "gongHit_fff.wav"])]},
+    "bass_drum": {"preset": 1, "key": 36, "lo": 34, "hi": 38, "ring": 6.5, "choke": True,
+                  "layers": [(top, [_G + f"BDrumNewhit_v{v}_rr{r}_Sum.wav" for r in (1, 2)])
+                             for v, top in enumerate((24, 44, 60, 76, 92, 108, 127), 1)]},
+    "anvil": {"preset": 2, "key": 60, "lo": 58, "hi": 62, "ring": 2.5, "choke": True,
+              "layers": [(top, [_B + f"Anvil/Anvil_Hit{h}_v{v}_rr1_Mid.wav" for h in (1, 2)])
+                         for v, top in enumerate((64, 100, 127), 1)]},
+    "brake_drum": {"preset": 3, "key": 55, "lo": 53, "hi": 57, "ring": 2.0, "choke": True,
+                   "layers": [(top, [_B + f"Brake%20Drum/BrakeDrum1_Hammer_v{v}_rr1_Mid.wav"])
+                              for v, top in enumerate((64, 100, 127), 1)]},
+}
+RR_KEYS = 64            # (a part's n-th round-robin is stored n * 64 keys above its own)
+
+
+def fetch_percussion(dest: Path = None, quiet: bool = False) -> Path:
+    """The real percussion: its 27 recordings (32 MB, once) built into a SoundFont of four
+    presets (PERC): each stroke trimmed to its ring and faded, played once (not looped),
+    the velocity layers levelled to step up at most 3 dB from one to the next (the
+    synth's velocity does the rest: a recording's own level jumps up to 20 dB)."""
+    dest = dest or PERC_SF2
+    if dest.is_file() and dest.stat().st_size > 1_000_000:
+        return dest
+    import numpy as np
+    import soundfile
+    import tempfile
+    from music import sf2write
+    if not quiet:
+        print("[orchestra] downloading the percussion (32 MB, once)", file=sys.stderr, flush=True)
+
+    def get(url, tmp):
+        wav = Path(tmp) / "stroke.wav"
+        with urllib.request.urlopen(url, timeout=60) as r:
+            data = r.read(64 << 20)                         # (a stroke is a few MB: no more)
+        wav.write_bytes(data)
+        audio, rate = soundfile.read(str(wav), dtype="float32", always_2d=True)
+        if audio.shape[1] == 1:
+            audio = np.repeat(audio, 2, axis=1)
+        return audio[:, :2], rate
+
+    def trim(audio, rate, ring):
+        mono = np.abs(audio).max(axis=1)
+        start = max(0, int(np.argmax(mono > 0.02 * mono.max())) - int(0.004 * rate))
+        x = audio[start:start + int(ring * rate)].astype("float64")
+        w = int(0.05 * rate)
+        env = np.sqrt(np.convolve(x.mean(1) ** 2, np.ones(w) / w, mode="same"))
+        live = np.nonzero(env > env.max() * 10 ** (-70 / 20))[0]      # (to 70 dB down)
+        x = x[:live[-1] + 1] if len(live) else x
+        fade = min(len(x) // 6, int(2.5 * rate))
+        x[len(x) - fade:] *= np.cos(np.linspace(0, np.pi / 2, fade))[:, None] ** 2
+        return x
+
+    presets = []
+    with tempfile.TemporaryDirectory() as tmp:
+        for name, p in PERC.items():
+            layers = []
+            for top, urls in p["layers"]:
+                takes = []
+                for url in urls:
+                    audio, rate = get(url, tmp)
+                    takes.append((trim(audio, rate, p["ring"]), rate))
+                first = [x[:int(0.5 * r)] for x, r in takes]
+                level = float(np.mean([10 * np.log10(np.mean(x ** 2) + 1e-20) for x in first]))
+                layers.append((top, takes, level))
+            make_up = [0.0] * len(layers)                   # (dB, from the loudest layer down)
+            for i in range(len(layers) - 2, -1, -1):
+                gap = layers[i + 1][2] + make_up[i + 1] - layers[i][2]
+                make_up[i] = gap - min(3.0, gap / 2) if gap > 0 else 0.0
+            peak = max(np.abs(x).max() * 10 ** (g / 20) for (_, takes, _), g in zip(layers, make_up) for x, _ in takes)
+            zones, vlo = [], 1
+            for (top, takes, level), g in zip(layers, make_up):
+                gain = 10 ** (g / 20) * 0.95 / peak
+                for i, (x, rate) in enumerate(takes):
+                    audio = sf2write.to_int16((x * gain).astype("float32"))
+                    key = p["key"] + RR_KEYS * i
+                    zones.append({"audio": audio, "rate": rate, "key": key, "lo": key - (p["key"] - p["lo"]),
+                                  "hi": key + (p["hi"] - p["key"]), "vlo": vlo, "vhi": top, "loop": False,
+                                  "ls": 8, "le": len(audio) - 8, "release_s": 1.5,
+                                  "excl": p["preset"] + 1 if p["choke"] else 0})
+                vlo = top + 1
+            presets.append((p["preset"], name, zones))
+    presets.sort()
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    part = dest.with_suffix(".part")
+    sf2write.write(part, [(n, z) for _, n, z in presets], "VSCO 2 CE / VCSL percussion (CC0)")
+    part.replace(dest)
+    return dest
+
+
+EXTRA_FONTS = {"chorus": fetch_choir, "vowels": fetch_vowels, "perc": fetch_percussion}
 
 
 def available() -> bool:
@@ -520,6 +634,10 @@ LOUDNESS = {
     "harp": 0.2, "oboe": 0.4, "bassoons": 1.9, "english_horn": 2.7, "reverse_cymbal": 5.4,
     "taiko": 5.5, "trumpets": 5.7, "brass": 6.6, "timpani": 6.9, "tuba": 8.2, "cellos": 8.6,
     "trombones": 9.7, "horns": 11.8, "solo_violin": 2.9, "men_choir": 5.5, "chorus": 5.6, "choir_oo": 11.5, "choir_oh": 11.6,
+    # the real percussion (perc.sf2), set so a mf stroke (velocity 80) peaks (400 ms) like the
+    # kit's: the gong like its crash "gong", the bass drum like its bass drum, the anvil and
+    # the brake drum like its snare
+    "gong": 8.7, "bass_drum": -5.7, "anvil": -6.1, "brake_drum": -2.3,
 }
 # How long each instrument's recording takes to speak (seconds to half its level), and
 # where it plays (MIDI, its practical range): for the score critic (arrangement.check).
@@ -533,6 +651,9 @@ RANGES = {
     "tuba": (28, 58), "brass": (36, 84), "choir": (40, 81), "harp": (24, 103),
     "celesta": (60, 108), "glockenspiel": (79, 108), "bells": (60, 77), "organ": (24, 96),
     "timpani": (38, 55), "solo_violin": (55, 100), "men_choir": (40, 69), "chorus": (40, 88), "choir_oo": (45, 87), "choir_oh": (45, 87),
+    # the struck percussion: one sound each, on its own key (PERC; "root" or any drum name in a
+    # score plays it), pitched a little around it - the gong down to A2, bigger and slower
+    **{part: (p["lo"], p["hi"]) for part, p in PERC.items()},
 }
 # How late each instrument's recording is heard after its note starts (seconds to come
 # within 9 dB of its full level, measured from MuseScore_General, less the ~20 ms a
@@ -610,8 +731,8 @@ def _synth(rate: int, sf2: Path, need=()):
         if font not in fonts:
             try:
                 fonts[font] = syn.sfload(str(EXTRA_FONTS[font](quiet=True)))
-            except Exception as e:                              # offline: the sound set's choir
-                print(f"[orchestra] no {font} ({e}): the sound set's choir plays", file=sys.stderr)
+            except Exception as e:                              # offline: the sound set's stand-in
+                print(f"[orchestra] no {font} ({e}): the sound set's stand-in plays", file=sys.stderr)
     return syn, sfid, fonts
 
 
@@ -622,15 +743,19 @@ def _stem(syn, sfid, fonts, name: str, events: list, total: int, rate: int):
     import numpy as np
     part = name.partition(":")[0]
     bank, preset, pan, vol = PARTS[part][:4]
-    font = sfid
+    font, drum, stand_in, own = sfid, part in DRUMS, None, False
     if len(PARTS[part]) > 4:
         if fonts.get(PARTS[part][4]) is not None:
-            font = fonts[PARTS[part][4]]
+            font, own = fonts[PARTS[part][4]], True
         else:
-            bank, preset = FALLBACK[part]
+            bank, preset, *stand_in = FALLBACK[part]
+            drum = bank == 128                              # (a GM kit's drum, on its own key)
+    perc = PERC.get(part) if own else None                  # the real percussion: let ring,
+    turns = len(perc["layers"][0][1]) if perc else 1        # its round-robins in turn
+    struck = 0
     bends = any(e[1] == 2 for e in events)
-    ch = 9 if part in DRUMS else 0
-    syn.program_select(ch, font, bank, preset, part in DRUMS)
+    ch = 9 if drum else 0
+    syn.program_select(ch, font, bank, preset, drum)
     syn.control_change(ch, 7, vol)
     syn.control_change(ch, 10, pan)
     if bends:
@@ -644,11 +769,16 @@ def _stem(syn, sfid, fonts, name: str, events: list, total: int, rate: int):
         if at > pos:
             chunks.append(np.frombuffer(syn.generate(at - pos), dtype="float32"))
             pos = at
+        if stand_in:
+            key = stand_in[0]
         if is_on == 2:
             syn.pitchbend(ch, int(max(0, min(16383, 8192 + vel / 12 * 8191))))
         elif is_on:
+            if perc:
+                key += RR_KEYS * (struck % turns)
+                struck += 1
             syn.noteon(ch, key, vel)
-        else:
+        elif not perc:                                      # (struck percussion rings on)
             syn.noteoff(ch, key)
     step = max(1, rate // 4)
     while pos < total:                                      # ring out, then stop: silence

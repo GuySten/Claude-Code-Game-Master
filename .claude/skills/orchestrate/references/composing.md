@@ -211,7 +211,9 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
   pizzicato, cellos, basses, flutes, piccolo, oboe, english_horn, clarinets, bassoons,
   horns, trumpets, trombones, tuba, brass, harp, celesta, glockenspiel, bells, organ,
   timpani, solo_violin; voices choir, chorus, men_choir, choir_oo, choir_oh; drums kit,
-  taiko, toms, reverse_cymbal (`"patterns"`). Ranges: violins G3-E7, violins2 G3-C7, cellos
+  taiko, toms, reverse_cymbal (`"patterns"`); real struck percussion, let ring: `gong` (a big
+  tam-tam - for transformations and the biggest arrivals; the kit's "gong" is a crash cymbal),
+  `anvil` and `brake_drum` (metal hits, sparingly), `bass_drum` (orchestral: weight). Ranges: violins G3-E7, violins2 G3-C7, cellos
   C2-E5, basses E1-C4, flutes C4-C7, piccolo D5-C8, oboe A#3-G6, english_horn E3-A5,
   clarinets D3-G6, bassoons A#1-C5, horns F2-F5, trumpets F#3-A#5, trombones E2-C5, tuba
   E1-A#3, timpani D2-G3, men_choir E2-A4, chorus E2-E6, choir_oo/oh A2-D#6 (critic). A

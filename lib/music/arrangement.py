@@ -109,7 +109,10 @@ except in "hits" and "rolls", where it is the velocity itself (1-127).
   ],                     # note: a pitch, "root"/"fifth" (of the chord, in the timpani's
                          # lowest octave, D2-C#3 - for drums; a pitched part's root is a
                          # "harmony" entry), or
-                         # snare, bd, crash, cymbal, china, splash, ride, triangle, gong
+                         # snare, bd, crash, cymbal, china, splash, ride, triangle, gong (on
+                         # the kit, a GM crash cymbal: the real gong is the "gong" part); the
+                         # gong, anvil, brake_drum and bass_drum parts play their one sound
+                         # for any of these names or "root" (a pitch moves it a little)
   "rolls": [{"part": "timpani", "note": "G#2", "from": 57, "to": 60, "vel": [70, 120]}],
   "unhinge": [{"parts": ["strings", "tremolo", "violins"], "from": 36, "to": 40, "drift": 0.6,
                "wobble": 0.3}],    # those parts waver and drift off pitch, each its own way,
@@ -153,6 +156,9 @@ tremolo, pizzicato, cellos, basses,
 flutes, piccolo, oboe, english_horn, clarinets, bassoons, horns, trumpets,
 trombones, tuba, brass, choir, chorus (E2-E6), men_choir (E2-A4; above E4 it sounds like an instrument), choir_oo, choir_oh (A2-D#6), harp, celesta, glockenspiel, bells, organ,
 timpani, taiko, toms, reverse_cymbal, kit (bd, snare, cymbals): as many as wanted.
+Real percussion (struck, let ring): gong (a big tam-tam, ~25 s ring: transformations and
+the biggest arrivals); anvil and brake_drum (metal hits, sparingly: a forge, a machine);
+bass_drum (the orchestral one: weight under a tutti or a march).
 """
 
 import argparse
@@ -668,6 +674,8 @@ def _build(spec: Dict[str, Any]) -> Dict[str, Any]:
                 sc.bend(part, t1 + 0.005, 0.0)
 
     def perc_key(part: str, what: Any, x: float) -> int:
+        if part in orchestra.PERC and (what in KIT or what in ("root", "fifth")):
+            return orchestra.PERC[part]["key"]      # (one struck sound: its own key)
         if isinstance(what, str) and what in KIT:
             return KIT[what]
         if what in ("root", "fifth"):
@@ -773,8 +781,8 @@ def render(spec: Dict[str, Any], rate: int = orchestra.RATE, sf2: Path = orchest
 
 # --- the score critic: what a listener would notice, measured (I can't hear) ---
 PERCUSSIVE = {"timpani", "taiko", "toms", "kit", "reverse_cymbal", "bells", "harp", "glockenspiel",
-              "celesta", "pizzicato"}                  # (struck: playing a note again is normal)
-DRUMS = {"timpani", "taiko", "toms", "kit", "reverse_cymbal"}
+              "celesta", "pizzicato", *orchestra.PERC}  # (struck: playing a note again is normal)
+DRUMS = {"timpani", "taiko", "toms", "kit", "reverse_cymbal", *orchestra.PERC}
 ROLL_EVERY = 0.18          # seconds between a roll's strokes (about 5.5 a second: the host's pick)
 
 
@@ -1134,7 +1142,8 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
     if host_checks:
         # Dissonance is a spice, not a bed: the host, of a stage with a semitone clash sounding 97%
         # of the time ("terrible... painful to hear"); the liked pieces sound one 11-21% of the time.
-        perc = {"timpani", "kit", "taiko", "toms", "cymbal", "gong", "bells", "glockenspiel", "triangle"}
+        perc = {"timpani", "kit", "taiko", "toms", "cymbal", "gong", "bells", "glockenspiel", "triangle",
+                *orchestra.PERC}
         sounding: Dict[Tuple[str, int], int] = {}   # a count: a re-struck held note overlaps itself
         t_prev, clash_t, total = 0.0, 0.0, 0.0
         for t, on, part, key, vel in sorted(sc.events, key=lambda e: (e[0], -e[1])):

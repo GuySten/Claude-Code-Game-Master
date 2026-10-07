@@ -37,7 +37,9 @@ def to_int16(audio):
 
 def write(path, presets, title):
     """presets: [(name, [zone, ...])], zone = dict(audio=int16 (n, ch), rate, key, lo, hi,
-    ls, le, tune=0, att_cb=0, release_s=0.6)."""
+    ls, le, tune=0, att_cb=0, release_s=0.6) - and, for struck sounds, vlo/vhi (the velocities
+    it plays at: a velocity layer), loop=False (played once, to its end) and excl (an
+    exclusive class: a new note in it stops the one ringing - a drum head struck again)."""
     import math
     data, shdr = [], []
     pos = 0
@@ -67,16 +69,22 @@ def write(path, presets, title):
             pans = [0] if chans == 1 else [-500, 500]
             for sid, pan in zip(ids, pans):
                 ibag.append((len(igen), 0))
-                igen += [(43, z["lo"] | (z["hi"] << 8)), (17, pan), (48, int(z.get("att_cb", 0))),
+                igen.append((43, z["lo"] | (z["hi"] << 8)))         # (keyRange first, velRange next)
+                if "vlo" in z:
+                    igen.append((44, z["vlo"] | (z["vhi"] << 8)))
+                igen += [(17, pan), (48, int(z.get("att_cb", 0))),
                          (52, int(z.get("tune", 0))), (38, int(1200 * math.log2(z.get("release_s", 0.6)))),
-                         (54, 1), (58, z["key"]), (53, sid)]
+                         (54, 1 if z.get("loop", True) else 0), (58, z["key"])]
+                if z.get("excl"):
+                    igen.append((57, int(z["excl"])))
+                igen.append((53, sid))
     phdr, pbag, pgen = [], [], []
     for i, (pname, _) in enumerate(presets):
         phdr.append((pname, i, 0, len(pbag)))
         pbag.append((len(pgen), 0))
         pgen.append((41, i))
     smpl = np.concatenate(data).tobytes()
-    U = (41, 43, 53, 54, 58)
+    U = (41, 43, 44, 53, 54, 57, 58)
     info = _chunk(b"ifil", struct.pack("<HH", 2, 1)) + _chunk(b"isng", b"EMU8000\0") + _chunk(b"INAM", title.encode() + b"\0")
     pd = _chunk(b"phdr", b"".join(_name(n) + struct.pack("<HHHIII", p, b, bag, 0, 0, 0) for n, p, b, bag in phdr)
                 + _name("EOP") + struct.pack("<HHHIII", 0, 0, len(pbag), 0, 0, 0))

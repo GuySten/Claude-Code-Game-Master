@@ -83,7 +83,8 @@ def test_an_instrument_built_from_recordings_plays_at_its_pitch(tmp_path):
     assert abs(np.argmax(spectrum) * rate / len(out) - 440.0) < 3
 
 
-@pytest.mark.parametrize("part", ["men_choir", "chorus", "choir_oo", "choir_oh"])
+@pytest.mark.parametrize("part", ["men_choir", "chorus", "choir_oo", "choir_oh", "gong", "bass_drum", "anvil",
+                                  "brake_drum"])
 def test_the_real_choirs_fall_back_to_the_sound_sets_choir_when_they_cant_be_had(monkeypatch, part):
     pytest.importorskip("numpy")
     pytest.importorskip("tinysoundfont")
@@ -145,3 +146,97 @@ def test_a_loop_with_an_entry_rings_over_its_loop_point_not_its_first_sample():
     head = float(np.abs(wet[:rate // 4]).max())                  # the entry: untouched
     at_loop = float(np.abs(wet[rate:rate + rate // 4]).max())    # the tail rings on here
     assert head < 1e-6 < at_loop
+
+
+PERC_PARTS = ["gong", "bass_drum", "anvil", "brake_drum"]
+
+
+def test_the_real_percussion_parts_play_from_their_own_soundfont():
+    assert orchestra.EXTRA_FONTS["perc"] is orchestra.fetch_percussion
+    for part in PERC_PARTS:
+        assert orchestra.PARTS[part][4] == "perc"
+        p = orchestra.PERC[part]
+        assert orchestra.PARTS[part][1] == p["preset"]
+        assert orchestra.RANGES[part] == (p["lo"], p["hi"]) and p["lo"] <= p["key"] <= p["hi"]
+        assert p["hi"] + orchestra.RR_KEYS * (len(p["layers"][0][1]) - 1) <= 127   # (its round-robins fit)
+        assert [top for top, _ in p["layers"]][-1] == 127
+        assert orchestra.FALLBACK[part][0] == 128                     # (offline: the GM kit's nearest)
+    assert len(orchestra.PERC["bass_drum"]["layers"]) == 7 and len(orchestra.PERC["bass_drum"]["layers"][0][1]) == 2
+    assert {p["preset"] for p in orchestra.PERC.values()} == {0, 1, 2, 3}
+    assert all(u.startswith("https://raw.githubusercontent.com/sgossner/") for p in orchestra.PERC.values()
+               for _, takes in p["layers"] for u in takes)
+
+
+def test_a_struck_instrument_built_from_recordings_has_layers_and_rings_once(tmp_path):
+    np = pytest.importorskip("numpy")
+    tsf = pytest.importorskip("tinysoundfont")
+    import sf2write
+    rate = 44100
+    t = np.arange(rate) / rate
+    def stroke(freq):
+        x = (np.sin(2 * np.pi * freq * t) * np.exp(-3 * t) * 20000).astype("int16")
+        return np.stack([x, x], 1)
+    soft, loud = stroke(200.0), stroke(800.0)
+    zones = [dict(audio=a, rate=rate, key=50, lo=48, hi=52, vlo=lo, vhi=hi, loop=False, ls=8,
+                  le=len(a) - 8, excl=1) for a, lo, hi in ((soft, 1, 64), (loud, 65, 127))]
+    sf2write.write(tmp_path / "p.sf2", [("Hit", zones)], "test")
+    syn = tsf.Synth(samplerate=rate)
+    sid = syn.sfload(str(tmp_path / "p.sf2"))
+    def hit(vel):
+        syn.program_select(0, sid, 0, 0)
+        syn.noteon(0, 50, vel)
+        out = np.frombuffer(syn.generate(rate * 2), dtype="float32").reshape(-1, 2)[:, 0]
+        syn.sounds_off(0)
+        syn.generate(256)
+        return out
+    for vel, freq in ((40, 200.0), (120, 800.0)):                   # the velocity picks the layer
+        out = hit(vel)[: rate // 2]
+        spectrum = np.abs(np.fft.rfft(out * np.hanning(len(out))))
+        assert abs(np.argmax(spectrum) * rate / len(out) - freq) < 5
+    out = hit(120)
+    assert float(abs(out[rate + 2000:]).max()) < 1e-4                 # played once: not looped
+
+
+@pytest.fixture
+def perc_font():
+    pytest.importorskip("numpy")
+    pytest.importorskip("tinysoundfont")
+    if not orchestra.SF2.is_file():
+        pytest.skip("the SoundFont isn't downloaded here")
+    if not orchestra.PERC_SF2.is_file():
+        pytest.skip("the percussion isn't built here (orchestra.fetch_percussion)")
+
+
+def test_the_real_percussion_sounds_rings_and_takes_turns(perc_font):
+    np = pytest.importorskip("numpy")
+    rate = 22050
+    for part in PERC_PARTS:
+        sc = orchestra.Score()
+        key = orchestra.PERC[part]["key"]
+        sc.note(part, key, 0.1, 0.3, 90)
+        sc.note(part, key, 1.6, 0.3, 90)
+        out = np.asarray(orchestra.play(sc, 3.0, rate=rate))
+        assert float(abs(out).max()) > 0.005, part
+        a, b = out[int(0.1 * rate): int(0.6 * rate), 0], out[int(1.6 * rate): int(2.1 * rate), 0]
+        if len(orchestra.PERC[part]["layers"][0][1]) > 1:            # its round-robins, in turn
+            assert float(np.corrcoef(a, b)[0, 1]) < 0.99, part
+    sc = orchestra.Score()
+    sc.note("gong", orchestra.PERC["gong"]["key"], 0.1, 0.5, 100)    # a short note: it rings on
+    out = np.asarray(orchestra.play(sc, 12.0, rate=rate))
+    level = lambda x: float(np.sqrt(np.mean(x ** 2)))
+    assert level(out[int(10 * rate): int(11 * rate)]) > 0.05 * level(out[int(0.2 * rate): int(1.2 * rate)])
+
+
+def test_an_arrangement_plays_the_real_percussion(perc_font):
+    import arrangement as A
+    s = {"tune": {"seed": "Test Hero", "cls": "Fighter"}, "tempo": 120, "statements": [],
+         "key": "C4", "meter": "4/4", "length": 8, "chords": [[0, 8, "I"]],
+         "patterns": [{"part": "bass_drum", "note": "bd", "from": 0, "to": 4, "pattern": "x"},
+                      {"part": "anvil", "from": 0, "to": 4, "pattern": " x x"}],
+         "hits": [{"part": "brake_drum", "at": 4, "vel": 100}, {"part": "gong", "note": "gong", "at": 6, "vel": 110}]}
+    score, _, _ = A.build(s)
+    keys = {(p, k) for _, on, p, k, _ in score.events if on}
+    assert keys == {(p, orchestra.PERC[p]["key"]) for p in PERC_PARTS}
+    assert not [m for lvl, m in A.check(s, listen=False) if lvl == "error"]
+    samples, rate = A.render(s, rate=22050)
+    assert float(abs(samples).max()) > 0.05
