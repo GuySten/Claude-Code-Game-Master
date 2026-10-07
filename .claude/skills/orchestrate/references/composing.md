@@ -238,10 +238,20 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
   chords ringing / palm-muted chugs, B1-E5), `guitar_lead` (its solo voice, one note at a time,
   E2-G5) - only in a boss's later stages (stage 2+ and their
   cues; critic), a surprise, never a bed; power chords only (root5, root, octaves: a third turns to mud).
-  `rock_organ`: a rock organ, for stage 3+ only (critic) - the church organ gone wild: chords and riffs; a Hammond B3 through a Leslie, then overdriven (setBfree; synthesized if it can't be built), the rotating speaker fast (`"organ"` slows it, setBfree easing it there); registered by passage on its own (held chords: all drawbars, light drive; riffs, notes under 0.6 s: 888888000, hard drive - `"drawbars"` fixes one), its bass pedals on each chord's lowest note at C1, clean (`"pedals": false`, `"pedal_db"`). Ranges: violins G3-E7, violins2 G3-C7, cellos
+  `rock_organ`: a rock organ, for stage 3+ only (critic) - the church organ gone wild: chords and riffs; a Hammond B3 through a Leslie, then overdriven (setBfree; synthesized if it can't be built), the rotating speaker fast (`"organ"` slows it, setBfree easing it there); registered by passage on its own (held chords: all drawbars, light drive; riffs, notes under 0.6 s: 888888000, hard drive - `"drawbars"` fixes one), its bass pedals on each chord's lowest note at C1, clean (`"pedals": false`, `"pedal_db"`).
+  Synthesizers, for stage 3+ only (critic) - an eldritch boss's own voice (boss-music 3c): the
+  orchestra with menacing synths, never EDM: `synth_bass` (a huge dark reese over a sine sub, mono
+  below 150 Hz; one voice: legato notes glide, a rest strikes again - write a driving bass a little
+  short; C1-C4), `synth_lead` (a cutting driven lead for a tune: one voice, gliding legato, delayed
+  vibrato; C3-C6), `synth_arp` (a tight pluck for ostinatos; C2-C6), `synth_pad` (a dark pad that swells
+  ~1.6 s and drifts; held chords; C2-C6), `synth_fx` (a held note: a riser into its end, two octaves up
+  to it; a short one: an impact, a sub boom falling two octaves, ~2.5 s). Synthesized in the engine,
+  mostly dry, a line as loud as the horns' [H, on the first demos: "they are ok" - a pass, not a
+  "great": offer a richer alternative beside them at the first eldritch boss]. Ranges: violins G3-E7, violins2 G3-C7, cellos
   C2-E5, basses E1-C4, flutes C4-C7, piccolo D5-C8, oboe A#3-G6, english_horn E3-A5,
   clarinets D3-G6, bassoons A#1-C5, horns and horn_solo F2-F5, trumpets F#3-A#5, trombones E2-C5, tuba
-  E1-A#3, timpani D2-G3, men_choir E2-A4, chorus E2-E6, choir_oo/oh A2-D#6 (critic). A
+  E1-A#3, timpani D2-G3, men_choir E2-A4, chorus E2-E6, choir_oo/oh A2-D#6, synth_bass C1-C4, synth_lead C3-C6
+  (critic). A
   low root may fall below a part (an F-minor arpeggio on violins2 starts on Ab3 or C4). A
   part plays one job at a time: where cellos carry the tune, the engine's bass moves to
   the basses; one `"range"` serves every part an entry lists.

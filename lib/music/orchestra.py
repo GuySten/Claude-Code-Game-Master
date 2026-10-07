@@ -117,6 +117,13 @@ PARTS = {
     "rock_organ": (0, 18, 64, 100),
     # and a lead guitar: one player, single-tracked near centre, its own amp pushed harder
     "guitar_lead": (0, 0, 64, 100, "guitar"), # a solo line: one note at a time, singing, vibrato
+    # synthesizers: an eldritch boss's own voice - synthesized (_synth_stem), not sampled: their
+    # bank and preset (GM's nearest) are only their names
+    "synth_bass": (0, 38, 64, 100),   # a huge dark reese over a sine sub: drives, growls
+    "synth_lead": (0, 81, 64, 100),   # a cutting lead: one voice, legato, gliding - a tune
+    "synth_arp": (0, 84, 64, 100),    # a tight pulsing pluck: ostinatos, arpeggios
+    "synth_pad": (0, 95, 64, 100),    # a dark evolving pad: slow to swell, wide, moving
+    "synth_fx": (0, 103, 64, 100),    # a riser into a note's end (held), an impact (short)
     # a real singer, alone (VocalSet's soprano f4, "ah"): sung by the engine (_voice_stem), not a
     # sound set; its bank and preset are its stand-in's - the sound set's choir, when she can't be had
     "solo_voice": (0, 52, 64, 100),
@@ -2589,6 +2596,395 @@ def _voice_stem(events: list, total: int, rate: int, styles: dict):
     return first, stem.astype("float32")
 
 
+# --- the synthesizers: an eldritch thing's own voice (boss-music rule 3c) ---
+# The hybrid score's electronics - the orchestra with menacing synths under and over it: a huge
+# distorted sub bass, a cutting lead, a pulsing arpeggio, a dark evolving pad, risers and impacts.
+# Synthesized here in numpy, subtractive as an analogue synth is: band-limited oscillators
+# (polyBLEP saws and pulses, sines), several to a voice, detuned against each other (the unison
+# that makes a reese beat and a pad wide); one resonant low-pass for a part, its cutoff moving
+# by envelope, velocity and slow LFOs (_synth_sweep); a tube-like drive oversampled 4x (no
+# fizz folding back); a voicing EQ that keeps every part under ~6 kHz - the host turned down an
+# organ that "sounds like static", and a synth's fizz is the same thing; the low end mono (below
+# SYNTH_MONO_HZ the two sides are one, so the bass can't thin out or cancel); then the guitar's
+# small studio room, sent to the hall only a little (in front, close, electronic).
+# Surge XT 1.3.4 (GPL-3; its Python binding renders offline) was weighed and built headless: its
+# factory patches are a sound designer's, but it needs a ~1 GB git checkout (19 submodules: no
+# source archive to pin), CMake and a C++17 compiler, a program apart for its licence - and a
+# stand-in like this one wherever it can't be built. These voices, written as code, are measured
+# and tuned to the orchestra; nothing to download, nothing to fall back from: they play anywhere.
+SYNTH_GRID = (20.0, 4)      # the swept filter's fixed cutoffs: from 20 Hz, 4 an octave (crossfaded)
+SYNTH_MONO_HZ = 150.0       # below this, a synth's left and right are the same (in phase)
+SYNTH_FX_RISE = 0.6         # s: a synth_fx note this long or longer is a riser; shorter, an impact
+SYNTH_ROOM_S = 0.3          # s: the small room's own ring, kept after a part's last sound
+SYNTH_LEAD_IN = 0.05        # s: a stem starts this early, faded in over its first 30 ms - the zero-phase
+                            # filters ring a little before an onset (inaudibly), never cut off
+# Each part's sound. "voices": its oscillators (wave, semitones, cents, level, pan -1..1, clean -
+# a clean voice skips the filter and the drive: the bass's sub). "amp": attack (s), decay (s, a
+# time constant), sustain, release (s, a time constant). The filter: "cutoff" (Hz at velocity 100,
+# key C3), "keytrack" (octaves a 12 semitones), "vel_oct" (octaves a doubling of velocity),
+# "env" (octaves, s: a positive time constant falls from the onset, a negative one blooms open),
+# "lfo" [(Hz, octaves)], "res" (0..~3: 4 would ring by itself). "drive" (its gain, 0: none),
+# "bias" (its asymmetry: even harmonics). "post": its voicing EQ. "level_db": its output - the
+# same velocity, the same loudness: a line at velocity 100 (the bass, the lead, the arpeggio,
+# a riser and an impact) as loud as the horns' (LUFS, measured), the pad's held chord as the
+# strings'. Velocity is loudness as GM's (squared; after a mono part's drive, which keeps its
+# character) and a brighter filter.
+SYNTH = {
+    # a huge dark reese: a sine sub (clean, mono) under four detuned saws and a saw an octave
+    # down, through a resonant low-pass that moves (two slow LFOs) and a hard drive, its own low
+    # end cut (the sub carries it): the beating saws growl and turn above a steady fundamental
+    "synth_bass": {"mono": True, "glide": 0.03,
+                   "voices": [("sine", 0, 0, 0.9, 0.0, True), ("saw", 0, -14, 0.5, -0.6, False),
+                              ("saw", 0, 13, 0.5, 0.6, False), ("saw", 0, -5, 0.4, 0.3, False),
+                              ("saw", 0, 6, 0.4, -0.3, False), ("saw", -12, 3, 0.35, 0.0, False)],
+                   "amp": (0.008, 0.5, 0.85, 0.07),
+                   "cutoff": 360.0, "keytrack": 0.3, "vel_oct": 1.0, "env": (1.6, 0.3),
+                   "lfo": [(0.13, 0.45), (0.37, 0.12)], "res": 1.2, "drive": 6.0, "bias": 0.15,
+                   "post": [("hp", 110, 0.7, 0.0), ("hp", 110, 0.7, 0.0), ("peak", 700, 1.0, 2.0),
+                            ("lp", 3200, 0.7, 0.0), ("lp", 4200, 0.7, 0.0)],
+                   "clean_post": [("lp", 260, 0.7, 0.0)], "dirty": 1.1, "level_db": -36.6},
+    # a cutting lead: three detuned saws and a pulse, a sine an octave under, a resonant
+    # filter with a bite at each attack, driven; a delayed vibrato on held notes, a glide
+    # between legato ones; pushed at 2 kHz to cut through an orchestra
+    "synth_lead": {"mono": True, "glide": 0.05,
+                   "voices": [("saw", 0, -9, 0.45, -0.35, False), ("saw", 0, 0, 0.55, 0.0, False),
+                              ("saw", 0, 9, 0.45, 0.35, False), ("pulse", 0, 4, 0.4, 0.0, False),
+                              ("sine", -12, 0, 0.25, 0.0, True)],
+                   "pwm": (0.3, 0.12, 0.31), "amp": (0.012, 0.6, 0.9, 0.12),
+                   "cutoff": 1300.0, "keytrack": 0.6, "vel_oct": 1.0, "env": (1.3, 0.22),
+                   "lfo": [(0.21, 0.15)], "res": 1.8, "drive": 2.5, "bias": 0.1,
+                   "vibrato": (0.35, 0.5, 16.0, 5.3),
+                   "post": [("hp", 170, 0.7, 0.0), ("peak", 1900, 0.9, 3.0), ("lp", 5000, 0.7, 0.0),
+                            ("lp", 6000, 0.7, 0.0)],
+                   "clean_post": [], "dirty": 1.0, "level_db": -37.8},
+    # a tight pulsing pluck: a saw and two pulses, the filter snapping shut after each onset
+    # (its envelope retriggered by every note), a short decay - for ostinatos
+    "synth_arp": {"mono": False, "per_note": True,
+                  "voices": [("saw", 0, -5, 0.6, -0.3, False), ("pulse", 0, 5, 0.5, 0.3, False),
+                             ("pulse", -12, 0, 0.3, 0.0, False)],
+                  "amp": (0.002, 0.14, 0.25, 0.05),
+                  "cutoff": 420.0, "keytrack": 0.4, "vel_oct": 1.2, "env": (3.4, 0.09), "lfo": [],
+                  "res": 0.8, "drive": 1.6, "bias": 0.0,
+                  "post": [("hp", 110, 0.7, 0.0), ("lp", 5500, 0.7, 0.0), ("lp", 6500, 0.7, 0.0)],
+                  "clean_post": [], "dirty": 1.0, "level_db": -31.6},
+    # a dark evolving pad: five saws spread across the stereo field, their detune breathing, a
+    # pulse an octave down with a slow PWM; slow to swell and to fade; the filter low, blooming
+    # open over a few seconds and drifting on two slow LFOs - never bright
+    "synth_pad": {"mono": False, "per_note": False,
+                  "voices": [("saw", 0, -17, 0.35, -0.9, False), ("saw", 0, -8, 0.35, 0.5, False),
+                             ("saw", 0, 0, 0.35, -0.2, False), ("saw", 0, 9, 0.35, -0.5, False),
+                             ("saw", 0, 18, 0.35, 0.9, False), ("pulse", -12, 0, 0.3, 0.0, False)],
+                  "pwm": (0.5, 0.25, 0.11), "detune_lfo": (0.09, 0.35), "amp": (1.6, 3.0, 1.0, 1.1),
+                  "cutoff": 520.0, "keytrack": 0.2, "vel_oct": 0.8, "env": (1.4, -3.5),
+                  "lfo": [(0.07, 0.55), (0.23, 0.15)], "res": 1.0, "drive": 0.0, "bias": 0.0,
+                  "post": [("hp", 90, 0.7, 0.0), ("lp", 3500, 0.7, 0.0), ("lp", 4500, 0.7, 0.0)],
+                  "clean_post": [], "dirty": 1.0, "level_db": -40.1},
+    # risers and impacts (_synth_fx_stem)
+    "synth_fx": {"level_db": -31.5},
+}
+
+
+def _synth_saw(ph, dt):
+    """A band-limited sawtooth (polyBLEP) from its phase (0..1) and its step a sample."""
+    import numpy as np
+    y = 2.0 * ph - 1.0
+    m = ph < dt
+    t = ph[m] / dt[m]
+    y[m] -= t + t - t * t - 1.0
+    m = ph > 1.0 - dt
+    t = (ph[m] - 1.0) / dt[m]
+    y[m] -= t * t + t + t + 1.0
+    return y
+
+
+def _synth_osc(wave: str, hz, rate: int, phase: float = 0.0, width=0.5):
+    """An oscillator following ``hz`` (a frequency a sample): "saw", "pulse" (two saws, the
+    second ``width`` of a cycle on: its duty, which may move) or "sine"."""
+    import numpy as np
+    dt = np.minimum(np.asarray(hz, dtype="float64") / rate, 0.45)
+    ph = (phase + np.cumsum(dt)) % 1.0
+    if wave == "sine":
+        return np.sin(2 * np.pi * ph)
+    if wave == "saw":
+        return _synth_saw(ph, dt)
+    return 0.5 * (_synth_saw(ph, dt) - _synth_saw((ph + width) % 1.0, dt)) + (np.asarray(width) - 0.5)
+
+
+def _synth_sweep(x, cutoff, res: float, rate: int, block: int = 1 << 18, pad: int = 1 << 13):
+    """x (n,) or (n, 2) through a resonant 4-pole low-pass (a ladder's response, unity at DC)
+    whose cutoff moves (``cutoff``: Hz, a sample) - zero-phase: a bank of fixed filters
+    SYNTH_GRID apart, crossfaded by where the cutoff is (in phase with one another: no comb
+    between them), by FFT, a block at a time."""
+    import numpy as np
+    x = np.asarray(x, dtype="float64")
+    n = len(x)
+    lo, per = SYNTH_GRID
+    top = int(per * math.log2(0.45 * rate / lo))
+    u = np.clip(per * np.log2(np.maximum(cutoff, lo) / lo), 0, top)
+    out = np.zeros_like(x)
+    for a in range(0, n, block):
+        b = min(n, a + block)
+        s0, s1 = max(0, a - pad), min(n, b + pad)
+        size = _fast_len(s1 - s0 + pad)
+        X = np.fft.rfft(x[s0:s1], size, axis=0)
+        s = 1j * np.fft.rfftfreq(size, 1 / rate)
+        ub = u[a:b]
+        for j in range(int(math.floor(ub.min())), int(math.ceil(ub.max())) + 1):
+            w = np.maximum(0.0, 1.0 - np.abs(ub - j))
+            if not w.any():
+                continue
+            H = np.abs((1 + res) / ((1 + s / (lo * 2 ** (j / per))) ** 4 + res))
+            y = np.fft.irfft(X * (H[:, None] if x.ndim == 2 else H), size, axis=0)[a - s0:b - s0]
+            out[a:b] += (w[:, None] if x.ndim == 2 else w) * y
+    return out
+
+
+def _synth_mono_low(st, rate: int, hz: float = SYNTH_MONO_HZ):
+    """Stereo whose low end is mono: its side taken out below ``hz`` (zero-phase, a smooth
+    half-octave edge above it)."""
+    import numpy as np
+    m = 0.5 * (st[:, 0] + st[:, 1])
+    s = 0.5 * (st[:, 0] - st[:, 1])
+    size = _fast_len(len(s) + rate // 4)
+    edge = np.clip(np.log2(np.fft.rfftfreq(size, 1 / rate) / hz + 1e-12) / 0.5, 0, 1)
+    s = np.fft.irfft(np.fft.rfft(s, size) * np.sin(0.5 * np.pi * edge) ** 2, size)[:len(s)]
+    return np.stack([m + s, m - s], axis=1)
+
+
+def _synth_lead_in(y, rate: int):
+    """A stem's first 30 ms (its SYNTH_LEAD_IN, before its first note) faded in from silence."""
+    import numpy as np
+    k = min(len(y), int(0.03 * rate))
+    y[:k] *= (np.sin(0.5 * np.pi * np.arange(k) / k) ** 2)[:, None]
+    return y
+
+
+def _synth_notes(events: list, total: int, rate: int):
+    """A synth part's notes [(start, end, key, vel)] (s, sorted) and its bends [(s, semitones)]."""
+    ons: Dict[int, list] = {}
+    notes, bends = [], []
+    for t, is_on, _, key, vel in sorted(events, key=lambda e: (e[0], e[1])):
+        if is_on == 2:
+            bends.append((t, float(vel)))
+        elif is_on == 1:
+            ons.setdefault(key, []).append((t, vel))
+        elif is_on == 0 and ons.get(key):
+            t0, v = ons[key].pop(0)
+            notes.append((t0, t, key, v))
+    notes += [(t0, total / rate, key, v) for key, left in ons.items() for t0, v in left]
+    return sorted(notes), bends
+
+
+def _synth_phrases(notes: list, gap: float = 0.03) -> List[list]:
+    """Notes grouped where each starts before the last has ended (or within ``gap`` of it)."""
+    out: List[list] = []
+    for nt in notes:
+        if out and nt[0] <= max(x[1] for x in out[-1]) + gap:
+            out[-1].append(nt)
+        else:
+            out.append([nt])
+    return out
+
+
+def _synth_env(m: int, held: int, amp, rate: int):
+    """An amplitude envelope m samples long: attack (a smooth S), decay to the sustain, and
+    from ``held`` on the release, its last 5 ms faded to nothing (no click)."""
+    import numpy as np
+    attack, decay, sustain, release = amp
+    t = np.arange(m) / rate
+    env = np.sin(0.5 * np.pi * np.clip(t / max(attack, 1e-4), 0, 1)) ** 2
+    env *= sustain + (1 - sustain) * np.exp(-np.maximum(0.0, t - attack) / decay)
+    if held < m:
+        env[held:] = env[max(0, held - 1)] * np.exp(-np.arange(m - held) / (release * rate))
+    fade = min(m, int(0.005 * rate))
+    env[m - fade:] *= np.linspace(1, 0, fade)
+    return env
+
+
+def _synth_bend(bends: list, t):
+    """The part's bend (semitones) at the times ``t`` (as written: each holds to the next)."""
+    import numpy as np
+    if not bends:
+        return 0.0
+    ts = np.array([b[0] for b in bends])
+    i = np.searchsorted(ts, t, side="right") - 1
+    return np.where(i >= 0, np.array([b[1] for b in bends])[np.maximum(i, 0)], 0.0)
+
+
+def _synth_stem(part: str, events: list, total: int, rate: int):
+    """A synthesizer part -> (first sample, stereo stem): its oscillators (one voice, legato
+    and gliding, for "mono" parts; a voice a note for the others), one filter for the part
+    (paraphonic), the drive, the voicing, its low end mono, a small room."""
+    import numpy as np
+    if part == "synth_fx":
+        return _synth_fx_stem(events, total, rate)
+    sp = SYNTH[part]
+    notes, bends = _synth_notes(events, total, rate)
+    if not notes:
+        return total, np.zeros((0, 2), dtype="float32")
+    tail = 6.0 * sp["amp"][3] + 0.05                       # (the release down ~52 dB)
+    first = max(0, int((notes[0][0] - SYNTH_LEAD_IN) * rate))
+    end = min(total, int((max(nt[1] for nt in notes) + tail + SYNTH_ROOM_S) * rate) + 1)
+    n = end - first
+    if n <= 0:
+        return total, np.zeros((0, 2), dtype="float32")
+    dirty, clean = np.zeros((n, 2)), np.zeros(n)
+    rng = np.random.default_rng(len(part))                 # (the same sound every time)
+    t_all = (np.arange(n) + first) / rate
+    lfo = sum((oc * np.sin(2 * np.pi * hz * t_all + i) for i, (hz, oc) in enumerate(sp["lfo"])), np.zeros(n))
+    width0, pwm, pwm_hz = sp.get("pwm", (0.5, 0.0, 0.0))
+    width = width0 + pwm * np.sin(2 * np.pi * pwm_hz * t_all) if pwm else None
+    breathe = sp.get("detune_lfo")
+    spread = 1.0 + breathe[1] * np.sin(2 * np.pi * breathe[0] * t_all) if breathe else None
+    gain = lambda v: max(1, min(127, v)) / 100.0           # noqa: E731  (squared: GM's curve)
+    octs = np.full(n, np.nan)                              # the cutoff, octaves over "cutoff"
+    after = np.ones(n)                                     # (a mono part's velocity: after its drive)
+
+    def play(a: int, b: int, pitch, amp, clean_amp) -> None:
+        """The part's oscillators over [a, b) at ``pitch`` (semitones, a sample), ``amp`` (its
+        clean voices: ``clean_amp``)."""
+        for wave, semis, cents, level, pan, is_clean in sp["voices"]:
+            c = cents * spread[a:b] if spread is not None else cents
+            hz = 440.0 * 2 ** ((pitch + semis + c / 100.0 - 69) / 12)
+            x = (_synth_osc(wave, hz, rate, rng.uniform(), width[a:b] if width is not None else width0)
+                 * (clean_amp if is_clean else amp) * level)
+            if is_clean:
+                clean[a:b] += x
+            else:
+                g = math.pi / 4 * (1 + pan)
+                dirty[a:b, 0] += x * (math.cos(g) * math.sqrt(2))
+                dirty[a:b, 1] += x * (math.sin(g) * math.sqrt(2))
+
+    amount, tau = sp["env"]
+    if sp["mono"]:
+        for ph in _synth_phrases(notes):
+            p0 = int(ph[0][0] * rate) - first
+            last = max(nt[1] for nt in ph)
+            p1 = min(n, int((last + tail) * rate) - first)
+            m = p1 - p0
+            if m <= 0:
+                continue
+            pitch, vel, fenv = np.empty(m), np.empty(m), np.zeros(m)
+            prev = float(ph[0][2])
+            for i, (s0, _, key, v) in enumerate(ph):
+                a = min(m, max(0, int(s0 * rate) - first - p0))
+                b = min(m, int(ph[i + 1][0] * rate) - first - p0) if i + 1 < len(ph) else m
+                if b <= a:
+                    continue
+                tt = np.arange(b - a) / rate
+                pitch[a:b] = key + (prev - key) * np.exp(-tt / sp["glide"])     # (a glide from the last)
+                if "vibrato" in sp:
+                    delay, ramp, cents, hz = sp["vibrato"]
+                    pitch[a:b] += np.clip((tt - delay) / ramp, 0, 1) * cents / 100 * np.sin(2 * np.pi * hz * tt)
+                prev = pitch[b - 1]
+                vel[a:b] = gain(v)
+                # the filter's envelope: from the phrase's first note, a smaller one at each legato note
+                fenv[a:b] = np.maximum(fenv[a:b], (1.0 if i == 0 else 0.45) * amount * np.exp(-tt / tau))
+            pitch += _synth_bend(bends, t_all[p0:p1])
+            k = max(1, int(0.01 * rate))                    # (a new velocity eased in over 10 ms)
+            c = np.cumsum(np.concatenate([np.full(k, vel[0]), vel]))
+            vel = (c[k:] - c[:-k]) / k
+            env = _synth_env(m, int((last - ph[0][0]) * rate), sp["amp"], rate)
+            # the velocity after the drive (its character the same, its loudness GM's: velocity squared)
+            after[p0:p1] = vel ** 2
+            play(p0, p1, pitch, env, env * vel ** 2)
+            keys = np.mean([nt[2] for nt in ph])
+            octs[p0:p1] = fenv + sp["vel_oct"] * np.log2(vel) + sp["keytrack"] * (keys - 48) / 12
+    else:
+        for s0, s1, key, v in notes:
+            a = int(s0 * rate) - first
+            b = min(n, int((s1 + tail) * rate) - first)
+            if b <= a:
+                continue
+            env = _synth_env(b - a, int((s1 - s0) * rate), sp["amp"], rate)
+            play(a, b, key + _synth_bend(bends, t_all[a:b]) + np.zeros(b - a), env * gain(v) ** 2, env * gain(v) ** 2)
+        # one filter for all its voices: its envelope from each onset (a pluck's) or from each
+        # phrase's first (a pad's bloom), following that note's velocity and the phrase's keys
+        starts = [[nt] for nt in notes] if sp.get("per_note") else _synth_phrases(notes)
+        on = np.array([ph[0][0] for ph in starts])
+        i = np.maximum(np.searchsorted(on, t_all, side="right") - 1, 0)
+        since = t_all - on[i]
+        fenv = amount * (np.exp(-since / tau) if tau > 0 else 1 - np.exp(since / tau))
+        vels = np.array([gain(ph[0][3]) for ph in starts])
+        keys = np.array([np.mean([nt[2] for nt in ph]) for ph in starts])
+        octs = fenv + sp["vel_oct"] * np.log2(vels[i]) + sp["keytrack"] * (keys[i] - 48) / 12
+    octs = np.where(np.isnan(octs), 0.0, octs)
+    y = _synth_sweep(dirty, sp["cutoff"] * 2 ** (octs + lfo), sp["res"], rate)
+    if sp["drive"]:
+        g, bias = sp["drive"], sp["bias"]
+        tube = lambda u: (np.tanh(g * u + bias) - math.tanh(bias)) / math.tanh(g)   # noqa: E731
+        y = np.stack([_oversampled(y[:, c], tube, 4, rate) for c in (0, 1)], axis=1)
+    y = _filter(y * after[:, None], sp["post"], rate) * sp["dirty"]
+    if sp["clean_post"]:
+        clean = _filter(clean, sp["clean_post"], rate)
+    y = _synth_lead_in(_synth_mono_low(_studio_room(y + clean[:, None], rate), rate), rate)
+    return first, (y * 10 ** (sp["level_db"] / 20)).astype("float32")
+
+
+def _synth_fx_stem(events: list, total: int, rate: int):
+    """synth_fx -> (first sample, stereo stem). A note SYNTH_FX_RISE or longer is a riser into
+    its end: three saws climbing two octaves to the written note, a filter opening and a dark
+    noise swelling with them, cut off as the note ends (the downbeat is the orchestra's). A
+    shorter one is an impact: a sub boom falling two octaves from it, a struck growl an octave
+    under it and a burst of dark noise, ringing ~2.5 s whatever the note's length."""
+    import numpy as np
+    notes, _ = _synth_notes(events, total, rate)
+    if not notes:
+        return total, np.zeros((0, 2), dtype="float32")
+    rng = np.random.default_rng(11)
+    first = max(0, int((notes[0][0] - SYNTH_LEAD_IN) * rate))
+    end = min(total, int((max(max(nt[1], nt[0] + 2.6) for nt in notes) + SYNTH_ROOM_S) * rate) + 1)
+    n = end - first
+    if n <= 0:
+        return total, np.zeros((0, 2), dtype="float32")
+    tone, sub, cut = np.zeros((n, 2)), np.zeros(n), np.full(n, 200.0)
+    hz = lambda semis: 440.0 * 2 ** ((semis - 69) / 12)    # noqa: E731
+
+    def spread(a: int, x, voices) -> None:
+        for pan, w in zip((-0.7, 0.0, 0.7) if len(voices) == 3 else (-0.5, 0.5), voices):
+            g = math.pi / 4 * (1 + pan)
+            tone[a:a + len(w), 0] += w * (math.cos(g) * math.sqrt(2))
+            tone[a:a + len(w), 1] += w * (math.sin(g) * math.sqrt(2))
+
+    for s0, s1, key, v in notes:
+        a = int(s0 * rate) - first
+        g = (max(1, min(127, v)) / 100.0) ** 2
+        if s1 - s0 >= SYNTH_FX_RISE:
+            m = min(n, int(s1 * rate) - first) - a
+            if m <= 0:
+                continue
+            x = np.arange(m) / m
+            env = x ** 2.2
+            env[m - min(m, int(0.03 * rate)):] *= np.linspace(1, 0, min(m, int(0.03 * rate))) ** 2
+            pitch = key - 24 * (1 - x) ** 1.6
+            spread(a, x, [_synth_osc("saw", hz(pitch + c / 100), rate, rng.uniform()) * env * g * 0.5
+                          for c in (-12, 0, 12)])
+            noise = _filter(rng.standard_normal(m), [("hp", 400, 0.7, 0.0), ("lp", 5000, 0.7, 0.0)], rate)
+            tone[a:a + m] += (noise * env * g * 0.18)[:, None] * np.array([[1.0, 0.9]])
+            cut[a:a + m] = 250 * 2 ** (4.2 * x ** 1.5)
+        else:
+            m = min(n - a, int(2.6 * rate))
+            if m <= 0:
+                continue
+            t = np.arange(m) / rate
+            fade = np.ones(m)
+            fade[m - min(m, int(0.2 * rate)):] = np.linspace(1, 0, min(m, int(0.2 * rate)))
+            boom = np.exp(-t / 0.7) * np.clip(t / 0.003, 0, 1) * fade
+            sub[a:a + m] += _synth_osc("sine", hz(key - 24 * (1 - np.exp(-t / 0.35))), rate) * boom * g * 1.2
+            hit = np.exp(-t / 0.18) * np.clip(t / 0.002, 0, 1) * fade
+            spread(a, t, [_synth_osc("saw", np.full(m, hz(key - 12 + c / 100)), rate, rng.uniform()) * hit * g * 0.6
+                          for c in (-15, 15)])
+            noise = _filter(rng.standard_normal(m), [("lp", 2500, 0.7, 0.0), ("lp", 2500, 0.7, 0.0)], rate)
+            tone[a:a + m] += (noise * np.exp(-t / 0.25) * np.clip(t / 0.002, 0, 1) * fade * g * 0.5)[:, None]
+            cut[a:a + m] = np.maximum(cut[a:a + m], 200 * 2 ** (4.0 * np.exp(-t / 0.12)))
+    y = _synth_sweep(tone, cut, 0.9, rate)
+    y = np.stack([_oversampled(y[:, c], lambda u: np.tanh(2.0 * u) / math.tanh(2.0), 4, rate) for c in (0, 1)], axis=1)
+    y = _filter(y, [("hp", 60, 0.7, 0.0), ("lp", 6000, 0.7, 0.0), ("lp", 7000, 0.7, 0.0)], rate)
+    y = _synth_mono_low(_studio_room(y + _filter(sub, [("lp", 200, 0.7, 0.0)], rate)[:, None], rate), rate)
+    y = _synth_lead_in(y, rate)
+    return first, (y * 10 ** (SYNTH["synth_fx"]["level_db"] / 20)).astype("float32")
+
+
 EXTRA_FONTS = {"chorus": fetch_choir, "vowels": fetch_vowels, "perc": fetch_percussion,
                "guitar": fetch_guitar, "strings_short": fetch_strings_short, "brass": fetch_brass,
                "horn_solo": fetch_horn_solo,
@@ -2626,6 +3022,8 @@ LOUDNESS = {
     "guitar_lead": 0.0,     # (its LEAD_LEVEL_DB: a held line ~3 LU over the rhythm guitar's chords)
     # the rock organ through its speaker (ORGAN_LEVEL_DB, SETBFREE_LEVEL_DB): set where the guitar sits
     "rock_organ": 0.0,
+    # the synthesizers (SYNTH's "level_db": a line as loud as the horns', the pad as the strings')
+    "synth_bass": 0.0, "synth_lead": 0.0, "synth_arp": 0.0, "synth_pad": 0.0, "synth_fx": 0.0,
     # the solo voice: its stand-in's (the sound set's choir), so it is evened out like the choir;
     # the singer herself is levelled to it by VOICE_LEVEL_DB
     "solo_voice": -6.9,
@@ -2637,7 +3035,8 @@ LOUDNESS = {
 # part's notes under SHORT_S play from the short-note recordings, which speak at once
 # (STRINGS_SHORT's "speak": 0.04-0.055 s): only its longer notes take SPEAKS to speak.
 SPEAKS = {"choir": 0.18, "men_choir": 0.1, "chorus": 0.1, "choir_oo": 0.05, "choir_oh": 0.08, "strings": 0.48, "violins": 0.50, "violins2": 0.26, "english_horn": 0.42,
-          "cellos": 0.24, "tremolo": 0.16, "organ": 0.10, "oboe": 0.12, "brass": 0.08, "horns": 0.06}
+          "cellos": 0.24, "tremolo": 0.16, "organ": 0.10, "oboe": 0.12, "brass": 0.08, "horns": 0.06,
+          "synth_pad": 0.8}      # (the synth pad swells: SYNTH's "amp")
 RANGES = {
     "violins": (55, 100), "violins2": (55, 96), "strings": (36, 96), "tremolo": (36, 96),
     "pizzicato": (28, 96), "cellos": (36, 76), "basses": (28, 60), "flutes": (60, 96),
@@ -2655,6 +3054,10 @@ RANGES = {
     "guitar": (GUITAR_LOW, GUITAR_KEYS[1]), "guitar_mute": (GUITAR_LOW, GUITAR_KEYS[1]),
     # the rock organ: a manual's 61 keys, C2-C7
     "rock_organ": (ORGAN_LOW, ORGAN_HIGH),
+    # the synthesizers: the bass C1-C4 (its sub felt more than heard under E1), the lead C3-C6,
+    # the arpeggio C2-C6, the pad C2-C6, the effects (a riser's goal, an impact's start) C1-C6
+    "synth_bass": (24, 60), "synth_lead": (48, 84), "synth_arp": (36, 84), "synth_pad": (36, 84),
+    "synth_fx": (24, 84),
     # the solo voice: C4-C6 at the most (her recordings: C4, C5, F5); she sings best A4-A5 (VOICE_BEST)
     "solo_voice": (60, 84),
 }
@@ -2683,7 +3086,9 @@ ROOM = {"flutes": -20.8, "horns": -17.5, "horn_solo": -17.5, "trumpets": -39.3, 
         # the guitar: close-miked in a small room of its own (_studio_room), sent to the hall
         # only a little (-12 dB) - a rhythm guitar is heard dry, in front, not across a hall
         "guitar": HALL_ROOM_GUITAR, "guitar_lead": HALL_ROOM_GUITAR,
-        "rock_organ": HALL_ROOM_GUITAR}     # (the rock organ's speaker too: in its room, in front)
+        "rock_organ": HALL_ROOM_GUITAR,     # (the rock organ's speaker too: in its room, in front)
+        # (and the synthesizers: close, electronic - in the small room, in front)
+        **{part: HALL_ROOM_GUITAR for part in ("synth_bass", "synth_lead", "synth_arp", "synth_pad", "synth_fx")}}
 HALL_ROOM = -12.8
 # (A part playing its own recordings is sent as OWN says; the brass BRASS_DRY_DB drier:
 # part_send_db.)
@@ -2764,6 +3169,8 @@ def _stem(syn, sfid, fonts, name: str, events: list, total: int, rate: int, shor
         return _guitar_stem(syn, sfid, fonts, events, total, rate)
     if part in ORGAN:                                       # (the rock organ: setBfree, or synthesized)
         return _organ_stem(events, total, rate, organ)
+    if part in SYNTH:                                       # (a synthesizer: synthesized here)
+        return _synth_stem(part, events, total, rate)
     if part in VOICE and _voice() is not None:              # (the solo voice: the singer, or the choir)
         return _voice_stem(events, total, rate, _voice())
     if short:

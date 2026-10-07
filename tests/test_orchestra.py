@@ -1214,6 +1214,136 @@ def test_an_arrangement_plays_the_solo_horn_over_the_brass(new_fonts):
     assert float(abs(samples).max()) > 0.05
 
 
+# --- the synthesizers ---
+SYNTHS = ("synth_bass", "synth_lead", "synth_arp", "synth_pad", "synth_fx")
+
+
+def _synth_figure(part, vel=100, at=0.2):
+    """A part's own kind of figure, as events: the bass's and the lead's line, the arpeggio's
+    eighths, the pad's held chord, a riser into an impact."""
+    if part == "synth_pad":
+        notes = [(at, at + 6.0, k) for k in (50, 57, 62, 65)]
+    elif part == "synth_arp":
+        notes = [(at + i * 0.125, at + i * 0.125 + 0.1, [50, 53, 57, 62, 57, 53, 50, 45][i % 8]) for i in range(48)]
+    elif part == "synth_fx":
+        notes = [(at, at + 4.0, 62), (at + 4.0, at + 4.3, 38)]
+    else:
+        line, t, notes = [(62, 1), (65, .5), (64, .5), (69, 2), (70, 1), (69, 2.5)], at, []
+        for k, d in line:
+            notes.append((t, t + d * 0.95, k - (24 if part == "synth_bass" else 0)))
+            t += d
+    return [ev for a, b, k in notes for ev in ((a, 1, part, k, vel), (b, 0, part, k, 0))]
+
+
+def test_the_synthesizers_are_parts_synthesized_here_needing_no_download():
+    assert set(SYNTHS) == set(orchestra.SYNTH) and set(SYNTHS) <= set(orchestra.PARTS)
+    for part in SYNTHS:
+        assert len(orchestra.PARTS[part]) == 4                       # (no sound set: _synth_stem)
+        assert orchestra.LOUDNESS[part] == 0.0                       # (their level: SYNTH's "level_db")
+        assert orchestra.send_db(orchestra.ROOM[part]) == -12.0     # close, in front: mostly dry
+        lo, hi = orchestra.RANGES[part]
+        assert 24 <= lo < hi <= 84
+    assert orchestra.RANGES["synth_bass"] == (24, 60) and orchestra.RANGES["synth_lead"] == (48, 84)
+    assert orchestra.SPEAKS["synth_pad"] >= 0.5                     # (it swells: the critic's short-note check)
+    assert not {p for p in SYNTHS if p in orchestra.EXTRA_FONTS}
+
+
+@pytest.mark.parametrize("part", SYNTHS)
+def test_each_synth_is_dark_clean_and_starts_and_ends_without_a_click(part):
+    np = pytest.importorskip("numpy")
+    rate = 44100
+    first, stem = orchestra._synth_stem(part, _synth_figure(part), int(16 * rate), rate)   # (room to ring out)
+    y = np.asarray(stem, dtype="float64")
+    assert first == int((0.2 - orchestra.SYNTH_LEAD_IN) * rate) and y.shape[1] == 2
+    peak = float(abs(y).max())
+    assert peak > 1e-3
+    m = y.mean(axis=1)
+    spec = np.abs(np.fft.rfft(m)) ** 2
+    f = np.fft.rfftfreq(len(m), 1 / rate)
+    assert spec[f > 8000].sum() < 0.001 * spec.sum()                 # no fizz, no static
+    assert spec[f > 5000].sum() < 0.01 * spec.sum()
+    assert float(abs(y[:int(0.0005 * rate)]).max()) < 0.05 * peak     # it starts from silence...
+    assert float(abs(y[-int(0.01 * rate):]).max()) < 1e-3 * peak       # ... and rings out to it
+
+
+@pytest.mark.parametrize("part", ["synth_bass", "synth_pad", "synth_fx"])
+def test_a_synths_low_end_is_mono(part):
+    np = pytest.importorskip("numpy")
+    rate = 44100
+    _, stem = orchestra._synth_stem(part, _synth_figure(part), int(10 * rate), rate)
+    y = np.asarray(stem, dtype="float64")
+    f = np.fft.rfftfreq(len(y), 1 / rate)
+    side = np.abs(np.fft.rfft(y[:, 0] - y[:, 1])) ** 2
+    mid = np.abs(np.fft.rfft(y[:, 0] + y[:, 1])) ** 2
+    low = f < orchestra.SYNTH_MONO_HZ
+    assert side[low].sum() < 1e-6 * mid[low].sum()                    # below 150 Hz: one, in phase
+    if part != "synth_bass":
+        assert side[f > 400].sum() > 0.01 * mid[f > 400].sum()        # (above it: wide)
+
+
+@pytest.mark.parametrize("part,want", [("synth_bass", -36.6), ("synth_lead", -36.6), ("synth_arp", -36.6),
+                                       ("synth_pad", -39.4), ("synth_fx", -36.5)])
+def test_the_same_velocity_is_the_same_loudness(part, want):
+    np = pytest.importorskip("numpy")
+    rate = 44100
+    lufs = lambda v: orchestra.loudness(np.asarray(orchestra._synth_stem(part, _synth_figure(part, v), int(10 * rate), rate)[1],  # noqa: E731
+                                                   dtype="float64"), rate)["integrated"]
+    at = lufs(100)
+    assert at == pytest.approx(want, abs=1.0)        # (a line as loud as the horns', the pad as the strings')
+    assert -11.0 < lufs(64) - at < -5.0 and 1.5 < lufs(127) - at < 6.0   # (GM's curve: velocity squared)
+
+
+def test_the_mono_synths_glide_through_legato_notes_and_strike_again_after_a_rest():
+    np = pytest.importorskip("numpy")
+    rate = 44100
+
+    def dip(gap):
+        """How low it falls just before its second note (against the first held)."""
+        ev = [(0.2, 1, "synth_lead", 62, 100), (1.2, 0, "synth_lead", 62, 0),
+              (1.2 + gap, 1, "synth_lead", 65, 100), (2.6, 0, "synth_lead", 65, 0)]
+        first, stem = orchestra._synth_stem("synth_lead", ev, int(3 * rate), rate)
+        m = np.asarray(stem, dtype="float64").mean(axis=1)
+        rms = lambda t: float(np.sqrt((m[int(t * rate) - first - int(0.01 * rate):int(t * rate) - first] ** 2).mean()))   # noqa: E731
+        return rms(1.2 + gap) / rms(1.0)
+    assert dip(0.0) > 0.5                                            # legato: one breath, gliding
+    assert dip(0.5) < 0.1                                            # after a rest: struck again
+
+
+def test_a_synth_fx_note_is_a_riser_into_its_end_or_a_short_impact():
+    np = pytest.importorskip("numpy")
+    rate = 44100
+    _, stem = orchestra._synth_stem("synth_fx", [(0.0, 1, "synth_fx", 62, 100), (3.0, 0, "synth_fx", 62, 0)],
+                                    int(5 * rate), rate)
+    m = np.asarray(stem, dtype="float64").mean(axis=1)
+    rms = lambda a, b: float(np.sqrt((m[int(a * rate):int(b * rate)] ** 2).mean()))   # noqa: E731
+    assert rms(2.6, 2.95) > 4 * rms(0.5, 1.0)                        # it rises...
+    assert rms(3.2, 3.3) < 0.05 * rms(2.6, 2.95)                     # ... and stops at the note's end
+    _, hit = orchestra._synth_stem("synth_fx", [(0.0, 1, "synth_fx", 38, 100), (0.2, 0, "synth_fx", 38, 0)],
+                                   int(5 * rate), rate)
+    h = np.asarray(hit, dtype="float64").mean(axis=1)
+    assert 2.5 * rate <= len(h) < 3.2 * rate                         # an impact rings ~2.5 s, whatever its length
+    assert float(abs(h[int(1.5 * rate):]).max()) > 0.01 * float(abs(h).max())
+
+
+def test_the_synths_play_in_the_orchestra_mostly_dry(monkeypatch):
+    np = pytest.importorskip("numpy")
+    pytest.importorskip("tinysoundfont")
+    if not orchestra.SF2.is_file():
+        pytest.skip("the SoundFont isn't downloaded here")
+    monkeypatch.setenv("GM_ORCHESTRA_WORKERS", "1")
+    sc = orchestra.Score()
+    for k in (38, 41):
+        sc.note("synth_bass", k, 0.2 + (k - 38) / 3, 0.9, 110)
+    for k in (50, 57, 62):
+        sc.note("synth_pad", k, 0.2, 2.0, 100)
+    sc.note("synth_lead:3", 69, 1.0, 1.0, 100)                       # (a layer: the tune, over the rest)
+    layers = orchestra.play_layers(sc, 3.0, lambda name: name.partition(":")[0], rate=44100)
+    for part in ("synth_bass", "synth_pad", "synth_lead"):
+        out = layers[part]
+        assert out.shape[1] == 2 and float(abs(out).max()) > 1e-3
+        assert float(abs(out.send).max()) < 0.3 * float(abs(out).max())
+
+
 # --- the solo voice ---
 def _voice_line(notes, part="solo_voice", vel=100):
     sc = orchestra.Score()

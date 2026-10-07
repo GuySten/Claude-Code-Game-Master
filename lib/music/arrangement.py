@@ -190,6 +190,16 @@ and held chords, C2-C7. Registered by passage on its own: held chords on all dra
 driven; riffs (notes under 0.6 s) on the lower six, driven hard. Its bass pedals play each
 chord's lowest note at C1, clean ("organ": "pedals", "pedal_db"). Rarer still than the guitar:
 a boss's third stage or later.
+Synthesizers - an eldritch boss's own voice, its third stage or later (the critic), the orchestra
+with menacing synths: synth_bass (a huge dark reese over a sine sub, its low end mono; C1-C4),
+synth_lead (a cutting, driven lead that carries a tune; C3-C6), synth_arp (a tight pulsing pluck
+for ostinatos; C2-C6), synth_pad (a dark pad, slow to swell and fade, drifting; C2-C6) and
+synth_fx (a note of 0.6 s or more: a riser climbing two octaves into its end - the downbeat is
+the orchestra's; a shorter one: an impact, ringing ~2.5 s; C1-C6). The bass and the lead are one
+voice each: a note joined to the last (legato) glides there without a new attack, a rest before
+it strikes again - write a driving bass's notes a little short; a chord is the pad's or the
+arpeggio's. Synthesized in the engine (no download), close and mostly dry; a line at the same
+velocity as loud as the horns', the pad's chord as the strings'.
 A real singer: solo_voice (VocalSet's soprano f4 alone on "ah": legato, her own vibrato; pp
 under velocity 64, a lone held note swells) - C4-C6, best A4-A5; held notes, none under 0.25 s.
 A boss's own voice, its third stage's surprise (a singer, a priest; boss-music 3c).
@@ -976,6 +986,22 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
                     "more, or a cue of one) - a special surprise, never a theme, a place or a first stage")
     # The rock organ is a rarer surprise still, held back for a boss's third stage (the host:
     # "rock organ sounds cool"): a stage 3+ or a cue of one ("stage": 3).
+    # The synthesizers are an eldritch boss's own voice (boss-music rule 3c: "an eldritch thing, an
+    # aberration, something from outside the world -> electronic / synth sounds"), held back the whole
+    # fight and revealed at its third stage: a stage 3+ or a cue of one ("stage": 3), as the rock organ.
+    synths = sorted(part for part in orchestra.SYNTH if by_part.get(part))
+    if synths and int(spec.get("stage", 1) or 1) < 3:
+        add("warn", f"{', '.join(synths)}: the synthesizers are an eldritch boss's own voice, held back for its "
+                    "third stage (a \"stage\" of 3 or more, or a cue of one) - never a theme, a place or an "
+                    "earlier stage")
+    # The synth bass and lead are one voice each (a mono synth): a note struck while another
+    # sounds takes the voice over, gliding to it - a chord collapses to one note.
+    for part in ("synth_bass", "synth_lead"):
+        on = sorted((a, b) for a, b, _ in by_part.get(part, []))
+        over = sum(1 for (a0, b0), (a1, _) in zip(on, on[1:]) if a1 < b0 - 0.05)
+        if over:
+            add("warn", f"{part}: {over} note(s) start while another still sounds - it is one voice (the new "
+                        "note takes it over, gliding there): a chord is synth_pad's or synth_arp's")
     if any(by_part.get(part) for part in orchestra.ORGAN) and int(spec.get("stage", 1) or 1) < 3:
         add("warn", "rock_organ: the rock organ is a rare surprise held back for a boss's third stage (a "
                     "\"stage\" of 3 or more, or a cue of one) - never a theme, a place or an earlier stage")

@@ -686,6 +686,29 @@ def test_the_rock_organ_speaker_and_registration_are_written_in_the_score():
             A.build(dict(s, organ=bad))
 
 
+def test_the_synthesizers_are_held_back_for_an_eldritch_bosss_third_stage():
+    s = {"tune": {"seed": "Test Hero", "cls": "Fighter"}, "tempo": 120, "statements": [],
+         "key": "D4", "meter": "4/4", "length": 8, "chords": [[0, 8, "i"]],
+         "lines": [{"part": "synth_bass", "notes": [[0, "D2", 1.5], [2, "F2", 1.5]]},
+                   {"part": "synth_pad", "notes": [[0, "D3", 8], [0, "A3", 8]]}]}
+    held = lambda sp: [m for lvl, m in A.check(sp, listen=False) if lvl == "warn" and "eldritch boss" in m]   # noqa: E731
+    assert held(s) and "synth_bass, synth_pad" in held(s)[0]     # a theme: no
+    assert held(dict(s, role="stage", stage=2))                 # a second stage: not yet
+    assert not held(dict(s, role="stage", stage=3))             # a third stage: the boss's own voice
+    assert not held(dict(s, role="hit", stage=3))               # a cue of one: yes
+
+
+def test_the_synth_bass_and_lead_are_one_voice_each():
+    s = {"tune": {"seed": "Test Hero", "cls": "Fighter"}, "tempo": 120, "statements": [], "stage": 3,
+         "key": "D4", "meter": "4/4", "length": 8, "chords": [[0, 8, "i"]]}
+    one = lambda sp: [m for lvl, m in A.check(sp, listen=False) if lvl == "warn" and "one voice" in m]   # noqa: E731
+    legato = dict(s, lines=[{"part": "synth_lead", "notes": [[0, "D4", 2], [2, "F4", 2], [4, "A4", 4]]}])
+    chord = dict(s, lines=[{"part": "synth_lead", "notes": [[0, "D4", 4], [0, "F4", 4]]}])
+    assert not one(legato) and one(chord) and "synth_lead" in one(chord)[0]
+    pad = dict(s, lines=[{"part": "synth_pad", "notes": [[0, "D4", 4], [0, "F4", 4]]}])
+    assert not one(pad)                                         # (the pad plays chords)
+
+
 def test_the_solo_voice_is_a_bosss_third_stage_surprise_held_slow_and_in_her_best_register():
     s = {"tune": {"seed": "Test Saint", "cls": "Cleric"}, "tempo": 60, "statements": [],
          "key": "C4", "meter": "4/4", "length": 8, "chords": [[0, 8, "i"]],

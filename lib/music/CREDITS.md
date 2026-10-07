@@ -72,3 +72,10 @@ under the GPL, version 2 or later, like the code it is built with (not under thi
 repository's licence); nothing else here links to setBfree. The synthesized organ in
 `orchestra.py` (`_organ_synth_stem`) is this repository's own, and plays when setBfree
 can't be built.
+
+## The synthesizers
+
+`synth_bass`, `synth_lead`, `synth_arp`, `synth_pad` and `synth_fx` are synthesized by the
+engine itself (`orchestra.py`, `_synth_stem`): this repository's own code - no recordings,
+no download, nothing to credit. Surge XT 1.3.4 (GPL-3, <https://github.com/surge-synthesizer/surge>)
+was built and auditioned for them and is not used.
