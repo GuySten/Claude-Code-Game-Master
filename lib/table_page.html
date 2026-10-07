@@ -3000,7 +3000,10 @@
     math.dir = "ltr";
     // The notation is math too: left to right in every language (in Hebrew a right-to-left
     // isolate turned 1ק20+3 into "20+3ק1"), its dice in Hebrew letters, keep-highest/lowest too.
-    math.innerHTML = `🎲 <bdi dir="ltr">${esc(rollNotation(r.notation || ""))}</bdi>: [${esc((r.rolls || []).join("+"))}]`
+    // Advantage and disadvantage read as words, not dice jargon: 2d20kh1-1 is "1d20-1, with advantage".
+    const edge = /^2d20k([hl])1\b(.*)$/i.exec(String(r.notation || "").replace(/\s+/g, ""));
+    const shown = edge ? "1d20" + edge[2] : (r.notation || "");
+    math.innerHTML = `🎲 <bdi dir="ltr">${esc(rollNotation(shown))}</bdi>: [${esc((r.rolls || []).join("+"))}]`
       + `${esc(mod)} = <span class="total">${esc(r.total)}</span>`;
     line.appendChild(math);
     const word = (text, cls) => {
@@ -3009,6 +3012,7 @@
       w.textContent = text;
       line.append("  ", w);
     };
+    if (edge) word(t(edge[1].toLowerCase() === "h" ? "rollWithAdv" : "rollWithDis"), "goal");
     if ((r.discarded || []).length) word(`(${t("rollDropped")} ${r.discarded.join(", ")})`, "goal");
     // Natural 1/20 decide only attack rolls (vs AC). On a check or save the total decides:
     // a 1 that succeeds adds a complication, a 20 that falls short is a near thing - and a

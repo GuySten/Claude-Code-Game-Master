@@ -311,7 +311,9 @@
   "mapBeen": "You've been here",
   "mapSeen": "Seen, not yet visited",
   "mapEmpty": "Nothing on the map yet.",
-  "fold": "Fold away (the button at the top brings it back)"
+  "fold": "Fold away (the button at the top brings it back)",
+  "rollWithAdv": "with advantage",
+  "rollWithDis": "with disadvantage"
  },
  "he": {
   "title": "השולחן",
@@ -625,6 +627,8 @@
   "mapBeen": "הייתם כאן",
   "mapSeen": "ראיתם, עוד לא הייתם",
   "mapEmpty": "עוד אין כלום על המפה.",
-  "fold": "לקפל (הכפתור למעלה מחזיר)"
+  "fold": "לקפל (הכפתור למעלה מחזיר)",
+  "rollWithAdv": "ביתרון",
+  "rollWithDis": "בחיסרון"
  }
 }
