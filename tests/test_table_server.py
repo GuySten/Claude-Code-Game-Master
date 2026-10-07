@@ -587,6 +587,30 @@ def test_hp_changes_wait_for_the_narration_that_explains_them(table):
     assert hp(pip)["Pip"] == 6
 
 
+
+def test_a_rolls_reason_the_gm_left_in_english_is_translated_for_the_table(table):
+    call, state, camp = table["call"], table["state"], table["camp"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    asked = []
+    state.narrator_ask = lambda system, prompt: asked.append(prompt) or json.dumps(
+        {k: [v, "חרב קצרה מול עורק אבן הלב"] for k, v in json.loads(prompt).items()})
+    _, body = call("/api/gm/roll", {"notation": "2d20kl1+5", "target": 12, "target_label": "AC", "pc": "Pip",
+                                    "why": "Shortsword vs Heartstone vein"}, host=True)   # (no --why-he)
+    for _ in range(100):
+        _, seen = call(f"/api/messages?code={CODE}&token={pip}&after=0")
+        card = [m for m in seen["messages"] if m["kind"] == "roll"][-1]
+        if card["event"].get("why_tr"):
+            break
+        time.sleep(0.05)
+    assert card["event"]["why_tr"] == {"he": "חרב קצרה מול עורק אבן הלב"}   # Hebrew only: it's in English
+    assert len(asked) == 1
+    again = TableState(camp, str(table["world"]))                              # and it outlives a restart
+    assert [m for m in again.messages if m["kind"] == "roll"][-1]["event"]["why_tr"]["he"] == "חרב קצרה מול עורק אבן הלב"
+    asked.clear()
+    call("/api/gm/roll", {"notation": "1d20", "pc": "Pip", "why": "Stealth", "why_tr": {"he": "התגנבות"}}, host=True)
+    time.sleep(0.3)
+    assert asked == []                                                          # given in every language: nothing to do
+
 def test_the_table_rolls_in_public_with_the_dc_fixed_first(table):
     call, state = table["call"], table["state"]
     pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]

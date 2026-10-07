@@ -363,6 +363,8 @@ class TableState:
                             target.pop("tr", None)
                         if entry.get("tr"):
                             target.setdefault("tr", {}).update(entry["tr"])
+                        if entry.get("why_tr"):   # a roll's reason, translated after it landed
+                            target.setdefault("event", {}).setdefault("why_tr", {}).update(entry["why_tr"])
                         if entry.get("read"):  # the GM read it: no more editing
                             target["read"] = True
                         if entry.get("redo"):  # it couldn't work: its player chose again
@@ -1975,9 +1977,39 @@ class TableState:
             if why_tr:
                 event["why_tr"] = why_tr
             msg = self.append("roll", "", pc=pc, event=event)
+            # A reason the GM didn't give in every table language ("--why-he" forgotten) is
+            # translated here, in the background, and lands on the card when it's ready.
+            written = languages.text_script(why or "")
+            missing = [l for l in self.table_langs()
+                       if why and l not in why_tr and languages.script(l) != written]
+            if missing:
+                threading.Thread(target=self._translate_why, args=(msg["id"], why, missing),
+                                 daemon=True).start()
         self.set_stage("dice")
         return {"ok": True, "result": result, "roll": roll, "message_id": msg["id"],
                 "secret": secret}
+
+    def _translate_why(self, msg_id: int, why: str, langs: List[str]) -> None:
+        """A roll's reason, into ``langs`` (the Narrator's model), patched onto its card."""
+        import narrator
+        for lang in langs:
+            try:
+                got = narrator.translate([why], lang, ask=self.narrator_ask).get(why)
+            except Exception as e:                   # offline...: the card keeps the GM's words
+                print(f"[roll] translating to {lang}: {e}", flush=True)
+                continue
+            got = " ".join(str(got or "").split())[:120]
+            if not got:
+                continue
+            with self.lock:
+                msg = next((m for m in self.messages if m["id"] == msg_id), None)
+                if msg is None:
+                    return
+                msg.setdefault("event", {}).setdefault("why_tr", {})[lang] = got
+                self.rev += 1
+                msg["rev"] = self.rev
+                with open(self.log_path, "a", encoding="utf-8") as f:
+                    f.write(json.dumps({"patch": msg_id, "why_tr": {lang: got}}, ensure_ascii=False) + "\n")
 
     def needs_translation(self, ids: Optional[List[int]] = None) -> List[Dict[str, Any]]:
         """What some language at the table can't read yet: [{id, pc, kind, from, to:
