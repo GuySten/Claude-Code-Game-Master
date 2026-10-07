@@ -29,6 +29,20 @@ each recording played as its SFZ describes it (volume, pan, envelope) and baked 
 SoundFont; the brass sections and the solo horn reduced to one microphone; the solo horn's
 recordings given crossfaded loops; levels set to match the rest of the orchestra.
 
+## The solo voice
+
+`solo_voice` sings from three recordings of **VocalSet: A Singing Voice Dataset** (Julia
+Wilkins, Prem Seetharaman, Alison Wahl, Bryan Pardo; ISMIR 2018), version 1.1, Zenodo,
+[doi:10.5281/zenodo.1442513](https://doi.org/10.5281/zenodo.1442513): its singer "f4" (a
+soprano) holding long tones on "ah" - forte, pianissimo, messa di voce
+(`FULL/female4/long_tones/*/f4_long_{forte,pp,messa}_a.wav`). Licence:
+[Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/).
+
+Changes made when she sings (`fetch_voice`, `_voice_stem`): the recordings' held notes found,
+analysed (pitch, pitch marks) and moved to the score's notes by pitch-synchronous overlap-add,
+held notes drawn back and forth over their recordings, notes joined legato, levels set, a
+small room added; the recordings themselves are kept unchanged on the machine that fetched them.
+
 ## The rest of the orchestra
 
 | What it plays | Recordings | Creator | Licence |

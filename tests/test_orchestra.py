@@ -1212,3 +1212,166 @@ def test_an_arrangement_plays_the_solo_horn_over_the_brass(new_fonts):
     assert not [m for lvl, m in A.check(s, listen=False) if lvl == "error"]
     samples, rate = A.render(s, rate=22050)
     assert float(abs(samples).max()) > 0.05
+
+
+# --- the solo voice ---
+def _voice_line(notes, part="solo_voice", vel=100):
+    sc = orchestra.Score()
+    for key, at, length in notes:
+        sc.note(part, key, at, length, vel)
+    return [e for e in sc.events]
+
+
+HOOK = [(72, 0.3, 1.0), (72, 1.3, 0.5), (72, 1.8, 0.5), (73, 2.3, 2.0)]    # her vow's hook: C C C, Db held
+
+
+@pytest.fixture
+def voice():
+    pytest.importorskip("numpy")
+    pytest.importorskip("soundfile")
+    have = all((orchestra.VOICE_DIR / m.rpartition("/")[2]).is_file() for m, *_ in orchestra.VOCALSET_F4.values())
+    if not have:
+        pytest.skip("the solo voice isn't fetched here (orchestra.fetch_voice)")
+    orchestra._VOICE.clear()
+    v = orchestra._voice()
+    if v is None:
+        pytest.skip("the solo voice can't be read here")
+    return v
+
+
+def test_the_solo_voice_is_a_singer_the_engine_sings_with_the_choir_as_her_stand_in():
+    assert orchestra.VOICE == {"solo_voice"} and len(orchestra.PARTS["solo_voice"]) == 4   # (sung, not a sound set)
+    assert orchestra.PARTS["solo_voice"][:2] == orchestra.PARTS["choir"][:2]              # her stand-in: the choir
+    assert orchestra.EXTRA_FONTS["voice"] is orchestra.fetch_voice
+    assert orchestra.RANGES["solo_voice"] == (60, 84) and orchestra.VOICE_BEST == (69, 81)   # C4-C6, best A4-A5
+    assert orchestra.level_db("solo_voice") == orchestra.level_db("choir")
+    assert orchestra.part_advance("solo_voice", own=True) == orchestra.VOICE_ADVANCE
+    assert orchestra.part_advance("solo_voice") == orchestra.ADVANCE["choir"]
+    assert set(orchestra.VOCALSET_F4) == {"forte", "pp", "messa"}
+
+
+def _member(name: str, data: bytes) -> bytes:
+    import zlib
+    c = zlib.compressobj(9, zlib.DEFLATED, -15)
+    raw = c.compress(data) + c.flush()
+    head = (b"PK\x03\x04" + (20).to_bytes(2, "little") + b"\0\0" + (8).to_bytes(2, "little") + b"\0" * 16
+            + len(name).to_bytes(2, "little") + (0).to_bytes(2, "little") + name.encode())
+    return head, raw
+
+
+def test_the_voice_wont_keep_a_recording_that_isnt_hers(tmp_path, monkeypatch):
+    member, off, csize, size, sha = orchestra.VOCALSET_F4["forte"]
+    fake = b"RIFF" + b"\0" * (size - 4)                           # the right size, not her recording
+    head, raw = _member(member, fake)
+    monkeypatch.setattr(orchestra, "VOCALSET_F4", {"forte": (member, off, len(raw), size, sha)})
+    def get(url, a, b):
+        assert url == orchestra.VOCALSET_URL and a >= off
+        blob = head + raw + b"\0" * 600
+        return blob[a - off: b - off]
+    monkeypatch.setattr(orchestra, "_range_get", get)
+    with pytest.raises(OSError, match="SHA-256"):
+        orchestra.fetch_voice(tmp_path / "v", quiet=True)
+    assert not (tmp_path / "v").exists() or not any((tmp_path / "v").iterdir())   # nothing kept
+    head2, _ = _member("FULL/female1/long_tones/forte/f1_long_forte_a.wav", fake)  # another member there
+    monkeypatch.setattr(orchestra, "_range_get", lambda url, a, b: (head2 + raw + b"\0" * 600)[a - off: b - off])
+    with pytest.raises(OSError, match="another member"):
+        orchestra.fetch_voice(tmp_path / "v", quiet=True)
+    # her own bytes (as pinned) are kept
+    monkeypatch.setattr(orchestra, "VOCALSET_F4", {"forte": (member, off, len(raw), size,
+                                                             __import__("hashlib").sha256(fake).hexdigest())})
+    monkeypatch.setattr(orchestra, "_range_get", get)
+    assert (orchestra.fetch_voice(tmp_path / "v", quiet=True) / "f4_long_forte_a.wav").read_bytes() == fake
+
+
+def _pitch_and_vibrato(np, y, rate):
+    ts, m = orchestra._yin(y, rate)
+    m = m[~np.isnan(m)]
+    dev = m - np.convolve(np.pad(m, 50, mode="edge"), np.ones(101) / 101, mode="same")[50:-50]
+    S = np.abs(np.fft.rfft(dev * np.hanning(len(dev)), 4096))
+    f = np.fft.rfftfreq(4096, 0.005)
+    band = (f > 3) & (f < 9)
+    return float(m.mean()), float(f[band][S[band].argmax()]), float(np.sqrt(2) * dev.std() * 100)
+
+
+@pytest.mark.parametrize("key", [69, 74, 80])
+def test_the_solo_voice_holds_a_note_in_tune_with_her_own_vibrato(voice, key):
+    np = pytest.importorskip("numpy")
+    rate = 44100
+    first, stem = orchestra._voice_stem(_voice_line([(key, 0.2, 3.0)]), 4 * rate, rate, voice)
+    y = stem.mean(axis=1).astype("float64")[int(1.0 * rate) - first: int(3.0 * rate) - first]
+    mean, hz, cents = _pitch_and_vibrato(np, y, rate)
+    assert abs(mean - key) * 100 < 10                                  # in tune, held
+    assert 4.5 < hz < 7.5 and 25 < cents < 120                         # her vibrato: ~6 Hz, a natural depth
+
+
+def test_the_solo_voice_sings_legato_without_clicks_and_a_repeat_is_sung_again(voice):
+    np = pytest.importorskip("numpy")
+    rate = 44100
+    first, stem = orchestra._voice_stem(_voice_line(HOOK + [(70, 4.3, 1.0), (79, 5.3, 1.5)]), 8 * rate, rate, voice)
+    y = np.zeros(8 * rate)
+    y[first: first + len(stem)] = stem.mean(axis=1)
+    lvl = lambda a, b: float(np.sqrt(np.mean(y[int(a * rate): int(b * rate)] ** 2)))   # noqa: E731
+    for join in (2.3, 4.3, 5.3):                                       # legato: no gap at a new pitch
+        assert lvl(join - 0.03, join + 0.03) > 0.4 * lvl(join - 0.3, join - 0.1), join
+    assert lvl(1.27, 1.3) < 0.6 * lvl(1.0, 1.2)                         # a repeated note: the voice dips
+    d = np.abs(np.diff(y))
+    worst = max(float(d[i: i + 882].max()) / (float(np.sqrt(np.mean(y[i: i + 882] ** 2))) + 1e-9)
+                for i in range(int(0.5 * rate), int(6.5 * rate), 882))
+    assert worst < 1.0                                                  # no click (her recording's own: ~0.7)
+    P = np.abs(np.fft.rfft(y)) ** 2
+    f = np.fft.rfftfreq(len(y), 1 / rate)
+    assert P[f > 8000].sum() / P.sum() < 0.002                         # no hiss
+    assert float(np.corrcoef(stem[:, 0], stem[:, 1])[0, 1]) > 0.8      # one singer, centred in her room
+
+
+def test_the_solo_voice_sings_soft_notes_from_her_pianissimo_and_a_long_lone_note_swells(voice, monkeypatch):
+    np = pytest.importorskip("numpy")
+    rate = 22050
+    used = []
+    real = orchestra._psola
+    monkeypatch.setattr(orchestra, "_psola", lambda src, *a, **k: used.append((src["style"], k.get("stretch")))
+                        or real(src, *a, **k))
+    orchestra._voice_stem(_voice_line([(72, 0.2, 1.0)], vel=40), 2 * rate, rate, voice)
+    orchestra._voice_stem(_voice_line([(77, 0.2, 1.0)], vel=100), 2 * rate, rate, voice)
+    orchestra._voice_stem(_voice_line([(77, 0.2, 3.0)], vel=100), 4 * rate, rate, voice)
+    assert used == [("pp", False), ("forte", False), ("messa", True)]
+    soft = orchestra._voice_stem(_voice_line([(77, 0.2, 1.5)], vel=50), 2 * rate, rate, voice)[1]
+    loud = orchestra._voice_stem(_voice_line([(77, 0.2, 1.5)], vel=100), 2 * rate, rate, voice)[1]
+    assert 4 < 20 * math.log10(float(np.sqrt((loud ** 2).mean())) / float(np.sqrt((soft ** 2).mean()))) < 8
+
+
+def test_a_forte_line_of_hers_is_as_loud_as_the_solo_horn(voice, monkeypatch):
+    np = pytest.importorskip("numpy")
+    pytest.importorskip("tinysoundfont")
+    if not (orchestra.SF2.is_file() and orchestra.HORN_SOLO_SF2.is_file()):
+        pytest.skip("the sound set or the solo horn isn't here")
+    monkeypatch.setenv("GM_ORCHESTRA_WORKERS", "1")
+    line = HOOK + [(70, 4.3, 1.0), (72, 5.3, 1.0), (79, 6.3, 1.0), (77, 7.3, 1.0), (72, 8.3, 2.0)]
+    lufs = {}
+    for part in ("solo_voice", "horn_solo"):
+        sc = orchestra.Score()
+        for k, a, n in line:
+            sc.note(part, k, a, n, 100)
+        lufs[part] = orchestra.loudness(np.asarray(orchestra.play(sc, 11.0), dtype="float64"))["integrated"]
+    assert abs(lufs["solo_voice"] - lufs["horn_solo"]) < 1.5
+
+
+def test_without_her_recordings_the_choir_sings_her_line_and_says_so_once(monkeypatch, capsys):
+    np = pytest.importorskip("numpy")
+    pytest.importorskip("tinysoundfont")
+    if not orchestra.SF2.is_file():
+        pytest.skip("the SoundFont isn't downloaded here")
+    monkeypatch.setattr(orchestra, "_VOICE", {})
+    def offline(**_):
+        raise OSError("offline")
+    monkeypatch.setattr(orchestra, "fetch_voice", offline)
+    monkeypatch.setenv("GM_ORCHESTRA_WORKERS", "1")
+    sc = orchestra.Score()
+    for k, a, n in HOOK:
+        sc.note("solo_voice", k, a, n, 100)
+    for _ in range(2):
+        out = orchestra.play(sc, 5.0)
+        assert float(abs(np.asarray(out)).max()) > 0.001                # heard, not silent
+    err = capsys.readouterr().err
+    assert err.count("no solo voice (offline)") == 1 and "choir sings her line" in err
+    assert orchestra.part_advance("solo_voice", own=orchestra._plays_own("solo_voice", {})) == orchestra.ADVANCE["choir"]

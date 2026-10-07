@@ -684,3 +684,23 @@ def test_the_rock_organ_speaker_and_registration_are_written_in_the_score():
                 {"pedal_db": "loud"}, {"pedal_db": 40}):
         with pytest.raises(A.ArrangementError):
             A.build(dict(s, organ=bad))
+
+
+def test_the_solo_voice_is_a_bosss_third_stage_surprise_held_slow_and_in_her_best_register():
+    s = {"tune": {"seed": "Test Saint", "cls": "Cleric"}, "tempo": 60, "statements": [],
+         "key": "C4", "meter": "4/4", "length": 8, "chords": [[0, 8, "i"]],
+         "lines": [{"part": "solo_voice", "notes": [[0, "C5", 1], [1, "C5", 0.5], [1.5, "C5", 0.5], [2, "C#5", 2]]}]}
+    warns = lambda sp: [m for lvl, m in A.check(sp, listen=False) if lvl == "warn" and "solo_voice" in m]   # noqa: E731
+    assert any("third stage" in m for m in warns(dict(s, role="stage", stage=2)))   # an earlier stage: spent
+    assert not warns(dict(s, role="stage", stage=3))                   # her stage
+    assert not warns(s)                                                 # a theme: allowed (a choice)
+    quick = dict(s, tempo=120, role="stage", stage=3)                  # eighths at 120: 0.25 s - just held
+    assert not warns(quick)
+    quick = dict(quick, lines=[{"part": "solo_voice", "notes": [[0, "C5", 0.25], [0.25, "D5", 0.25], [0.5, "C5", 1]]}])
+    assert any("quick notes" in m for m in warns(quick))               # 0.125 s: an instrument, not a singer
+    low = dict(s, role="stage", stage=3, lines=[{"part": "solo_voice", "notes": [[0, "E4", 2], [2, "C5", 2]]}])
+    assert any("sings best" in m for m in warns(low))
+    out = dict(s, role="stage", stage=3, lines=[{"part": "solo_voice", "notes": [[0, "B3", 2]]}])
+    assert any(lvl == "error" and "out of its range" in m for lvl, m in A.check(out, listen=False))
+    two = dict(s, role="stage", stage=3, lines=[{"part": "solo_voice", "notes": [[0, "C5", 2], [1, "G5", 2]]}])
+    assert any("one note at a" in m for m in warns(two))

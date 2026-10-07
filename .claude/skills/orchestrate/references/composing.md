@@ -227,7 +227,10 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
   tune that must cut through - a call, a hero's line over the band; it carries a tune more
   clearly than the section [H "6b is the best"]), trumpets, tuba, brass (the brass sits drier
   than the strings: less hall), harp, celesta, glockenspiel, bells, organ,
-  timpani, solo_violin; voices choir, chorus, men_choir, choir_oo, choir_oh; drums kit,
+  timpani, solo_violin; voices choir, chorus, men_choir, choir_oo, choir_oh; `solo_voice` (a real
+  soprano alone on "ah", VocalSet's f4: legato, her own vibrato, pp under velocity 64, a lone held
+  note swells; C4-C6, best A4-A5; held notes only, none under 0.25 s - a singer/priest boss's
+  stage-3 surprise, boss-music 3c [H "f4 is her"]; critic); drums kit,
   taiko, toms, reverse_cymbal (`"patterns"`); real struck percussion, let ring: `gong` (a big
   tam-tam - for transformations and the biggest arrivals; the kit's "gong" is a crash cymbal),
   `anvil` and `brake_drum` (metal hits, sparingly), `bass_drum` (orchestral: weight);

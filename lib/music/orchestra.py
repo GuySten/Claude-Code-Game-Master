@@ -117,6 +117,9 @@ PARTS = {
     "rock_organ": (0, 18, 64, 100),
     # and a lead guitar: one player, single-tracked near centre, its own amp pushed harder
     "guitar_lead": (0, 0, 64, 100, "guitar"), # a solo line: one note at a time, singing, vibrato
+    # a real singer, alone (VocalSet's soprano f4, "ah"): sung by the engine (_voice_stem), not a
+    # sound set; its bank and preset are its stand-in's - the sound set's choir, when she can't be had
+    "solo_voice": (0, 52, 64, 100),
 }
 # Where a part's own sound set can't be had: the sound set's choir; for the percussion, the
 # GM kit's nearest (bank, preset, its key): a crash cymbal for the gong, the cowbell, an agogo.
@@ -1133,13 +1136,18 @@ def _sampled_stem(syn, font: int, part: str, how: dict, events: list, total: int
 
 
 def _plays_own(part: str, fonts: dict) -> bool:
-    """Whether a part plays its own recordings here (OWN: their font loaded), not the stand-in."""
+    """Whether a part plays its own recordings here (OWN: their font loaded; the solo voice: hers
+    to be had), not the stand-in."""
+    if part in VOICE:
+        return _voice() is not None
     return part in OWN and fonts.get(OWN[part]["font"]) is not None
 
 
 def part_send_db(part: str, own: bool = False) -> float:
     """A part's hall send (dB): matched to the room its recording carries (ROOM; its own
     recordings: OWN's), the brass's BRASS_DRY_DB under that."""
+    if part in VOICE and own:
+        return VOICE_SEND_DB
     base = OWN[part]["send_db"] if own and part in OWN else send_db(ROOM.get(part))
     return base + (BRASS_DRY_DB if part in BRASS_DRY else 0.0)
 
@@ -1150,6 +1158,8 @@ def part_advance(part: str, short: bool = False, own: bool = False) -> float:
         return STRINGS_SHORT[part]["advance"]
     if own and part in OWN:
         return OWN[part]["advance"]
+    if part in VOICE:                                   # (the singer's own; her stand-in, the choir's)
+        return VOICE_ADVANCE if own else ADVANCE["choir"]
     return ADVANCE.get(part, 0.0)
 
 
@@ -2189,9 +2199,400 @@ def _guitar_lead_stem(syn, sfid, fonts, events: list, total: int, rate: int):
     return first, _studio_room(np.stack(sides, axis=1), rate).astype("float32")
 
 
+# --- the solo voice ---
+# A real singer: VocalSet (Wilkins, Seetharaman, Wahl & Pardo, 2018, doi:10.5281/zenodo.1442513;
+# CC BY 4.0: lib/music/CREDITS.md) - its soprano "f4" holding long tones on "ah" (C4, C5 and F5:
+# forte, with her own vibrato; pianissimo; a messa di voce, swelling and fading). The host heard
+# her as the Ashen Saint's own voice, held back for the fight's third stage ("f4 is her"; boss-music
+# 3c). Her three recordings (2.9 MB) are read out of the dataset's 2 GB zip by range request, each
+# checked (its size, its SHA-256), into VOICE_DIR - never kept in the repo (fetch_voice). She sings
+# the score's line (_voice_stem): one voice, her recordings moved to its notes pitch-synchronously
+# (TD-PSOLA: the vowel stays hers - resampling would make her a chipmunk), her vibrato carried over,
+# legato within a phrase (a glide between notes; a repeated note sung again, the voice dipping),
+# a held note's recording turned back and forth, never looped by a seam; velocity picks pianissimo
+# or forte, and a lone note held VOICE_MESSA_S or more swells (her messa di voce, stretched to it).
+VOICE = {"solo_voice"}
+VOICE_DIR = Path(os.environ.get("ORCHESTRA_VOICE_DIR") or SF2.parent / "vocalset-f4")
+VOCALSET_URL = "https://zenodo.org/api/records/1442513/files/VocalSet11.zip/content"   # (VocalSet 1.1, 2.1 GB)
+VOCALSET_F4 = {         # style: (its member in the zip, the member's offset, compressed size, size, SHA-256)
+    "forte": ("FULL/female4/long_tones/forte/f4_long_forte_a.wav", 1291179892, 730049, 982356,
+              "e7f4280fdaad5d47dc8182128581fdc510be2fa188221da7de8774d6ea923839"),
+    "pp": ("FULL/female4/long_tones/pp/f4_long_pp_a.wav", 1279520383, 586199, 965700,
+           "5cfc45fdcf71f2bab03b7760887c894a2f31791a94553ea04597c56c5a695ebc"),
+    "messa": ("FULL/female4/long_tones/messa/f4_long_messa_a.wav", 1292677339, 745071, 1074794,
+              "a3fe12ee4d5bebec5b302196eb6148de14096535c1744fb36df0f8321fc183b3"),
+}
+VOICE_BEST = (69, 81)       # A4-A5: where she sings best (the critic says so outside it; RANGES: C4-C6)
+VOICE_PP_VEL = 64           # a note under this velocity: her pianissimo; from it, her forte
+VOICE_MESSA_S = 2.5         # a lone note held this long (a phrase of one, from velocity VOICE_PP_VEL): it swells
+VOICE_LEGATO_S = 0.15       # a note starting within this of the last one's end: sung legato, one breath
+VOICE_GLIDE_S = 0.09        # her glide from note to note, legato
+VOICE_XFADE_S = 0.08        # where the recording she sings from changes (another note's, another style's)
+VOICE_RELEASE_S = 0.2       # a phrase's end: the voice stops over this
+VOICE_TILT_DB = 1.0         # higher, louder: this much every 4 semitones over C5 (a voice's register)
+VOICE_ROOM = (0.45, 0.14)   # her own small room (RT60 s, its level) before the hall: a soloist, not dry
+VOICE_LEVEL_DB = -47.2      # her stem: a forte line as loud as horn_solo's at the same velocity (measured)
+VOICE_ADVANCE = 0.07        # her attack speaks this late (s): played that early (ADVANCE)
+VOICE_SEND_DB = -3.0        # her hall send: a soloist in front, a little drier than the choir
+VOICE_SHORT_S = 0.25        # (the critic: a solo voice can't spit notes quicker than this)
+_VOICE_ANALYSIS = 4         # (the analysis kept beside the recordings: its version)
+_VOICE: Dict[str, object] = {}
+
+
+def _range_get(url: str, a: int, b: int) -> bytes:
+    """Bytes a..b-1 of a (big, untrusted) download, by a range request - exactly those."""
+    req = urllib.request.Request(url, headers={"Range": f"bytes={a}-{b - 1}"})
+    with urllib.request.urlopen(req, timeout=120) as r:
+        data = r.read(b - a + 1)
+    if len(data) != b - a:
+        raise OSError(f"asked {url} for {b - a} bytes, got {len(data)}")
+    return data
+
+
+def fetch_voice(dest: Path = None, quiet: bool = False) -> Path:
+    """The solo voice's recordings (VOCALSET_F4: 2.9 MB, once) into ``dest`` (VOICE_DIR): each read
+    out of VocalSet's zip by a range request (its member's local header, then its deflated bytes),
+    and kept only if its size and SHA-256 are the pinned ones."""
+    import hashlib
+    import zlib
+    dest = Path(dest or VOICE_DIR)
+    for style, (member, off, csize, size, sha) in VOCALSET_F4.items():
+        out = dest / member.rpartition("/")[2]
+        if out.is_file() and out.stat().st_size == size and hashlib.sha256(out.read_bytes()).hexdigest() == sha:
+            continue
+        if not quiet:
+            print(f"[orchestra] downloading the solo voice's {style} (VocalSet, {csize >> 10} KB, once)",
+                  file=sys.stderr, flush=True)
+        head = _range_get(VOCALSET_URL, off, off + 30 + 512)
+        if head[:4] != b"PK\x03\x04":
+            raise OSError(f"VocalSet's zip has no member at {off} ({member})")
+        method = int.from_bytes(head[8:10], "little")
+        n, m = int.from_bytes(head[26:28], "little"), int.from_bytes(head[28:30], "little")
+        if head[30:30 + n].decode("utf-8", "replace") != member or method not in (0, 8):
+            raise OSError(f"VocalSet's zip has another member at {off}, not {member}")
+        raw = _range_get(VOCALSET_URL, off + 30 + n + m, off + 30 + n + m + csize)
+        data = zlib.decompressobj(-15).decompress(raw, size + 1) if method == 8 else raw
+        got = hashlib.sha256(data).hexdigest()
+        if len(data) != size or got != sha:
+            raise OSError(f"{member} is not VocalSet's recording ({len(data)} bytes, SHA-256 {got})")
+        dest.mkdir(parents=True, exist_ok=True)
+        part = out.with_suffix(".part")
+        part.write_bytes(data)
+        part.replace(out)
+    return dest
+
+
+def _yin(x, rate: int, hop: float = 0.005, win: float = 0.04, fmin: float = 150.0, fmax: float = 1100.0):
+    """A voice's pitch (YIN: de Cheveigne & Kawahara) -> (frame centres s, MIDI pitch, nan unvoiced)."""
+    import numpy as np
+    H, W, tmax, tmin = int(hop * rate), int(win * rate), int(rate / fmin), int(rate / fmax)
+    starts = np.arange(0, max(0, len(x) - W - tmax), H)
+    n = W + tmax
+    N = _fast_len(2 * n)
+    cs = np.concatenate([[0.0], np.cumsum(x * x)])
+    lags = np.arange(tmax + 1)
+    midi = np.full(len(starts), np.nan)
+    for b0 in range(0, len(starts), 256):
+        st = starts[b0:b0 + 256]
+        idx = st[:, None] + np.arange(n)[None, :]
+        seg = x[idx]
+        corr = np.fft.irfft(np.conj(np.fft.rfft(seg[:, :W], N, axis=1)) * np.fft.rfft(seg, N, axis=1), N,
+                            axis=1)[:, :tmax + 1]
+        e0 = (cs[st + W] - cs[st])[:, None]
+        et = cs[st[:, None] + lags[None, :] + W] - cs[st[:, None] + lags[None, :]]
+        d = np.maximum(e0 + et - 2 * corr, 0.0)
+        d[:, 0] = 0.0
+        cm = np.ones_like(d)
+        cm[:, 1:] = d[:, 1:] * lags[1:] / np.maximum(np.cumsum(d[:, 1:], axis=1), 1e-12)
+        for i in range(len(st)):
+            c = cm[i]
+            cand = np.nonzero(c[tmin:] < 0.15)[0]
+            if not len(cand):
+                continue
+            t = int(cand[0]) + tmin
+            while t + 1 <= tmax and c[t + 1] < c[t]:
+                t += 1
+            if 1 <= t < tmax:
+                a1, b1, c1 = c[t - 1], c[t], c[t + 1]
+                den = a1 - 2 * b1 + c1
+                p = t + (0.5 * (a1 - c1) / den if den else 0.0)
+                midi[b0 + i] = 69 + 12 * math.log2(rate / p / 440.0)
+    return (starts + W / 2) / rate, midi
+
+
+def _voice_sources(x, rate: int, style: str) -> List[dict]:
+    """A long-tone recording's held notes, each ready to sing from: its samples (the attack on),
+    its pitch contour (her vibrato), its pitch marks (a period apart), its held part, its level."""
+    import numpy as np
+    w = int(0.01 * rate)
+    db = 20 * np.log10(np.sqrt(np.convolve(x * x, np.ones(w) / w, "same")[::w]) + 1e-9)
+    on = db > db.max() - 32
+    runs, i = [], 0
+    while i < len(on):                                  # (sung stretches, gaps under 150 ms bridged)
+        if not on[i]:
+            i += 1
+            continue
+        j = i
+        while j < len(on) and (on[j] or on[j:j + 15].any()):
+            j += 1
+        runs.append((i * 0.01, j * 0.01))
+        i = j
+    out = []
+    for a, b in runs:
+        if b - a < 1.6:
+            continue
+        pad = 0.1
+        s0, s1 = max(0, int((a - pad) * rate)), min(len(x), int((b + pad) * rate))
+        seg = x[s0:s1]
+        ts, m = _yin(seg, rate)
+        good = ~np.isnan(m)
+        if good.mean() < 0.5:
+            continue
+        med = float(np.nanmedian(m))
+        steady = np.nonzero(good & (np.abs(m - med) < 1.0))[0]
+        t0, t1 = float(ts[steady[0]]), float(ts[steady[-1]])
+        core = (ts > t0 + 0.3) & (ts < t1 - 0.1)
+        med = float(np.nanmedian(m[core])) if core.any() else med
+        bad = ~good | (np.abs(m - med) > 2.5)          # (a stray octave, an unvoiced edge: the line through)
+        if bad.all():
+            continue
+        m = m.copy()
+        m[bad] = np.interp(ts[bad], ts[~bad], m[~bad])
+        k = 5
+        m = np.convolve(np.pad(m, k, mode="edge"), np.ones(2 * k + 1) / (2 * k + 1), mode="same")[k:-k]
+        if core.any():
+            med = float(m[core].mean())                  # (her vibrato's centre: its mean)
+        tt = np.arange(len(seg)) / rate
+        f = 440 * 2 ** ((np.interp(tt, ts, m) - 69) / 12)
+        ph = np.cumsum(f) / rate
+        lp = np.convolve(seg, np.ones(8) / 8, mode="same")
+        best, bo = -1e18, 0.0
+        for o in np.linspace(0, 1, 16, endpoint=False):     # (the marks on the waveform's peaks)
+            idx = np.searchsorted(ph, np.arange(math.ceil(ph[0]), ph[-1]) + o)
+            idx = idx[(idx > 0) & (idx < len(seg))]
+            if lp[idx].sum() > best:
+                best, bo = float(lp[idx].sum()), float(o)
+        marks = np.searchsorted(ph, np.arange(math.ceil(ph[0]), ph[-1]) + bo)
+        marks = marks[(marks > 0) & (marks < len(seg) - 1)]
+        ls, le = t0 + 0.4, t1 - 0.15
+        if le - ls < 0.5:
+            continue
+        held = seg[int(ls * rate): int(le * rate)]
+        lvl = np.sqrt(np.convolve(seg * seg, np.ones(w) / w, "same")[::w])
+        up = np.nonzero(lvl > np.sqrt(np.mean(held ** 2)) * 10 ** (-15 / 20))[0]
+        att = max(0.0, min(t0, (up[0] if len(up) else 0) * 0.01 - 0.02))   # (her onset: its slow swell left out)
+        out.append({"style": style, "x": seg.astype("float32"), "ts": ts.astype("float32"),
+                    "m": m.astype("float32"), "marks": marks.astype("int32"),
+                    "per": (rate / f[marks]).astype("float32"),
+                    "meta": np.array([med, att, ls, le, float(np.sqrt(np.mean(held ** 2))), t1], dtype="float64")})
+    return out
+
+
+def _voice(quiet: bool = True) -> Optional[dict]:
+    """Her recordings, analysed (once a process; the analysis kept beside them) - or None, said
+    once: the sound set's choir sings her line instead."""
+    if "v" in _VOICE:
+        return _VOICE["v"]
+    try:
+        import numpy as np
+        import soundfile
+        d = fetch_voice(quiet=quiet)
+        cache = d / f"analysis-{_VOICE_ANALYSIS}.npz"
+        srcs: List[dict] = []
+        if cache.is_file():
+            try:
+                z = np.load(cache, allow_pickle=False)
+                for i in range(int(z["count"])):
+                    srcs.append({k: z[f"{i}_{k}"] for k in ("x", "ts", "m", "marks", "per", "meta")})
+                    srcs[-1]["style"] = str(z[f"{i}_style"])
+            except Exception:
+                srcs = []
+        if not srcs:
+            rate = None
+            for style, (member, *_rest) in VOCALSET_F4.items():
+                x, rate = soundfile.read(str(d / member.rpartition("/")[2]), dtype="float64", always_2d=True)
+                srcs += _voice_sources(x.mean(axis=1), rate, style)
+            if rate != RATE:
+                raise OSError(f"the voice's recordings are at {rate} Hz, not {RATE}")
+            flat = {"count": np.array(len(srcs))}
+            for i, s in enumerate(srcs):
+                flat.update({f"{i}_{k}": v for k, v in s.items() if k != "style"})
+                flat[f"{i}_style"] = np.array(s["style"])
+            part = cache.with_suffix(".part.npz")
+            np.savez(part, **flat)
+            part.replace(cache)
+        styles = {}
+        for s in srcs:
+            styles.setdefault(s["style"], []).append(s)
+        if not {"forte", "pp"} <= set(styles):
+            raise OSError("her forte or pianissimo notes weren't found in the recordings")
+        _VOICE["v"] = styles
+    except Exception as e:
+        _VOICE["v"] = None
+        print(f"[orchestra] no solo voice ({e}): the sound set's choir sings her line "
+              f"(orchestra.fetch_voice fetches the real one)", file=sys.stderr)
+    return _VOICE["v"]
+
+
+def _voice_phrases(events: list, total: int, rate: int) -> list:
+    """The line she sings: [(phrase start s, [(start, end, key, vel), ...])] - one voice (a new
+    note ends the last), legato where a note starts within VOICE_LEGATO_S of the last one's end
+    (held on to it); the score's slides kept apart."""
+    ons: Dict[int, list] = {}
+    notes = []
+    for t, is_on, _, key, vel in sorted(events, key=lambda e: (e[0], e[1])):
+        if is_on == 1:
+            ons.setdefault(key, []).append((t, vel))
+        elif is_on == 0 and ons.get(key):
+            t0, v = ons[key].pop(0)
+            notes.append((t0, t, key, v))
+    notes += [(t0, total / rate, key, v) for key, left in ons.items() for t0, v in left]
+    notes.sort()
+    phrases: list = []
+    for i, (t0, t1, key, v) in enumerate(notes):
+        if i + 1 < len(notes):
+            t1 = min(t1, notes[i + 1][0])
+        if t1 - t0 < 0.01:
+            continue
+        if phrases and t0 - phrases[-1][-1][1] <= VOICE_LEGATO_S:
+            a, _, k, vv = phrases[-1][-1]
+            phrases[-1][-1] = (a, t0, k, vv)                # (held on into the next: legato)
+            phrases[-1].append((t0, t1, key, v))
+        else:
+            phrases.append([(t0, t1, key, v)])
+    return phrases
+
+
+def _psola(src: dict, target, dur: float, rate: int, stretch: bool = False):
+    """``src`` sung for ``dur`` s at ``target`` (MIDI, a 1 ms grid; her vibrato added): its grains,
+    a pitch period each, laid a target period apart - the vowel kept. Through her attack, then
+    back and forth over the held part (``stretch``: the whole note drawn out to ``dur``: a swell)."""
+    import numpy as np
+    x, ts, m, marks, per = src["x"], src["ts"], src["m"], src["marks"], src["per"]
+    med, att, ls, le, _, t1 = (float(v) for v in src["meta"])
+    out = np.zeros(int((dur + 0.1) * rate) + 4096)
+    span = le - ls
+    tau = 0.0
+    while tau < dur:
+        if stretch:
+            s = att + (t1 - 0.05 - att) * tau / dur
+        else:
+            s = att + tau
+            if s > le:
+                q = (s - le) % (2 * span)
+                s = le - q if q < span else ls + (q - span)
+        k = int(np.clip(np.searchsorted(marks, s * rate), 1, len(marks) - 1))
+        if abs(marks[k - 1] - s * rate) < abs(marks[k] - s * rate):
+            k -= 1
+        mk, P = int(marks[k]), int(round(float(per[k])))
+        g = x[mk - P: mk + P + 1]
+        if mk - P < 0 or len(g) < 2 * P + 1:
+            tau += P / rate
+            continue
+        want = target[min(len(target) - 1, int(tau * 1000))] + (float(np.interp(s, ts, m)) - med)
+        Pout = rate / (440.0 * 2 ** ((want - 69) / 12))
+        c = int(round(tau * rate))
+        out[c: c + 2 * P + 1] += g * np.hanning(2 * P + 3)[1:-1] * (Pout / P)
+        tau += Pout / rate
+    return out
+
+
+def _voice_stem(events: list, total: int, rate: int, styles: dict):
+    """The solo voice (solo_voice) -> (first sample, stereo stem): her line, phrase by phrase
+    (_voice_phrases), each note sung from her recording nearest it in pitch in its style (velocity:
+    pianissimo or forte; a lone long note her messa di voce), the recordings crossfaded where they
+    change, in her small room, centred."""
+    import numpy as np
+    src_rate = RATE
+    slides = sorted((t, sem) for t, kind, _, _, sem in events if kind == 2)
+    phrases = _voice_phrases([e for e in events if e[1] != 2], total, rate)
+    if not phrases:
+        return total, np.zeros((0, 2), dtype="float32")
+    first_s = max(0.0, phrases[0][0][0] - 0.01)
+    end_s = min(total / rate, phrases[-1][-1][1] + VOICE_RELEASE_S + VOICE_ROOM[0] * 1.2)
+    y = np.zeros(int((end_s - first_s + 1.0) * src_rate))
+    r = src_rate
+
+    def slide(t: float) -> float:
+        v = 0.0
+        for at, sem in slides:
+            if at > t:
+                break
+            v = sem
+        return v
+
+    for notes in phrases:
+        p0 = notes[0][0]
+        nts = [(a - p0, b - p0, k, v) for a, b, k, v in notes]
+        dur = nts[-1][1] + VOICE_RELEASE_S
+        grid = np.arange(int(dur * 1000) + 2) / 1000.0
+        target = np.full(len(grid), float(nts[0][2]))
+        for a, b, k, v in nts:
+            target[grid >= a] = k
+        for (a, b, k, v), (a2, b2, k2, v2) in zip(nts, nts[1:]):     # (the glides)
+            if k2 != k:
+                g0 = a2 - 0.6 * VOICE_GLIDE_S
+                sel = (grid > g0) & (grid < g0 + VOICE_GLIDE_S)
+                w = 0.5 - 0.5 * np.cos(np.pi * (grid[sel] - g0) / VOICE_GLIDE_S)
+                target[sel] = k + w * (k2 - k)
+        if slides:
+            target = target + np.array([slide(p0 + t) for t in grid])
+        lone = len(nts) == 1 and nts[0][1] - nts[0][0] >= VOICE_MESSA_S and nts[0][3] >= VOICE_PP_VEL \
+            and styles.get("messa")
+        choice = []
+        for a, b, k, v in nts:
+            style = "messa" if lone else ("pp" if v < VOICE_PP_VEL else "forte")
+            pool = styles[style]
+            choice.append((style, min(range(len(pool)), key=lambda i: abs(float(pool[i]["meta"][0]) - k))))
+        n = int((dur + 0.1) * r) + 4096
+        tt = np.arange(n) / r
+        mix = np.zeros(n)
+        for c in sorted(set(choice)):
+            s = styles[c[0]][c[1]]
+            sung = _psola(s, target, dur, r, stretch=bool(lone))
+            sung *= 10 ** (VOICE_TILT_DB * (float(s["meta"][0]) - 72) / 4 / 20) / float(s["meta"][4])
+            wgt = np.zeros(n)
+            for (a, b, k, v), cc in zip(nts, choice):
+                if cc == c:
+                    wgt[(tt >= a) & (tt < (b if b < nts[-1][1] else dur + 0.1))] = 1.0
+            kk = max(1, int(VOICE_XFADE_S * r))
+            wgt = np.convolve(wgt, np.ones(kk) / kk, mode="same")
+            if wgt[0] < 1 and choice[0] == c:
+                wgt[:kk] = 1.0                              # (her attack: whole, not faded in)
+            mix += sung * np.sqrt(np.clip(wgt, 0.0, 1.0))
+        env = np.clip(tt / 0.015, 0, 1) * np.clip((dur - tt) / VOICE_RELEASE_S, 0, 1) ** 1.5
+        vel = np.zeros(n)
+        for a, b, k, v in nts:
+            vel[tt >= a] = v / 100.0                        # (the sound set's: level as velocity)
+        kk = int(0.03 * r)
+        vel = np.convolve(np.pad(vel, kk, mode="edge"), np.ones(kk) / kk, mode="same")[kk:-kk]
+        env *= vel
+        for (a, b, k, v), (a2, b2, k2, v2) in zip(nts, nts[1:]):     # (a note sung again: a dip)
+            depth, wid = (0.8, 0.045) if k2 == k else (0.25, 0.05)
+            env *= 1 - depth * np.exp(-((tt - a2 + 0.01) / wid) ** 2)
+        at = int(round((p0 - first_s) * r))
+        seg = (mix * env)[: max(0, len(y) - at)]
+        y[at: at + len(seg)] += seg
+    if rate != src_rate:
+        y = np.interp(np.arange(int(len(y) * rate / src_rate)) / rate, np.arange(len(y)) / src_rate, y)
+    rt, lvl = VOICE_ROOM
+    rng = np.random.default_rng(11)
+    nir = int(rt * 1.2 * rate)
+    t = np.arange(nir) / rate
+    ir = rng.standard_normal((nir, 2)) * (np.exp(-6.91 * t / rt) * np.clip(t / 0.004, 0, 1))[:, None]
+    ir /= np.sqrt((ir ** 2).sum(axis=0))
+    N = _fast_len(len(y) + nir)
+    wet = np.fft.irfft(np.fft.rfft(y, N)[:, None] * np.fft.rfft(ir, N, axis=0), N, axis=0)[:len(y)]
+    stem = (y[:, None] + lvl * wet) * 10 ** (VOICE_LEVEL_DB / 20)
+    first = int(first_s * rate)
+    stem = stem[: max(0, total - first)]
+    return first, stem.astype("float32")
+
+
 EXTRA_FONTS = {"chorus": fetch_choir, "vowels": fetch_vowels, "perc": fetch_percussion,
                "guitar": fetch_guitar, "strings_short": fetch_strings_short, "brass": fetch_brass,
                "horn_solo": fetch_horn_solo,
+               "voice": fetch_voice,            # (the solo voice's: recordings she sings from - _voice)
                "setbfree": fetch_setbfree}      # (the rock organ's: a program, not a sound set - _setbfree)
 
 
@@ -2225,6 +2626,9 @@ LOUDNESS = {
     "guitar_lead": 0.0,     # (its LEAD_LEVEL_DB: a held line ~3 LU over the rhythm guitar's chords)
     # the rock organ through its speaker (ORGAN_LEVEL_DB, SETBFREE_LEVEL_DB): set where the guitar sits
     "rock_organ": 0.0,
+    # the solo voice: its stand-in's (the sound set's choir), so it is evened out like the choir;
+    # the singer herself is levelled to it by VOICE_LEVEL_DB
+    "solo_voice": -6.9,
 }
 # (The parts that play their own recordings - OWN, STRINGS_SHORT's short notes - are evened out
 # to these, the sound set's, by their "trim_db": the same velocity, the same loudness.)
@@ -2251,6 +2655,8 @@ RANGES = {
     "guitar": (GUITAR_LOW, GUITAR_KEYS[1]), "guitar_mute": (GUITAR_LOW, GUITAR_KEYS[1]),
     # the rock organ: a manual's 61 keys, C2-C7
     "rock_organ": (ORGAN_LOW, ORGAN_HIGH),
+    # the solo voice: C4-C6 at the most (her recordings: C4, C5, F5); she sings best A4-A5 (VOICE_BEST)
+    "solo_voice": (60, 84),
 }
 # How late each instrument's recording is heard after its note starts (seconds to come
 # within 9 dB of its full level, measured from MuseScore_General, less the ~20 ms a
@@ -2294,7 +2700,7 @@ def send_db(room: Optional[float]) -> float:
 BALANCE = {
     "horns": 2, "horn_solo": 2, "trumpets": 3, "trombones": 2, "brass": 3, "violins": 1, "strings": -3,
     "tremolo": -2, "choir": 3, "men_choir": 3, "chorus": 3, "choir_oo": 3, "choir_oh": 3, "timpani": 2, "taiko": 3, "glockenspiel": -2, "piccolo": -2,
-    "reverse_cymbal": -2,
+    "reverse_cymbal": -2, "solo_voice": 3,
 }
 
 
@@ -2358,6 +2764,8 @@ def _stem(syn, sfid, fonts, name: str, events: list, total: int, rate: int, shor
         return _guitar_stem(syn, sfid, fonts, events, total, rate)
     if part in ORGAN:                                       # (the rock organ: setBfree, or synthesized)
         return _organ_stem(events, total, rate, organ)
+    if part in VOICE and _voice() is not None:              # (the solo voice: the singer, or the choir)
+        return _voice_stem(events, total, rate, _voice())
     if short:
         return _sampled_stem(syn, fonts["strings_short"], part, STRINGS_SHORT[part], events, total, rate)
     if _plays_own(part, fonts):
@@ -2450,6 +2858,8 @@ def play_layers(score: Score, seconds: float, layer_of, sf2: Path = SF2, rate: i
     syn, sfid, fonts = _synth(rate, sf2, sorted(need))
     if any(k is not None and name.partition(":")[0] in ORGAN for name, k in wanted.items()):
         _setbfree()                                     # (built - or its stand-in said - before the workers)
+    if any(k is not None and name.partition(":")[0] in VOICE for name, k in wanted.items()):
+        _voice()                                        # (fetched and analysed - or said - before the workers)
     organ = dict(getattr(score, "organ", None) or {})
     for name, events in groups.items():
         k = wanted[name]

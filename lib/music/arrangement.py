@@ -190,6 +190,9 @@ and held chords, C2-C7. Registered by passage on its own: held chords on all dra
 driven; riffs (notes under 0.6 s) on the lower six, driven hard. Its bass pedals play each
 chord's lowest note at C1, clean ("organ": "pedals", "pedal_db"). Rarer still than the guitar:
 a boss's third stage or later.
+A real singer: solo_voice (VocalSet's soprano f4 alone on "ah": legato, her own vibrato; pp
+under velocity 64, a lone held note swells) - C4-C6, best A4-A5; held notes, none under 0.25 s.
+A boss's own voice, its third stage's surprise (a singer, a priest; boss-music 3c).
 """
 
 import argparse
@@ -976,6 +979,33 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
     if any(by_part.get(part) for part in orchestra.ORGAN) and int(spec.get("stage", 1) or 1) < 3:
         add("warn", "rock_organ: the rock organ is a rare surprise held back for a boss's third stage (a "
                     "\"stage\" of 3 or more, or a cue of one) - never a theme, a place or an earlier stage")
+    # The solo voice: a real singer, alone (VocalSet's soprano f4) - a boss's own voice, the surprise
+    # of its third stage (boss-music 3c: the Ashen Saint sings her vow; the host: "f4 is her"). A
+    # boss stage under 3 gives her away early; elsewhere (a theme, a cue) she is a choice, allowed.
+    for part in orchestra.VOICE:
+        sung = sorted(by_part.get(part, []))
+        if not sung:
+            continue
+        if spec.get("role") == "stage" and int(spec.get("stage", 1) or 1) < 3:
+            add("warn", f"{part}: the solo voice is a boss's own voice, held back for its third stage (a "
+                        f"\"stage\" of 3) - heard earlier, the surprise is spent")
+        held = [(a, n[0] if n and n[0] - b <= orchestra.VOICE_LEGATO_S else b)    # (legato: held on to the next)
+                for (a, b, _), n in zip(sung, sung[1:] + [None])]
+        quick = [(a, b) for a, b in held if b - a < orchestra.VOICE_SHORT_S - 1e-9]
+        if quick:
+            add("warn", f"{part}: {len(quick)} note(s) under {orchestra.VOICE_SHORT_S:g}s (first at {quick[0][0]:.1f} s) "
+                        f"- a solo voice can't spit quick notes (the host, on choirs on quick lines: \"they "
+                        f"sound like an instrument\"): give her held notes, a slow line; the band runs")
+        lo, hi = orchestra.VOICE_BEST
+        out_best = [k for _, _, k in sung if not lo <= k <= hi]
+        if out_best:
+            add("warn", f"{part}: {len(out_best)} note(s) outside where she sings best ({name_of(lo)}-{name_of(hi)}), "
+                        f"e.g. {name_of(out_best[0])} - further from her recordings (C4, C5, F5) she sounds "
+                        f"processed: move the line into {name_of(lo)}-{name_of(hi)}")
+        cut = sum(1 for (a0, b0, _), (a1, _, _) in zip(sung, sung[1:]) if a1 < b0 - 0.05)
+        if cut:
+            add("warn", f"{part}: {cut} note(s) start while another still sounds - she sings one note at a "
+                        "time (a new note ends the last): a second voice is another part's")
     # The tune: all played, and against its chords.
     melody = spec.get("melody") or []
     silent = [u0 for u0, _, _ in ctx["played"]
