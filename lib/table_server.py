@@ -3085,49 +3085,48 @@ class TableState:
                                    event={"type": "purse", **change}))
         return out
 
-    def map_graph(self) -> Dict[str, Any]:
-        """The party's map: the places they have been, the ways out they have seen
-        from there (a connection the GM recorded from or to a visited place), and how
-        they join - nothing else, so a place prepared ahead stays secret. Each place has
-        its picture when it has one; ``here`` is where the party is."""
-        try:
-            data = json.loads((self.campaign_dir / "locations.json").read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return {"nodes": [], "edges": [], "here": None}
-        table = data["locations"] if isinstance(data.get("locations"), dict) else data
-        keys = {str(k).strip().lower(): k for k, v in table.items() if isinstance(v, dict)}
+    def map_for(self, lang: Optional[str] = None) -> Dict[str, Any]:
+        """The party's map: the places they have been, the ones in sight of those
+        (their recorded connections), and the ways between. Nothing further out is
+        sent, so a place the GM has written ahead stays secret. The page lays it out."""
+        here = self._note_visit()
+        locs = self._read_json(self.campaign_dir / "locations.json", {})
+        locs = locs if isinstance(locs, dict) else {}
+        by_lower = {str(k).lower(): str(k) for k in locs}
 
-        def canon(n):
-            return keys.get(str(n or "").strip().lower())
+        def canon(name: Any) -> str:
+            name = " ".join(str(name or "").split())
+            return by_lower.get(name.lower(), name)
 
-        def links(k):
-            for c in table[k].get("connections") or []:
+        visited = list(dict.fromkeys(canon(v) for v in self.visited if v))
+        known = {v: True for v in visited}
+        ways: Dict[tuple, Dict[str, Any]] = {}
+        for v in visited:
+            rec = locs.get(v) if isinstance(locs.get(v), dict) else {}
+            for c in rec.get("connections") or []:
                 to = canon(c.get("to") if isinstance(c, dict) else c)
-                if to and to != k:
-                    yield to, str((c.get("path") if isinstance(c, dict) else "") or "")
-
-        been = list(dict.fromkeys(k for k in map(canon, self.visited) if k))
-        here = canon(self.overview().get("location")) or (been[-1] if been else None)
-        known = list(been)
-        for k in been:                                       # ways out seen from where they've been
-            known += [to for to, _ in links(k) if to not in known]
-        for k in keys.values():                              # ...and ways recorded into a visited place
-            if k not in known and any(to in been for to, _ in links(k)):
-                known.append(k)
-        edges, seen = [], set()
-        for k in known:
-            for to, path in links(k):
-                pair = tuple(sorted((k, to)))
-                if to in known and pair not in seen:
-                    seen.add(pair)
-                    walked = (k in been and to in been) or path.strip().lower() == "traveled"
-                    edges.append({"a": pair[0], "b": pair[1], "walked": walked})
-        nodes = []
-        for k in known:
-            img = table[k].get("image")
-            ok = bool(img) and (self.campaign_dir / "images" / str(img)).is_file()
-            nodes.append({"name": k, "image": img if ok else None, "visited": k in been})
-        return {"nodes": nodes, "edges": edges, "here": here}
+                if not to or to == v:
+                    continue
+                known.setdefault(to, False)
+                ways[tuple(sorted((v, to)))] = {"a": v, "b": to}
+        for w in ways.values():
+            w["walked"] = known[w["a"]] and known[w["b"]]
+        here = canon(here) if here else None
+        sc = languages.script(lang) if lang else "latin"
+        aliases = self.aliases() if sc != "latin" else {}
+        out = []
+        for name, been in known.items():
+            # The name as the reader's language writes it (the longest recorded
+            # spelling in its script: "פיר אבן הלב", not a short form).
+            forms = [a for a, n in aliases.items()
+                     if n.lower() == name.lower() and languages.text_script(a) == sc]
+            place = {"name": name, "label": max(forms, key=len) if forms else name,
+                     "visited": been, "here": name == here}
+            img = (locs.get(name) or {}).get("image") if been else None
+            if img and self._has_image(img):
+                place["image"] = img
+            out.append(place)
+        return {"here": here, "places": out, "ways": list(ways.values())}
 
     def thumbnail(self, path: Path, width: Any) -> Optional[Path]:
         """A small JPEG of a picture (for hover cards, avatars, the gallery's list),
@@ -3411,7 +3410,7 @@ def make_handler(state: TableState, code: str, host_key: str):
                                    "waiting_on": state.waiting_on(),
                                    "music": state.music, "server_now": time.time(),
                                    "progress": state.progress(), "tts": state.tts_ready(),
-                                   "places": state.places(), "map": state.map_graph(),
+                                   "places": state.places(),
                                    **state.gallery(),
                                    "round": state.round_state(),
                                    "lore_terms": state.lore_terms(me, q.get("lang")),
@@ -3427,6 +3426,11 @@ def make_handler(state: TableState, code: str, host_key: str):
                     return self._err("Take a seat first.", 403)
                 lang = q.get("lang") if q.get("lang") in state.table_langs() else state.lang_for(me)
                 return self._json(state.recap(me, lang))
+            if url.path == "/api/map":
+                if not me:
+                    return self._err("Take a seat first.", 403)
+                lang = q.get("lang") if q.get("lang") in state.table_langs() else state.lang_for(me)
+                return self._json({"ok": True, **state.map_for(lang)})
             if url.path == "/api/messages":
                 try:
                     after = int(q.get("after", 0))

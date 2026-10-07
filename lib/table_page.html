@@ -59,8 +59,17 @@
   label { display: block; margin: 10px 0 4px; font-size: .9rem; color: var(--muted); }
 
   /* table screen */
-  #table { display: grid; grid-template-columns: 1fr 280px; height: 100vh; height: 100dvh; }
-  #main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  /* The story in the middle, the side chat on one side and the party on the other
+     (a right-to-left page mirrors them); either folds away (#table.chat-hidden /
+     .party-hidden, set by the page). */
+  #table { display: grid; grid-template-columns: var(--chat-w, 300px) 1fr var(--party-w, 270px);
+           grid-template-areas: "chat main party"; height: 100vh; height: 100dvh; }
+  #main { grid-area: main; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  #party { grid-area: party; min-width: 0; }
+  #chat { grid-area: chat; min-width: 0; }
+  .panel-head { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+  .panel-head h2 { margin: 4px 0 10px; }
+  #party-close { padding: 2px 8px; }
   header { padding: 8px 16px; border-bottom: 1px solid var(--line); display: flex;
            justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
   header .title { font-weight: bold; }
@@ -235,6 +244,31 @@
                   border: 1px solid var(--line); border-radius: 12px;
                   background: var(--panel); color: var(--ink); }
   dialog#places::backdrop { background: rgba(0, 0, 0, .55); }
+  dialog#map { width: min(760px, calc(100% - 24px)); max-height: 90vh; padding: 0;
+               border: 1px solid var(--line); border-radius: 12px;
+               background: var(--panel); color: var(--ink); }
+  dialog#map::backdrop { background: rgba(0, 0, 0, .55); }
+  .map-body { padding: 10px 16px 16px; }
+  #map-scroll { overflow: auto; max-height: 58vh; border: 1px solid var(--line); border-radius: 8px;
+                background: var(--bg); }
+  #map-canvas { position: relative; margin: 0 auto; }
+  #map-canvas svg { position: absolute; inset: 0; pointer-events: none; }
+  #map-canvas line { stroke: var(--muted); stroke-width: 2; stroke-dasharray: 6 5; }
+  #map-canvas line.walked { stroke: var(--ink); stroke-dasharray: none; }
+  .map-node { position: absolute; transform: translate(-50%, -50%); max-width: 130px;
+              padding: 4px 8px; border-radius: 8px; font-size: .82rem; line-height: 1.2;
+              text-align: center; white-space: normal; background: var(--panel); color: var(--muted);
+              border: 1.5px dashed var(--muted); cursor: pointer; }
+  .map-node.visited { color: var(--ink); border: 1.5px solid var(--ink); }
+  .map-node.here { background: var(--accent); color: var(--accent-ink); border-color: var(--accent);
+                   font-weight: 600; }
+  .map-node[aria-current="true"] { box-shadow: 0 0 0 3px var(--accent); }
+  #map-legend { font-size: .8rem; margin: 6px 0 0; }
+  #map-info { margin-top: 10px; }
+  #map-info h3 { margin: 0 0 2px; font-size: 1.05rem; }
+  #map-info img { max-width: 220px; width: 100%; border-radius: 8px; cursor: zoom-in; display: block;
+                  margin: 6px 0; }
+  #map-info .text { font-size: .9rem; }
   .places-body { padding: 10px 16px 16px; }
   #place-big { width: 100%; display: block; border-radius: 8px; }
   #place-name { margin: 8px 0 4px; font-size: 1.15rem; }
@@ -245,16 +279,6 @@
   #place-list img { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; display: block; }
   #place-list span { display: block; font-size: .8rem; padding: 3px 6px; }
   #place-list button[aria-current="true"] { border-color: var(--accent); }
-  /* The map: where the party has been (solid), the ways seen from there (dashed). */
-  #map-box { display: none; }
-  #map-box.on { display: block; }
-  #map-box svg { width: 100%; height: auto; max-height: 62vh; display: block;
-                 background: var(--bg); border-radius: 8px; }
-  #map-box .node { cursor: pointer; }
-  #map-box .node:focus { outline: none; }
-  #map-box .node:focus circle.ring { stroke: var(--accent); }
-  #map-box text { fill: var(--ink); text-anchor: middle; }
-  #map-key { font-size: .8rem; opacity: .75; margin-top: 6px; }
   .bar > div { transition: width .9s ease; }
   /* A PC's card changes the moment the story reaches them. */
   .pc.hurt { animation: hurt 1.6s ease-out; }
@@ -388,11 +412,16 @@
   .nar-a.thinking { color: var(--muted); font-style: italic; }
   #chat-toggle .badge { background: var(--hp-low); color: #fff; border-radius: 9px;
                         font-size: .72rem; padding: 0 6px; margin-inline-start: 4px; }
-  @media (min-width: 1180px) {
-    #table { grid-template-columns: 1fr 280px 300px; }
-    #chat { display: flex; }
+  @media (min-width: 761px) {
+    #chat { display: flex; border-inline-start: 0; border-inline-end: 1px solid var(--line); }
     #chat.open { position: static; width: auto; box-shadow: none; }
-    #chat-toggle { display: none; }
+    #chat-close { display: inline-block; }
+    #table.chat-hidden { --chat-w: 0px; }
+    #table.party-hidden { --party-w: 0px; }
+    #table.chat-hidden #chat, #table.party-hidden #party { display: none; }
+    #party-toggle { display: inline-block; }
+    #party-toggle::before { content: "👥 "; }
+    #party-toggle[aria-pressed="true"], #chat-toggle[aria-pressed="true"] { border-color: var(--accent); }
   }
 
   /* The ⋯ menu exists only on a phone; elsewhere its buttons sit in the row. */
@@ -402,7 +431,7 @@
   #tabs { display: none; }
 
   @media (max-width: 760px) {
-    #table { grid-template-columns: 1fr; }
+    #table { grid-template-columns: 1fr; grid-template-areas: "main"; }
     aside { display: none; position: fixed; inset: 56px 0 auto 0; max-height: 65vh;
             background: var(--panel); border: 0; border-bottom: 1px solid var(--line); z-index: 5; }
     aside.open { display: block; }
@@ -468,7 +497,7 @@
 
     /* Drawers and dialogs use the whole phone. */
     #chat.open { width: 100%; }
-    dialog#sheet, dialog#places { width: 100%; max-width: 100%; height: 100dvh; max-height: 100dvh;
+    dialog#sheet, dialog#places, dialog#map { width: 100%; max-width: 100%; height: 100dvh; max-height: 100dvh;
                                   margin: 0; border: 0; border-radius: 0; }
   }
 </style>
@@ -577,7 +606,10 @@
     </nav>
   </div>
   <aside id="party">
-    <h2 data-i18n="partyTitle"></h2>
+    <div class="panel-head">
+      <h2 data-i18n="partyTitle"></h2>
+      <button id="party-close" type="button" data-i18n-label="fold">✕</button>
+    </div>
     <div id="party-list"></div>
     <div class="voice-settings">
       <div id="now-playing" class="muted" dir="auto"></div>
@@ -622,6 +654,18 @@
 
 <div id="lore-card" class="hidden" role="tooltip"></div>
 
+<dialog id="map" aria-labelledby="map-title">
+  <div class="sheet-head">
+    <h2 id="map-title" data-i18n="mapTitle"></h2>
+    <button id="map-close" type="button" aria-label="✕">✕</button>
+  </div>
+  <div class="map-body">
+    <div id="map-scroll"><div id="map-canvas"></div></div>
+    <p id="map-legend" class="muted" data-i18n="mapLegend"></p>
+    <div id="map-info" dir="auto"></div>
+  </div>
+</dialog>
+
 <dialog id="places" aria-labelledby="places-title">
   <div class="sheet-head">
     <h2 id="places-title" data-i18n="placesTitle"></h2>
@@ -629,7 +673,6 @@
   </div>
   <div class="places-body">
     <div class="gallery-tabs" id="gallery-tabs"></div>
-    <div id="map-box"></div>
     <img id="place-big" alt="">
     <div id="place-name" dir="auto"></div>
     <div id="place-list"></div>
@@ -760,7 +803,7 @@
   async function api(path, body) {
     // Hover cards, sheet translations and the table's state come in the language
     // being read now (even before the table has heard about a switch).
-    if (!body && /^\/api\/(info|lore|sheet-tr)\b/.test(path) && !/[?&]lang=/.test(path))
+    if (!body && /^\/api\/(info|lore|sheet-tr|map)\b/.test(path) && !/[?&]lang=/.test(path))
       path += (path.includes("?") ? "&" : "?") + "lang=" + encodeURIComponent(lang);
     const opts = body ? { method: "POST", headers: { "Content-Type": "application/json" },
                           body: JSON.stringify(Object.assign({ code, token }, body)) } : {};
@@ -1747,8 +1790,24 @@
   // The drawers (chat; party on a phone) open just below the header, however
   // many rows it wrapped into, so its buttons stay reachable.
   const headerBottom = () => document.querySelector("#table header").getBoundingClientRect().bottom;
-  $("chat-close").onclick = () => $("chat").classList.remove("open");
+  // Wider screens: the party and the chat are docked on opposite sides of the
+  // story, and either folds away (remembered on this device). Narrower than
+  // 1180px the chat starts folded, so the story keeps its room.
+  const docked = () => matchMedia("(min-width: 761px)").matches;
+  function showDock(which, show, remember) {
+    $("table").classList.toggle(which + "-hidden", !show);
+    $(which + "-toggle").setAttribute("aria-pressed", String(show));
+    if (remember) store.set("dock." + which, show ? "open" : "closed");
+    if (which === "chat" && show) { setUnread(0); $("chat-log").scrollTop = $("chat-log").scrollHeight; }
+  }
+  const dockSaved = (which, dflt) => { const v = store.get("dock." + which); return v ? v === "open" : dflt; };
+  showDock("party", dockSaved("party", true));
+  showDock("chat", dockSaved("chat", innerWidth >= 1180));
+  const toggleDock = (which) => showDock(which, $("table").classList.contains(which + "-hidden"), true);
+  $("party-close").onclick = () => docked() ? showDock("party", false, true) : $("party").classList.remove("open");
+  $("chat-close").onclick = () => docked() ? showDock("chat", false, true) : $("chat").classList.remove("open");
   $("chat-toggle").onclick = () => {
+    if (docked()) return toggleDock("chat");
     $("chat").style.top = headerBottom() + "px";
     const open = $("chat").classList.toggle("open");
     if (open) { setUnread(0); $("party").classList.remove("open"); $("chat-text").focus();
@@ -1789,19 +1848,20 @@
     document.title = info.campaign || t("title");
     $("where").textContent = [info.location, info.time].filter(Boolean).join(" · ");
     gallery = { places: info.places || [], people: info.people || [], foes: info.foes || [],
-                treasures: info.treasures || [], map: info.map || { nodes: [], edges: [] } };
-    if (gallery.map.nodes.length > 1) {
-      const m = document.createElement("button");
-      m.type = "button"; m.textContent = "🗺"; m.title = t("mapShow");
-      m.onclick = () => openGallery("map");
-      $("where").appendChild(m);
-    }
+                treasures: info.treasures || [] };
     if (gallery.places.length || gallery.people.length || gallery.foes.length || gallery.treasures.length) {
       const b = document.createElement("button");
       b.type = "button"; b.textContent = "🖼"; b.title = t("placeShow");
       b.onclick = () => gallery.places.length ? openGallery("places", info.location) : openGallery();
       $("where").appendChild(b);
     }
+    if (info.location && me) {
+      const b = document.createElement("button");
+      b.type = "button"; b.textContent = "🗺"; b.title = t("mapShow");
+      b.onclick = () => openMap();
+      $("where").appendChild(b);
+    }
+    if ($("map").open && info.location !== mapWhere) drawMap();   // the party moved
     partyLive = info.party || [];
     narrationGate = info.narration_id || 0;
     syncParty();
@@ -2322,24 +2382,10 @@
   // lists only what the players have already seen, so nothing is spoiled).
   let gallery = { places: [], people: [], foes: [], treasures: [] };
   function openGallery(tab, name) {
-    const has = (k) => k === "map" ? gallery.map.nodes.length > 1 : gallery[k].length;
-    const tabs = ["map", "places", "people", "foes", "treasures"].filter(has);
+    const tabs = ["places", "people", "foes", "treasures"].filter((k) => gallery[k].length);
     if (!tabs.length) return;
-    tab = tabs.includes(tab) ? tab : tabs.find((k) => k !== "map") || tabs[0];
-    $("map-box").className = tab === "map" ? "on" : "";
-    $("place-list").hidden = tab === "map";
-    $("place-big").hidden = false;
-    if (tab === "map") {
-      $("place-big").hidden = true; $("place-name").textContent = "";
-      drawMap(gallery.map, (p) => {
-        $("place-big").hidden = !p.image;
-        if (p.image) { $("place-big").src = imageUrl(p.image); $("place-big").className = ""; }
-        $("place-name").textContent = p.name + (p.name === gallery.map.here ? " · 📍 " + t("mapHere")
-                                                : p.visited ? "" : " · " + t("mapSeen"));
-      });
-    }
+    tab = tabs.includes(tab) ? tab : tabs[0];
     renderGalleryTabs(tabs, tab);
-    if (tab === "map") { showGalleryDialog(); return; }
     const items = gallery[tab];
     const label = (p) => p.name + (p.owner ? " — " + t("lootFor").replace("{pc}", p.owner) : "")
                          + (p.boss ? " 💀" : "");
@@ -2365,7 +2411,7 @@
     if (tabs.length > 1) tabs.forEach((k) => {
       const b = document.createElement("button");
       b.type = "button";
-      b.textContent = t({ map: "galMap", places: "galPlaces", people: "galPeople", foes: "galFoes",
+      b.textContent = t({ places: "galPlaces", people: "galPeople", foes: "galFoes",
                           treasures: "galTreasures" }[k]);
       b.setAttribute("aria-pressed", String(k === tab));
       b.onclick = () => openGallery(k);
@@ -2376,87 +2422,124 @@
     const dlg = $("places");
     if (!dlg.open) { if (dlg.showModal) dlg.showModal(); else dlg.setAttribute("open", ""); }
   }
-  // The map's layout: a small force layout (places push apart, paths pull together),
-  // the same every time for the same places, with "here" held in the middle.
+  // The map: the places the party has been and the ones seen from there (the
+  // server sends nothing further out), drawn as rings around where they stand.
+  // Each place gets a slice of the circle as wide as the places beyond it.
+  let mapWhere = null, mapPick = null;
   function layoutMap(m) {
-    const n = m.nodes.length, idx = new Map(m.nodes.map((p, i) => [p.name, i]));
-    const pos = m.nodes.map((p, i) => [Math.cos(2 * Math.PI * i / n) * 200, Math.sin(2 * Math.PI * i / n) * 200]);
-    const hi = idx.has(m.here) ? idx.get(m.here) : -1;
-    if (hi >= 0) pos[hi] = [0, 0];
-    const E = m.edges.map((e) => [idx.get(e.a), idx.get(e.b)]).filter(([a, b]) => a !== undefined && b !== undefined);
-    const N = 400;
-    for (let it = 0; it < N; it++) {
-      const f = pos.map(() => [0, 0]);
-      for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
-        const dx = pos[i][0] - pos[j][0], dy = pos[i][1] - pos[j][1];
-        const d2 = Math.max(dx * dx + dy * dy, 1), d = Math.sqrt(d2), r = 18000 / d2;
-        f[i][0] += dx / d * r; f[i][1] += dy / d * r; f[j][0] -= dx / d * r; f[j][1] -= dy / d * r;
-      }
-      for (const [a, b] of E) {
-        const dx = pos[b][0] - pos[a][0], dy = pos[b][1] - pos[a][1], d = Math.max(Math.hypot(dx, dy), 1);
-        const k = (d - 140) * 0.05;
-        f[a][0] += dx / d * k; f[a][1] += dy / d * k; f[b][0] -= dx / d * k; f[b][1] -= dy / d * k;
-      }
-      const step = 1 - it / N;
-      for (let i = 0; i < n; i++) if (i !== hi) {
-        pos[i][0] += Math.max(-20, Math.min(20, f[i][0])) * step;
-        pos[i][1] += Math.max(-20, Math.min(20, f[i][1])) * step;
+    const names = m.places.map((p) => p.name);
+    const adj = new Map(names.map((n) => [n, []]));
+    m.ways.forEach((w) => {
+      if (adj.has(w.a) && adj.has(w.b)) { adj.get(w.a).push(w.b); adj.get(w.b).push(w.a); }
+    });
+    const root = names.includes(m.here) ? m.here : (m.places.find((p) => p.visited) || m.places[0]).name;
+    const kids = new Map(names.map((n) => [n, []])), seen = new Set([root]), order = [root];
+    for (let i = 0; i < order.length; i++) {
+      for (const n of adj.get(order[i])) {
+        if (!seen.has(n)) { seen.add(n); kids.get(order[i]).push(n); order.push(n); }
       }
     }
+    names.forEach((n) => { if (!seen.has(n)) { seen.add(n); kids.get(root).push(n); } });   // no known way there
+    const leaves = new Map();
+    const count = (n) => {
+      const k = kids.get(n);
+      const c = k.length ? k.reduce((s, x) => s + count(x), 0) : 1;
+      leaves.set(n, c); return c;
+    };
+    count(root);
+    const pos = new Map();
+    const put = (n, a0, a1, d) => {
+      const a = (a0 + a1) / 2;
+      pos.set(n, { x: Math.cos(a) * d, y: Math.sin(a) * d });
+      let s = a0;
+      for (const k of kids.get(n)) {
+        const w = (a1 - a0) * leaves.get(k) / leaves.get(n);
+        put(k, s, s + w, d + 1); s += w;
+      }
+    };
+    put(root, -Math.PI / 2, 1.5 * Math.PI, 0);
     return pos;
   }
-  function drawMap(m, onPick) {
-    const NS = "http://www.w3.org/2000/svg", R = 30;
-    const el = (tag, attrs, parent) => {
-      const e = document.createElementNS(NS, tag);
-      for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
-      if (parent) parent.appendChild(e);
-      return e;
-    };
-    const pos = layoutMap(m), idx = new Map(m.nodes.map((p, i) => [p.name, i]));
-    const xs = pos.map((p) => p[0]), ys = pos.map((p) => p[1]), pad = R + 60;
-    const x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad;
-    const W = Math.max(...xs) - x0 + pad, H = Math.max(...ys) - y0 + pad;
-    const fs = Math.max(13, W / 30);           // labels stay readable when a phone shrinks the map
-    const svg = el("svg", { viewBox: `${x0} ${y0} ${W} ${H}`, role: "img", "aria-label": t("galMap") });
-    for (const e of m.edges) {
-      const a = pos[idx.get(e.a)], b = pos[idx.get(e.b)];
-      if (!a || !b) continue;
-      el("line", { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: "var(--line)",
-                   "stroke-width": e.walked ? 3 : 2, "stroke-dasharray": e.walked ? "" : "6 6" }, svg);
+  async function drawMap() {
+    const m = await api("/api/map");
+    mapWhere = m.here || null;
+    const canvas = $("map-canvas");
+    canvas.textContent = "";
+    $("map-info").textContent = "";
+    if (!m.ok || !m.places || !m.places.length) {
+      canvas.style.width = "auto"; canvas.style.height = "auto";
+      $("map-info").textContent = m.ok ? t("mapEmpty") : (m.error || "");
+      return;
     }
-    m.nodes.forEach((p, i) => {
-      const [x, y] = pos[i], here = p.name === m.here;
-      const g = el("g", { class: "node", tabindex: "0", role: "button", "aria-label": p.name,
-                          opacity: p.visited ? 1 : 0.6 }, svg);
-      el("circle", { cx: x, cy: y, r: R, fill: "var(--panel)" }, g);
-      if (p.image) {
-        const clip = el("clipPath", { id: "map-c" + i }, g);
-        el("circle", { cx: x, cy: y, r: R }, clip);
-        el("image", { href: imageUrl(p.image, 200), x: x - R * 1.5, y: y - R, width: R * 3, height: R * 2,
-                      preserveAspectRatio: "xMidYMid slice", "clip-path": `url(#map-c${i})` }, g);
-      } else {
-        el("text", { x, y: y + 6, "font-size": 18 }, g).textContent = "?";
-      }
-      el("circle", { class: "ring", cx: x, cy: y, r: R, fill: "none",
-                     stroke: here ? "var(--accent)" : "var(--line)", "stroke-width": here ? 4 : 2,
-                     "stroke-dasharray": p.visited ? "" : "5 4" }, g);
-      if (here) el("text", { x, y: y - R - 8, "font-size": 18 }, g).textContent = "📍";
-      const label = p.name.length > 24 ? p.name.slice(0, 23) + "…" : p.name;
-      el("text", { x, y: y + R + fs + 2, dir: "auto", "font-size": fs }, g).textContent = label;
-      const pick = () => onPick(p);
-      g.addEventListener("click", pick);
-      g.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); pick(); } });
+    const pos = layoutMap(m);
+    const R = 140, PAD_X = 90, PAD_Y = 40;
+    const xs = [...pos.values()].map((p) => p.x * R), ys = [...pos.values()].map((p) => p.y * R);
+    const minX = Math.min(...xs), minY = Math.min(...ys);
+    const w = Math.max(...xs) - minX + 2 * PAD_X, h = Math.max(...ys) - minY + 2 * PAD_Y;
+    const at = (n) => ({ x: pos.get(n).x * R - minX + PAD_X, y: pos.get(n).y * R - minY + PAD_Y });
+    canvas.style.width = w + "px"; canvas.style.height = h + "px";
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("width", w); svg.setAttribute("height", h);
+    m.ways.forEach((way) => {
+      if (!pos.has(way.a) || !pos.has(way.b)) return;
+      const a = at(way.a), b = at(way.b);
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("x1", a.x); line.setAttribute("y1", a.y);
+      line.setAttribute("x2", b.x); line.setAttribute("y2", b.y);
+      if (way.walked) line.setAttribute("class", "walked");
+      svg.appendChild(line);
     });
-    const box = $("map-box");
-    box.textContent = "";
-    box.appendChild(svg);
-    const key = document.createElement("div");
-    key.id = "map-key"; key.textContent = t("mapKey");
-    box.appendChild(key);
-    const start = m.nodes.find((p) => p.name === m.here) || m.nodes[0];
-    if (start) onPick(start);
+    canvas.appendChild(svg);
+    m.places.forEach((p) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.dir = "auto";
+      b.className = "map-node" + (p.visited ? " visited" : "") + (p.here ? " here" : "");
+      b.textContent = (p.here ? "📍 " : "") + p.label;
+      b.dataset.name = p.name;
+      const c = at(p.name);
+      b.style.left = c.x + "px"; b.style.top = c.y + "px";
+      b.onclick = () => pickPlace(p);
+      canvas.appendChild(b);
+    });
+    const here = m.places.find((p) => p.here);
+    const keep = m.places.find((p) => p.name === mapPick);
+    pickPlace(keep || here || m.places[0]);
+    if (here) {                                   // where the party stands, in view
+      const c = at(here.name), box = $("map-scroll");
+      box.scrollLeft = c.x - box.clientWidth / 2; box.scrollTop = c.y - box.clientHeight / 2;
+    }
   }
+  async function pickPlace(p) {
+    mapPick = p.name;
+    [...$("map-canvas").querySelectorAll(".map-node")].forEach((b) =>
+      b.setAttribute("aria-current", String(b.dataset.name === p.name)));
+    const box = $("map-info");
+    box.textContent = "";
+    const head = document.createElement("h3");
+    head.dir = "auto"; head.textContent = p.label;
+    const sub = document.createElement("div");
+    sub.className = "muted";
+    sub.textContent = t(p.here ? "mapHere" : p.visited ? "mapBeen" : "mapSeen");
+    box.append(head, sub);
+    if (p.image) {
+      const img = imageEl(p.image, 400);
+      img.onclick = () => { $("map").close(); openGallery("places", p.name); };
+      box.appendChild(img);
+    }
+    // What the players know of it: its hover card (only once the story has named it).
+    const r = await api("/api/lore?term=" + encodeURIComponent(p.label));
+    if (mapPick !== p.name || !r.ok || !r.text) return;
+    const text = document.createElement("div");
+    text.className = "text"; text.textContent = r.text; text.dir = dirFor(r.text);
+    box.appendChild(text);
+  }
+  async function openMap() {
+    const dlg = $("map");
+    if (!dlg.open) { if (dlg.showModal) dlg.showModal(); else dlg.setAttribute("open", ""); }
+    await drawMap();
+  }
+  $("map-close").onclick = () => $("map").close();
+  $("map").addEventListener("click", (ev) => { if (ev.target === $("map")) $("map").close(); });
   $("places-close").onclick = () => $("places").close();
   $("places").addEventListener("click", (ev) => { if (ev.target === $("places")) $("places").close(); });
   $("sheet-close").onclick = () => $("sheet").close();
@@ -3546,6 +3629,7 @@
     location.reload();
   };
   $("party-toggle").onclick = () => {
+    if (docked()) { toggleDock("party"); return setMoreMenu(false); }
     $("party").style.top = headerBottom() + "px";
     $("party").classList.toggle("open");
     $("chat").classList.remove("open");
