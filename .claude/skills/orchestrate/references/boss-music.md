@@ -185,7 +185,10 @@ once, then its body loops (`"loop_from"`).
 3b. **The electric guitar is a later stage's surprise** (the host: "electric guitar will only be used on
    bosses' later stages. It is a special surprise"): held back through stage 1, heard first at a later
    stage's entry (the Saint's eruption), then driving that stage - and never in themes, places or players'
-   themes (an acoustic guitar is an ordinary instrument). The critic warns on it anywhere else.
+   themes (an acoustic guitar is an ordinary instrument). The critic warns on it anywhere else. A short
+   lead solo (`guitar_lead`: overdriven, singing, near centre) is allowed in a later stage where the chant
+   rests or only holds - a few bars built from the boss's hook, climbing (the host: "a short solo guitar
+   to higher notes could lift it up"); never a falling bend.
 3c. **The rock organ is a third stage's surprise** - rarer still (the host: "rock organ sounds cool"): an
    overdriven tonewheel organ through a rotating speaker (Dancing Mad's last movement), held back for a
    stage 3 or later, heard first at its entry. For a sacred villain it is the church organ gone wild.

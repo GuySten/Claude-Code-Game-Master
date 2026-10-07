@@ -178,7 +178,9 @@ A real electric guitar, through an amp, double-tracked left and right: guitar (o
 chords, ringing to the next pick) and guitar_mute (palm-muted chugs) - one instrument, one
 amp: a new pick stops what rang, and "mix": {"guitar": dB} sets both. B1-E5; power chords
 only ("root5", "root", "octaves": a third turns to mud). A surprise held back for a later
-stage, never a bed for every piece.
+stage, never a bed for every piece. guitar_lead: a lead guitar of its own (overdriven, singing,
+near centre; one note at a time, legato, a delayed vibrato on held notes; E2-G5, best E4-E5) -
+a short solo in a later stage, where the chant rests (no falling slides: comic).
 A rock organ, synthesized: rock_organ, a tonewheel organ (888800000) overdriven through a
 rotating speaker, fast by default ("organ" switches it) - the church organ gone wild: riffs,
 stabbed and held chords, C2-C7. Rarer still than the guitar: a boss's third stage or later.
@@ -858,13 +860,14 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
     # A falling bend on brass or low reeds is a raspberry: the host, on a corrupted
     # champion's boss fight whose trumpet stabs fell a fifth and whose trombone call slid
     # down: "it sounds like he farts". And a slide bends the whole part, chords and all.
-    blown = {"trumpets", "trombones", "tuba", "horns", "horn_solo", "brass", "bassoons"}
+    blown = {"trumpets", "trombones", "tuba", "horns", "horn_solo", "brass", "bassoons",
+             orchestra.GUITAR_LEAD}                         # (and a lead guitar's falling bend)
     chorded = {h.get("part") for h in spec.get("harmony", [])}
     for line in spec.get("lines", []):
         bent = [n for n in line.get("notes", []) if len(n) > 4 and isinstance(n[-1], dict) and n[-1].get("slide")]
         falls = [n for n in bent if float(n[-1]["slide"]) <= -2]
         if line.get("part") in blown and falls and spec.get("role") != "comic":
-            add("warn", f"{line['part']}: {len(falls)} note(s) bend down on brass or low reeds - heard as comic "
+            add("warn", f"{line['part']}: {len(falls)} note(s) bend down on brass, low reeds or the lead guitar - heard as comic "
                         f"(a raspberry; the host: \"it sounds like he farts\"): keep falling slides for strings or "
                         f"soft voices, or set \"role\": \"comic\" if that's the joke")
         if bent and line.get("part") in chorded:
@@ -928,6 +931,8 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
     # difference tones beat against the chord.
     struck: Dict[float, set] = {}
     for part in orchestra.GUITAR:
+        if part == orchestra.GUITAR_LEAD:
+            continue                                        # (the lead: single notes, its own amp)
         for a, b, k in by_part.get(part, []):
             struck.setdefault(round(a, 3), set()).add(k)
     muddy = sorted(t for t, ks in struck.items()
@@ -936,6 +941,12 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
         add("warn", f"guitar: {len(muddy)} chord(s) with a third, sixth, seventh or second (first at "
                     f"{muddy[0]:.1f} s) - through its distortion that turns to mud: power chords only "
                     "(\"play\": \"root5\", \"root\", \"octaves\"; root, fifth, octave)")
+    # The lead guitar is one player: a note struck while another sounds cuts it (one voice).
+    lead_on = sorted((a, b) for a, b, _ in by_part.get(orchestra.GUITAR_LEAD, []))
+    cut = sum(1 for (a0, b0), (a1, _) in zip(lead_on, lead_on[1:]) if a1 < b0 - 0.05)
+    if cut:
+        add("warn", f"guitar_lead: {cut} note(s) start while another still sounds - the lead plays one "
+                    "note at a time (a new note ends the last): a chord or a second voice is another part's")
     # The electric guitar is a special surprise, kept for a boss's later stages (the host: "electric
     # guitar will only be used on bosses' later stages. It is a special surprise"): a stage 2+ or a
     # cue of one ("stage": 2), never a theme, a place, a player's theme or a first stage.

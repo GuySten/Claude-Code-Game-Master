@@ -3,6 +3,7 @@ import re
 import sys
 from pathlib import Path
 
+import math
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
@@ -357,13 +358,13 @@ def test_an_arrangement_plays_the_real_percussion(perc_font):
 # --- the electric guitar ---
 def test_the_guitar_parts_play_one_instrument_from_its_own_soundfont():
     assert orchestra.EXTRA_FONTS["guitar"] is orchestra.fetch_guitar
-    assert set(orchestra.GUITAR) == {"guitar", "guitar_mute"}
+    assert set(orchestra.GUITAR) == {"guitar", "guitar_mute", "guitar_lead"}
     for part, art in orchestra.GUITAR.items():
         assert orchestra.PARTS[part][4] == "guitar"
         assert orchestra.PARTS[part][1] == orchestra._guitar_preset(art, 0, 0)     # (its left pass, take 1)
         assert orchestra.FALLBACK[part] == (0, 30)                    # (offline: GM distortion guitar)
-        assert orchestra.RANGES[part] == (35, 76)                     # B1-E5
-        assert orchestra.send_db(orchestra.ROOM["guitar"]) == -12.0   # mostly dry
+        assert orchestra.RANGES[part] == ((40, 79) if part == "guitar_lead" else (35, 76))   # (lead: E2-G5) B1-E5
+        assert orchestra.send_db(orchestra.ROOM[part if part == "guitar_lead" else "guitar"]) == -12.0   # mostly dry
     presets = {orchestra._guitar_preset(a, s, t) for a in (0, 1) for s in (0, 1)
                for t in range(orchestra.GUITAR_TAKES)}
     assert presets == set(range(4 * orchestra.GUITAR_TAKES))
@@ -595,6 +596,61 @@ def test_the_rock_organ_plays_in_the_orchestra_beside_the_guitar(monkeypatch):
     assert float(np.corrcoef(body[:, 0], body[:, 1])[0, 1]) < 0.95
     assert float(abs(out.send).max()) < 0.3 * float(abs(out).max())  # mostly dry, like the guitar
     assert orchestra.level_db("rock_organ") == orchestra.level_db("guitar")
+
+
+def _guitar_solo():
+    sc = orchestra.Score()
+    for i, (k, d) in enumerate([(66, 0.33), (66, 0.17), (66, 0.17), (67, 1.2), (78, 0.33), (79, 1.6)]):
+        sc.note("guitar_lead", k, 0.2 + sum(x for _, x in [(66, 0.33), (66, 0.17), (66, 0.17), (67, 1.2),
+                                                             (78, 0.33)][:i]), d * 0.97, 108)
+    return sc
+
+
+def test_the_lead_guitar_is_one_player_near_centre_and_sings(monkeypatch):
+    np = pytest.importorskip("numpy")
+    pytest.importorskip("tinysoundfont")
+    if not orchestra.SF2.is_file():
+        pytest.skip("the SoundFont isn't downloaded here")
+    if not orchestra.GUITAR_SF2.is_file():
+        pytest.skip("the guitar isn't built here (orchestra.fetch_guitar)")
+    monkeypatch.setenv("GM_ORCHESTRA_WORKERS", "1")
+    rate = 44100
+    layers = orchestra.play_layers(_guitar_solo(), 4.5, lambda name: name, rate=rate)
+    assert set(layers) == {"guitar_lead"}                              # its own player, not the rhythm's
+    out = np.asarray(layers["guitar_lead"], dtype="float64")
+    body = out[int(0.3 * rate): int(4.0 * rate)]
+    assert float(np.corrcoef(body[:, 0], body[:, 1])[0, 1]) > 0.9      # one pass, not double-tracked
+    assert abs(10 * math.log10((body[:, 0] ** 2).sum() / (body[:, 1] ** 2).sum())) < 1.0   # centred
+    m = body.mean(axis=1)
+    P = np.abs(np.fft.rfft(m)) ** 2
+    f = np.fft.rfftfreq(len(m), 1 / rate)
+    assert P[(f >= 2000) & (f < 4000)].sum() / P.sum() < 0.1           # no buzz
+    assert P[f >= 8000].sum() / P.sum() < 0.002                        # no fizz
+    top = out[int(2.6 * rate): int(3.6 * rate)].mean(axis=1)           # G5 (E5 bent up), held: it sings
+    rms = [float(np.sqrt((top[i:i + 4410] ** 2).mean())) for i in range(0, len(top) - 4410, 4410)]
+    assert min(rms) > 0.5 * max(rms)
+    n = 1 << 17
+    S = np.abs(np.fft.rfft(top * np.hanning(len(top)), n))
+    fr = np.fft.rfftfreq(n, 1 / rate)
+    band = (fr > 700) & (fr < 880)
+    assert abs(1200 * math.log2(fr[band][S[band].argmax()] / 783.99)) < 30   # in tune, up there
+    import arrangement as A
+    assert orchestra.RANGES["guitar_lead"][1] == A.pitch("G5")
+
+
+def test_the_lead_guitar_is_kept_for_later_stages_and_plays_one_note_at_a_time():
+    import arrangement as A
+    s = {"tune": {"seed": "Test Hero", "cls": "Fighter"}, "tempo": 120, "statements": [],
+         "key": "D4", "meter": "4/4", "length": 8, "chords": [[0, 8, "i"]],
+         "harmony": [{"part": "guitar", "play": "root5", "range": ["D2", "D3"], "pattern": "x-  ", "step": 0.5}],
+         "lines": [{"part": "guitar_lead", "notes": [[0, "D5", 1], [1, "D5", 0.5], [1.5, "D5", 0.5], [2, "Eb5", 2]]}]}
+    warns = lambda sp: [m for lvl, m in A.check(sp, listen=False) if lvl == "warn" and "guitar" in m]
+    assert any("later stages" in m for m in warns(dict(s, role="stage", stage=1)))   # a first stage: no
+    assert not warns(dict(s, role="stage", stage=2))      # a later stage: yes - and no "mud" from its notes
+    s["lines"][0]["notes"].append([2, "A4", 2])                         # a second voice
+    assert any("one note at a time" in m for m in warns(dict(s, role="stage", stage=2)))
+    s["lines"][0]["notes"][-1] = [4, "D5", 2, 0, {"slide": -2}]         # a falling bend: comic
+    assert any("comic" in m for m in warns(dict(s, role="stage", stage=2)))
 
 
 # --- the real strings' short notes, the real brass ---

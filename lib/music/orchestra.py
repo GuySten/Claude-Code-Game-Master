@@ -115,13 +115,16 @@ PARTS = {
     # a rock organ: a tonewheel organ, overdriven, through a rotating speaker - synthesized
     # (_organ_stem), not sampled: its bank and preset (GM's Rock Organ) are only its name
     "rock_organ": (0, 18, 64, 100),
+    # and a lead guitar: one player, single-tracked near centre, its own amp pushed harder
+    "guitar_lead": (0, 0, 64, 100, "guitar"), # a solo line: one note at a time, singing, vibrato
 }
 # Where a part's own sound set can't be had: the sound set's choir; for the percussion, the
 # GM kit's nearest (bank, preset, its key): a crash cymbal for the gong, the cowbell, an agogo.
 FALLBACK = {"men_choir": (0, 52), "chorus": (0, 52), "choir_oo": (0, 52), "choir_oh": (0, 52),
             "horns": (0, 60), "trombones": (0, 57), "horn_solo": (0, 60),   # (the sound set's horns, trombones)
             "gong": (128, 48, 57), "bass_drum": (128, 48, 35), "anvil": (128, 48, 67), "brake_drum": (128, 48, 56),
-            "guitar": (0, 30), "guitar_mute": (0, 30)}   # (the GM distortion guitar, through a cabinet)
+            "guitar": (0, 30), "guitar_mute": (0, 30),   # (the GM distortion guitar, through a cabinet)
+            "guitar_lead": (0, 30)}
 DRUMS = {"kit"}
 LEAD_DB = 4.0          # the tune's notes, mixed this much over the rest
 BASS_DRUM, CRASH = 35, 49
@@ -1150,7 +1153,9 @@ def part_advance(part: str, short: bool = False, own: bool = False) -> float:
 
 
 # --- the electric guitar ---
-GUITAR = {"guitar": 0, "guitar_mute": 1}        # its parts: the articulation (0 sustain, 1 palm mute)
+GUITAR = {"guitar": 0, "guitar_mute": 1, "guitar_lead": 0}   # its parts: the articulation (0 sustain,
+                                                # 1 palm mute); the lead a player of its own (GUITAR_LEAD)
+GUITAR_LEAD = "guitar_lead"
 GUITAR_TAKES = 3        # takes (round-robins) kept a note, each a stereo pair: its left and right
                         # channels are separate takes, one for each pass of the double-tracking
 GUITAR_KEYS = (40, 76)  # the recordings kept: E2-E5 (one a semitone; E2's also plays B1-D#2)
@@ -1351,14 +1356,15 @@ CAB_GM = (("hp", 90, 0.7, 0), ("hp", 90, 0.7, 0), ("peak", 120, 1.0, 2.5), ("pea
           ("peak", 6500, 1.0, -4), ("lp", 5000, 0.7, 0), ("lp", 5000, 0.7, 0), ("lp", 7000, 0.7, 0))
 
 
-def _amp(di, rate: int):
+def _amp(di, rate: int, pre=AMP_PRE, gain_db: float = AMP_GAIN_DB, cab=CAB, level_db: float = AMP_LEVEL_DB):
     """A DI guitar (mono) through the amp: pre-EQ, two asymmetric tanh stages 4x
-    oversampled (so the distortion doesn't fold back as fizz), then the cabinet."""
+    oversampled (so the distortion doesn't fold back as fizz), then the cabinet (the
+    lead's voicing: LEAD_PRE, LEAD_GAIN_DB, LEAD_CAB, LEAD_LEVEL_DB)."""
     import numpy as np
-    x = _filter(np.asarray(di, dtype="float64") * GUITAR_DRIVE, AMP_PRE, rate)
+    x = _filter(np.asarray(di, dtype="float64") * GUITAR_DRIVE, pre, rate)
     out = np.zeros_like(x)
     blk, pad, k = 4 * rate, 4096, 4
-    g = 10 ** (AMP_GAIN_DB / 20)
+    g = 10 ** (gain_db / 20)
     for i in range(0, len(x), blk):
         a, b = max(0, i - pad), min(len(x), i + blk + pad)
         seg = x[a:b]
@@ -1373,7 +1379,7 @@ def _amp(di, rate: int):
         d = np.fft.irfft(np.fft.rfft(u)[:n // 2 + 1], n) / k  # (and down)
         m = min(blk, len(x) - i)
         out[i:i + m] = d[i - a:i - a + m]
-    return _filter(out, CAB, rate) * 10 ** (AMP_LEVEL_DB / 20)
+    return _filter(out, cab, rate) * 10 ** (level_db / 20)
 
 
 def _studio_room(x, rate: int):
@@ -1733,6 +1739,120 @@ def _organ_stem(events: list, total: int, rate: int, organ: Optional[dict] = Non
     return first, stem.astype("float32")
 
 
+# The lead guitar (guitar_lead): a solo line, the classic overdriven lead voice. The same amp
+# and cabinet pushed harder: more gain (a held note sings on, the amp holding up its decay),
+# less low end into it (tight, not woolly), a mid push before and after the amp so it sings
+# over the band, and no more top than the rhythm sound (its fizz, its 2-4 kHz buzz kept down).
+# One pass, near centre (a short slap left and right, its small room); one note at a time,
+# legato (a new note ends the last); held notes take a delayed vibrato by pitch bend. Notes
+# over E5 (the recordings' top) are E5 bent up, by at most LEAD_STRETCH semitones.
+LEAD_PRE = (("hp", 170, 0.7, 0.0), ("peak", 850, 0.7, 6.0), ("lp", 4500, 0.7, 0.0))
+LEAD_GAIN_DB = 44.0
+LEAD_CAB = CAB + (("peak", 1100, 0.8, 3.0), ("peak", 3000, 1.4, -3.0))
+LEAD_LEVEL_DB = -30.6   # (as the rhythm's: a held line, single-tracked, ~3 LU over its driving chords at
+                        # the same velocity - measured; a solo's "mix" sets it over the band)
+LEAD_VIBRATO = (0.25, 0.3, 28.0, 5.5)   # (it starts this far into a note, s; grows over s; cents deep; Hz)
+LEAD_STRETCH = 3        # semitones over E5 it bends a note up to (G5), still sounding right
+LEAD_SLAP = ((0.083, 0.107), -16.0)     # (a slap echo, left and right, s; dB): a little width
+LEAD_BEND_STEP = 0.005  # (the bend's control rate, s)
+
+
+def _guitar_lead_stem(syn, sfid, fonts, events: list, total: int, rate: int):
+    """The lead guitar (guitar_lead) -> (first sample, stereo stem): one player, one pass
+    (the takes in turn, so a repeated note isn't a machine gun), monophonic legato, a
+    delayed vibrato on held notes and the score's slides (rising ones: a falling bend is
+    comic) by pitch bend, through the amp's lead voicing, near centre. Offline: the GM
+    distortion guitar, through a cabinet."""
+    import numpy as np
+    font = fonts.get("guitar")
+    own = font is not None
+    slides = sorted((t, sem) for t, kind, _, _, sem in events if kind == 2)
+    ons: Dict[int, list] = {}
+    notes = []                                                  # (on, off, key, vel)
+    for t, is_on, _, key, vel in sorted(events, key=lambda e: (e[0], e[1])):
+        if is_on == 1:
+            ons.setdefault(key, []).append((t, vel))
+        elif is_on == 0 and ons.get(key):
+            t0, v = ons[key].pop(0)
+            notes.append((t0, t, key, v))
+    notes += [(t0, total / rate, key, v) for key, left in ons.items() for t0, v in left]
+    notes.sort()
+    mono = []
+    for i, (t0, t1, key, v) in enumerate(notes):                # (one voice: a new note ends the last)
+        t1 = min(t1, notes[i + 1][0]) if i + 1 < len(notes) else t1
+        if t1 - t0 >= 0.01:
+            mono.append((t0, t1, key, v))
+    if not mono:
+        return total, np.zeros((0, 2), dtype="float32")
+    first = max(0, int((mono[0][0] - 0.02) * rate))
+    end = min(total, int((mono[-1][1] + 1.0) * rate))
+    if end <= first:
+        return total, np.zeros((0, 2), dtype="float32")
+    delay, grow, cents, hz = LEAD_VIBRATO
+
+    def slide(t: float) -> float:                               # (the score's bend there)
+        v = 0.0
+        for at, sem in slides:
+            if at > t:
+                break
+            v = sem
+        return v
+
+    ev = []                                                     # (t, order, ch, key, value)
+    for i, (t0, t1, key, vel) in enumerate(mono):
+        ch = i % GUITAR_TAKES
+        play = min(key, GUITAR_KEYS[1])
+        up = min(key - play, LEAD_STRETCH)                      # (over E5: E5, bent up)
+        step = t0
+        while step < t1:
+            into = step - t0
+            vib = (cents / 100 * min(1.0, (into - delay) / grow) * math.sin(2 * math.pi * hz * (into - delay))
+                   if into > delay else 0.0)
+            ev.append((step, 1, ch, play, up + slide(step) + vib))
+            step += LEAD_BEND_STEP if (into + LEAD_BEND_STEP > delay or slides) else delay
+        ev.append((t0, 2, ch, play, vel))
+        ev.append((t1, 0, ch, play, 0))
+    ev.sort(key=lambda e: (e[0], e[1]))                         # (at one time: off, bend, then on)
+    chans = range(GUITAR_TAKES)
+    for c in chans:
+        if own:
+            syn.program_select(c, font, 0, _guitar_preset(0, 0, c))
+        else:
+            syn.program_select(c, sfid, *FALLBACK[GUITAR_LEAD])
+        syn.control_change(c, 7, 100)
+        syn.control_change(c, 10, 64)
+        syn.pitchbend_range(c, 12)
+        syn.pitchbend(c, 8192)
+    chunks, pos = [], first
+    for t, kind, ch, key, val in ev:
+        at = min(end, int(t * rate))
+        if at > pos:
+            chunks.append(np.frombuffer(syn.generate(at - pos), dtype="float32"))
+            pos = at
+        if kind == 1:
+            syn.pitchbend(ch, int(max(0, min(16383, 8192 + val / 12 * 8191))))
+        elif kind == 2:
+            syn.noteon(ch, key, int(max(1, min(127, val))))
+        else:
+            syn.noteoff(ch, key)
+    if pos < end:
+        chunks.append(np.frombuffer(syn.generate(end - pos), dtype="float32"))
+    for c in chans:
+        syn.sounds_off(c)
+        syn.pitchbend(c, 8192)
+    syn.generate(256)
+    di = np.concatenate(chunks).reshape(-1, 2).mean(axis=1).astype("float64")[:end - first]
+    x = (_amp(di, rate, LEAD_PRE, LEAD_GAIN_DB, LEAD_CAB, LEAD_LEVEL_DB) if own
+         else _filter(di, CAB_GM, rate) * GUITAR_GM_GAIN)
+    (dl, dr), slap_db = LEAD_SLAP
+    echo = _filter(x, [("lp", 3000, 0.7, 0.0), ("hp", 300, 0.7, 0.0)], rate) * 10 ** (slap_db / 20)
+    sides = []
+    for d in (dl, dr):
+        n = int(d * rate)
+        sides.append(x + np.concatenate([np.zeros(n), echo[:len(echo) - n]]))
+    return first, _studio_room(np.stack(sides, axis=1), rate).astype("float32")
+
+
 EXTRA_FONTS = {"chorus": fetch_choir, "vowels": fetch_vowels, "perc": fetch_percussion,
                "guitar": fetch_guitar, "strings_short": fetch_strings_short, "brass": fetch_brass,
                "horn_solo": fetch_horn_solo}
@@ -1765,6 +1885,7 @@ LOUDNESS = {
     # the guitar through its amp (AMP_LEVEL_DB): at no "mix", ~6 dB under a forte orchestra -
     # a distorted guitar is dense (its peaks barely over its body): heard well there
     "guitar": 0.0, "guitar_mute": 0.0,
+    "guitar_lead": 0.0,     # (its LEAD_LEVEL_DB: a held line ~3 LU over the rhythm guitar's chords)
     # the rock organ through its speaker (ORGAN_LEVEL_DB): set where the guitar sits
     "rock_organ": 0.0,
 }
@@ -1787,6 +1908,8 @@ RANGES = {
     # the struck percussion: one sound each, on its own key (PERC; "root" or any drum name in a
     # score plays it), pitched a little around it - the gong down to A2, bigger and slower
     **{part: (p["lo"], p["hi"]) for part, p in PERC.items()},
+    # the lead: E2 up to G5 (E5 bent up LEAD_STRETCH semitones); it sings best E4-E5
+    "guitar_lead": (GUITAR_KEYS[0], GUITAR_KEYS[1] + LEAD_STRETCH),
     # the guitar: B1 (a 7-string's low B, a drop tuning's D2) to E5; power chords sit B1-D4
     "guitar": (GUITAR_LOW, GUITAR_KEYS[1]), "guitar_mute": (GUITAR_LOW, GUITAR_KEYS[1]),
     # the rock organ: a manual's 61 keys, C2-C7
@@ -1816,7 +1939,7 @@ ROOM = {"flutes": -20.8, "horns": -17.5, "horn_solo": -17.5, "trumpets": -39.3, 
         "brass": -20.9, "organ": -15.4, "pizzicato": -24.9, "taiko": -20.9, "toms": -28.9,
         # the guitar: close-miked in a small room of its own (_studio_room), sent to the hall
         # only a little (-12 dB) - a rhythm guitar is heard dry, in front, not across a hall
-        "guitar": HALL_ROOM_GUITAR,
+        "guitar": HALL_ROOM_GUITAR, "guitar_lead": HALL_ROOM_GUITAR,
         "rock_organ": HALL_ROOM_GUITAR}     # (the rock organ's speaker too: in its room, in front)
 HALL_ROOM = -12.8
 # (A part playing its own recordings is sent as OWN says; the brass BRASS_DRY_DB drier:
@@ -1892,6 +2015,8 @@ def _stem(syn, sfid, fonts, name: str, events: list, total: int, rate: int, shor
     their own recordings (STRINGS_SHORT). ``organ``: the rock organ's settings (Score.organ)."""
     import numpy as np
     part = name.partition(":")[0]
+    if part == GUITAR_LEAD:                                 # (the lead guitar: a player of its own)
+        return _guitar_lead_stem(syn, sfid, fonts, events, total, rate)
     if part in GUITAR:                                      # (the guitar: its own player, an amp)
         return _guitar_stem(syn, sfid, fonts, events, total, rate)
     if part in ORGAN:                                       # (the rock organ: synthesized)
@@ -1973,7 +2098,8 @@ def play_layers(score: Score, seconds: float, layer_of, sf2: Path = SF2, rate: i
     for e in score.events:
         part, colon, layer = e[2].partition(":")
         # the guitar's two parts are one instrument through one amp: played together, as "guitar"
-        groups.setdefault("guitar" + colon + layer if part in GUITAR else e[2], []).append(e)
+        # (the lead guitar is another player, another amp: a part of its own)
+        groups.setdefault("guitar" + colon + layer if part in GUITAR and part != GUITAR_LEAD else e[2], []).append(e)
     keys: List = []
     jobs = []
     wanted = {name: layer_of(name) for name in groups}
