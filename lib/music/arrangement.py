@@ -121,8 +121,10 @@ except in "hits" and "rolls", where it is the velocity itself (1-127).
   "organ": {"speaker": [[0, "slow"], [32, "fast"]], "drawbars": "888800000", "percussion": "third"},
                          # the rock organ's: its rotating speaker switched slow / fast there (it
                          # eases into it: the horn in ~1 s, the drum in ~4; default "fast" all
-                         # through - "speaker": "slow" for all of it), its drawbars (16' to 1',
-                         # default 888800000) and percussion ("second", "third"; default none)
+                         # through - "speaker": "slow" for all of it), its drawbars (16' to 1';
+                         # default by passage: 888888888 on held chords, 888888000 on riffs),
+                         # percussion ("second", "third"; default none), "pedals": false (its
+                         # bass pedals out; default in) and "pedal_db" (dB up or down for them)
   "mix": {"choir": 3},   # dB up or down for a part in this piece (all parts are already
                          # evened out: the same velocity is the same loudness)
   "lead": 4              # the tune's notes are mixed this many dB over the rest (default 4);
@@ -181,10 +183,13 @@ only ("root5", "root", "octaves": a third turns to mud). A surprise held back fo
 stage, never a bed for every piece. guitar_lead: a lead guitar of its own (overdriven, singing,
 near centre; one note at a time, legato, a delayed vibrato on held notes; E2-G5, best E4-E5) -
 a short solo in a later stage, where the chant rests (no falling slides: comic).
-A rock organ: rock_organ, a Hammond B3 (888800000) overdriven through a Leslie - setBfree's
-model of both (a synthesized one if it can't be built) - the speaker fast by default ("organ"
-switches it; it accelerates and brakes as a real one does) - the church organ gone wild: riffs,
-stabbed and held chords, C2-C7. Rarer still than the guitar: a boss's third stage or later.
+A rock organ: rock_organ, a Hammond B3 through a Leslie, then overdriven - setBfree's model of
+both (a synthesized one if it can't be built) - the speaker fast by default ("organ" switches
+it; it accelerates and brakes as a real one does) - the church organ gone wild: riffs, stabbed
+and held chords, C2-C7. Registered by passage on its own: held chords on all drawbars, lightly
+driven; riffs (notes under 0.6 s) on the lower six, driven hard. Its bass pedals play each
+chord's lowest note at C1, clean ("organ": "pedals", "pedal_db"). Rarer still than the guitar:
+a boss's third stage or later.
 """
 
 import argparse
@@ -515,12 +520,24 @@ def progression_chords(spec: Dict[str, Any], bar: float) -> List[list]:
 
 def _organ(spec: Dict[str, Any], sc: "orchestra.Score", T) -> None:
     """The rock organ's settings ("organ"): its drawbars, its percussion, its rotating speaker
-    ("slow", "fast", or [[time, "slow" | "fast"], ...]: switched there, easing into it)."""
+    ("slow", "fast", or [[time, "slow" | "fast"], ...]: switched there, easing into it), its
+    bass pedals ("pedals": false leaves them out; "pedal_db": dB from their own level)."""
     org = spec.get("organ")
     if not org:
         return
     if not isinstance(org, dict):
-        raise ArrangementError('"organ" is {"speaker": ..., "drawbars": "888000000", "percussion": ...}')
+        raise ArrangementError('"organ" is {"speaker": ..., "drawbars": "888000000", "percussion": ..., '
+                               '"pedals": true, "pedal_db": 0}')
+    pedals = org.get("pedals", True)
+    if not isinstance(pedals, bool):
+        raise ArrangementError(f'"pedals" {pedals!r}: true or false')
+    if not pedals:
+        sc.organ["pedals"] = False
+    pedal_db = org.get("pedal_db")
+    if pedal_db is not None:
+        if isinstance(pedal_db, bool) or not isinstance(pedal_db, (int, float)) or not -24 <= pedal_db <= 12:
+            raise ArrangementError(f'"pedal_db" {pedal_db!r}: dB up or down from the pedals\' level (-24 to 12)')
+        sc.organ["pedal_db"] = float(pedal_db)
     bars = org.get("drawbars")
     if bars is not None:
         if not re.fullmatch(r"[0-8]{9}", str(bars)):

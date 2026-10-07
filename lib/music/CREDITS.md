@@ -52,8 +52,8 @@ Ubuntu's `setbfree_0.8.12+ds-2build2.dsc` gives). Licence: the
 
 `fetch_setbfree` compiles setBfree's tone generator, overdrive and rotating speaker (its
 reverb, JACK and LV2 parts left out) with `lib/music/setbfree_render.c` - a small program that
-plays the score's notes and speaker switches through them offline - into one program in
-`~/.cache/gm-orchestra/`, which the engine runs as a separate process. That file is licensed
+plays the score's notes, bass pedals and speaker switches through them offline - into one
+program in `~/.cache/gm-orchestra/`, which the engine runs as a separate process. That file is licensed
 under the GPL, version 2 or later, like the code it is built with (not under this
 repository's licence); nothing else here links to setBfree. The synthesized organ in
 `orchestra.py` (`_organ_synth_stem`) is this repository's own, and plays when setBfree

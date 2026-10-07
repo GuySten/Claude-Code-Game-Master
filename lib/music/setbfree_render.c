@@ -23,12 +23,15 @@
  * one a line, in order:
  *   cfg KEY=VALUE      a setBfree configuration line (before any other line)
  *   bars 888800000     the upper manual's drawbars, 16' to 1'
+ *   pbars 880000000    the pedals' drawbars (setBfree's pedal stops: 880000000 sounds a pedal's
+ *                      fundamental and its twelfth, the third harmonic)
  *   cc NAME VALUE      one of setBfree's MIDI control functions (0..127), e.g.
  *                      "cc overdrive.enable 127", "cc percussion.harmonic 0"
  *   speed 0|1          the rotary speaker slow or fast, already turning at that speed
  *   swell X            the swell pedal, 0..1 (eased there over ~30 ms)
  *   at FRAME           render up to this frame (setBfree works 128 frames at a time)
  *   on KEY / off KEY   a key of the upper manual (MIDI note number) down / up
+ *   pon KEY / poff KEY a pedal (MIDI note number: 24, C1, the lowest) down / up
  *   fast 0|1           the speaker switched slow / fast: it accelerates as setBfree's does
  *   end FRAME          render to here and stop
  */
@@ -107,10 +110,21 @@ render_to (long frame, FILE* out)
 }
 
 static void
-key (int down, int note)
+key (int channel, int down, int note)
 {
-	uint8_t msg[3] = { down ? 0x90 : 0x80, (uint8_t)(note & 0x7f), down ? 127 : 0 };
+	/* setBfree's own MIDI channels: the upper manual on the first, the pedals on the third */
+	uint8_t msg[3] = { (uint8_t)((down ? 0x90 : 0x80) | channel), (uint8_t)(note & 0x7f), down ? 127 : 0 };
 	parse_raw_midi_data (&inst, msg, 3);
+}
+
+static void
+drawbars (int manual, const char* arg)
+{
+	unsigned int bars[9];
+	for (int i = 0; i < 9; ++i) {
+		bars[i] = (i < (int)strlen (arg) && arg[i] >= '0' && arg[i] <= '8') ? arg[i] - '0' : 0;
+	}
+	setDrawBars (&inst, manual, bars); /* (0 the upper manual, 2 the pedals) */
 }
 
 static void
@@ -186,11 +200,9 @@ main (int argc, char** argv)
 			ready = 1;
 		}
 		if (!strcmp (word, "bars")) {
-			unsigned int bars[9];
-			for (int i = 0; i < 9; ++i) {
-				bars[i] = (i < (int)strlen (arg) && arg[i] >= '0' && arg[i] <= '8') ? arg[i] - '0' : 0;
-			}
-			setDrawBars (&inst, 0, bars);
+			drawbars (0, arg);
+		} else if (!strcmp (word, "pbars")) {
+			drawbars (2, arg);
 		} else if (!strcmp (word, "cc")) {
 			char name[64];
 			int  v;
@@ -209,7 +221,9 @@ main (int argc, char** argv)
 		} else if (!strcmp (word, "at")) {
 			render_to (atol (arg), out);
 		} else if (!strcmp (word, "on") || !strcmp (word, "off")) {
-			key (word[1] == 'n', atoi (arg));
+			key (0, word[1] == 'n', atoi (arg));
+		} else if (!strcmp (word, "pon") || !strcmp (word, "poff")) {
+			key (2, word[2] == 'n', atoi (arg));
 		} else if (!strcmp (word, "fast")) {
 			speed (atoi (arg), 0);
 		} else if (!strcmp (word, "end")) {

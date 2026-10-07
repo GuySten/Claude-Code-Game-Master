@@ -588,11 +588,14 @@ def test_the_rock_organ_plays_in_the_orchestra_beside_the_guitar(monkeypatch):
         sc.note("rock_organ", k, 0.2, 2.5, 112)
         sc.note("rock_organ:3", k, 3.0, 0.4, 112)                      # (a layer: the same speaker)
     sc.rotate(0.0, False)
-    sc.organ = {"drawbars": "888800000"}
     layers = orchestra.play_layers(sc, 4.0, lambda name: name.partition(":")[0], rate=44100)
     out = layers["rock_organ"]
     assert out.shape[1] == 2 and float(abs(out).max()) > 0.01
     body = np.asarray(out[int(0.4 * 44100):int(2.6 * 44100)], dtype="float64")
+    # (wide: the swirl of the horn - its registration's upper drawbars - over the drum and the
+    # bass pedals, heard by one mic and in phase by design; setBfree's own overdrive, which
+    # gave a 888800000 chord its highs, is off: the static the host heard)
+    body = orchestra._filter(body, [("hp", 200, 0.7, 0.0)] * 2, 44100)
     assert float(np.corrcoef(body[:, 0], body[:, 1])[0, 1]) < 0.95
     assert float(abs(out.send).max()) < 0.3 * float(abs(out).max())  # mostly dry, like the guitar
     assert orchestra.level_db("rock_organ") == orchestra.level_db("guitar")
@@ -658,7 +661,7 @@ def test_the_scores_speaker_drawbars_and_percussion_reach_setbfree(monkeypatch):
     start = first - int(orchestra.SETBFREE_PREROLL * rate)            # (it plays from here, the speaker turning)
     assert lines[-1] == f"end {int(20.3 * rate) - start}"
     for want in ("bars 888000000", "cc percussion.enable 127", "cc percussion.harmonic 127",
-                 "cc overdrive.enable 127", "speed 0", "swell 1.0000"):
+                 "cc overdrive.enable 0", "speed 0", "swell 1.0000"):     # (its own overdrive off: ours after)
         assert want in lines, want                                   # (slow: as the switch before it left it)
     assert not [line for line in lines if "reverb" in line]           # (the hall is the engine's)
     at = lines.index("fast 1")
@@ -705,27 +708,36 @@ def setbfree():
 def test_setbfree_eases_its_speaker_from_slow_to_fast_where_the_score_says(setbfree):
     np = pytest.importorskip("numpy")
     rate = 44100
-    ev = [(0.0, 1, "rock_organ", 74, 105), (9.0, 0, "rock_organ", 74, 0), (0.0, 3, "rock_organ", 0, 0),
+    # (one 8' wheel, D6 - the horn's: no two wheels beating to swing the level too; clean into
+    # the speaker now, so the note itself is what the horn swings, not the overdrive's harmonics)
+    ev = [(0.0, 1, "rock_organ", 86, 105), (9.0, 0, "rock_organ", 86, 0), (0.0, 3, "rock_organ", 0, 0),
           (4.0, 3, "rock_organ", 0, 1)]
-    # (one 8' wheel: no two wheels beating through the drive to swing the level too)
     first, stem = orchestra._setbfree_stem(setbfree, ev, int(10 * rate), rate, {"drawbars": "008000000"})
     s = stem.astype("float64")
-    assert stem.shape[1] == 2 and float(abs(s).max()) > 0.01
-    assert _mod_peak(np, s[int(0.2 * rate):int(3.9 * rate), 0], rate, (1500, 5000), 0.3, 9) < 1.0
-    assert 1.5 < _mod_peak(np, s[int(4.0 * rate):int(4.4 * rate), 0], rate, (1500, 5000), 0.3, 9) < 6.6   # speeding up
-    assert _mod_peak(np, s[int(5.5 * rate):int(8.9 * rate), 0], rate, (1500, 5000), 0.3, 9) > 6.6
+    assert stem.shape[1] == 2 and float(abs(s).max()) > 0.002      # (one wheel, a held note: lightly driven)
+    # (slow: a pure wheel the slow horn beams round swings at its turning's harmonics too -
+    # 0.67 Hz and up, the strongest ~2.7 - far under the fast horn's 6.7)
+    assert _mod_peak(np, s[int(0.2 * rate):int(3.9 * rate), 0], rate, (900, 5000), 0.3, 9) < 3.0
+    assert 1.5 < _mod_peak(np, s[int(4.0 * rate):int(4.4 * rate), 0], rate, (900, 5000), 0.3, 9) < 6.6   # speeding up
+    assert _mod_peak(np, s[int(5.5 * rate):int(8.9 * rate), 0], rate, (900, 5000), 0.3, 9) > 6.6
     P = np.abs(np.fft.rfft(s.mean(axis=1))) ** 2
     assert P[np.fft.rfftfreq(len(s), 1 / rate) > 8000].sum() / P.sum() < 0.02
+
+
+def _organ_riff(bars=(0.5, 2.5)):
+    """C, C-C, D-flat: power chords, the last one long (the host's demo riff)."""
+    ev = []
+    for bar in bars:
+        for at, dur, keys, vel in ((0, 0.41, (48, 55, 60), 114), (0.5, 0.2, (48, 55, 60), 114),
+                                   (0.75, 0.2, (48, 55, 60), 114), (1.0, 0.92, (49, 56, 61), 118)):
+            ev += [e for k in keys for e in ((bar + at, 1, "rock_organ", k, vel), (bar + at + dur, 0, "rock_organ", k, 0))]
+    return ev
 
 
 def test_setbfree_plays_a_riff_on_time_and_as_loud_as_the_synthesized_organ(setbfree):
     np = pytest.importorskip("numpy")
     rate = 44100
-    ev = []
-    for bar in (0.5, 2.5):                                            # C, C-C, D-flat: power chords
-        for at, dur, keys, vel in ((0, 0.41, (48, 55, 60), 114), (0.5, 0.2, (48, 55, 60), 114),
-                                   (0.75, 0.2, (48, 55, 60), 114), (1.0, 0.92, (49, 56, 61), 118)):
-            ev += [e for k in keys for e in ((bar + at, 1, "rock_organ", k, vel), (bar + at + dur, 0, "rock_organ", k, 0))]
+    ev = _organ_riff()
     n = int(5 * rate)
 
     def placed(first, stem):
@@ -756,6 +768,115 @@ def test_setbfrees_low_end_is_in_phase_and_its_swirl_stays_wide(setbfree):
     assert coherence(300, 800) > 0.5                    #  the drum's two mics in opposite phase)
     assert coherence(800, 5000) < 0.8                   # the horn's two mics: still a wide swirl
     assert float(np.corrcoef(s[:, 0], s[:, 1])[0, 1]) > 0.5
+
+
+def _flatness(np, x, rate, lo, hi, n=4096):
+    """The spectral flatness of x in lo-hi Hz (~0 tones, 1 noise): its median over the frames
+    that sound (93 ms, half overlapped)."""
+    m = x.mean(axis=1)
+    f = np.fft.rfftfreq(n, 1 / rate)
+    band = (f >= lo) & (f < hi)
+    frames = [np.abs(np.fft.rfft(m[i:i + n] * np.hanning(n)))[band] ** 2 + 1e-30
+              for i in range(0, len(m) - n, n // 2)]
+    loud = max(P.mean() for P in frames)
+    return float(np.median([np.exp(np.log(P).mean()) / P.mean() for P in frames if P.mean() > 1e-3 * loud]))
+
+
+def test_setbfree_plays_clean_into_its_speaker_our_drive_after_it_no_static(setbfree, monkeypatch):
+    np = pytest.importorskip("numpy")
+    rate = 44100
+    n = int(5 * rate)
+    runs = []
+    run = orchestra._setbfree_run
+    monkeypatch.setattr(orchestra, "_setbfree_run", lambda exe, lines, r, m: runs.append(list(lines)) or run(exe, lines, r, m))
+    first, stem = orchestra._setbfree_stem(setbfree, _organ_riff(), n, rate, {})
+    new = stem.astype("float64")
+    assert "cc overdrive.enable 0" in runs[0]
+    # as it played before: setBfree's own overdrive into its Leslie (888800000, "character" 96)
+    lines = [ln for ln in runs[0] if not ln.startswith(("cc overdrive", "bars"))]
+    lines[1:1] = ["bars 888800000", "cc overdrive.enable 127", "cc overdrive.character 96"]
+    start = max(0, first - int(orchestra.SETBFREE_PREROLL * rate))
+    old = run(setbfree, lines, rate, n)[first - start:first - start + len(new)]
+    # (the host heard a noise-like static in the old one: 2-6 kHz flat, ~0.47 here, and 0.8% of
+    # its energy; the riff they chose: ~0.17, 0.01%)
+    assert _flatness(np, new, rate, 2000, 6000) < 0.2
+    assert _flatness(np, new, rate, 2000, 6000) < 0.5 * _flatness(np, old, rate, 2000, 6000)
+    hiss = lambda y: _band_share(np, y, rate, 2000, 6000)                # noqa: E731
+    assert hiss(new) < 0.1 * hiss(old)
+    s = new[int(0.3 * rate):]
+    F = np.fft.rfft(s, axis=0)
+    fr = np.fft.rfftfreq(len(s), 1 / rate)
+    a, b = F[(fr >= 30) & (fr < 300), 0], F[(fr >= 30) & (fr < 300), 1]
+    assert float(np.real((a * np.conj(b)).sum()) / np.sqrt((abs(a) ** 2).sum() * (abs(b) ** 2).sum())) > 0.9
+    assert _band_share(np, new, rate, 30, 40) > 0.15                     # the pedals: C1, D-flat 1
+    bare = orchestra._setbfree_stem(setbfree, _organ_riff(), n, rate, {"pedals": False})[1]
+    assert _band_share(np, bare.astype("float64"), rate, 30, 40) < 0.01
+
+
+def _band_share(np, x, rate, lo, hi):
+    """The share of x's energy (both sides together) in lo-hi Hz."""
+    P = np.abs(np.fft.rfft(x.mean(axis=1))) ** 2
+    f = np.fft.rfftfreq(len(x), 1 / rate)
+    return float(P[(f >= lo) & (f < hi)].sum() / P.sum())
+
+
+def _held_then_riff():
+    """A held chord, C3-G3-C4-E4 (2.8 s), then the riff from 3.0 s: the host's demo."""
+    held = [e for k in (48, 55, 60, 64) for e in ((0.0, 1, "rock_organ", k, 114), (2.8, 0, "rock_organ", k, 0))]
+    return held + _organ_riff((3.0, 5.4))
+
+
+def test_the_rock_organ_is_registered_by_passage_held_chords_b4_riffs_b3(monkeypatch):
+    np = pytest.importorskip("numpy")
+    notes = orchestra._organ_notes(_held_then_riff(), int(9 * 44100), 44100)
+    assert orchestra._organ_passages(notes) == [(0.0, "held"), (3.0, "riff")]
+    lone = [e for t, d in ((0.0, 2.0), (2.0, 0.3), (2.3, 2.0), (4.3, 2.0)) for k in (48, 55)
+            for e in ((t, 1, "rock_organ", k, 100), (t + d, 0, "rock_organ", k, 0))]
+    assert orchestra._organ_passages(orchestra._organ_notes(lone, 7 * 44100, 44100)) == [(0.0, "held")]   # (a stab)
+    sent = _fake_setbfree(monkeypatch)
+    rate = 44100
+    first, stem = orchestra._organ_stem(_held_then_riff(), int(9 * rate), rate)
+    lines = sent[0]
+    start = max(0, first - int(orchestra.SETBFREE_PREROLL * rate))
+    assert "bars 888888888" in lines[:8] and "cc overdrive.enable 0" in lines   # "B4 start"
+    at = lines.index("bars 888888000")                                          # "B3 middle"
+    assert lines[at - 1] == f"at {int(3.0 * rate) - start}" and lines.index("off 64") < at < lines.index("on 49")
+    # the drive (the fake plays a steady tone, 0.1): light on the held chord, ~9 dB harder on the riff
+    first, stem = orchestra._organ_stem(_held_then_riff(), int(9 * rate), rate, {"pedals": False})
+    s = stem.astype("float64")
+    rms = lambda a, b: float(np.sqrt((s[int(a * rate) - first:int(b * rate) - first] ** 2).mean()))   # noqa: E731
+    assert rms(3.2, 3.3) > 1.4 * rms(1.0, 2.0)                       # (into the tube's knee: not 2.9x)
+    sent.clear()
+    orchestra._organ_stem(_held_then_riff(), int(9 * rate), rate, {"drawbars": "888800000", "pedals": False})
+    assert len(sent) == 1 and [ln for ln in sent[0] if ln.startswith("bars")] == ["bars 888800000"]
+
+
+def test_the_bass_pedals_follow_the_roots_at_c1_one_at_a_time(monkeypatch):
+    sent = _fake_setbfree(monkeypatch)
+    rate = 44100
+    first, _ = orchestra._organ_stem(_held_then_riff(), int(9 * rate), rate)
+    assert len(sent) == 2                                              # the manuals, the pedals: a run each
+    ped = sent[1]
+    start = max(0, first - int(orchestra.SETBFREE_PREROLL * rate))
+    assert "pbars 880000000" in ped and "cc overdrive.enable 0" in ped and not [ln for ln in ped if ln.startswith("on ")]
+    downs = [(int(ped[i - 1].split()[1]) + start, ln) for i, ln in enumerate(ped) if ln.startswith(("pon", "poff"))]
+    keys = [ln.split()[1] for _, ln in downs if ln.startswith("pon")]
+    assert keys == ["24"] + ["24", "24", "24", "25"] * 2                # the held chord's C, the riff's C C C D-flat
+    held = 0
+    for _, ln in downs:                                                # one at a time
+        held += 1 if ln.startswith("pon") else -1
+        assert held in (0, 1)
+    assert downs[0] == (0, "pon 24") and downs[1] == (int(2.8 * rate), "poff 24")   # as long as the chord over it
+    assert [ln for ln in ped if ln.startswith(("fast", "swell"))] == [ln for ln in sent[0] if ln.startswith(("fast", "swell"))]
+    # a lone line (or its octaves) has no root to stand on; a busier layer's pedals come first
+    line = [e for t, k in ((0.0, 60), (0.5, 62), (1.0, 64)) for kk in (k, k - 12)
+            for e in ((t, 1, "rock_organ", kk, 100), (t + 0.45, 0, "rock_organ", kk, 0))]
+    assert orchestra._organ_pedals(orchestra._organ_notes(line, 2 * rate, rate)) == []
+    notes = orchestra._organ_notes(_held_then_riff(), int(9 * rate), rate)
+    assert orchestra._organ_pedals(notes, [(0.0, 5.3)]) == orchestra._organ_pedals(notes)[5:]
+    sent.clear()
+    orchestra._organ_stem(_held_then_riff(), int(9 * rate), rate, {"pedals": False})
+    assert len(sent) == 1
 
 
 def _guitar_solo():

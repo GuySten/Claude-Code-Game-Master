@@ -269,7 +269,8 @@ class Score:
     def __init__(self):
         self.events: List[Tuple[float, int, str, int, int]] = []   # (seconds, on?, part, key, vel)
         self.bends: List[Tuple[float, str, float]] = []             # (seconds, part, semitones)
-        self.organ: Dict[str, str] = {}         # the rock organ's "drawbars", "percussion", "speaker"
+        self.organ: Dict[str, object] = {}      # the rock organ's "drawbars", "percussion", "speaker",
+                                                # "pedals" (False: none), "pedal_db"
         self.speaker: List[Tuple[float, bool]] = []     # (seconds, fast?): its rotating speaker switched
 
     def rotate(self, at: float, fast: bool) -> None:
@@ -1742,12 +1743,13 @@ def _organ_synth_stem(events: list, total: int, rate: int, organ: Optional[dict]
 
 
 # The real thing, modelled: setBfree (Fredrik Kilander and Robin Gareus; GPL-2) - a Hammond
-# B3's tone generator (its 91 wheels, their leakage and crosstalk, the key click), its preamp
-# overdriven and a Leslie (setBfree's whirl: the horn and the drum each accelerating and
-# braking as a real one's do), the reverb left out (the hall is the engine's). Played offline
-# by setbfree_render.c beside this file: a separate program, GPL-2 like the code it is built
-# with, compiled once in the cache from setBfree's pinned source (fetch_setbfree; a C compiler
-# needed) and run as a process. Missing or failing, the synthesized organ above plays.
+# B3's tone generator (its 91 wheels, their leakage and crosstalk, the key click), its bass
+# pedals and a Leslie (setBfree's whirl: the horn and the drum each accelerating and braking
+# as a real one's do), its own overdrive and its reverb left out (the drive is ours, after the
+# speaker; the hall is the engine's). Played offline by setbfree_render.c beside this file: a
+# separate program, GPL-2 like the code it is built with, compiled once in the cache from
+# setBfree's pinned source (fetch_setbfree; a C compiler needed) and run as a process. Missing
+# or failing, the synthesized organ above plays.
 SETBFREE_VERSION = "0.8.12"
 SETBFREE_URL = ("https://archive.ubuntu.com/ubuntu/pool/universe/s/setbfree/"
                 "setbfree_0.8.12+ds.orig.tar.xz")      # (Ubuntu's copy of the release: 3.8 MB)
@@ -1758,12 +1760,42 @@ SETBFREE_DRIVER = Path(__file__).resolve().parent / "setbfree_render.c"
 SETBFREE_SOURCES = ("src/midi.c", "src/state.c", "src/vibrato.c", "src/tonegen.c", "src/program.c",
                     "src/pgmParser.c", "src/cfgParser.c", "b_reverb/reverb.c", "b_whirl/whirl.c",
                     "b_whirl/eqcomp.c", "b_overdrive/overdrive.c")
-# Its preamp: setBfree's overdrive on, its "character" (0..127) at 96 - the bass pushed into
-# the tube and taken out after: one note ~20% distortion, a power chord ~45%, a full chord
-# ~55% at full swell (the synthesized organ's growl, measured the same way). The swell pedal
-# follows the velocity, (vel / 127) ** 1.5, eased over 30 ms: a harder chord drives harder.
-SETBFREE_DRIVE = 96
-SETBFREE_LEVEL_DB = -8.9    # its output: as loud as the synthesized organ (LUFS, the same riff)
+# Its sound as the host chose it by ear, demo by demo ("3 is the best": setBfree played clean,
+# then our own drive, then its bass pedals):
+# - setBfree's own overdrive OFF. Driven into its Leslie it made a noise-like static (a riff's
+#   2-6 kHz: 0.8% of its energy, spectral flatness ~0.47; clean into the speaker and driven
+#   after it: 0.01%, ~0.17): the drive is our tube (_organ_drive), on each mic.
+# - The registration by passage, "B4 start, B3 middle": a held chord on all nine drawbars
+#   (888888888, "B4"), a riff on the lower six (888888000, "B3": the 1 3/5', 1 1/3' and 1' out,
+#   no fizz through the drive). A chord is a riff's when a note shorter than ORGAN_RIFF_NOTE
+#   was struck within ORGAN_RIFF_SPAN before it (itself included): a riff's last long note
+#   still the riff's; a passage of either kind struck over less than ORGAN_PASSAGE_MIN between
+#   two of the other takes theirs. The drawbars change as its first chord is struck (a score's
+#   own "drawbars": that registration all through, the drive still following).
+# - The drive: light on held chords, ~9 dB harder on riffs (crossfaded over ORGAN_DRIVE_FADE,
+#   ending as the new passage's first chord is struck). A fixed gain into the tube for setBfree's
+#   clean output - not scaled to a piece's loudest moment, so a riff in a long stage is driven
+#   as the demo's was: the demo's 1.5 and 4 over its clean render's peak (0.883 on B4, 0.817 on
+#   B3: C3-G3-C4-E4 at swell 0.85, velocity 114). The swell pedal follows the velocity,
+#   (vel / 127) ** 1.5, eased over 30 ms: a harder chord drives harder, as a real one's does.
+# - The bass pedals: setBfree's own (880000000: C1's fundamental and its twelfth) under each
+#   struck chord - two or more pitch classes sounding, so a lone line (or its octaves) has
+#   none - on the C1 octave (24-35) of the lowest manual note sounding, held while it sounds,
+#   one at a time (legato from chord to chord, held on through a chord on the same root).
+#   Clean, never through the drive: through the same speaker (its drum heard by one mic: in
+#   phase), in a run of their own, at the RMS of the organ over them (the demo's "loud": ~31%
+#   of its energy at 20-45 Hz). "organ": {"pedals": false} leaves them out, "pedal_db" moves them.
+SETBFREE_REGISTRATION = {"held": "888888888", "riff": "888888000"}
+SETBFREE_DRIVE_GAIN = {"held": 1.5 / 0.883, "riff": 4.0 / 0.817}
+ORGAN_RIFF_NOTE = 0.6       # s: a note shorter than this is struck, not held
+ORGAN_RIFF_SPAN = 0.8       # s: ... and makes the chords struck within this after it a riff's
+ORGAN_PASSAGE_MIN = 1.0     # s: a passage struck over less, between two of the other kind, takes theirs
+ORGAN_DRIVE_FADE = 0.15     # s: the drive's change between passages
+ORGAN_CHORD_SPREAD = 0.02   # s: notes struck this close are one chord
+SETBFREE_PEDALS = "880000000"
+SETBFREE_PEDAL_LOW = 24     # C1: the pedals' octave, 24-35
+SETBFREE_PEDAL_GAIN = 4.65  # the pedals' clean output, at the organ's RMS over them (the demo's)
+SETBFREE_LEVEL_DB = -27.6   # its output, pedals and all: as loud as the synthesized organ (LUFS, a riff)
 SETBFREE_PREROLL = 10.0     # s it plays before the first note: the speaker turning as it should
 _SETBFREE: Dict[str, object] = {}
 
@@ -1841,15 +1873,111 @@ def _setbfree() -> Optional[Path]:
     return _SETBFREE["exe"]
 
 
-def _setbfree_stem(exe: Path, events: list, total: int, rate: int, organ: Optional[dict] = None):
-    """The rock organ played by setBfree -> (first sample, stereo stem): the notes on its upper
-    manual (the drawbars and percussion the score asks for), the swell following the velocity,
-    the speaker switched where the score says (``events`` with is_on 3, "vel" 1 fast, 0 slow:
-    setBfree accelerates and brakes it) - started SETBFREE_PREROLL early, the speaker already
-    turning as the earlier switches left it."""
-    import bisect
+def _organ_notes(events: list, total: int, rate: int) -> list:
+    """The organ's notes [(start, end, key, vel)] (s; sorted) from its on / off events: a key
+    still down at the end held to ``total``."""
+    ons: Dict[int, list] = {}
+    notes = []
+    for t, is_on, _, key, vel in sorted(events, key=lambda e: (e[0], e[1])):
+        if is_on == 1:
+            ons.setdefault(key, []).append((t, vel))
+        elif is_on == 0 and ons.get(key):
+            t0, v = ons[key].pop(0)
+            notes.append((t0, t, key, v))
+    notes += [(t0, total / rate, key, v) for key, left in ons.items() for t0, v in left]
+    return sorted(notes)
+
+
+def _organ_chords(notes: list) -> list:
+    """The chords struck [[time, its shortest note's length]]: notes ORGAN_CHORD_SPREAD apart one."""
+    chords: list = []
+    for t0, t1, _, _ in notes:
+        if chords and t0 - chords[-1][0] <= ORGAN_CHORD_SPREAD:
+            chords[-1][1] = min(chords[-1][1], t1 - t0)
+        else:
+            chords.append([t0, t1 - t0])
+    return chords
+
+
+def _organ_passages(notes: list) -> list:
+    """Where the organ's passages start [(time, "held" | "riff")] - a chord is a riff's when a
+    note shorter than ORGAN_RIFF_NOTE was struck within ORGAN_RIFF_SPAN before it (itself
+    included); a passage struck over less than ORGAN_PASSAGE_MIN (its first chord to its last)
+    between two of the other kind takes theirs (a stab among held chords, a held chord in a riff)."""
+    chords = _organ_chords(notes)
+    kinds, struck = [], []
+    for t, shortest in chords:
+        if shortest < ORGAN_RIFF_NOTE:
+            struck.append(t)
+        kinds.append("riff" if struck and t - struck[-1] < ORGAN_RIFF_SPAN else "held")
+    runs: list = []                                             # [first chord, last chord, kind]
+    for i, k in enumerate(kinds):
+        if runs and runs[-1][2] == k:
+            runs[-1][1] = i
+        else:
+            runs.append([i, i, k])
+    for j in range(1, len(runs) - 1):
+        a, b, k = runs[j]
+        if runs[j - 1][2] == runs[j + 1][2] != k and chords[b][0] - chords[a][0] < ORGAN_PASSAGE_MIN:
+            runs[j][2] = runs[j - 1][2]
+    out: list = []
+    for a, _, k in runs:
+        if not out or out[-1][1] != k:
+            out.append((chords[a][0], k))
+    return out
+
+
+def _organ_pedals(notes: list, rests=()) -> list:
+    """The bass pedals under the manuals [(start, end, key)]: at each chord struck with two or
+    more pitch classes sounding, the lowest sounding note's on the C1 octave (SETBFREE_PEDAL_LOW),
+    held until the next chord or until the manuals are let go; held on through chords on the
+    same root; none in ``rests`` [(start, end)] (where a busier layer of the organ has its own)."""
+    out: list = []
+    starts = [c[0] for c in _organ_chords(notes)]
+    sounding: list = []
+    j = 0
+    for i, t in enumerate(starts):
+        nxt = starts[i + 1] if i + 1 < len(starts) else math.inf
+        while j < len(notes) and notes[j][0] <= t + ORGAN_CHORD_SPREAD:
+            sounding.append(notes[j])
+            j += 1
+        sounding = [n for n in sounding if n[1] > t + ORGAN_CHORD_SPREAD]
+        if len({n[2] % 12 for n in sounding}) < 2:
+            continue
+        key = SETBFREE_PEDAL_LOW + min(n[2] for n in sounding) % 12
+        stop = min(nxt, max(n[1] for n in sounding))
+        if out and out[-1][2] == key and out[-1][1] >= t - 1e-6:
+            out[-1][1] = stop                                   # (the same root, legato: held on)
+        else:
+            out.append([t, stop, key])
+    for a, b in rests:                                          # (another layer's pedals there)
+        out = [p for s, e, k in out for p in ([s, min(e, a), k], [max(s, b), e, k]) if p[1] - p[0] > 0.05]
+    return [tuple(p) for p in out]
+
+
+def _setbfree_run(exe: Path, lines: list, rate: int, n: int):
+    """setbfree_render played ``lines`` -> its n frames (stereo float64)."""
     import subprocess
     import tempfile
+    import numpy as np
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "organ.f32"
+        r = subprocess.run([str(exe), str(rate), str(out)], input="\n".join(lines) + "\n", text=True,
+                           capture_output=True, timeout=120 + n / rate)
+        if r.returncode != 0:
+            raise OSError(f"setbfree_render failed: {r.stderr.strip()[-200:]}")
+        return np.fromfile(out, dtype="float32").reshape(-1, 2).astype("float64")
+
+
+def _setbfree_stem(exe: Path, events: list, total: int, rate: int, organ: Optional[dict] = None):
+    """The rock organ played by setBfree -> (first sample, stereo stem): the notes on its upper
+    manual, registered by passage (SETBFREE_REGISTRATION, or the score's "drawbars"), with its
+    percussion if asked for, the swell following the velocity, the speaker switched where the
+    score says (``events`` with is_on 3, "vel" 1 fast, 0 slow: setBfree accelerates and brakes
+    it) - started SETBFREE_PREROLL early, the speaker already turning as the earlier switches
+    left it; its clean output through our drive (light on held chords, hard on riffs); its
+    bass pedals (_organ_pedals: a second run, the same speaker) mixed in clean."""
+    import bisect
     import numpy as np
     organ = organ or {}
     fast = organ.get("speaker", "fast") != "slow"
@@ -1860,55 +1988,77 @@ def _setbfree_stem(exe: Path, events: list, total: int, rate: int, organ: Option
     times = [e[0] for e in ons]
     first = max(0, int((ons[0][0] - 0.01) * rate))
     start = max(0, first - int(SETBFREE_PREROLL * rate))
-    # (the bass rotor heard by one mic, both sides: setBfree's two drum mics come out in opposite
-    # phase below ~800 Hz - a hollow, phasey low end that cancels in mono, which the host heard as
-    # "it does not render correctly"; the horn keeps its two mics, the swirl wide)
-    lines = ["cfg whirl.drum.width=1",
-             f"bars {organ.get('drawbars', ORGAN_DRAWBARS)}", "cc vibrato.upper 0",
-             "cc overdrive.enable 127", f"cc overdrive.character {SETBFREE_DRIVE}"]
-    harm = {"second": 127, "third": 0}.get(organ.get("percussion") or "")
-    lines += [f"cc percussion.enable {0 if harm is None else 127}", "cc percussion.volume 0",
-              "cc percussion.decay 127", f"cc percussion.harmonic {harm or 0}"]
+    notes = _organ_notes(evs, total, rate)
+    passages = _organ_passages(notes)
+    bars = organ.get("drawbars")
+    pedals = _organ_pedals(notes, organ.get("pedal_rests", ())) if organ.get("pedals", True) else []
     for t, is_on, _, _, vel in evs:                             # (the speaker as it turns at the start)
         if is_on == 3 and int(t * rate) <= start:
             fast = bool(vel)
-    lines.append(f"speed {int(fast)}")
+    # (the bass rotor heard by one mic, both sides: setBfree's two drum mics come out in opposite
+    # phase below ~800 Hz - a hollow, phasey low end that cancels in mono, which the host heard as
+    # "it does not render correctly"; the horn keeps its two mics, the swirl wide)
+    head = ["cfg whirl.drum.width=1", "cc vibrato.upper 0", "cc overdrive.enable 0"]
+    harm = {"second": 127, "third": 0}.get(organ.get("percussion") or "")
+    man = head + [f"bars {bars or SETBFREE_REGISTRATION[passages[0][1]]}",
+                  f"cc percussion.enable {0 if harm is None else 127}", "cc percussion.volume 0",
+                  "cc percussion.decay 127", f"cc percussion.harmonic {harm or 0}", f"speed {int(fast)}"]
+    ped = head + ["bars 000000000", f"pbars {SETBFREE_PEDALS}", "cc percussion.enable 0",
+                  f"speed {int(fast)}"]
+    acts = []                                                   # (time, order, to: "m" / "p" / "mp", line)
+    for t, k in passages[1:]:
+        if not bars:
+            acts.append((t, 2, "m", f"bars {SETBFREE_REGISTRATION[k]}"))
+    for a, b, key in pedals:
+        acts += [(a, 5, "p", f"pon {key}"), (b, 1, "p", f"poff {key}")]
     held: Dict[int, int] = {}
     end, last = first, None
     for t, is_on, _, key, vel in evs:
-        at = max(0, int(t * rate) - start)
         if is_on == 3:
-            if at > 0:
-                lines += [f"at {at}", f"fast {int(bool(vel))}"]
-            continue
-        if is_on == 1:
-            if last is None or t - last > 0.02:                 # (a chord's notes: one swell, its loudest)
+            acts.append((t, 6, "mp", f"fast {int(bool(vel))}"))
+        elif is_on == 1:
+            if last is None or t - last > ORGAN_CHORD_SPREAD:   # (a chord's notes: one swell, its loudest)
                 last = t
-                loud = max(e[4] for e in ons[bisect.bisect_left(times, t):bisect.bisect_right(times, t + 0.02)])
-                lines += [f"at {at}", f"swell {(max(1, min(127, loud)) / 127) ** 1.5:.4f}"]
+                loud = max(e[4] for e in ons[bisect.bisect_left(times, t):
+                                             bisect.bisect_right(times, t + ORGAN_CHORD_SPREAD)])
+                acts.append((t, 3, "mp", f"swell {(max(1, min(127, loud)) / 127) ** 1.5:.4f}"))
             held[key] = held.get(key, 0) + 1
             if held[key] == 1:
-                lines += [f"at {at}", f"on {key}"]
+                acts.append((t, 4, "m", f"on {key}"))
         elif is_on == 0 and held.get(key):
             held[key] -= 1
             if not held[key]:
-                lines += [f"at {at}", f"off {key}"]
+                acts.append((t, 0, "m", f"off {key}"))
             end = max(end, int(t * rate))
     if any(held.values()):
         end = total
     end = min(total, end + int(0.3 * rate))                     # (the speaker's own ring: short)
     if end <= first:
         return total, np.zeros((0, 2), dtype="float32")
-    lines.append(f"end {end - start}")
-    with tempfile.TemporaryDirectory() as tmp:
-        out = Path(tmp) / "organ.f32"
-        r = subprocess.run([str(exe), str(rate), str(out)], input="\n".join(lines) + "\n", text=True,
-                           capture_output=True, timeout=120 + (end - start) / rate)
-        if r.returncode != 0:
-            raise OSError(f"setbfree_render failed: {r.stderr.strip()[-200:]}")
-        stem = np.fromfile(out, dtype="float32").reshape(-1, 2)[first - start:end - start].astype("float64")
-    if len(stem) < end - first:
-        raise OSError(f"setbfree_render played {len(stem)} of {end - first} samples")
+    for t, _, to, line in sorted(acts, key=lambda a: (a[0], a[1])):
+        at = max(0, int(t * rate) - start)
+        if at > 0 or not line.startswith("fast"):
+            for lines in ((man,) if to == "m" else (ped,) if to == "p" else (man, ped)):
+                lines += [f"at {at}", line]
+    man.append(f"end {end - start}")
+    ped.append(f"end {end - start}")
+    n = end - first
+    x = _setbfree_run(exe, man, rate, end - start)[first - start:end - start]
+    if len(x) < n:
+        raise OSError(f"setbfree_render played {len(x)} of {n} samples")
+    # the drive into our tube, by passage: a step to the next, eased in over ORGAN_DRIVE_FADE
+    xs, ys = [0.0], [SETBFREE_DRIVE_GAIN[passages[0][1]]]
+    for t, k in passages[1:]:
+        s = float(int(t * rate) - first)
+        xs += [max(xs[-1], s - ORGAN_DRIVE_FADE * rate), max(xs[-1], s) + 1e-3]
+        ys += [ys[-1], SETBFREE_DRIVE_GAIN[k]]
+    g = np.interp(np.arange(n), xs, ys)
+    stem = np.stack([_organ_drive(x[:, c] * g, rate) for c in (0, 1)], axis=1)
+    if pedals:
+        p = _setbfree_run(exe, ped, rate, end - start)[first - start:end - start]
+        if len(p) < n:
+            raise OSError(f"setbfree_render played {len(p)} of {n} samples")
+        stem += p * (SETBFREE_PEDAL_GAIN * 10 ** (float(organ.get("pedal_db", 0.0)) / 20))
     return first, (_studio_room(stem, rate) * 10 ** (SETBFREE_LEVEL_DB / 20)).astype("float32")
 
 
@@ -2322,6 +2472,16 @@ def play_layers(score: Score, seconds: float, layer_of, sf2: Path = SF2, rate: i
                 evs = [(max(0.0, t - early), *rest) for t, *rest in evs]
             jobs.append((name, keys.index(k), evs, short))
     total = int((seconds + 0.5) * rate)
+    # the rock organ's layers: each its own run through the speaker, but one pedal board under
+    # them all - the busiest layer's pedals (the most notes: its riff, its chords) first, a
+    # layer over it ("rock_organ:5", the tune doubled) its own only where those rest
+    organs: Dict[str, dict] = {}
+    if organ.get("pedals", True):
+        taken: List[Tuple[float, float]] = []
+        for name, _, evs, _ in sorted((j for j in jobs if j[0].partition(":")[0] in ORGAN),
+                                      key=lambda j: -sum(e[1] == 1 for e in j[2])):
+            organs[name] = {**organ, "pedal_rests": list(taken)}
+            taken += [(a, b) for a, b, _ in _organ_pedals(_organ_notes(evs, total, rate), taken)]
     lanes = 2 if send else 1
     w = _workers(len(jobs))
     shape = (w, len(keys), lanes, total, 2)
@@ -2333,7 +2493,7 @@ def play_layers(score: Score, seconds: float, layer_of, sf2: Path = SF2, rate: i
         for name, k, events, short in mine:
             part, _, layer = name.partition(":")
             first, stem = _stem(syn, sfid, fonts, name, events, total, rate, short,
-                                **({"organ": organ} if part in ORGAN else {}))
+                                **({"organ": organs.get(name, organ)} if part in ORGAN else {}))
             if not len(stem):
                 continue
             gain = level_db(part, mix) + (float(layer) if layer else 0.0)

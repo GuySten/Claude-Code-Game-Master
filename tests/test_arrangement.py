@@ -677,6 +677,10 @@ def test_the_rock_organ_speaker_and_registration_are_written_in_the_score():
     assert sc.speaker == [(0.0, False), (2.0, True)]          # (beat 4 at 120: 2 s)
     assert sc.organ == {"drawbars": "888800000", "percussion": "third"}
     assert A.build(dict(s, organ={"speaker": "slow"}))[0].organ == {"speaker": "slow"}
-    for bad in ({"drawbars": "999"}, {"percussion": "fifth"}, {"speaker": "medium"}):
+    org = A.build(dict(s, organ={"pedals": False, "pedal_db": -3}))[0].organ
+    assert org["pedals"] is False and org["pedal_db"] == -3.0
+    assert "pedals" not in A.build(dict(s, organ={"pedals": True}))[0].organ     # (on: the default)
+    for bad in ({"drawbars": "999"}, {"percussion": "fifth"}, {"speaker": "medium"}, {"pedals": "no"},
+                {"pedal_db": "loud"}, {"pedal_db": 40}):
         with pytest.raises(A.ArrangementError):
             A.build(dict(s, organ=bad))
