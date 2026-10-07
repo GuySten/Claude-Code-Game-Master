@@ -9,6 +9,7 @@ show_usage() {
     echo "Session Actions:"
     echo "  start                    - Begin new session, show world state"
     echo "  end <summary>            - End session with summary"
+    echo "  push [summary]           - Commit and push the campaign to its repo (after end: required)"
     echo "  status                   - Show current campaign status"
     echo "  move <location>          - Move party to new location"
     echo "  context                  - Full session context (character, party, consequences, rules)"
@@ -43,7 +44,7 @@ shift
 
 # Every action the case below handles, in one place: the guard and the
 # unknown-action message both read this, so they cannot drift apart.
-VALID_ACTIONS="start end status move context choices dice world-tick world-tick-rollback world-tick-log save restore list-saves delete-save history"
+VALID_ACTIONS="start end status move context choices dice world-tick world-tick-rollback world-tick-log save restore list-saves delete-save history push"
 
 is_valid_action() {
     local valid
@@ -131,6 +132,42 @@ case "$ACTION" in
         echo "World tick: optionally advance a few SMALL off-screen developments"
         echo "  (grounded in plots/RAG) with: gm-session.sh world-tick '<json list>'"
         echo "  Applies all; warns if more than 3. Rollback with world-tick-rollback."
+        echo ""
+        echo "LAST STEP (REQUIRED): after the arc entry and any world tick, save the campaign"
+        echo "  to its repo: bash tools/gm-session.sh push \"<the session's summary>\""
+        ;;
+
+    push)
+        # The campaign repo, updated after the session: the active campaign's folder
+        # committed and pushed, so the session is kept (and can be reviewed) off this
+        # machine. A campaigns folder that isn't a git repo is left alone.
+        CAMPAIGN_DIR=$(get_campaign_dir) || { echo "No active campaign."; exit 1; }
+        if ! git -C "$CAMPAIGN_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            echo "The campaigns folder isn't a git repo: nothing to push ($WORLD_STATE_BASE)."
+            exit 0
+        fi
+        REPO=$(git -C "$CAMPAIGN_DIR" rev-parse --show-toplevel)
+        NAME=$(basename "$CAMPAIGN_DIR")
+        MSG="${NAME}: ${1:-session saved} ($(date '+%Y-%m-%d %H:%M'))"
+        git -C "$REPO" add -A -- "$CAMPAIGN_DIR" || exit 1
+        if git -C "$REPO" diff --cached --quiet -- "$CAMPAIGN_DIR"; then
+            echo "Nothing new in $NAME since the last save."
+        else
+            git -C "$REPO" commit -q -m "$MSG" -- "$CAMPAIGN_DIR" || { echo "COMMIT FAILED: tell the host."; exit 1; }
+            echo "Committed: $MSG"
+        fi
+        BRANCH=$(git -C "$REPO" rev-parse --abbrev-ref HEAD)
+        if ! git -C "$REPO" remote get-url origin >/dev/null 2>&1; then
+            echo "Saved locally; the campaign repo has no remote to push to."
+            exit 0
+        fi
+        if git -C "$REPO" push -q origin "$BRANCH" 2>/dev/null \
+           || { git -C "$REPO" pull -q --no-rebase origin "$BRANCH" && git -C "$REPO" push -q origin "$BRANCH"; }; then
+            echo "Pushed $NAME to origin/$BRANCH."
+        else
+            echo "PUSH FAILED (origin/$BRANCH): the session is saved locally only - tell the host."
+            exit 1
+        fi
         ;;
 
     world-tick)

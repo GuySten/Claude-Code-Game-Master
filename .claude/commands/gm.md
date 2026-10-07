@@ -275,7 +275,16 @@ When player says they're done:
 bash tools/gm-session.sh end "[brief summary of what happened]"
 ```
 
-Confirm the session is saved: who rests where, and that progress is recorded. No fenced boxes; phone-friendly.
+Then the arc entry and any world tick it asks for, and **last, always: update the campaign repo**
+(the host's rule - the session is kept, and can be reviewed, off this machine):
+
+```bash
+bash tools/gm-session.sh push "[the same summary]"
+```
+
+If it says PUSH FAILED, tell the host plainly (the session is saved on this machine only).
+Confirm the session is saved: who rests where, that progress is recorded, and that the campaign
+repo was updated. No fenced boxes; phone-friendly.
 
 ---
 
@@ -323,9 +332,15 @@ bash tools/gm-session.sh status
 bash tools/gm-consequence.sh check
 ```
 
-### 4. Display Confirmation
+### 4. Update the Campaign Repo (required)
+```bash
+bash tools/gm-session.sh push "[brief summary of key events]"
+```
+If it says PUSH FAILED, tell the host plainly.
 
-Confirm the save: who rests where, and that NPCs, locations, consequences, and the session log were updated. No fenced boxes; phone-friendly.
+### 5. Display Confirmation
+
+Confirm the save: who rests where, that NPCs, locations, consequences, and the session log were updated, and that the campaign repo was pushed. No fenced boxes; phone-friendly.
 
 ---
 
