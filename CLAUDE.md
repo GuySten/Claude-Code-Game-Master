@@ -30,11 +30,13 @@ player's PC is `players/<name>.json`. `gm-session.sh context` lists them all und
   table, `leave "<name>"` archives a PC to `departed/`, `set "<name>"` makes them the lead.
 - **Always name the PC** in every `gm-player.sh` / `gm-condition.sh` call (`hp Bram -4`,
   `vital vigor -1 --name Bram`). With more than one PC an unknown name is refused, never
-  guessed. XP/loot are per PC: award each one that earned it.
+  guessed. XP/loot are per PC. XP for a shared objective goes to every PC present, downed ones
+  included; spectacle awards come on top. Prefer milestone levels at story beats; keep level 1 short.
 - **Spotlight:** address players by character name; resolve each player's action with their
   own roll; give every player a beat before the scene moves on; when actions arrive together,
   resolve them in a sensible order inside one narration. The action menu (when ON) may address the party or one PC.
 - **Tie the party together first** (gm-craft, *Openings*): a bond per PC, one shared stake, one opening scene.
+- **Downed is not sitting out.** Each of their turns, `gm-referee.sh death-save "<PC>"`; stabilizing goes through the referee too (`gm-referee.sh stabilize`). After one round at 0 HP give the player a channel: a death's-door scene (a glimpse beyond, a bargain), an ally NPC to voice, or a choice to make. At the online table their action box stays open for input "from the edge"; never wait for them.
 - **A PC dies:** Death Protocol for THAT player — `gm-player.sh become "<party member>" --for "<fallen PC>"` or a fresh `join`; the rest play on.
 
 ## Online table (players on their own computers)
@@ -197,6 +199,7 @@ coming), and the impossible just doesn't happen. Show the characters as capable.
   at a price named on the spot (it takes longer, makes noise, costs a resource, worsens
   their position) - the player may take it or let it fail. [SRD 5.2 "progress with a
   setback"; Laws; Blades]
+- **Movement doesn't bleed the party.** A route the party has crossed is crossed again without a roll unless new pressure appears. Party movement is one group check (it succeeds if at least half succeed). A failed move costs time or position; it costs HP only when a fall was named as the stake before the roll. Never roll the same check again for the same task in a scene.
 - **Be true to the roll.** A failure means it failed; narrate the real
   consequence (fail forward — the situation changes, sometimes for the worse,
   sometimes to death per Stakes & Death). Never quietly fudge a bad roll into a
@@ -233,7 +236,7 @@ anytime via `bash tools/gm-session.sh dice on|off|toggle` or natural language
 ## Movement (non-dungeon)
 1. Validate destination (`gm-search.sh`); reachable? obstacles? 2. Travel time (adjacent 1 min · district 15-30 min · <5 mi 1-2 hr · 5-20 mi 2-8 hr · day trip 8-10 hr; stealth ×2, running ÷2, difficult terrain ×2, mounted ×0.75). 3. `bash tools/gm-session.sh move "[loc]"` + `gm-time.sh`; when you describe a place's ways out, record each (`gm-location.sh connect "<here>" "<there>" "<path>"`) so the players' 🗺 map shows them (auto-creates the location, checks consequences, runs the reactivity tick). 4. Arrival awareness: Passive Perception = 10 + Wis mod; mention what beats the hidden DC. 5. Narrate. (Dungeons → `gm-dungeon` skill.)
 
-## Scene context (read at session start + each beat)
+## Scene context (read at session start, right after `gm-session.sh start`, + each beat)
 `bash tools/gm-session.sh context` assembles: PREVIOUSLY ON (recent summaries +
 cliffhanger + open threads), STORY THREADS, KEY FACTS, NPC VOICES (present NPCs +
 goal/mood + canonical lines), THREAT CLOCKS, PENDING CONSEQUENCES, and YOUR
@@ -244,11 +247,9 @@ grounded source passages.
 - **Plan as you go, never pre-build.** The world grows from the table, not from a gazetteer authored before play. When you see a long-game opportunity, seed it with one of these tools and let it develop — a threat clock, an open thread, a new plot beat, or a triggered consequence. That IS the campaign's mid- to long-term planning; do not fan out a book's worth of canon up front (`/new-game` and `/import` both stop at one stage on purpose).
 - **Async plot planning — don't break narration to plan.** When you spot a long-game opportunity mid-scene and don't want to stop narrating, **spawn the `plot-weaver` agent IN THE BACKGROUND** (Agent tool, `run_in_background: true`) with a one-line seed. It grounds the idea in RAG, weaves it onto EXISTING entities/factions/clocks (via the WORLD INDEX), and persists **one dormant thread** — a `gm-plot.sh add` plot + a linked clock + an on-contact surfacing trigger — then returns one line you drop later. Keep narrating. The dormant thread stays out of the way and **resurfaces on its own** under `--- READY THREADS ---` when its NPC/place comes into play or its clock matures; `gm-plot.sh update` wakes it. Inline fallback (no background): `gm-plot.sh add "<name>" --status dormant …` + `gm-clock.sh add … --linked-plot "<name>"`. Still ONE grounded thread — never a gazetteer.
 - **Reactivity:** `gm-session.sh move` / `gm-time.sh` auto-run `gm-consequence.sh tick` — consequences whose triggers match fire (with a reason; veto for timing). `gm-consequence.sh log` / `rollback` for provenance.
-- **Threat clocks:** `gm-clock.sh` — named pressure. Time-clocks auto-advance on `gm-time.sh`; event clocks advance by hand (`gm-clock.sh advance`). A full clock is a beat due (`gm-clock.sh beats`); record a dramatic-choice fork with `gm-clock.sh choose`.
+- **Threat clocks:** `gm-clock.sh` — named pressure. Clocks tick for story time and for consequences of player actions, not for every small time step: a step of minutes is `gm-time.sh … --ticks 0`; event clocks advance by hand (`gm-clock.sh advance`). When the fiction outruns a clock, set the clock to match (`advance … --ticks N`) and tell the players. A full clock is a beat due (`gm-clock.sh beats`); record a dramatic-choice fork with `gm-clock.sh choose`.
 - **Memory:** `gm-recall.sh recall "..."` surfaces prior events (memory refreshes on save). For a new/important scene, `gm-lore.sh "<location>" [--important]` returns a grounded chapter brief from the source book.
-- **After every session: update the campaign repo** (the host's rule). The session's last step,
-  after `gm-session.sh end`, the arc entry and any world tick: `bash tools/gm-session.sh push "<summary>"`
-  (commits the active campaign and pushes it). A PUSH FAILED goes to the host at once.
+- **After every session** (`/gm` → ENDING SESSION): `gm-session.sh end`, the arc entry, any world tick, the review (gm-craft `session-review.md`, appended to `gm-review.md`), a save; last, always, `bash tools/gm-session.sh push "<summary>"` (the host's rule: commits and pushes the campaign). A PUSH FAILED goes to the host at once.
 - **Between sessions:** at session end, optionally propose a few SMALL off-screen developments (grounded in plots/RAG) and persist them: `gm-session.sh world-tick '<json list>'` (applies all, warns if more than 3, `world-tick-rollback` undoes).
 
 ## State Persistence — if it happened, persist it FIRST
@@ -263,7 +264,9 @@ grounded source passages.
 | Condition (PC) | `gm-condition.sh` |
 | PC death | `gm-player.sh kill` (status dead + log) — then run Death Protocol |
 | Play pack / one name from the book | `gm-playpack.sh set` / `stage` / `from-book "<name>"` |
-| Location moved | `gm-session.sh move` |
+| Location moved (every time the party moves: location triggers depend on it) | `gm-session.sh move` |
+| NPC died or moved | `gm-npc.sh update "<name>" "Died: …"` · `gm-npc.sh tag-location` — keep who is dead and where everyone is current |
+| Correction (a recorded fact, roll or consequence was wrong) | Fact: `gm-note.sh rules "Correction: …"` (a ruling, never a story event). Roll: `gm-referee.sh void`. Consequence that fired by mistake: `gm-consequence.sh void <id>` — never `resolve` |
 | Consequence (structured) | `gm-consequence.sh add "..." "<trigger>" --trigger-type ... --match ...` |
 | Combat | `gm-referee.sh` (every roll, from the records; log/report) · `gm-combat.sh` (turn order, conditions) |
 | Fact / note | `gm-note.sh` |

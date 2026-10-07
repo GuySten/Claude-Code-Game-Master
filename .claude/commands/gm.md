@@ -200,7 +200,13 @@ Complete Steps 1-2 before presenting the scene. Do not skip them.
 bash tools/gm-session.sh start
 bash tools/gm-session.sh context
 ```
-This single command gives you: character stats, party members (with recent events), pending consequences, campaign rules, location, and time. Read and internalize ALL of it.
+`start` comes first, every session: it opens and numbers the session (skipping it misnumbers the
+campaign's sessions). `context` gives you: character stats, party members (with recent events), pending consequences, campaign rules, location, and time. Read and internalize ALL of it.
+
+Then read the last entry of the campaign's `gm-review.md` and work the gm-craft
+`references/prep-checklist.md` "Before each session" list, its **Each PC** part above all. Bonds,
+lines and veils must be on record (session zero confirms and records them); before a horror-heavy
+session, reread the lines and veils.
 
 **If there is no character yet** (no `character.json` / the context shows no active PC), don't
 narrate a scene into a void and don't launch the 9-step builder — go to ENTERING A WORLD
@@ -275,8 +281,14 @@ When player says they're done:
 bash tools/gm-session.sh end "[brief summary of what happened]"
 ```
 
-Then the arc entry and any world tick it asks for, and **last, always: update the campaign repo**
-(the host's rule - the session is kept, and can be reviewed, off this machine):
+Then, in order:
+1. The arc entry (`gm-recall.sh arc`) and any world tick it asks for.
+2. Character-arc milestones the session earned (a vow, a bargain, a loss): `gm-table.sh grow`.
+3. The review: gm-craft `references/session-review.md`, one dated section appended to the
+   campaign's `gm-review.md`.
+4. A save: `bash tools/gm-session.sh save "end-session-N"`.
+5. **Last, always: update the campaign repo** (the host's rule - the session is kept, and can be
+   reviewed, off this machine):
 
 ```bash
 bash tools/gm-session.sh push "[the same summary]"
@@ -331,6 +343,9 @@ Ensure all changes from the session are persisted:
 bash tools/gm-session.sh status
 bash tools/gm-consequence.sh check
 ```
+Also check: positions current (`gm-session.sh move` used for every move), dead NPCs recorded
+dead, clocks matching the fiction, corrections filed as rulings (never as story events). At a
+session's end, also the arc milestones, the review and a save (ENDING SESSION, steps 2-4).
 
 ### 4. Update the Campaign Repo (required)
 ```bash

@@ -121,7 +121,8 @@ what their characters could reasonably know:
   "<there>" "<path>"`): the players' map shows them. Describe the places that matter on
   arrival (`gm-location.sh describe`), each with a landmark.
 - In a fight or chase, name two to four zones, give distances in feet, state cover once
-  and keep it consistent; restate positions when they change.
+  and keep it consistent; restate positions when they change, and record them (`gm-referee.sh zone`):
+  nobody is attacked from out of reach. Out of a fight, every party move is `gm-session.sh move`.
 
 ## Narration
 - **Say what changes hands, with the numbers.** When a PC gains or loses money or an item,
