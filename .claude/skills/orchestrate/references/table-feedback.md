@@ -480,3 +480,13 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   2 s of silence, the entry no louder than either stage; and stage 2's body below stage 1 on every drive
   measure (the slow tempo chosen so the choir could sing every note). Now boss-music.md 3a; the choir takes
   the long notes and the strings and brass the quick ones (the Margrave's stage 2 model).
+- **The electric guitar, diagnosed** (Oct 2026). The General MIDI distortion guitar under the Saint's stage 1:
+  "the guitar sounds off... I felt like someone was trying to hurt the guitar instead of playing it". When I
+  dropped it, the host: "do not give up that fast... we need to figure out why". Measured: not the pitching,
+  releases or voicing, but the recording's tone - its loudest band after the fundamental at 2.5-3.15 kHz (as
+  loud as the note itself; 28% of its energy at 2-4 kHz), a distortion recorded without a speaker cabinet,
+  with no pick attack; choked notes and full-force hits made it worse. A real recorded guitar (Unreal
+  Instruments' Standard Guitar: DI, 8 round robins, palm mutes, true double-tracking) through an amp and cab
+  chain (5% at 2-4 kHz), double-tracked, under the orchestra: "8 is great". Planned as the Saint's stage-2
+  surprise (the host's idea), entering at the eruption. Lesson: a verdict on a sample is not a verdict on the
+  instrument - find out why before ruling it out.

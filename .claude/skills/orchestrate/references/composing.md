@@ -70,8 +70,12 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
     Dissonance is a spice, not a bed: a semitone clash sounding most of the time is "painful to hear"
     [H, the Saint's violated hymn, a clash 97% of the time; the liked pieces 11-21%] - keep the grind for
     cadences, cracks and the peak, over chords that otherwise sound clean. (critic)
-    Electric guitar: the sound set's General MIDI distortion guitar (chugging power chords under the
-    Saint's stage 1) "sounds off" [H] - don't use that sample; better guitar sounds are being tested.
+    Electric guitar: never the General MIDI distortion guitar - "like someone was trying to hurt the
+    guitar instead of playing it" [H]: a harsh 3 kHz buzz (distortion recorded with no speaker cabinet) and
+    no pick attack. The real recorded guitar (Unreal Instruments' Standard Guitar, through an amp and
+    cabinet, double-tracked hard left and right, mostly dry, ~6 dB under the orchestra; chords ringing on
+    the strong beats, palm-muted chugs between, never choked notes): "great" [H]. A surprise held back
+    for a later stage, never a bed for every piece.
 
 ## 2. What the research adds
 14. Themes the table can learn: short, distinct in rhythm and timbre, on a clear type
