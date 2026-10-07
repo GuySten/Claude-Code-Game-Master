@@ -1769,7 +1769,8 @@ class TableState:
     def append(self, kind: str, text: str, pc: Optional[str] = None,
                to: Optional[str] = None, image: Optional[str] = None,
                lang: Optional[str] = None, voice: bool = False,
-               event: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+               event: Optional[Dict[str, Any]] = None,
+               from_edge: Optional[str] = None) -> Dict[str, Any]:
         with self.lock:
             msg = {"id": (self.messages[-1]["id"] + 1) if self.messages else 1,
                    "ts": _now(), "t": _stamp(), "kind": kind, "text": text}
@@ -1785,6 +1786,8 @@ class TableState:
                 msg["voice"] = True
             if event:
                 msg["event"] = event   # lets each browser word the notice in its language
+            if from_edge:
+                msg["from_edge"] = from_edge   # a PC who can't act (why): not a move in the scene
             self.rev += 1
             msg["rev"] = self.rev
             self.messages.append(msg)
@@ -2240,6 +2243,8 @@ class TableState:
                      "states": {k: v for k, v in states.items() if k in ("hidden", "cover") and v},
                      "conditions": [str(x.get("name") if isinstance(x, dict) else x)
                                     for x in c.get("conditions") or []]}
+            if c.get("zone"):
+                entry["zone"] = str(c["zone"])
             if foe:
                 try:
                     ratio = max(0.0, float(c.get("hp_current"))) / float(c.get("hp_max"))
@@ -2454,6 +2459,7 @@ class TableState:
         fingerprint of the whole sheet, so pages refetch a sheet only when it
         changed; ``sheets=True`` includes the sheets themselves."""
         out = []
+        zones = self._zones()
         companions: Dict[str, List[Dict[str, Any]]] = {}
         for n, r in self._npcs().items():
             if r.get("companion_of"):
@@ -2477,6 +2483,7 @@ class TableState:
                 "ac": c.get("ac", c.get("armor_class")),
                 "status": c.get("status", "alive"),
                 "conditions": c.get("conditions", []),
+                "zone": zones.get(str(c.get("name", path.stem)).lower()),
                 "claimed": self.claimed_by_anyone(c.get("name", "")),
                 "sheet_rev": hashlib.sha1(sheet_json.encode("utf-8")).hexdigest()[:12],
                 "portrait": c.get("portrait"),
@@ -2486,6 +2493,14 @@ class TableState:
             if sheets:          # (a copy, in the sheet's own order: STR DEX CON...)
                 out[-1]["sheet"] = json.loads(json.dumps(c, ensure_ascii=False, default=str))
         return out
+
+    def _zones(self) -> Dict[str, str]:
+        """Where each combatant stands in the fight on now (lower-cased name -> zone)."""
+        data = self._read_json(self.campaign_dir / "combat_state.json", {})
+        if not isinstance(data, dict) or data.get("active") is False:
+            return {}
+        return {str(c["name"]).lower(): str(c["zone"]) for c in data.get("combatants") or []
+                if isinstance(c, dict) and c.get("name") and c.get("zone")}
 
     def overview(self) -> Dict[str, Any]:
         o = self._read_json(self.campaign_dir / "campaign-overview.json", {})
@@ -3569,8 +3584,12 @@ def make_handler(state: TableState, code: str, host_key: str):
                 private = bool(data.get("private"))
                 lang = data.get("lang") if data.get("lang") in state.languages else None
                 state.set_lang(me, lang)
+                # A downed PC still writes (a dream, a vision, an ally's voice): marked
+                # as from the edge, and the round never waits for it.
+                edge = next((why for n, why in state.out_of_action().items()
+                             if party_roster._same_name(n, me)), None)
                 msg = state.append("player", text, pc=me, to=me if private else None,
-                                   lang=lang, voice=bool(data.get("voice")))
+                                   lang=lang, voice=bool(data.get("voice")), from_edge=edge)
                 return self._json({"ok": True, "message": msg})
 
             if url.path == "/api/stop":
@@ -4300,6 +4319,9 @@ def _print_messages(messages: List[dict], waiting_on: List[str],
                 tags.append("private, to GM only")
             if m.get("edited"):
                 tags.append("edited")
+            if m.get("from_edge"):
+                tags.append(f"FROM THE EDGE — can't act ({m['from_edge']}): a dream, a vision or an "
+                            f"ally's voice, not a move in the scene")
             tag = f" ({', '.join(tags)})" if tags else ""
             print(f"[#{m['id']} {m.get('pc', '?')}{tag}] {m['text']}")
     if waiting_on:

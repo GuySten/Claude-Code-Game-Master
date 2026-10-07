@@ -1580,6 +1580,55 @@ def test_the_round_never_waits_for_a_pc_who_cannot_act(table):
     assert table_server.cant_act({"conditions": ["poisoned", "prone"]}) is None
 
 
+def test_a_pc_who_cannot_act_still_writes_from_the_edge(table):
+    # Downed players sat out half a playtest session with nothing to do: their
+    # words now go to the GM marked as from the edge, and the round never waits.
+    import table_server
+    call, state, camp = table["call"], table["state"], table["camp"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    bram_tok = call("/api/create", {"code": CODE, "name": "Bram", "concept": "a dwarf"})[1]["token"]
+    call("/api/gm/inbox", {}, host=True)
+    bram = next((camp / "players").glob("*.json"))
+    bram.write_text(json.dumps({**json.loads(bram.read_text()), "status": "dying",
+                                "hp": {"current": 0, "max": 12}}))
+    status, body = call("/api/say", {"code": CODE, "token": bram_tok,
+                                     "text": "In the dark the Stone speaks my name."})
+    assert status == 200 and body["message"]["from_edge"] == "dying"
+    assert "Bram" not in state.waiting_on() and "Bram" in state.round_state()["out_of_action"]
+    call("/api/say", {"code": CODE, "token": pip, "text": "I drag Bram up."})
+    msgs = call("/api/gm/inbox", {}, host=True)[1]["messages"]
+    assert [m.get("from_edge") for m in msgs if m["kind"] == "player"] == ["dying", None]
+    import io, contextlib
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        table_server._print_messages(msgs, [])
+    assert "FROM THE EDGE — can't act (dying)" in out.getvalue()
+    strings = json.loads((Path(table_server.__file__).parent / "table_strings.json").read_text())
+    for lang in strings.values():                    # every language the page ships with
+        assert lang["placeholderEdge"] and lang["fromEdge"] and lang["zoneTitle"]
+
+
+def test_zones_show_on_the_party_panel_and_in_the_fight(table):
+    from lib.combat_manager import CombatManager
+    call, state, camp, world = table["call"], table["state"], table["camp"], table["world"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    m = CombatManager(str(world))
+    assert m.set_zone("Pip", "on the chain, 15 ft up") is None       # no fight: nowhere to stand
+    m.add_combatant("Stone-sick 4", 15, ac=8, zone="on the Vault floor")
+    assert m.set_zone("Pip", "on the chain, 15 ft up")["kind"] == "pc"
+    header = m.header()
+    assert "Pip: PC (HP on the sheet) @ on the chain, 15 ft up" in header
+    assert "Stone-sick 4: 15/15 HP, AC 8 @ on the Vault floor" in header
+    info = call(f"/api/info?code={CODE}&token={pip}")[1]
+    assert next(p for p in info["party"] if p["name"] == "Pip")["zone"] == "on the chain, 15 ft up"
+    assert {c["name"]: c.get("zone") for c in info["fight"]["order"]} == {
+        "Stone-sick 4": "on the Vault floor", "Pip": "on the chain, 15 ft up"}
+    m.set_zone("Pip", "")
+    assert "zone" not in m._find(m._load(), "Pip")
+    m.end()
+    assert next(p for p in state.party() if p["name"] == "Pip")["zone"] is None
+
+
 def test_previously_on_tells_the_story_so_far_in_the_players_language(table):
     call, state = table["call"], table["state"]
     state.set_round_seconds(0)

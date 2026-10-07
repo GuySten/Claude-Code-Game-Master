@@ -1924,7 +1924,7 @@
     const rnd = roundState || {};
     const ticking = rnd.open && rnd.deadline > serverNow();
     const sig = lang + "|" + me + "|" + (ticking ? (rnd.waiting_on || []).join(",") : "-") + "|"
-      + list.map((p) => [p.name, p.sheet_rev, p.claimed, p.lead, p.hp, p.level_up].join("/")).join("|");
+      + list.map((p) => [p.name, p.sheet_rev, p.claimed, p.lead, p.hp, p.level_up, p.zone || ""].join("/")).join("|");
     if (sig === partySig) return;
     partySig = sig;
     const box = $("party-list");
@@ -1953,7 +1953,8 @@
         `<div class="bar"><div style="width:${from}%;background:${color}"></div></div>` +
         `<div class="meta" dir="auto">${esc(t("sheet_hp"))} ${esc(pc.hp)}/${esc(pc.hp_max)} · ${t("lvl")} ${esc(pc.level)} ` +
         `${esc([tx(pc.race), tx(pc.class)].filter(Boolean).join(" "))}` +
-        `${status ? " · " + esc(status) : ""}${conds ? " · " + esc(conds) : ""}</div>`;
+        `${status ? " · " + esc(status) : ""}${conds ? " · " + esc(conds) : ""}</div>` +
+        (pc.zone ? `<div class="meta zone" dir="auto" title="${esc(t("zoneTitle"))}">📍 ${esc(tx(pc.zone))}</div>` : "");
       if (from !== pct) requestAnimationFrame(() => requestAnimationFrame(() => {
         d.querySelector(".bar > div").style.width = pct + "%";
       }));
@@ -2041,6 +2042,7 @@
       [...new Set(conds)].forEach((x) => bits.push(tx(x)));
       if ((c.states || {}).cover) bits.push(t("cover_" + c.states.cover));
       if ((c.states || {}).hidden) bits.push(t("hiddenState"));
+      if (c.zone) bits.push("📍 " + tx(c.zone));
       b.innerHTML = `${c.foe ? "👹 " : ""}${esc(c.label || tx(c.name))}<span class="h">${esc(bits.join(" · "))}</span>`;
       b.dir = "auto";
       if (c.foe && c.health !== "down") {
@@ -2892,6 +2894,10 @@
   }
   function updateTurn() {
     const el = $("turn"), st = turnState();
+    // A player who can't act keeps the box: what they write comes from the edge
+    // (a dream, a vision, an ally's voice), and the round still never waits for them.
+    const area = $("text"), ph = st && st[0] === "out" ? "placeholderEdge" : "placeholder";
+    if (area.dataset.i18nPh !== ph) { area.dataset.i18nPh = ph; area.placeholder = t(ph); }
     if (!st) { el.classList.add("hidden"); return; }
     el.classList.remove("hidden");
     if (el.dataset.k !== st[0]) { el.className = st[0]; el.dataset.k = st[0]; }
@@ -3287,7 +3293,8 @@
         const name = document.createElement("span");      // hover: who they are
         name.textContent = m.pc || "?";
         if (m.pc) { name.className = "lore"; name.dataset.term = m.pc; name.tabIndex = 0; }
-        label.append(name, (m.voice ? " 🎤" : "") + (m.to ? " — " + t("toGm") : ""));
+        label.append(name, (m.voice ? " 🎤" : "") + (m.to ? " — " + t("toGm") : "")
+                     + (m.from_edge ? " — " + t("fromEdge") : ""));
       }
       who.appendChild(label);
       if (m.edited) {

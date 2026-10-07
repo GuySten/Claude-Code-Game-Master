@@ -29,7 +29,7 @@
   "turnSent": "✓ Action sent — waiting for {names}",
   "turnSentAll": "✓ Action sent — the GM is about to read the round",
   "turnGm": "✍️ The GM is telling what happens…",
-  "turnOut": "💤 You can't act right now ({why})",
+  "turnOut": "💤 You can't act right now ({why}), but you can still speak from the edge: a dream, a vision, or the voice of an ally",
   "acted": "Acted this round",
   "stillChoosing": "Still choosing",
   "leaveConfirm": "Give up your seat? You can take it again afterwards.",
@@ -146,7 +146,7 @@
   "roundYours": "⏳ {t} to act — the GM answers when everyone has acted",
   "roundHurry": "⚠ Only {t} left — act now!",
   "roundWaiting": "⏳ Waiting for {names} — {t}",
-  "roundOut": "💤 You can't act right now ({why}), so the table won't wait for you — {t}",
+  "roundOut": "💤 You can't act right now ({why}), so the table won't wait for you; you can still write from the edge — {t}",
   "playingAs": "Playing as",
   "waiting": "Waiting on: ",
   "considering": "The GM is considering…",
@@ -313,7 +313,10 @@
   "mapEmpty": "Nothing on the map yet.",
   "fold": "Fold away (the button at the top brings it back)",
   "rollWithAdv": "with advantage",
-  "rollWithDis": "with disadvantage"
+  "rollWithDis": "with disadvantage",
+  "placeholderEdge": "From the edge — a dream, a vision, or speak for an ally",
+  "fromEdge": "from the edge",
+  "zoneTitle": "Where they are in the fight"
  },
  "he": {
   "title": "השולחן",
@@ -345,7 +348,7 @@
   "turnSent": "✓ הפעולה נשלחה — מחכים ל{names}",
   "turnSentAll": "✓ הפעולה נשלחה — מנהל המשחק עומד לקרוא את הסבב",
   "turnGm": "✍️ מנהל המשחק מספר מה קורה…",
-  "turnOut": "💤 אינך יכול/ה לפעול כרגע ({why})",
+  "turnOut": "💤 אינך יכול/ה לפעול כרגע ({why}), אבל אפשר עדיין לדבר מן הקצה: חלום, חזיון, או קולו של בן ברית",
   "acted": "פעל/ה בסבב הזה",
   "stillChoosing": "עדיין בוחר/ת",
   "leaveConfirm": "לפנות את המושב? אפשר לחזור אליו אחר כך.",
@@ -462,7 +465,7 @@
   "roundYours": "⏳ נותרו {t} לפעול — מנהל המשחק עונה כשכולם פעלו",
   "roundHurry": "⚠ נותרו רק {t} — פעלו עכשיו!",
   "roundWaiting": "⏳ מחכים ל{names} — {t}",
-  "roundOut": "💤 אינכם יכולים לפעול כרגע ({why}), לכן השולחן לא מחכה לכם — {t}",
+  "roundOut": "💤 אינכם יכולים לפעול כרגע ({why}), לכן השולחן לא מחכה לכם; אפשר עדיין לכתוב מן הקצה — {t}",
   "playingAs": "משחקים בתור",
   "waiting": "מחכים ל: ",
   "considering": "מנהל המשחק חושב…",
@@ -629,6 +632,9 @@
   "mapEmpty": "עוד אין כלום על המפה.",
   "fold": "לקפל (הכפתור למעלה מחזיר)",
   "rollWithAdv": "ביתרון",
-  "rollWithDis": "בחיסרון"
+  "rollWithDis": "בחיסרון",
+  "placeholderEdge": "מן הקצה — חלום, חזיון, או דברו בשם בן ברית",
+  "fromEdge": "מן הקצה",
+  "zoneTitle": "איפה הם נמצאים בקרב"
  }
 }
