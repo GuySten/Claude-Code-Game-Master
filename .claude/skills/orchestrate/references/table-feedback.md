@@ -496,3 +496,9 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   ring alone) - "ok but it is silent most of the time": the demo left the gong's ring fading alone for 20 s.
   Judge the gong inside music (a transformation's eruption), not bare. The kit's old "gong" was a GM crash
   cymbal - up to 31% of its energy above 8 kHz.
+- **Real short-note strings** (Oct 2026, blind A/B on "In the Hall of the Mountain King", accelerating 132 to 228,
+  the same notes, levels and placement; only the samples differ): Sonatina staccato violins and Virtual Playing
+  Orchestra's spiccato/staccato violas, cellos and basses (VSCO2 CE and Sonatina recordings) against our
+  MuseScore_General "Strings Fast" - "strings A [the new ones] is clearly better". Measured: a violin note
+  reaches full level in 0.05 s against our 0.16 s, and a 0.12-0.2 s note sounds 6-16 dB louder against a long
+  one. The limit every fast string engine fought (pizzicato doubling, legato ringing) is the sample.
