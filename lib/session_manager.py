@@ -863,7 +863,8 @@ class SessionManager(EntityManager):
                 cur, mx = int(c.get('current', 0)), int(c.get('max', 1))
                 bar = "●" * cur + "○" * max(0, mx - cur)
                 flag = "  ⚠ FULL — a beat is due" if cur >= mx else ""
-                lines.append(f"{clock_name}: [{bar}] {cur}/{mx}{flag}")
+                kind = "  (named track: gm-clock.sh track)" if c.get('track') else ""
+                lines.append(f"{clock_name}: [{bar}] {cur}/{mx}{flag}{kind}")
 
         # --- Character(s) ---
         pcs = [to_flat(raw) for _, raw in party_roster.all_pcs(self.campaign_dir)]
@@ -1079,8 +1080,18 @@ class SessionManager(EntityManager):
                          "do not just narrate them) ---")
             lines.append("Resolve with lib/game_core primitives "
                          "(named_track / price_roll / reaction_roll / guarded_payoff).")
+            stored = self.json_ops.load_json("threat-clocks.json") or {}
+            stored = {k.lower(): v for k, v in stored.items() if isinstance(v, dict)} \
+                if isinstance(stored, dict) else {}
             for s in sys_list:
-                lines.append(f"- {s['name']} ({s['primitive']}): {self._system_summary(s)}")
+                now = ""
+                if s['primitive'] == "named_track":
+                    c = stored.get(str(s['name']).lower())
+                    mx = (c or {}).get('max', (s.get('config') or {}).get('max', '?'))
+                    now = (f" NOW {c.get('current', 0)}/{mx}." if c else
+                           f" NOW 0/{mx} (not recorded yet).")
+                    now += f" Move it: gm-clock.sh track \"{s['name']}\" +N|-N|N --reason \"...\" —"
+                lines.append(f"- {s['name']} ({s['primitive']}):{now} {self._system_summary(s)}")
 
         context = "\n".join(lines)
 
