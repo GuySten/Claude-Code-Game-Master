@@ -532,3 +532,9 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   overall but in the start it made the fact that the guitar is bad more obvious". The level is right; the
   sound is not good enough exposed - clip 8 passed under the orchestra. Fix the guitar's tone at the source
   (a real amp model and cabinet), and until then never expose it alone.
+- **The guitar's amp, exposed** (4.4 s, the eruption riff alone and in the mix): the engine's chain (two tanh stages
+  + a cabinet filter) against a real amp capture (NAM, a 5150) + a real 4x12 cabinet impulse response, which the
+  measurements favoured (fuller low end, real speaker resonance): "the current chain is good except the last two
+  beats". The ear kept the current amp; measured "better" is not heard better. The last two beats are where the
+  palm-muted chugs begin (G+D dyads, alternating velocity): boomy, then thin - the chug articulation is the weak
+  spot, not the amp. Under test: short open power chords vs full-voiced, even palm mutes.
