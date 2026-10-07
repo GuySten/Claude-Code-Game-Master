@@ -622,7 +622,7 @@ def test_a_choir_on_quick_notes_is_flagged_but_held_choir_notes_are_not():
     base = {"tune": {"seed": "sketch", "key": "D4", "meter": "4/4"}, "length": 16, "tempo": 126,
             "chords": [[0, 16, "i"]], "statements": []}
     quick = {**base, "lines": [{"part": "chorus", "notes": [[i / 2, "D4" if i % 2 else "F4", 0.5] for i in range(16)]}]}
-    held = {**base, "lines": [{"part": "chorus", "notes": [[i * 2, "D4" if i % 2 else "F4", 2] for i in range(8)]}]}
+    held = {**base, "lines": [{"part": "chorus", "notes": [[i * 3, "D4" if i % 2 else "F4", 3] for i in range(5)]}]}   # (1.4 s a note)
     flagged = lambda sp: [m for _, m in arrangement.check(sp, listen=False) if "changes notes" in m]
     assert flagged(quick) and not flagged(held)
 
@@ -712,15 +712,15 @@ def test_the_synth_bass_and_lead_are_one_voice_each():
 def test_the_solo_voice_is_a_bosss_third_stage_surprise_held_slow_and_in_her_best_register():
     s = {"tune": {"seed": "Test Saint", "cls": "Cleric"}, "tempo": 60, "statements": [],
          "key": "C4", "meter": "4/4", "length": 8, "chords": [[0, 8, "i"]],
-         "lines": [{"part": "solo_voice", "notes": [[0, "C5", 1], [1, "C5", 0.5], [1.5, "C5", 0.5], [2, "C#5", 2]]}]}
+         "lines": [{"part": "solo_voice", "notes": [[0, "C5", 2], [2, "C#5", 2]]}]}
     warns = lambda sp: [m for lvl, m in A.check(sp, listen=False) if lvl == "warn" and "solo_voice" in m]   # noqa: E731
     assert any("third stage" in m for m in warns(dict(s, role="stage", stage=2)))   # an earlier stage: spent
     assert not warns(dict(s, role="stage", stage=3))                   # her stage
     assert not warns(s)                                                 # a theme: allowed (a choice)
-    quick = dict(s, tempo=120, role="stage", stage=3)                  # eighths at 120: 0.25 s - just held
+    quick = dict(s, tempo=100, role="stage", stage=3)                  # half notes at 100: 1.2 s - held
     assert not warns(quick)
-    quick = dict(quick, lines=[{"part": "solo_voice", "notes": [[0, "C5", 0.25], [0.25, "D5", 0.25], [0.5, "C5", 1]]}])
-    assert any("quick notes" in m for m in warns(quick))               # 0.125 s: an instrument, not a singer
+    quick = dict(quick, lines=[{"part": "solo_voice", "notes": [[0, "C5", 1], [1, "D5", 1], [2, "C5", 2]]}])
+    assert any("fast changes" in m for m in warns(quick))              # 0.5 s: the host, "she cannot do fast changes"
     low = dict(s, role="stage", stage=3, lines=[{"part": "solo_voice", "notes": [[0, "E4", 2], [2, "C5", 2]]}])
     assert any("sings best" in m for m in warns(low))
     out = dict(s, role="stage", stage=3, lines=[{"part": "solo_voice", "notes": [[0, "B3", 2]]}])

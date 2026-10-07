@@ -201,7 +201,7 @@ it strikes again - write a driving bass's notes a little short; a chord is the p
 arpeggio's. Synthesized in the engine (no download), close and mostly dry; a line at the same
 velocity as loud as the horns', the pad's chord as the strings'.
 A real singer: solo_voice (VocalSet's soprano f4 alone on "ah": legato, her own vibrato; pp
-under velocity 64, a lone held note swells) - C4-C6, best A4-A5; held notes, none under 0.25 s.
+under velocity 64, a lone held note swells) - C4-C6, best A4-A5; held notes, none under 1 s.
 A boss's own voice, its third stage's surprise (a singer, a priest; boss-music 3c).
 """
 
@@ -1017,11 +1017,11 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
                         f"\"stage\" of 3) - heard earlier, the surprise is spent")
         held = [(a, n[0] if n and n[0] - b <= orchestra.VOICE_LEGATO_S else b)    # (legato: held on to the next)
                 for (a, b, _), n in zip(sung, sung[1:] + [None])]
-        quick = [(a, b) for a, b in held if b - a < orchestra.VOICE_SHORT_S - 1e-9]
+        quick = [(a, b) for a, b in held if b - a < orchestra.VOICE_SHORT_S - 1e-6]
         if quick:
             add("warn", f"{part}: {len(quick)} note(s) under {orchestra.VOICE_SHORT_S:g}s (first at {quick[0][0]:.1f} s) "
-                        f"- a solo voice can't spit quick notes (the host, on choirs on quick lines: \"they "
-                        f"sound like an instrument\"): give her held notes, a slow line; the band runs")
+                        f"- a solo voice can't make fast changes (the host, of her: \"she cannot do fast "
+                        f"changes\"): give her long held notes, a slow line; the band plays the quick figures")
         lo, hi = orchestra.VOICE_BEST
         out_best = [k for _, _, k in sung if not lo <= k <= hi]
         if out_best:
@@ -1285,15 +1285,16 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
         # 126 ("the choir cannot do fast changes, they sound like an instrument"). Measured: that
         # piece changed notes 156 times in under 0.5 s; every liked piece held each note 0.7 s+.
         # And the men's choir again, of a hook sung at 0.56 s a note: "the men choir cannot do fast
-        # changes" - the choirs the host accepted never moved faster than 0.71 s.
+        # changes"; and of the Saint's stage 3: "the choir cannot do fast changes either. So only the
+        # electric guitar is suitable for doing fast changes" - a note a second at the quickest.
         for part in ("choir", "chorus", "men_choir", "choir_oo", "choir_oh"):
             ons = sorted({round(t0, 3) for b, t0, _ in played_notes if b == part})
-            quick = [b for a, b in zip(ons, ons[1:]) if b - a < 0.7]
+            quick = [b for a, b in zip(ons, ons[1:]) if b - a < orchestra.VOICE_SHORT_S - 1e-9]
             if quick:
-                add("warn", f"the {part} changes notes {len(quick)} time(s) in under 0.7 s (first at "
-                            f"{quick[0]:.1f} s): a sampled choir can't sing that fast - it sounds like an "
-                            "instrument. Keep the voices on notes of 0.7 s or more (the tune's long notes, "
-                            "held chords) and give the quick notes to strings or woods (rule 13)")
+                add("warn", f"the {part} changes notes {len(quick)} time(s) in under {orchestra.VOICE_SHORT_S:g} s "
+                            f"(first at {quick[0]:.1f} s): a sampled choir can't change notes that fast. Keep "
+                            "the voices on long notes and held chords; the quick figures go to the electric "
+                            "guitar in a boss's later stage, otherwise to strings or woods (rule 13)")
         # The men's choir's top sounds like an instrument (the host, of a men's choir rising to F4-G#4;
         # one that stayed at D#4 and below drew no complaint).
         if men_high:

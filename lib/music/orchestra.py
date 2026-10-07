@@ -2241,7 +2241,8 @@ VOICE_ROOM = (0.45, 0.14)   # her own small room (RT60 s, its level) before the 
 VOICE_LEVEL_DB = -47.2      # her stem: a forte line as loud as horn_solo's at the same velocity (measured)
 VOICE_ADVANCE = 0.07        # her attack speaks this late (s): played that early (ADVANCE)
 VOICE_SEND_DB = -3.0        # her hall send: a soloist in front, a little drier than the choir
-VOICE_SHORT_S = 0.25        # (the critic: a solo voice can't spit notes quicker than this)
+VOICE_SHORT_S = 1.0         # (the critic: the voices' notes - hers and the choirs' - no quicker; the host:
+                            # "she cannot do fast changes"; "the choir cannot do fast changes either")
 _VOICE_ANALYSIS = 4         # (the analysis kept beside the recordings: its version)
 _VOICE: Dict[str, object] = {}
 

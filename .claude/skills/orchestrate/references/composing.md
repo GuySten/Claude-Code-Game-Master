@@ -60,10 +60,13 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
     their B1 is thin). [H, Kestrel: "a weak start and weaker instruments, and weaker combination"; "it's
     not always good to start strong"; the brass "really weak" as a lead] (critic: the tune on
     brass or low reeds alone)
-    The voices can't run: a sampled choir changing notes faster than every 0.7 s sounds like an
-    instrument [H, the Saint's hymn on eighths at 126: "the choir cannot do fast changes, they sound
-    like an instrument"; again of a men's choir at 0.56 s a note] - give the voices the tune's long
-    notes and held chords, the quick notes to strings or woods. The `men_choir` stays at E4 and below
+    The voices can't run: a sampled choir or the solo voice changing notes faster than every 1 s
+    sounds wrong [H, the Saint's hymn on eighths at 126: "the choir cannot do fast changes, they sound
+    like an instrument"; again of a men's choir at 0.56 s a note; of her solo voice: "she cannot do fast
+    changes"; and "the choir cannot do fast changes either. So only the electric guitar is suitable for
+    doing fast changes"] (critic) - give the voices the tune's long notes and held chords. In a boss's
+    later stage the quick figures of the tune or hook go to the electric guitar (`guitar_lead`, or the
+    `guitar`'s power chords); otherwise to strings or woods. The `men_choir` stays at E4 and below
     (its top "sounds like an instrument" [H]); a line that rises higher moves to the `chorus`. And the brass section is jarring in repeated short stabs [H: "the trumpets are
     too jarring", ~45 stabs a minute]: a few, held longer, or the hits on low strings, timpani and
     trombones blended. (critic)
@@ -229,7 +232,7 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
   than the strings: less hall), harp, celesta, glockenspiel, bells, organ,
   timpani, solo_violin; voices choir, chorus, men_choir, choir_oo, choir_oh; `solo_voice` (a real
   soprano alone on "ah", VocalSet's f4: legato, her own vibrato, pp under velocity 64, a lone held
-  note swells; C4-C6, best A4-A5; held notes only, none under 0.25 s - a singer/priest boss's
+  note swells; C4-C6, best A4-A5; held notes only, none under 1 s [H "she cannot do fast changes"] - a singer/priest boss's
   stage-3 surprise, boss-music 3c [H "f4 is her"]; critic); drums kit,
   taiko, toms, reverse_cymbal (`"patterns"`); real struck percussion, let ring: `gong` (a big
   tam-tam - for transformations and the biggest arrivals; the kit's "gong" is a crash cymbal),
