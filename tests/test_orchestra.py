@@ -653,6 +653,15 @@ def test_the_lead_guitar_is_kept_for_later_stages_and_plays_one_note_at_a_time()
     assert any("comic" in m for m in warns(dict(s, role="stage", stage=2)))
 
 
+
+def test_the_loudness_meter_reads_as_bs1770_does():
+    np = pytest.importorskip("numpy")
+    rate = 48000
+    t = np.arange(4 * rate) / rate
+    for hz, lufs in ((1000, -20.0), (100, -21.8), (5000, -16.7)):  # (ffmpeg's ebur128, stereo sines)
+        y = np.stack([0.1 * np.sin(2 * np.pi * hz * t)] * 2, axis=1)
+        assert abs(orchestra.loudness(y, rate)["integrated"] - lufs) < 0.15, hz
+
 # --- the real strings' short notes, the real brass ---
 SHORT_PARTS = ["violins", "violins2", "cellos", "basses"]
 

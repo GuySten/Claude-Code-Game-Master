@@ -2309,7 +2309,10 @@ def hall(dry, rate: int = RATE, rt60: float = 2.3, wet: float = 0.28, seed: int 
 # distance below it they were written with. (A fifth, not the single loudest window: one
 # drum roll does not set the level.) A loop is measured as it plays, its windows running on
 # over its loop point.
-MASTER_LUFS = -8.7          # a piece's full passages (the Saint's theme as it was: -8.3; integrated ~-13)
+MASTER_LUFS = -12.9         # a piece's full passages, BS.1770 as ffmpeg reads it (integrated ~-17). (It was
+                            # -8.7 on a meter whose high shelf was mis-built - "10 ** g ** e" is 10 ** (g ** e) -
+                            # reading full orchestral passages 4.2 LU too loud; the target moved with the fix,
+                            # so the approved Saint stages kept their level within 0.1 dB.)
 LOUD_SHARE = 0.2            # ... its loudest fifth of 3 s windows
 SHORT_TERM_S = 3.0
 TRUE_PEAK_DB = -1.5         # the ceiling, true peak (4x oversampled): the OGG never clips
@@ -2326,7 +2329,8 @@ def _k_filters(rate: int):
     """The two BS.1770 K-weighting biquads (a high shelf, then a high pass) for ``rate``."""
     f0, gain, q = 1681.974450955533, 3.999843853973347, 0.7071752369554196
     k = math.tan(math.pi * f0 / rate)
-    vh, vb = 10 ** (gain / 20), 10 ** (gain / 20) ** 0.4996667741545416
+    vh = 10 ** (gain / 20)
+    vb = vh ** 0.4996667741545416
     a0 = 1 + k / q + k * k
     shelf = ([(vh + vb * k / q + k * k) / a0, 2 * (k * k - vh) / a0, (vh - vb * k / q + k * k) / a0],
              [1.0, 2 * (k * k - 1) / a0, (1 - k / q + k * k) / a0])
