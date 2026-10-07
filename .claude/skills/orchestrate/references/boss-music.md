@@ -95,6 +95,10 @@ Ordinary fights share one campaign battle cue and get none of this.
 
 ## The order of work
 
+**Deadline: the session that meets the boss.** Its tune finals (`SKILL.md`, the host judge) and
+the fight brief's fresh review are done before it, with the GM's stage plan and numbers
+(`gm-craft/references/boss-fights.md` 1); no boss without them. A music brief is not a stage plan.
+
 First the **intent page** (`briefs.md`): for each stage its Cue, Job (what the table must feel - always a threat, rule 3), Fable (what changed in the story), Ideas and Not-this, written before any notes and reviewed by a fresh agent (`brief-review.md`); a wrong intent can't be fixed in a bar map. Then the **stage plan**: every stage's key, tempo, carrying concept and own sound, decided together, and each stage's **bar map** - its entry and body sections as bar ranges (drive, statements, breakdown, rebuild, peak, fall-back), laid out on `arrangement.py grid` - so the composer fills a map instead of designing one (a
 stage may move its key - up a step, a minor third). The plan is the composer's whole brief:
 one role and one length (the bar map's), rule numbers from `composing.md`, and every sound it

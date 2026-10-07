@@ -11,8 +11,8 @@ goes, and most of it is a line or two of notes.
       is retreat sometimes the smart move). (80, 81, T9)
 - [ ] Table conventions said: rolls and DCs are public, what whispers are for, how to reach the
       GM privately ("Only the GM sees this"), PvP and theft need consent. (81)
-- [ ] Lines and veils collected, privately for anyone who prefers; recorded without names
-      (`gm-note.sh rules "Table line: …"`); stop signal explained ("X"). (82, 83)
+- [ ] Lines and veils collected and confirmed, privately for anyone who prefers; recorded without
+      names (`gm-note.sh rules "Table line: …"`); stop signal explained ("X"). (82, 83)
 - [ ] Each player asked what they enjoy most; a first preference guess noted per PC name
       (in-game play only). (49, 84)
 - [ ] Every PC has a bond with at least one other PC, recorded with `gm-note.sh npc_relations`;
@@ -54,6 +54,8 @@ Most of this file assumes a party; with one PC the numbers and the safety nets c
       feedback. Write 2-3 playtest questions for tonight. (85, 87)
 - [ ] Scene context read; last location checked against the session log; open threads, clocks
       and pending consequences noted. (71)
+- [ ] Clocks match the fiction (a cliffhanger that brings a threat in fills its clock); bonds,
+      lines and veils on record. Before a horror-heavy session, reread the lines and veils. (60, 82)
 
 **Each PC** (from the review ledger)
 - [ ] Their kind of fun, and one beat planned for it; patch only the gaps. (49, 50) V3
@@ -65,7 +67,8 @@ Most of this file assumes a party; with one PC the numbers and the safety nets c
 **The session's shape**
 - [ ] Strong start; recap and goals line ready (now, this session, the campaign). (55, 56)
 - [ ] A few possible scenes, one line each, disposable; each with a question. (57, 62)
-- [ ] Planned rhythm: a build, a rest, a bigger peak near the end; different kinds of scene. (58, 59)
+- [ ] Planned rhythm: a build, a rest, a bigger peak near the end; different kinds of scene.
+      Never two climaxes back to back: a rest beat between. (58, 59)
 - [ ] One open question that matters to the PCs, and any deadline they should feel. (60)
 
 **Clues** V2
@@ -83,6 +86,11 @@ Most of this file assumes a party; with one PC the numbers and the safety nets c
       rules; stat blocks ready to lock (`gm-referee.sh enemy`). (8, 15)
 - [ ] Battlefield: 2-4 named zones, distances, cover, one reason to move, one unusual element. (14, 45, 73) V5
 - [ ] Hard set-pieces: a planning glimpse available. (17)
+- [ ] **A boss met this session has its stage plan in the prep notes** (`prep/<boss>.md`): each
+      stage's trigger and numbers (HP, AC, attacks, DCs, and each object - vein, grate - with its
+      AC and HP), sized to the party's damage a round; each remaining weak point asks a different
+      answer. A music brief is not a stage plan. Tune finals and fight-brief review done
+      (`orchestrate/references/boss-music.md`): no boss without them. (`boss-fights.md` 1, 4, 5)
 - [ ] One obstacle that needs two PCs' abilities combined. (4) V1
 
 **World, rewards, rulings**
