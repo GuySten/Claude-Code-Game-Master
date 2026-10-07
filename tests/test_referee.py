@@ -158,3 +158,128 @@ def test_a_natural_one_or_twenty_is_automatic_only_on_an_attack():
     assert dice.judge(one, 15) == "success"
     assert dice.judge(twenty, 25, "AC") == "success"      # an attack: a 20 hits
     assert dice.judge(twenty, 25, "DC") == "failure"      # a check: still short
+
+
+def _sheet(world):
+    return json.loads((world["camp"] / "character.json").read_text())
+
+
+def test_death_saves_are_tallied_on_the_sheet(world):
+    ref = Referee(world["base"], roller=Dice(12, 1, 15, 3, 14))
+    ref.damage("Pip", "10", "a falling portcullis")
+    pip = _sheet(world)
+    assert pip["status"] == "dying" and pip["death_saves"] == {"successes": 0, "failures": 0}
+    assert ref.death_save("Pip")["death"]["death_saves"] == {"successes": 1, "failures": 0}
+    assert ref.death_save("Pip")["death"]["death_saves"] == {"successes": 1, "failures": 2}   # a natural 1
+    assert ref.death_save("Pip")["death"]["death_saves"] == {"successes": 2, "failures": 2}
+    # Damage at 0 HP is a failure: the third one kills.
+    ref.damage("Pip", "1", "a stray arrow")
+    assert _sheet(world)["status"] == "dead" and "death_saves" not in _sheet(world)
+    with pytest.raises(RefereeError, match="is dead, not dying"):
+        ref.death_save("Pip")
+    saves = [e for e in read_log(world["camp"]) if e["action"] == "death-save"]
+    assert [e["result"] for e in saves] == ["success", "failure", "success"]
+
+
+def test_three_successes_are_stable_and_a_twenty_wakes(world):
+    ref = Referee(world["base"], roller=Dice(10, 11, 19, 20))
+    ref.damage("Pip", "10", "a trap")
+    for _ in range(3):
+        out = ref.death_save("Pip")
+    assert out["death"]["outcome"] == "stable"
+    pip = _sheet(world)
+    assert pip["status"] == "stable" and "death_saves" not in pip and "stable" not in pip["conditions"]
+    with pytest.raises(RefereeError, match="stable, not dying"):
+        ref.death_save("Pip")
+    # A crit while down: two failures, and stable is over.
+    from lib.player_manager import PlayerManager
+    PlayerManager(world["base"]).modify_hp("Pip", -2, crit=True)
+    assert _sheet(world)["status"] == "dying" and _sheet(world)["death_saves"]["failures"] == 2
+    assert ref.death_save("Pip")["death"]["outcome"] == "revived"          # natural 20
+    pip = _sheet(world)
+    assert pip["hp"]["current"] == 1 and pip["status"] == "alive" and "death_saves" not in pip
+
+
+def test_healing_clears_the_tally_and_stable_is_never_a_condition_beside_dying(world):
+    from lib.player_manager import PlayerManager, life_tag
+    pm = PlayerManager(world["base"])
+    pm.modify_hp("Pip", -10)
+    pm.modify_hp("Pip", -1)
+    assert _sheet(world)["death_saves"]["failures"] == 1
+    pm.modify_condition("Pip", "add", "stable")                 # the old way: becomes the status
+    pip = _sheet(world)
+    assert pip["status"] == "stable" and "stable" not in pip["conditions"]
+    pm.modify_hp("Pip", 3)
+    pip = _sheet(world)
+    assert pip["status"] == "alive" and "death_saves" not in pip
+    # A legacy sheet written as dying + condition stable reads as stable.
+    assert life_tag({"status": "dying", "conditions": ["unconscious", "stable"],
+                     "hp": {"current": 0, "max": 9}}) == " | STABLE"
+
+
+def test_stabilize_rolls_medicine_or_uses_a_source(world):
+    (world["camp"] / "players").mkdir()
+    (world["camp"] / "players" / "ammet.json").write_text(json.dumps({
+        "name": "Ammet", "class": "Cleric", "level": 1, "hp": {"current": 8, "max": 8},
+        "stats": {"wis": 14}, "skills": {"Medicine": 4}, "conditions": []}))
+    ref = Referee(world["base"], roller=Dice(8, 13))
+    ref.damage("Pip", "10", "a trap")
+    with pytest.raises(RefereeError, match="--by"):
+        ref.stabilize("Pip")
+    assert ref.stabilize("Pip", by="Ammet")["stable"] is False             # Medicine 8 vs DC 10
+    assert _sheet(world)["status"] == "dying"
+    assert ref.stabilize("Pip", by="Ammet")["stable"] is True
+    assert _sheet(world)["status"] == "stable"
+    log = read_log(world["camp"])
+    assert [e["outcome"] for e in log if e["action"] == "stabilize"] == ["still dying", "stable"]
+    assert [e["dc"] for e in log if e["action"] == "check"] == [10, 10]
+    ref.damage("Pip", "1", "a kick")                                        # dying again
+    assert ref.stabilize("Pip", source="Spare the Dying", by="Ammet")["stable"] is True
+    assert len([e for e in read_log(world["camp"]) if e["action"] == "check"]) == 2   # no roll
+
+
+def test_a_check_outside_a_fight_creates_no_combatants(world):
+    ref = Referee(world["base"], roller=Dice(12, 12, 12))
+    ref.check("Pip", "athletics", parse_dc("easy"))
+    assert not (world["camp"] / "combat_state.json").exists()
+    ref.help("Pip", "Pip")                                       # a recorded situation is kept...
+    state = json.loads((world["camp"] / "combat_state.json").read_text())
+    assert state["combatants"] == [] and state["outside"][0]["states"]["helped_by"] == "Pip"
+    ref.check("Pip", "athletics", parse_dc("easy"))              # ...until spent
+    assert json.loads((world["camp"] / "combat_state.json").read_text()) == {}
+    # In a fight, the PC joins it.
+    ref.add_enemy(GOBLIN)
+    ref.check("Pip", "athletics", parse_dc("easy"))
+    assert [c["name"] for c in ref.status()["combatants"]] == ["Grak", "Pip"]
+
+
+def test_void_strikes_a_ruling_and_undoes_its_damage(world):
+    dice = Dice(15, 5, 14, 4)
+    ref = Referee(world["base"], roller=dice)
+    ref.add_enemy(GOBLIN)
+    ref.attack("Grak", "Pip", "Scimitar")                      # hits for 5: Pip 10 -> 5
+    assert _sheet(world)["hp"]["current"] == 5
+    attack = next(e for e in read_log(world["camp"]) if e["action"] == "attack")
+    out = ref.void(attack["_line"], "Pip was 15 ft up the chain, out of reach")
+    assert _sheet(world)["hp"]["current"] == 10 and len(out["voided"]) == 2
+    log = read_log(world["camp"])
+    assert all(e.get("voided") for e in log if e["action"] in ("attack", "damage"))
+    assert report(log) == {}                                    # a voided roll leaves the report
+    assert ref_mod.describe_entry(attack | {"voided": "x"}).startswith("✗ VOIDED")
+    ref.attack("Pip", "Grak", "shortsword")                    # 14 hits, 4 damage: Grak 7 -> 3
+    dmg = [e for e in read_log(world["camp"]) if e["action"] == "damage"][-1]
+    ref.void(dmg["_line"], "wrong target")
+    assert ref.status()["combatants"][0]["hp"] == 7
+    with pytest.raises(RefereeError, match="already voided"):
+        ref.void(dmg["_line"], "again")
+
+
+def test_a_repeat_roll_is_flagged_never_blocked(world, capsys):
+    ref = Referee(world["base"], roller=Dice(5, 6, 15))
+    ref.check("Pip", "athletics", 10, why="climb the shaft")
+    assert "REPEAT ROLL" not in capsys.readouterr().out
+    ref.check("Pip", "athletics", 10, why="climb the shaft again")
+    out = capsys.readouterr().out
+    assert "REPEAT ROLL" in out and "1× in this scene (1 failed)" in out
+    r = ref.check("Pip", "athletics", 15, why="a harder wall")          # another DC: another task
+    assert "REPEAT ROLL" not in capsys.readouterr().out and r["outcome"] == "success"

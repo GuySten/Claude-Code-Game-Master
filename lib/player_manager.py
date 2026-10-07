@@ -17,6 +17,39 @@ from character_schema import to_flat, is_open_schema
 import party_roster
 
 
+DEATH_SAVES_TO_END = 3   # three successes: stable; three failures: dead
+
+
+def death_saves(char: Dict[str, Any]) -> Dict[str, int]:
+    """A dying character's death-save tally (zeros when none is recorded)."""
+    t = char.get('death_saves')
+    t = t if isinstance(t, dict) else {}
+    return {'successes': int(t.get('successes') or 0), 'failures': int(t.get('failures') or 0)}
+
+
+def life_status(char: Dict[str, Any]) -> str:
+    """alive / dying / stable / dead. A legacy sheet that wrote 'stable' as a
+    condition next to status 'dying' reads as stable: the two can't both be true."""
+    status = str(char.get('status') or 'alive').lower()
+    if status in ('dying', 'alive') and any(str(c).strip().lower() == 'stable'
+                                            for c in char.get('conditions') or []):
+        hp = char.get('hp') if isinstance(char.get('hp'), dict) else {}
+        if not hp.get('current'):
+            return 'stable'
+    return status
+
+
+def life_tag(char: Dict[str, Any]) -> str:
+    """' | DYING (death saves 1✓ 2✗)', ' | STABLE', ' | DEAD', or '' when alive."""
+    status = life_status(char)
+    if status == 'dying':
+        t = death_saves(char)
+        return f" | DYING (death saves {t['successes']}✓ {t['failures']}✗)"
+    if status in ('stable', 'dead'):
+        return f" | {status.upper()}"
+    return ""
+
+
 class PlayerManager(EntityManager):
     """Manage player character operations. Inherits from EntityManager for common functionality."""
 
@@ -214,9 +247,7 @@ class PlayerManager(EntityManager):
         gold = char.get('gold', 0)
         summary = f"{char.get('name', name)} - {char.get('race', '?')} {char.get('class', '?')} Level {char.get('level', 1)} (HP: {hp.get('current', 0)}/{hp.get('max', 0)}, Gold: {gold})"
         summary += self._vitals_summary(char)
-        status = char.get('status')
-        if status in ('dying', 'dead'):
-            summary += f" | {status.upper()}"
+        summary += life_tag(char)
         conditions = char.get('conditions', [])
         if conditions:
             summary += f" | Conditions: {', '.join(conditions)}"
@@ -235,9 +266,7 @@ class PlayerManager(EntityManager):
             line = (f"{char.get('name', 'Unknown')} - {char.get('race', '?')} {char.get('class', '?')} "
                     f"Level {char.get('level', 1)} (HP: {hp.get('current', 0)}/{hp.get('max', 0)}, Gold: {gold})"
                     + self._vitals_summary(char))
-            status = char.get('status')
-            if status in ('dying', 'dead'):
-                line += f" | {status.upper()}"
+            line += life_tag(char)
             if multi:
                 seat = "lead" if path == self.character_file else "player"
                 line = f"[{seat}] {line}"
@@ -536,10 +565,15 @@ class PlayerManager(EntityManager):
             'xp_remaining': remaining
         }
 
-    def modify_hp(self, name: str, amount: int) -> Dict[str, Any]:
+    def modify_hp(self, name: str, amount: int, crit: bool = False) -> Dict[str, Any]:
         """
         Modify character HP (positive = heal, negative = damage)
         Returns dict with HP status info
+
+        Dropping to 0 HP opens the dying gate with a fresh death-save tally.
+        Damage while at 0 HP is a failed death save (two on a critical hit, 5e),
+        and the third failure kills. Any healing off 0 ends dying or stable and
+        clears the tally.
         """
         char = self._load_character(name)
         if not char:
@@ -575,11 +609,21 @@ class PlayerManager(EntityManager):
         # Track the dying gate. 0 HP -> dying (unless already dead). Healing off
         # 0 -> alive. A 'dead' status is sticky (only kill_character sets it; only
         # an explicit revive would clear it), so it is never silently overwritten.
-        if char.get('status') != 'dead':
-            if new_hp == 0:
-                char['status'] = 'dying'
-            elif new_hp > 0 and char.get('status') == 'dying':
-                char['status'] = 'alive'
+        failed_saves = 0
+        if new_hp == 0 and current_hp > 0:
+            char['status'] = 'dying'
+            char['death_saves'] = {'successes': 0, 'failures': 0}
+        elif new_hp == 0 and amount < 0:
+            # Hit while down: a failed death save (a critical hit: two), and a
+            # stable character starts dying again.
+            failed_saves = 2 if crit else 1
+            tally = death_saves(char)
+            tally['failures'] = min(DEATH_SAVES_TO_END, tally['failures'] + failed_saves)
+            char['death_saves'] = tally
+            char['status'] = 'dying'
+            self._drop_condition(char, 'stable')
+        elif new_hp > 0 and life_status(char) in ('dying', 'stable'):
+            self._wake(char)
 
         # Save character
         if not self._save_character(name, char):
@@ -596,9 +640,15 @@ class PlayerManager(EntityManager):
         print(f"HP: {new_hp}/{max_hp}")
 
         if new_hp == 0:
-            print("STATUS: UNCONSCIOUS")
+            print("STATUS: UNCONSCIOUS" + life_tag(char))
+            if failed_saves:
+                print(f"Damage at 0 HP: {failed_saves} failed death save{'s' if failed_saves > 1 else ''}")
         elif new_hp <= max_hp // 4:
             print("STATUS: BLOODIED")
+
+        if failed_saves and death_saves(char)['failures'] >= DEATH_SAVES_TO_END:
+            self.kill_character(char_name, cause="three failed death saves (struck while dying)")
+            char['status'] = 'dead'
 
         return {
             'success': True,
@@ -609,7 +659,117 @@ class PlayerManager(EntityManager):
             'unconscious': new_hp == 0,
             'bloodied': 0 < new_hp <= max_hp // 4,
             'status': char.get('status', 'alive'),
+            'death_saves': death_saves(char) if new_hp == 0 and char.get('status') != 'dead' else None,
         }
+
+    # --- dying, stable, death saves ---
+    @staticmethod
+    def _drop_condition(char: Dict, condition: str) -> None:
+        char['conditions'] = [c for c in char.get('conditions') or []
+                              if str(c).strip().lower() != condition]
+
+    def _wake(self, char: Dict) -> None:
+        """Back above 0 HP: alive, the tally gone, no longer unconscious or stable."""
+        char['status'] = 'alive'
+        char.pop('death_saves', None)
+        char.pop('stabilized', None)
+        self._drop_condition(char, 'stable')
+        self._drop_condition(char, 'unconscious')
+
+    def record_death_save(self, name: str, natural: int, success: bool) -> Dict[str, Any]:
+        """Record one death save (5e): a natural 20 regains 1 HP and wakes; a
+        natural 1 is two failures; three successes make the character stable,
+        three failures kill."""
+        char = self._load_character(name)
+        if not char:
+            print(f"[ERROR] Character '{name}' not found")
+            return {'success': False, 'error': 'not found'}
+        char_name = char.get('name', name)
+        status = life_status(char)
+        if status != 'dying':
+            return {'success': False, 'name': char_name, 'status': status,
+                    'error': f"{char_name} is {status}, not dying: no death save to make"}
+        tally = death_saves(char)
+        if natural == 20:
+            char['hp']['current'] = 1
+            self._wake(char)
+            outcome = 'revived'
+        else:
+            if natural == 1:
+                tally['failures'] += 2
+            elif success:
+                tally['successes'] += 1
+            else:
+                tally['failures'] += 1
+            tally = {k: min(DEATH_SAVES_TO_END, v) for k, v in tally.items()}
+            char['death_saves'] = tally
+            outcome = 'success' if success and natural != 1 else 'failure'
+            if tally['successes'] >= DEATH_SAVES_TO_END:
+                char['status'] = 'stable'
+                char.pop('death_saves', None)
+                self._drop_condition(char, 'stable')
+                outcome = 'stable'
+        if not self._save_character(char_name, char):
+            return {'success': False}
+        if outcome != 'revived' and tally['failures'] >= DEATH_SAVES_TO_END:
+            self.kill_character(char_name, cause="three failed death saves")
+            outcome = 'dead'
+        return {'success': True, 'name': char_name, 'outcome': outcome, 'natural': natural,
+                'death_saves': tally if outcome not in ('stable', 'revived') else None,
+                'status': 'dead' if outcome == 'dead' else char.get('status'),
+                'current_hp': char['hp'].get('current')}
+
+    def restore_vitals(self, name: str, hp: int, status: Optional[str] = None,
+                       tally: Optional[Dict[str, int]] = None) -> Dict[str, Any]:
+        """Put HP (and, when known, the life status and death-save tally) back as
+        they were before a ruling that was voided. Not a heal: no rule applies,
+        and a death the voided ruling caused is undone with it."""
+        char = self._load_character(name)
+        if not char:
+            return {'success': False, 'error': 'not found'}
+        char_name = char.get('name', name)
+        max_hp = int((char.get('hp') or {}).get('max') or 0)
+        char.setdefault('hp', {})['current'] = max(0, min(max_hp, int(hp))) if max_hp else max(0, int(hp))
+        if char['hp']['current'] > 0:
+            self._wake(char)
+            char.pop('died_at', None)
+            char.pop('cause', None)
+        elif status:
+            char['status'] = status
+            if status != 'dead':
+                char.pop('died_at', None)
+                char.pop('cause', None)
+            if tally:
+                char['death_saves'] = dict(tally)
+            else:
+                char.pop('death_saves', None)
+        if not self._save_character(char_name, char):
+            return {'success': False}
+        return {'success': True, 'name': char_name, 'current_hp': char['hp']['current'],
+                'status': char.get('status', 'alive')}
+
+    def stabilize(self, name: str, how: Optional[str] = None) -> Dict[str, Any]:
+        """A dying character is stable: no more death saves, still at 0 HP and
+        unconscious until healed. Clears the tally."""
+        char = self._load_character(name)
+        if not char:
+            print(f"[ERROR] Character '{name}' not found")
+            return {'success': False, 'error': 'not found'}
+        char_name = char.get('name', name)
+        status = life_status(char)
+        if status not in ('dying', 'stable'):
+            return {'success': False, 'name': char_name, 'status': status,
+                    'error': f"{char_name} is {status}, not dying: nothing to stabilize"}
+        char['status'] = 'stable'
+        char.pop('death_saves', None)
+        self._drop_condition(char, 'stable')
+        if how:
+            char['stabilized'] = how
+        if not self._save_character(char_name, char):
+            return {'success': False}
+        print(f"STABLE {char_name} is stable" + (f" ({how})" if how else "")
+              + ": unconscious at 0 HP, no more death saves")
+        return {'success': True, 'name': char_name, 'status': 'stable'}
 
     def _kit_vitals(self) -> List[str]:
         """Vital tracks the active World Kit declares — 'hp' plus whatever else the
@@ -725,6 +885,7 @@ class PlayerManager(EntityManager):
         char.setdefault('hp', {})
         char['hp']['current'] = 0
         char['status'] = 'dead'
+        char.pop('death_saves', None)
         char['died_at'] = self.get_timestamp()
         if cause:
             char['cause'] = cause
@@ -1137,6 +1298,14 @@ class PlayerManager(EntityManager):
         if not condition:
             print(f"[ERROR] Condition name required for {action}")
             return {'success': False}
+
+        if action == 'add' and condition.strip().lower() == 'stable':
+            # Stable is a status (no more death saves), never a condition beside
+            # 'dying': gm-referee.sh stabilize records how.
+            result = self.stabilize(char_name)
+            if not result.get('success'):
+                print(f"[ERROR] {result.get('error')}")
+            return result
 
         if action == 'add':
             # Case-insensitive dedup

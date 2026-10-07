@@ -898,8 +898,8 @@ class SessionManager(EntityManager):
             conditions = char.get('conditions', [])
             cond_str = ', '.join(conditions) if conditions else '(none)'
             seat = "" if len(pcs) == 1 else ("[lead] " if idx == 0 else "[player] ")
-            status = char.get('status')
-            status_str = f" | {status.upper()}" if status in ('dying', 'dead') else ""
+            from player_manager import life_tag
+            status_str = life_tag(char)
             lines.append(f"{seat}{name} - Level {level} {race} {cls} | HP: {hp_cur}/{hp_max} | AC: {ac} | XP: {xp_val} | Gold: {gold}{status_str}")
             lines.append(f"Conditions: {cond_str}")
 

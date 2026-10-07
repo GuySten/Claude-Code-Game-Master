@@ -42,7 +42,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import dice  # noqa: E402
 from combat_manager import CombatManager  # noqa: E402
-from player_manager import PlayerManager  # noqa: E402
+from player_manager import PlayerManager, death_saves, life_status  # noqa: E402
 
 ABILITIES = ("str", "dex", "con", "int", "wis", "cha")
 ABILITY_NAMES = {"strength": "str", "dexterity": "dex", "constitution": "con",
@@ -70,6 +70,11 @@ MELEE_AUTO_CRIT = {"paralyzed", "unconscious"}
 CHECK_DIS = {"poisoned", "frightened", "cursed"}   # (cursed: the table's punishment, until atonement)
 AUTO_FAIL_STR_DEX_SAVES = {"paralyzed", "petrified", "stunned", "unconscious"}
 COVER_AC = {"half": 2, "three-quarters": 5}
+# The same check of the same skill against the same DC by the same character in
+# one scene (within this many hours, among this many recent log entries) is
+# flagged to the GM as a repeat roll. A note, never a block.
+REPEAT_HOURS = 6
+REPEAT_WINDOW = 400
 # Battlefield effects: what an effect may change, nothing else.
 EFFECT_KINDS = {"adv", "dis"}
 EFFECT_ROLLS = {"attack", "check", "save"}
@@ -234,8 +239,12 @@ class Combatant:
         return [_norm(t) for t in out]
 
     def conditions(self) -> List[str]:
-        return [_norm(c) for c in (self.record.get("conditions") or [])] + \
-               [_norm(c) for c in (self.state.get("conditions") or [])]
+        out = [_norm(c) for c in (self.record.get("conditions") or [])] + \
+              [_norm(c) for c in (self.state.get("conditions") or [])]
+        if self.kind == "pc" and life_status(self.record) in ("dying", "stable") \
+                and "unconscious" not in out:
+            out.append("unconscious")          # (at 0 HP: unconscious, by the rules)
+        return [c for c in out if c != "stable"]
 
     def states(self) -> Dict[str, Any]:
         return self.state.setdefault("states", {})
@@ -288,22 +297,53 @@ class Referee:
         data.setdefault("fields", [])
         return data
 
+    @staticmethod
+    def _in_fight(data: Dict[str, Any]) -> bool:
+        return bool(data.get("active"))
+
     def _save(self, data: Dict[str, Any]) -> None:
+        """Write the fight. Outside a fight, a PC's entry is only a holder for a
+        recorded situation (helped, hidden, cover) and never a combatant: a check
+        in the corridor writes no combat_state.json unless something is recorded."""
+        outside = [e for e in data.get("outside") or [] if e.get("states")]
+        if outside:
+            data["outside"] = outside
+        else:
+            data.pop("outside", None)
+        if not (self._in_fight(data) or data.get("combatants") or data.get("fields") or outside):
+            camp = getattr(self.combat, "campaign_dir", None)
+            if camp is None or not (Path(camp) / self.combat.combat_file).exists():
+                return                          # nothing to record, and no file to clear
+            data = {}
         self.combat._save(data)
 
     def _log(self, action: str, **fields) -> None:
         audit(getattr(self.combat, "campaign_dir", None), {"kind": "referee", "action": action, **fields})
 
-    def _entry(self, data: Dict[str, Any], name: str, create_pc: bool = True) -> Dict[str, Any]:
+    def _entry(self, data: Dict[str, Any], name: str, create_pc: bool = True,
+               join: bool = False) -> Dict[str, Any]:
+        """The fight's entry for ``name``. A PC not yet in it joins the fight only
+        while one is on (or when ``join``: initiative); outside a fight the PC
+        gets a holder entry that is never a combatant."""
         for c in data["combatants"]:
             if _norm(c["name"]) == _norm(name):
                 return c
         sheet = self._sheet(name)
         if sheet and create_pc:
-            entry = {"name": sheet.get("name", name), "side": "party", "kind": "pc",
-                     "initiative": 0, "conditions": [], "states": {}}
-            data["combatants"].append(entry)
-            return entry
+            outside = data.setdefault("outside", [])
+            held = next((e for e in outside if _norm(e["name"]) == _norm(name)), None)
+            if self._in_fight(data) or join:
+                if held is not None:
+                    outside.remove(held)
+                entry = held or {"name": sheet.get("name", name), "side": "party", "kind": "pc",
+                                 "initiative": 0, "conditions": [], "states": {}}
+                data["combatants"].append(entry)
+                return entry
+            if held is None:
+                held = {"name": sheet.get("name", name), "side": "party", "kind": "pc",
+                        "conditions": [], "states": {}}
+                outside.append(held)
+            return held
         raise RefereeError(f"no combatant or player character named {name}")
 
     def _sheet(self, name: str) -> Optional[Dict[str, Any]]:
@@ -342,7 +382,7 @@ class Referee:
     def initiative(self) -> List[Dict[str, Any]]:
         data = self._data()
         for name in [p.get("name") for p in self.players.get_all_players() if p.get("status") != "dead"]:
-            self._entry(data, name)
+            self._entry(data, name, join=True)
         out = []
         for c in data["combatants"]:
             who = self.who(data, c["name"])
@@ -426,10 +466,52 @@ class Referee:
         return f"1d20{tail}", " · ".join(note) + (" (they cancel)" if adv and dis else "")
 
     # --- the rolls ---
-    def check(self, name: str, skill: str, dc: Optional[int] = None, why: str = "") -> Dict[str, Any]:
+    def _scene(self) -> str:
+        """Where and when the party is (location | time of day | date): a scene."""
+        camp = getattr(self.combat, "campaign_dir", None)
+        try:
+            o = json.loads((Path(camp) / "campaign-overview.json").read_text(encoding="utf-8")) if camp else {}
+        except (OSError, ValueError):
+            o = {}
+        pos = o.get("player_position") if isinstance(o.get("player_position"), dict) else {}
+        return " | ".join(str(x or "") for x in (pos.get("current_location"), o.get("time_of_day"),
+                                                  o.get("current_date")))
+
+    def _earlier_tries(self, who: str, skill: str, dc: Optional[int], scene: str) -> List[Dict[str, Any]]:
+        """The same character's checks of the same skill against the same DC in this
+        scene (and within REPEAT_HOURS): the smell of rolling until it works."""
+        import datetime
+        camp = getattr(self.combat, "campaign_dir", None)
+        if camp is None:
+            return []
+        now = datetime.datetime.now(datetime.timezone.utc)
+        out = []
+        for e in read_log(Path(camp))[-REPEAT_WINDOW:]:
+            if (e.get("action") != "check" or e.get("voided") or e.get("scene") != scene
+                    or e.get("who") != who or e.get("skill") != skill or e.get("dc") != dc):
+                continue
+            try:
+                age = now - datetime.datetime.fromisoformat(e.get("at", ""))
+            except ValueError:
+                continue
+            if age.total_seconds() <= REPEAT_HOURS * 3600:
+                out.append(e)
+        return out
+
+    def check(self, name: str, skill: str, dc: Optional[int] = None, why: str = "",
+              warn_repeat: bool = True) -> Dict[str, Any]:
         data = self._data()
         who = self.who(data, name)
         bonus, label = who.skill_bonus(skill)
+        scene = self._scene()
+        if warn_repeat:
+            earlier = self._earlier_tries(who.name, label, dc, scene)
+            if earlier:
+                failed = sum(e.get("outcome") == "failure" for e in earlier)
+                print(f"⚠ REPEAT ROLL (a note, not a block): {who.name} has already rolled {label} vs DC {dc} "
+                      f"{len(earlier)}× in this scene ({failed} failed). A route once crossed stays crossed; "
+                      f"party movement is one group check; a failed move costs time or position, "
+                      f"HP only when a fall was the stated stake.")
         ab = SKILLS.get(_norm(skill)) or ability_key(skill)
         adv, dis = [], []
         for c in who.conditions():
@@ -444,7 +526,7 @@ class Referee:
         self._save(data)
         self._log("check", who=who.name, side=who.state.get("side", "party"), skill=label,
                   bonus=bonus, bonus_from=f"{who.kind} record", advantage=adv, disadvantage=dis,
-                  dc=dc, why=why, notation=notation, **_result(r))
+                  dc=dc, why=why, notation=notation, scene=scene, **_result(r))
         return r
 
     def save(self, name: str, ability: str, dc: int, source: str) -> Dict[str, Any]:
@@ -480,14 +562,51 @@ class Referee:
                   source=source, notation=notation, **_result(r))
         return r
 
+    def _dying_pc(self, name: str) -> Dict[str, Any]:
+        sheet = self._sheet(name)
+        if not sheet:
+            raise RefereeError(f"no player character named {name} (death saves are for PCs)")
+        status = life_status(sheet)
+        if status != "dying":
+            raise RefereeError(f"{sheet.get('name', name)} is {status}, not dying")
+        return sheet
+
     def death_save(self, name: str) -> Dict[str, Any]:
-        """A flat d20 against 10: no bonus can touch it."""
-        data = self._data()
-        who = self.who(data, name)
-        r = self.roller("1d20", 10, "DC", who.name, "⚖ Death save")
-        self._log("death-save", who=who.name, side=who.state.get("side", "party"), dc=10,
-                  notation="1d20", **_result(r))
-        return r
+        """A flat d20 against 10: no bonus can touch it. Recorded on the sheet: a
+        natural 20 regains 1 HP, a natural 1 is two failures, three successes are
+        stable, three failures are death."""
+        sheet = self._dying_pc(name)
+        who = sheet.get("name", name)
+        r = self.roller("1d20", 10, "DC", who, "⚖ Death save")
+        nat = r.get("natural") if r.get("natural") is not None else r.get("total")
+        res = self.players.record_death_save(who, int(nat or 0), r.get("outcome") == "success")
+        if not res.get("success"):
+            raise RefereeError(res.get("error") or f"could not record {who}'s death save")
+        self._log("death-save", who=who, side="party", dc=10, notation="1d20", **_result(r),
+                  result=res["outcome"], tally=res.get("death_saves"), status=res.get("status"))
+        return {**r, "death": res}
+
+    def stabilize(self, name: str, by: Optional[str] = None, source: Optional[str] = None) -> Dict[str, Any]:
+        """Stop a dying PC's death saves: a Medicine check (DC 10) by ``by``, or no
+        roll at all for a ``source`` that just works (Spare the Dying, a healer's
+        kit). Logged either way."""
+        sheet = self._dying_pc(name)
+        who = sheet.get("name", name)
+        if source:
+            res = self.players.stabilize(who, how=source + (f" ({by})" if by else ""))
+            self._log("stabilize", who=who, side="party", by=by, source=source, roll=None,
+                      outcome="stable")
+            return {"stable": res.get("success", False), "check": None}
+        if not by:
+            raise RefereeError("stabilize needs --by <who tends them> (Medicine DC 10) or "
+                               "--source \"<spell or healer's kit>\" (no roll)")
+        r = self.check(by, "medicine", 10, why=f"stabilize {who}", warn_repeat=False)
+        stable = r.get("outcome") == "success"
+        if stable:
+            self.players.stabilize(who, how=f"Medicine {r.get('total')} ({by})")
+        self._log("stabilize", who=who, side="party", by=by, source="Medicine DC 10",
+                  roll=r.get("total"), outcome="stable" if stable else "still dying")
+        return {"stable": stable, "check": r}
 
     def hide(self, name: str) -> Dict[str, Any]:
         """Stealth against the best passive Perception on the other side."""
@@ -500,7 +619,8 @@ class Referee:
             raise RefereeError("nobody on the other side to hide from (add the foes first)")
         best = max(foes, key=lambda f: f.passive_perception())
         dc = best.passive_perception()
-        r = self.check(name, "stealth", dc, why=f"hide from {best.name} (passive Perception {dc})")
+        r = self.check(name, "stealth", dc, why=f"hide from {best.name} (passive Perception {dc})",
+                       warn_repeat=False)
         data = self._data()
         entry = self._entry(data, name)
         self._log("hide", who=entry["name"], against=best.name, passive_perception=dc,
@@ -587,16 +707,78 @@ class Referee:
         data = self._data()
         entry = self._entry(data, target)
         if entry.get("kind") == "enemy":
+            before = {"hp": entry["hp_current"]}
             entry["hp_current"] = min(entry["hp_max"], entry["hp_current"] + amount) if heal \
                 else max(0, entry["hp_current"] - amount)
             left = {"hp": entry["hp_current"], "hp_max": entry["hp_max"]}
             self._save(data)
         else:
-            res = self.players.modify_hp(entry["name"], amount if heal else -amount)
-            left = {"hp": res.get("current_hp"), "hp_max": res.get("max_hp")}
+            sheet = self._sheet(entry["name"]) or {}
+            before = {"hp": (sheet.get("hp") or {}).get("current"), "status": life_status(sheet),
+                      "death_saves": sheet.get("death_saves")}
+            res = self.players.modify_hp(entry["name"], amount if heal else -amount, crit=crit and not heal)
+            left = {"hp": res.get("current_hp"), "hp_max": res.get("max_hp"), "status": res.get("status")}
+            if res.get("death_saves"):
+                left["death_saves"] = res["death_saves"]
         self._log("heal" if heal else "damage", target=entry["name"], side=entry.get("side", "party"),
-                  amount=amount, notation=notation, crit=crit, source=source, **left)
+                  amount=amount, notation=notation, crit=crit, source=source, before=before, **left)
         return {"amount": amount, "target": entry["name"], **left}
+
+    # --- a mistaken ruling, struck from the record ---
+    def void(self, line: int, reason: str) -> Dict[str, Any]:
+        """Void the referee-log entry on ``line`` (as `log` numbers them): it stays
+        in the log, marked voided, and leaves the report. Its hit-point effect is
+        reversed (an attack: the damage it dealt) to the state before it, instead
+        of a made-up heal. Nothing else in the fight is touched."""
+        camp = getattr(self.combat, "campaign_dir", None)
+        entries = read_log(Path(camp)) if camp else []
+        by_line = {e["_line"]: e for e in entries}
+        e = by_line.get(int(line))
+        if e is None or e.get("kind") != "referee":
+            raise RefereeError(f"no referee decision on line {line} (gm-referee.sh log shows the numbers)")
+        if e.get("action") == "void":
+            raise RefereeError("that line is itself a void")
+        if e.get("voided"):
+            raise RefereeError(f"line {line} is already voided ({e['voided']})")
+        hits = [e] if e.get("action") in ("damage", "heal") else []
+        if e.get("action") == "attack":
+            src = f"{e.get('weapon')} ({e.get('who')})"
+            hits = [x for x in entries if e["_line"] < x["_line"] <= e["_line"] + 4
+                    and x.get("action") == "damage" and x.get("target") == e.get("target")
+                    and x.get("source") == src and not x.get("voided")][:1]
+        restored = []
+        for h in hits:
+            restored.append(self._undo_hp(h))
+        lines = [e["_line"]] + [h["_line"] for h in hits if h is not e]
+        self._log("void", voids=lines, reason=reason, restored=restored)
+        return {"voided": lines, "restored": restored}
+
+    def _undo_hp(self, h: Dict[str, Any]) -> Dict[str, Any]:
+        """Put one damage/heal entry's target back as it was before it."""
+        amount = int(h.get("amount") or 0)
+        sign = 1 if h.get("action") == "damage" else -1
+        before = h.get("before") or {}
+        data = self._data()
+        foe = next((c for c in data["combatants"] if _norm(c["name"]) == _norm(h.get("target"))
+                    and c.get("kind") == "enemy"), None)
+        if foe is not None:
+            unchanged = foe["hp_current"] == h.get("hp") and before.get("hp") is not None
+            foe["hp_current"] = int(before["hp"]) if unchanged else \
+                max(0, min(foe["hp_max"], foe["hp_current"] + sign * amount))
+            self._save(data)
+            return {"target": foe["name"], "hp": foe["hp_current"]}
+        sheet = self._sheet(h.get("target"))
+        if sheet:
+            hp = sheet.get("hp") or {}
+            unchanged = hp.get("current") == h.get("hp") and before.get("hp") is not None
+            if unchanged:
+                new_hp, status, tally = int(before["hp"]), before.get("status"), before.get("death_saves")
+            else:
+                new_hp = max(0, min(int(hp.get("max") or 0), int(hp.get("current") or 0) + sign * amount))
+                status, tally = None, None
+            res = self.players.restore_vitals(sheet["name"], new_hp, status, tally)
+            return {"target": sheet["name"], "hp": res.get("current_hp"), "status": res.get("status")}
+        return {"target": h.get("target"), "hp": None, "note": "no longer in the fight: nothing to restore"}
 
     def status(self) -> Dict[str, Any]:
         """The whole fight, as the combat referee sees it: no story, no plans."""
@@ -626,20 +808,38 @@ def _result(r: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def read_log(campaign_dir: Path) -> List[Dict[str, Any]]:
+    """The log's entries, each with its ``_line`` number; an entry a later `void`
+    struck carries ``voided`` (the reason)."""
     out = []
     try:
-        for line in (Path(campaign_dir) / LOG_NAME).read_text(encoding="utf-8").splitlines():
+        for n, line in enumerate((Path(campaign_dir) / LOG_NAME).read_text(encoding="utf-8").splitlines(), 1):
             try:
-                out.append(json.loads(line))
+                e = json.loads(line)
             except ValueError:
-                pass
+                continue
+            if isinstance(e, dict):
+                e["_line"] = n
+                out.append(e)
     except OSError:
         pass
+    voided = {}
+    for e in out:
+        if e.get("action") == "void":
+            for n in e.get("voids") or []:
+                voided[n] = e.get("reason") or "voided"
+    for e in out:
+        if e["_line"] in voided:
+            e["voided"] = voided[e["_line"]]
     return out
 
 
 def describe_entry(e: Dict[str, Any]) -> str:
     """One log line, for people."""
+    text = _describe(e)
+    return f"✗ VOIDED ({e['voided']}): {text}" if e.get("voided") else text
+
+
+def _describe(e: Dict[str, Any]) -> str:
     at = e.get("at", "")[11:16]
     a = e.get("action")
     def edges():
@@ -673,13 +873,27 @@ def describe_entry(e: Dict[str, Any]) -> str:
         return f"{at} foe locked in: {e['name']} AC {b.get('ac')} HP {b.get('hp')}"
     if a == "hide":
         return f"{at} {e['who']} hides from {e['against']} (passive {e['passive_perception']}): {'hidden' if e['hidden'] else 'seen'}"
-    return f"{at} {a}: " + json.dumps({k: v for k, v in e.items() if k not in ('at', 'kind', 'action')}, ensure_ascii=False)
+    if a == "death-save":
+        t = e.get("tally") or {}
+        result = e.get("result")
+        return (f"{at} {e['who']} death save{res}" + ("" if result in ("success", "failure") else f" → {result}")
+                + (f" ({t.get('successes', 0)}✓ {t.get('failures', 0)}✗)" if t else ""))
+    if a == "stabilize":
+        how = e.get("source") + (f" by {e['by']}" if e.get("by") else "") if e.get("source") else e.get("by")
+        return f"{at} {e['who']} stabilize: {how}" + (f" → {e['roll']}" if e.get("roll") is not None else "") \
+            + f" → {e.get('outcome')}"
+    if a == "void":
+        return f"{at} VOID lines {', '.join(map(str, e.get('voids') or []))}: {e.get('reason')}"
+    return f"{at} {a}: " + json.dumps({k: v for k, v in e.items() if k not in ('at', 'kind', 'action', '_line')},
+                                      ensure_ascii=False)
 
 
 def report(entries: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Per side: how the dice and the edges fell, and how many rolls skipped the referee."""
     sides: Dict[str, Dict[str, Any]] = {}
     for e in entries:
+        if e.get("voided"):
+            continue
         if e.get("kind") == "free":
             s = sides.setdefault("free rolls (GM, outside the referee)", {"rolls": 0})
             s["rolls"] += 1
@@ -758,8 +972,14 @@ def main() -> None:
     p.add_argument("target"); p.add_argument("notation"); p.add_argument("--source", required=True)
     p = sub.add_parser("heal", help="heal <target> <dice|N> --source '...'")
     p.add_argument("target"); p.add_argument("notation"); p.add_argument("--source", required=True)
-    p = sub.add_parser("death-save", help="A flat d20 vs 10 (3 successes stable, 3 failures dead)")
+    p = sub.add_parser("death-save", help="A flat d20 vs 10, recorded on the sheet (nat 20: 1 HP; "
+                                          "nat 1: two failures; 3 successes stable, 3 failures dead)")
     p.add_argument("who")
+    p = sub.add_parser("stabilize", help="stabilize <dying PC> --by <who tends them> (Medicine DC 10) "
+                                         "| --source \"Spare the Dying\" (no roll)")
+    p.add_argument("who"); p.add_argument("--by"); p.add_argument("--source")
+    p = sub.add_parser("void", help="void <line> --reason '...': strike a mistaken ruling and undo its HP")
+    p.add_argument("line", type=int); p.add_argument("--reason", required=True)
     p = sub.add_parser("hide", help="Stealth vs the other side's best passive Perception; success records hidden")
     p.add_argument("who")
     p = sub.add_parser("help", help="help <helper> <who>: advantage on their next roll")
@@ -814,9 +1034,20 @@ def main() -> None:
             print(f"→ {d['target']}: {d['hp']}/{d['hp_max']} HP")
         elif args.cmd == "death-save":
             r = ref.death_save(args.who)
-            nat = r.get("natural")
-            print("→ " + ("natural 20: 1 HP, conscious" if nat == 20 else "natural 1: two failures"
-                          if nat == 1 else "success" if r.get("outcome") == "success" else "failure"))
+            d, nat = r["death"], r.get("natural")
+            t = d.get("death_saves") or {}
+            print("→ " + {"revived": "natural 20: 1 HP, conscious",
+                          "stable": "third success: STABLE (no more death saves)",
+                          "dead": "third failure: DEAD (gm-player.sh / the Death Protocol)"}.get(
+                d["outcome"], ("natural 1: two failures" if nat == 1 else d["outcome"])
+                + f" — {t.get('successes', 0)}✓ {t.get('failures', 0)}✗"))
+        elif args.cmd == "stabilize":
+            out = ref.stabilize(args.who, by=args.by, source=args.source)
+            print(f"→ {args.who} is " + ("STABLE" if out["stable"] else "still dying"))
+        elif args.cmd == "void":
+            out = ref.void(args.line, args.reason)
+            print(f"→ voided line(s) {', '.join(map(str, out['voided']))}"
+                  + "".join(f"; {x['target']} back to {x['hp']} HP" for x in out["restored"] if x.get("hp") is not None))
         elif args.cmd == "hide":
             r = ref.hide(args.who)
             print(f"→ {args.who} is {'HIDDEN' if r.get('outcome') == 'success' else 'not hidden'}")
@@ -840,7 +1071,7 @@ def main() -> None:
             print(json.dumps(ref.status(), ensure_ascii=False, indent=1))
         elif args.cmd == "log":
             for e in read_log(ref.combat.campaign_dir)[-args.last:]:
-                print(describe_entry(e))
+                print(f"#{e['_line']} " + describe_entry(e))
         elif args.cmd == "report":
             for side, s in report(read_log(ref.combat.campaign_dir)).items():
                 print(f"{side}: " + ", ".join(f"{k} {v}" for k, v in s.items()))
