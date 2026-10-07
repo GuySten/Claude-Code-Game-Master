@@ -1189,6 +1189,7 @@ def _unpack_rar(archive: Path, out: Path, patterns: List[str]) -> None:
     (7zz / 7z / 7za, or the program ORCHESTRA_7Z names), unar, or bsdtar (libarchive)."""
     import subprocess
     tried = []
+    out.mkdir(parents=True, exist_ok=True)       # (bsdtar's -C needs its folder: it won't make it)
     for exe in _rar_tools():
         kind = Path(exe).name
         if kind.startswith("unar"):
