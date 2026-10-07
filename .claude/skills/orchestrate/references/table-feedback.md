@@ -508,3 +508,10 @@ whenever the host says how a piece sounded. Their ears are the final judge.
   first: "A is better... but I want more quality"), and the second time the host hears our brass as unclear.
   The crispness measure did not agree this time (VPO -0.51 dB vs ours -0.34): clarity in brass is something
   else (articulation, the section's thickness, the hall) - still to find.
+- **Brass clarity, a ladder** (Oct 2026, "Ode to Joy" with VPO's brass placed in our hall, one change per clip):
+  the base, the tune lifted +4 dB (the lead lift our arrangements always apply - the blind brass tests had
+  left it out on both sides, so the trombones sat ~4 dB over the tune in its own band), a solo horn (VSCO2 CE's
+  F horn, CC0) on the tune, and solo horn + the brass's hall send -6 dB + the lift: "6b is the best", with "maybe
+  my headphones are partly to blame" - the same clip measures clearest (the sharpest note changes, -5.0 dB
+  dips against -3.1, and the tune no longer buried), so the choice holds beyond one pair of headphones. A
+  tune that must cut through goes to a solo horn, not the section; brass takes less hall than strings.
