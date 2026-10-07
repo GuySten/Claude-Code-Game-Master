@@ -199,7 +199,8 @@ def test_a_loop_has_no_seam(tmp_path):
     x, rate = A.render(spec(loop=True, length=16))
     assert x.shape[1] == 2
     rms = lambda s: float(np.sqrt((s ** 2).mean()))           # noqa: E731
-    assert abs(20 * np.log10(rms(x[-rate // 4:]) / rms(x[:rate // 4]))) < 6
+    assert abs(20 * np.log10(rms(x[-rate // 4:]) / rms(x[:rate // 4]))) < 6.5   # (6.0 dB; 5.8 before the
+                                                     # brass went drier, BRASS_DRY_DB: less hall rings over the seam)
     assert float(np.abs(x[0] - x[-1]).max()) < 0.1
     out = music_compose.write(x, rate, tmp_path / "loop.ogg")
     assert out.stat().st_size > 1000
@@ -218,16 +219,30 @@ def test_the_critic_reads_a_score_for_what_a_listener_would_notice():
     assert not [m for lv, m in found if lv == "error"]
     # out of range, quick notes on a slow instrument with no quick doubling, a buried tune
     bad = spec(lines=[{"part": "horns", "notes": [[0, "C2", 2]]},
-                      {"part": "violins2", "notes": [[float(i) / 2, "C5", 0.25] for i in range(16)]}],
+                      {"part": "tremolo", "notes": [[float(i) / 2, "C5", 0.25] for i in range(16)]}],
                chords=[[0, 40, "I"]], dynamics=[[0, 90]])
     found = A.check(bad, listen=False)
     text = " | ".join(f"{lv}: {m}" for lv, m in found)
     assert "error: horns: 1 note(s) out of its range" in text
-    assert "warn: violins2: 15 of 16 notes are shorter than it takes to speak" in text   # (the horn doubles one)
+    assert "warn: tremolo: 15 of 16 notes are shorter than it takes to speak" in text   # (the horn doubles one)
     assert "only move 0 velocity points" in text and "one chord holds" in text
     # a quick instrument doubling the same notes takes the warning away
     doubled = dict(bad, lines=bad["lines"] + [{"part": "clarinets", "notes": [[float(i) / 2, "C4", 0.25] for i in range(16)]}])
-    assert not any("violins2" in m for _, m in A.check(doubled, listen=False))
+    assert not any("tremolo" in m for _, m in A.check(doubled, listen=False))
+
+
+def test_quick_string_notes_play_their_short_recordings_and_need_no_double():
+    # 0.19 s notes (a quarter of a beat at 80): under SHORT_S - the short-note recordings, which
+    # speak at once; 0.375 s ones (half a beat): too long for those, too short for the sustained
+    quick = spec(lines=[{"part": "violins2", "notes": [[float(i) / 2, "C5", 0.25] for i in range(16)]}],
+                 chords=[[0, 40, "I"]])
+    assert 0.25 * 60 / 80 < orchestra.SHORT_S
+    assert not any(m.startswith("violins2:") for _, m in A.check(quick, listen=False))
+    middling = spec(lines=[{"part": "violins2", "notes": [[float(i), "C5", 0.5] for i in range(16)]}],
+                    chords=[[0, 40, "I"]])
+    text = " | ".join(m for _, m in A.check(middling, listen=False))
+    assert "violins2: 16 of 16 notes are shorter than it takes to speak" in text
+    assert f"under {orchestra.SHORT_S:.2f}s" in text
 
 
 def test_the_critic_hears_a_buried_tune(tmp_path):
@@ -388,7 +403,7 @@ def test_fix_moves_notes_into_range_and_doubles_quick_notes_on_slow_strings():
             "harmony": [{"part": "basses", "from": 0, "to": 16, "play": "root", "range": ["C1", "C2"]}],
             "lines": [{"part": "trumpets", "notes": [[0, "D7", 2], [2, "A6", 2]]},          # all too high: one shift
                       {"part": "bells", "notes": [[0, "C2", 4], [4, "C4", 4]]},             # one note too low
-                      {"part": "violins", "notes": [[i * 0.25, "D5", 0.25] for i in range(32)]}],
+                      {"part": "violins", "notes": [[i * 0.75, "D5", 0.75] for i in range(20)]}],   # (0.375 s)
             "patterns": [{"part": "timpani", "note": "D1", "from": 0, "to": 8, "pattern": "x"}]}
     fixed, changes = arrangement.fix(spec, listen=False)
     assert not [m for lv, m in arrangement.check(fixed, listen=False) if lv == "error"]

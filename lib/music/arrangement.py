@@ -124,7 +124,8 @@ except in "hits" and "rolls", where it is the velocity itself (1-127).
 }                        # a "melody" entry's "gain" adds to it, a "lines" entry's sets its own
 
 Choir (and organ, strings) voices take over a second to bloom: give them notes of a
-beat or longer, held chords, not quick rhythms; let brass and drums carry those.
+beat or longer, held chords, not quick rhythms; let brass and drums carry those. (The
+string sections are different: see Parts.)
 
 What the tools can make - each sound serves many characters and moods, none is a default:
 - a pulse that never stops: a dance (a waltz "xoo", a habanera), a march, an ostinato,
@@ -137,7 +138,7 @@ What the tools can make - each sound serves many characters and moods, none is a
   open fifths, doom, an ancient power); choir_oo / choir_oh (a soft mixed choir on "oo" or
   "oh": the ethereal, the holy, wonder, a hushed lament); organ; low brass for weight;
 - a written voice: a countermelody, a fanfare (trumpets, horns), an answering second
-  voice, a lone solo (solo_violin, oboe, english_horn, flute), a run - "lines";
+  voice, a lone solo (solo_violin, oboe, english_horn, flute, horn_solo), a run - "lines";
 - bells tolling, a music box (celesta, glockenspiel), a birdlike flute figure;
 - drums of war or urgency (taiko, toms, snare, timpani), a roll into a moment, a sudden
   loud hit or dissonant chord after quiet ("hits", a loud chord in "lines"), a reverse
@@ -153,9 +154,18 @@ What the tools can make - each sound serves many characters and moods, none is a
 
 Parts: violins, violins2, solo_violin (one player: exposed, quick), strings (sustained),
 tremolo, pizzicato, cellos, basses,
-flutes, piccolo, oboe, english_horn, clarinets, bassoons, horns, trumpets,
+flutes, piccolo, oboe, english_horn, clarinets, bassoons, horns, horn_solo, trumpets,
 trombones, tuba, brass, choir, chorus (E2-E6), men_choir (E2-A4; above E4 it sounds like an instrument), choir_oo, choir_oh (A2-D#6), harp, celesta, glockenspiel, bells, organ,
 timpani, taiko, toms, reverse_cymbal, kit (bd, snare, cymbals): as many as wanted.
+Short string notes are automatic: a note on violins, violins2, cellos or basses shorter than
+0.3 s (orchestra.SHORT_S) plays from real staccato/spiccato recordings, which speak at once (a
+crisp stroke, as loud as a held note at the same velocity); longer notes play the sustained
+strings, as before. Write quick string figures as they are - no pizzicato double to make them
+heard (pizzicato is a colour of its own, played as it is). A note of 0.3 s up to the time its
+sustained recording takes to speak is the one to avoid: shorter (a lower "legato") or held.
+horns and trombones are real sections (Virtual Playing Orchestra's); horn_solo is one real
+horn (F2-F5): the voice for a tune that must cut through - a horn call, a hero's line over
+the band - clearer than the section. The brass sits drier than the strings (less hall).
 Real percussion (struck, let ring): gong (a big tam-tam, ~25 s ring: transformations and
 the biggest arrivals); anvil and brake_drum (metal hits, sparingly: a forge, a machine);
 bass_drum (the orchestral one: weight under a tutti or a march).
@@ -811,7 +821,7 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
     # A falling bend on brass or low reeds is a raspberry: the host, on a corrupted
     # champion's boss fight whose trumpet stabs fell a fifth and whose trombone call slid
     # down: "it sounds like he farts". And a slide bends the whole part, chords and all.
-    blown = {"trumpets", "trombones", "tuba", "horns", "brass", "bassoons"}
+    blown = {"trumpets", "trombones", "tuba", "horns", "horn_solo", "brass", "bassoons"}
     chorded = {h.get("part") for h in spec.get("harmony", [])}
     for line in spec.get("lines", []):
         bent = [n for n in line.get("notes", []) if len(n) > 4 and isinstance(n[-1], dict) and n[-1].get("slide")]
@@ -834,8 +844,11 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
     by_part: Dict[str, list] = {}
     for name, got in notes.items():
         by_part.setdefault(name.partition(":")[0], []).extend(got)
-    quick = {(round(a, 3), k % 12) for part, got in by_part.items() if part not in orchestra.SPEAKS
-             or orchestra.SPEAKS[part] < 0.1 for a, _, k in got}           # (a quick attack doubling it)
+    def snappy(part: str, a: float, b: float) -> bool:        # speaks at once: a quick instrument, or
+        return (part not in orchestra.SPEAKS or orchestra.SPEAKS[part] < 0.1    # a string part's short
+                or (part in orchestra.STRINGS_SHORT and b - a < orchestra.SHORT_S))   # note (its own recordings)
+    quick = {(round(a, 3), k % 12) for part, got in by_part.items()
+             for a, b, k in got if snappy(part, a, b)}                  # (a quick attack doubling it)
     for part, got in by_part.items():
         lo, hi = orchestra.RANGES.get(part, (0, 127))
         bad = [k for _, _, k in got if not lo <= k <= hi]
@@ -844,8 +857,16 @@ def check(spec: Dict[str, Any], listen: bool = True) -> List[Tuple[str, str]]:
                          f"e.g. {name_of(bad[0])}")
         speak = orchestra.SPEAKS.get(part)
         if speak:
-            short = [(a, b) for a, b, k in got if b - a < 1.5 * speak and (round(a, 3), k % 12) not in quick]
-            if short and len(short) >= 0.25 * len(got):
+            # (a string part's notes under SHORT_S play from its short-note recordings: they speak at once)
+            stroke = orchestra.SHORT_S if part in orchestra.STRINGS_SHORT else 0.0
+            short = [(a, b) for a, b, k in got if stroke <= b - a < 1.5 * speak and (round(a, 3), k % 12) not in quick]
+            if short and len(short) >= 0.25 * len(got) and stroke:
+                add("warn", f"{part}: {len(short)} of {len(got)} notes are shorter than it takes to speak "
+                            f"({1.5 * speak:.2f}s) but too long for its short-note recordings (under {stroke:.2f}s: "
+                            f"a crisp stroke that speaks at once): they sound at under half its level, smeared. "
+                            f"Make them shorter than {stroke:.2f}s (a lower \"legato\"), give it held notes, or "
+                            f"double them with a quick instrument")
+            elif short and len(short) >= 0.25 * len(got):
                 add("warn", f"{part}: {len(short)} of {len(got)} notes are shorter than it takes to speak "
                             f"({1.5 * speak:.2f}s): they sound at under half its level, smeared. Double "
                             f"them with a quick instrument (horns, trumpets, flutes, clarinets, bassoons, "

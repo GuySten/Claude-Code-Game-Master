@@ -99,12 +99,17 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
     start (a stage: the body's start): end on a swell, a pickup or a roll into bar 1, not on
     a quiet offbeat. [r] (critic: seam, measured as heard on a repeat - a step means
     write the swell, roll or pickup into the last bar; `dynamics` alone won't do it)
-22. Slow speakers (the bowed strings - violins, violins2, strings, tremolo, cellos; not basses
-    or pizzicato - oboe, english_horn, organ, the choirs) need held notes; a
+22. Slow speakers (strings, tremolo, oboe, english_horn, organ, the choirs) need held notes; a
     quick note of theirs - the tune's too - needs a quick double at the same moment and
     pitch (the critic names one: flutes, clarinets, bassoons, horns, trumpets, pizzicato;
-    `make` adds it to `lines`, you add it to `melody`). A part never restarts a pitch
-    still sounding - a second choir at the peak goes on another choir part. [r] (critic)
+    `make` adds it to `lines`, you add it to `melody`). The string sections are not slow in
+    quick notes: on violins, violins2, cellos and basses a note under 0.3 s plays from real
+    short-note recordings (staccato/spiccato) that speak at once - automatic, in every
+    score; write the figure as it is, with no pizzicato double to make it heard. Their
+    notes from 0.3 s to the time the sustained recording takes to speak (violins 0.75 s,
+    violins2 0.39, cellos 0.36) still smear: shorter (a lower `"legato"`) or held. A part
+    never restarts a pitch still sounding - a second choir at the peak goes on another
+    choir part. [r] [H "strings A is clearly better"] (critic)
 
 ## 3. Recipes (length · form · what must be there)
 - **Theme** (a character, a villain's scenes): short - a first theme about 30-45 s, the
@@ -207,9 +212,14 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
   its top. Velocity changes a sampled note's attack and colour more than its level: the
   growth you hear comes from parts joining and doubling (raising a phrase from 80 to 92
   measured as nothing).
-- Parts: violins, violins2 (also the viola register - there is no viola), strings, tremolo,
-  pizzicato, cellos, basses, flutes, piccolo, oboe, english_horn, clarinets, bassoons,
-  horns, trumpets, trombones, tuba, brass, harp, celesta, glockenspiel, bells, organ,
+- Parts: violins, violins2 (also the viola register - there is no viola; its short notes are
+  real violas), strings, tremolo, pizzicato, cellos, basses - their notes under 0.3 s play real
+  short-note recordings by themselves (crisp, as loud as a held note; no pizzicato double
+  needed); flutes, piccolo, oboe, english_horn, clarinets, bassoons,
+  horns and trombones (real sections), `horn_solo` (one real horn, F2-F5: the voice for a
+  tune that must cut through - a call, a hero's line over the band; it carries a tune more
+  clearly than the section [H "6b is the best"]), trumpets, tuba, brass (the brass sits drier
+  than the strings: less hall), harp, celesta, glockenspiel, bells, organ,
   timpani, solo_violin; voices choir, chorus, men_choir, choir_oo, choir_oh; drums kit,
   taiko, toms, reverse_cymbal (`"patterns"`); real struck percussion, let ring: `gong` (a big
   tam-tam - for transformations and the biggest arrivals; the kit's "gong" is a crash cymbal),
@@ -218,7 +228,7 @@ inference. **(critic)** = `arrangement.py make` checks it: follow the rule and y
   chords ringing / palm-muted chugs, B1-E5) - a surprise held back for a later stage, never a bed
   for every piece; power chords only (root5, root, octaves: a third turns to mud). Ranges: violins G3-E7, violins2 G3-C7, cellos
   C2-E5, basses E1-C4, flutes C4-C7, piccolo D5-C8, oboe A#3-G6, english_horn E3-A5,
-  clarinets D3-G6, bassoons A#1-C5, horns F2-F5, trumpets F#3-A#5, trombones E2-C5, tuba
+  clarinets D3-G6, bassoons A#1-C5, horns and horn_solo F2-F5, trumpets F#3-A#5, trombones E2-C5, tuba
   E1-A#3, timpani D2-G3, men_choir E2-A4, chorus E2-E6, choir_oo/oh A2-D#6 (critic). A
   low root may fall below a part (an F-minor arpeggio on violins2 starts on Ab3 or C4). A
   part plays one job at a time: where cellos carry the tune, the engine's bass moves to

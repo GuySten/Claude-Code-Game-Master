@@ -1,7 +1,61 @@
 """A minimal SoundFont (SF2) writer: presets of key-ranged, looped stereo or mono
-recordings - for building an instrument from recordings (orchestra.fetch_choir)."""
+recordings - for building an instrument from recordings (orchestra.fetch_choir) - and a
+minimal SFZ reader, for the libraries that describe their recordings in one."""
+import re
 import struct
 import numpy as np
+
+_NOTE = {"c": 0, "d": 2, "e": 4, "f": 5, "g": 7, "a": 9, "b": 11}
+
+
+def sfz_key(v) -> int:
+    """An SFZ key: a MIDI number or a name ("c#4", "eb3"; C4 = 60)."""
+    v = str(v).strip().lower()
+    if re.fullmatch(r"-?\d+", v):
+        return int(v)
+    m = re.fullmatch(r"([a-g])(#|b)?(-?\d+)", v)
+    if not m:
+        raise ValueError(f"not an SFZ key: {v!r}")
+    return 12 * (int(m.group(3)) + 1) + _NOTE[m.group(1)] + {"#": 1, "b": -1, None: 0}[m.group(2)]
+
+
+def parse_sfz(text: str):
+    """An SFZ file's regions, each a dict of its opcodes with what it inherits from its
+    <global>, <master> and <group> merged in, and "_default_path" (the <control>'s). Only
+    the text is read - nothing it names is opened (the caller resolves the samples)."""
+    text = re.sub(r"//[^\n]*", "", text)
+    text = "\n".join(line for line in text.splitlines() if not line.strip().startswith("#"))
+    out, scopes = [], {"control": {}, "global": {}, "master": {}, "group": {}}
+    cur, region = None, None
+    for tok in re.split(r"(<\w+>)", text):
+        tok = tok.strip()
+        if not tok:
+            continue
+        m = re.fullmatch(r"<(\w+)>", tok)
+        if m:
+            if region is not None:
+                out.append(region)
+                region = None
+            cur = m.group(1)
+            if cur == "global":
+                scopes["global"], scopes["master"], scopes["group"] = {}, {}, {}
+            elif cur == "master":
+                scopes["master"], scopes["group"] = {}, {}
+            elif cur == "group":
+                scopes["group"] = {}
+            elif cur == "region":
+                region = {**scopes["global"], **scopes["master"], **scopes["group"]}
+                region["_default_path"] = scopes["control"].get("default_path", "")
+            continue
+        ops = {om.group(1): om.group(2).strip()
+               for om in re.finditer(r"(\w+)=(.*?)(?=\s+\w+=|$)", tok, re.S)}
+        if cur == "region" and region is not None:
+            region.update(ops)
+        elif cur in scopes:
+            scopes[cur].update(ops)
+    if region is not None:
+        out.append(region)
+    return [r for r in out if r.get("sample")]
 
 
 def _chunk(tag, body):

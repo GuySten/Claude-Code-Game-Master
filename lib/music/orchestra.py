@@ -3,8 +3,9 @@
 
 The tune comes from lib/music_compose.py's leitmotif (the notes); this arranges it
 (harmony, bass, brass, choir, timpani, cymbals) and plays the arrangement through
-a SoundFont of real instrument recordings (MuseScore_General: free, MIT licensed),
-then puts the orchestra in a concert hall (a convolution reverb). No model, no
+a SoundFont of real instrument recordings (MuseScore_General: free, MIT licensed - and,
+for some parts, libraries of their own, fetched once: lib/music/CREDITS.md), then puts the
+orchestra in a concert hall (a convolution reverb). No model, no
 GPU: seconds on any computer, the same notes every time.
 
   python3 lib/orchestra.py "Kestrel" --class Barbarian --stage 3 --out kestrel.ogg
@@ -67,16 +68,16 @@ SSO = "https://raw.githubusercontent.com/peastman/sso/32bbdb169aef636b8216029a2e
 
 # channel: (bank, preset, pan 0..127, volume 0..127)   (General MIDI numbering)
 PARTS = {
-    "violins": (0, 48, 50, 112),      # Strings Fast: the tune
+    "violins": (0, 48, 50, 112),      # Strings Fast: the tune (a note under SHORT_S: STRINGS_SHORT)
     "flutes": (0, 73, 70, 80),        # an octave above it, when the theme comes home
-    "horns": (0, 60, 74, 118),        # French horns: the tune, an octave below
+    "horns": (0, 0, 74, 118, "brass"),   # the horn section (VPO, Westlund's): the tune, an octave below
     "trumpets": (0, 56, 84, 96),      # the tune, from the climb on
     "strings": (0, 49, 40, 92),       # Strings Slow: the chords
     "tremolo": (0, 44, 46, 84),       # Strings Tremolo: the intro, the climax
     "choir": (0, 52, 64, 90),         # Choir Aahs: the chords, heroic and up
     "cellos": (0, 42, 30, 112),       # the bass line (the ostinato, when it drives)
     "basses": (0, 43, 36, 104),       # Contrabass: an octave under the cellos
-    "trombones": (0, 57, 90, 92),     # root and fifth
+    "trombones": (0, 2, 90, 92, "brass"),  # the trombone section (VPO, No Budget Orchestra's): root and fifth
     "tuba": (0, 58, 80, 96),
     "timpani": (0, 47, 64, 118),
     "kit": (128, 48, 64, 100),        # Orchestra Kit: bass drum, snare, cymbals
@@ -98,6 +99,7 @@ PARTS = {
     "toms": (0, 117, 58, 104),        # Melodic Tom
     "reverse_cymbal": (0, 119, 64, 96),
     "solo_violin": (0, 40, 70, 110),  # one violin, alone: exposed, quick, edgy
+    "horn_solo": (0, 0, 74, 118, "horn_solo"),  # one horn (VSCO 2 CE's F horn): a tune that must cut through
     "men_choir": (0, 0, 60, 100, "chorus"),   # a real men's chorus, "ah": chant, monks, doom
     "chorus": (0, 2, 64, 100, "chorus"),      # the real chorus, men under women, "ah": present, sacred, epic
     "choir_oo": (0, 0, 66, 100, "vowels"),    # a soft mixed choir on "oo": ethereal, holy, wonder
@@ -114,6 +116,7 @@ PARTS = {
 # Where a part's own sound set can't be had: the sound set's choir; for the percussion, the
 # GM kit's nearest (bank, preset, its key): a crash cymbal for the gong, the cowbell, an agogo.
 FALLBACK = {"men_choir": (0, 52), "chorus": (0, 52), "choir_oo": (0, 52), "choir_oh": (0, 52),
+            "horns": (0, 60), "trombones": (0, 57), "horn_solo": (0, 60),   # (the sound set's horns, trombones)
             "gong": (128, 48, 57), "bass_drum": (128, 48, 35), "anvil": (128, 48, 67), "brake_drum": (128, 48, 56),
             "guitar": (0, 30), "guitar_mute": (0, 30)}   # (the GM distortion guitar, through a cabinet)
 DRUMS = {"kit"}
@@ -631,6 +634,512 @@ def fetch_percussion(dest: Path = None, quiet: bool = False) -> Path:
     return dest
 
 
+# --- the real strings' short notes, the real brass ---
+# Recordings the host chose in blind tests over the sound set's (the strings lab, Oct 2026):
+# - short string notes (In the Hall of the Mountain King, "clearly better"): the Sonatina
+#   Symphonic Orchestra's staccato 1st violins and basses, VSCO 2 CE's spiccato violas and
+#   cellos. The sound set's "Strings Fast" takes 0.16 s to come within 9 dB of its level (these:
+#   0.03-0.055 s), so a 0.12-0.2 s note of it sounds 4-12 dB under a long one - smeared;
+# - the horn and trombone sections (Ode to Joy, twice "a tad better"): Mattias Westlund's horn
+#   section, No Budget Orchestra's trombone section;
+# - a solo horn on a tune that must cut through, the brass drier than the strings ("6b is the
+#   best"): VSCO 2 CE's F horn.
+# The recordings as Virtual Playing Orchestra 3 (Paul Battersby) gathers them - trimmed ("-PB"),
+# looped, described by its SFZ files - from a mirror pinned to one commit (FLAC: the same audio
+# as VPO's WAVs, compared sample for sample, but without their loop points, which are kept here:
+# VPO_LOOPS); the F horn from VSCO 2 CE's own SFZ branch, pinned. Each keeps its licence:
+#   Sonatina Symphonic Orchestra (Mattias Westlund): Creative Commons Sampling Plus 1.0;
+#   VSCO 2 Community Edition (Versilian Studios): CC0 1.0 (public domain);
+#   Mattias Westlund's horn section ("Brass 2011-11-07 Horns Sustain"): CC BY-SA 3.0;
+#   No Budget Orchestra (ssj71), the trombones: CC BY-SA 4.0;
+#   VPO's SFZ files and edits: free to use and pass on with credit (virtualplaying.com).
+# The attribution licences ask for credit: lib/music/CREDITS.md. Fetched, never kept in the repo.
+VPO = "https://raw.githubusercontent.com/studiorack/virtual-playing-orchestra/9ab3329bb136834d33dcabb734b76053d5606b83/"
+VSCO2_SFZ = "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/6dd651d55dde97fd4028699be9d4481f26917891/"
+STRINGS_SHORT_SF2 = Path(os.environ.get("ORCHESTRA_STRINGS_SHORT_SF2") or SF2.parent / "strings-short.sf2")
+BRASS_SF2 = Path(os.environ.get("ORCHESTRA_BRASS_SF2") or SF2.parent / "vpo-brass.sf2")
+HORN_SOLO_SF2 = Path(os.environ.get("ORCHESTRA_HORN_SOLO_SF2") or SF2.parent / "horn-solo.sf2")
+
+# A string note shorter than this plays from the short-note recordings, a longer one from the
+# sound set's sustained strings - in every score, nothing to write. Measured (velocity 100, the
+# sound set): a 0.25 s note of its strings peaks 1.7-3.1 dB under its long notes' level, a 0.3 s
+# note 0.3-2.5 dB (0.2 s: 2.8-4.3; 0.15 s: 4.5-8.4 dB), and a 0.3 s note sounds 0.42-0.59 s
+# with its release - as long as a short recording's stroke (0.33-0.6 s). Under 0.3 s the
+# sustained recordings are still speaking when the note ends; from 0.3 s they have spoken, and a
+# stroke would end before a longer note does.
+SHORT_S = 0.3
+# The players' unevenness VPO's SFZ files give their sections (pitch_random=12 cents,
+# amp_random=1.5 dB, delay_random=0.012 s): each note a little off in level and time (the same
+# every render: seeded by the part), and in pitch - the notes take turns on three channels tuned
+# DETUNE apart (the synth can't detune one note of a chord; the spread is VPO's random one's).
+HUMAN_DB, HUMAN_DELAY = 1.5, 0.012
+DETUNE = (-8.0, 0.0, 8.0)       # cents
+
+# The parts with short notes - one section with its long notes: the same pan and volume, hall
+# send, width and position. Each: its SFZ (in VPO); how the stroke ends (a one-shot rings to its
+# end, released "one_shot" s after it starts; else the note's end starts the SFZ's "release");
+# how it is placed, as the lab placed it at our part's width and position - violins and violas
+# stereo, their width and position set after the synth to the long notes' (measured over the
+# part's range, every third semitone: "side", the side signal's gain, and "tilt_db", the left over
+# the right), cellos and basses mono, the two microphones summed (the basses' aligned by
+# "mono_lag" samples: they comb less) and panned where the sound set's mono ones are; how soon it
+# speaks ("speak", to within 9 dB) and is started early ("advance": as the lab timed it, its
+# attacks where the long notes' are heard); and "trim_db": a short note's peak (50 ms) where a
+# long note at the same velocity holds (measured against MuseScore_General's, velocity 100; the
+# same from 40 to 125 - "soft": a soft layer turned down to meet the loud one).
+STRINGS_SHORT = {
+    "violins": {"preset": 0, "sfz": "Strings/1st-violin-SEC-staccato.sfz", "one_shot": 1.0, "release": None,
+                "mono_lag": None, "side": 1.105, "tilt_db": 0.05, "speak": 0.05, "advance": 0.067, "trim_db": -14.17},
+    "violins2": {"preset": 2, "sfz": "Strings/viola-SEC-staccato.sfz", "one_shot": None, "release": 4.0,
+                 "mono_lag": None, "side": 1.661, "tilt_db": 2.17, "speak": 0.04, "advance": 0.057, "trim_db": -17.17},
+    "cellos": {"preset": 4, "sfz": "Strings/cello-SEC-staccato.sfz", "one_shot": None, "release": 2.0,
+               "mono_lag": 0, "speak": 0.055, "advance": 0.072, "trim_db": 0.39,
+               "soft": (62, 3.9)},    # (its soft layer, to velocity 62, 3.9 dB over the loud one where
+                                      # they meet: turned down, so a soft note is as loud as a long one)
+    "basses": {"preset": 6, "sfz": "Strings/bass-SEC-staccato.sfz", "one_shot": None, "release": 2.0,
+               "mono_lag": -58, "speak": 0.055, "advance": 0.072, "trim_db": -12.13},
+}
+for _p, _s in STRINGS_SHORT.items():          # (two round-robins each: played in turn, per key)
+    _s.update({"font": "strings_short", "presets": [[_s["preset"]], [_s["preset"] + 1]], "human": True})
+
+# The parts that play their own recordings (a font of their own) through _sampled_stem: their
+# presets (a list per round-robin, a preset per velocity layer), the velocity crossfade between
+# the layers (VPO's xfin/xfout: equal power), as the lab placed them - one microphone (summing a
+# section's two combs it), at the sound set's position; how soon each speaks (ADVANCE), its hall
+# send (dB: so it ends at the room the sound set's part did - 0.5 s notes, measured after the
+# hall, here: the horns -4.0, where the lab's own player had -5.75; the trombones and the solo
+# horn as the lab's), "trim_db": the same velocity as loud as the sound set's part (measured: Ode
+# to Joy, the tune at velocity 100 - the solo horn against the sound set's horns, as the lab
+# levelled it - and the trombones' chords at 88; the same within 1 dB from velocity 40 to 125).
+OWN = {
+    "horns": {"font": "brass", "presets": [[0, 1]], "xfade": [("in", 75, 127), ("out", 75, 127)],
+              "human": True, "advance": 0.022, "send_db": -4.0, "trim_db": 1.64},
+    "trombones": {"font": "brass", "presets": [[2, 3]], "xfade": [("in", 75, 90), ("out", 75, 90)],
+                  "human": True, "advance": 0.002, "send_db": -2.0, "trim_db": 7.28},
+    "horn_solo": {"font": "horn_solo", "presets": [[0]], "human": False, "advance": 0.025, "send_db": -0.25,
+                  "trim_db": 1.47},
+}
+# The brass sits drier than the strings: its hall send this much under what matches the room
+# ("6b is the best": a solo horn on the tune, the brass's send -6 dB, the tune's lift).
+BRASS_DRY_DB = -6.0
+BRASS_DRY = {"horns", "horn_solo", "trombones", "tuba", "trumpets", "brass"}
+
+# The trombones' ff recordings are 3 dB over their mp ones (against the sound set's trombone at
+# the same velocity): turned down, so a soft chord is as loud, for its velocity, as a loud one
+# (its trim_db is 3 dB more for it).
+BRASS_EVEN_DB = {("trombones", "ff"): 3.0}
+# The brass sections' loops (VPO's WAVs carry them; its FLACs do not): (start, end) inclusive.
+VPO_LOOPS = {
+    "2_A": (64512, 210431), "2_Bb_p": (33318, 121749), "2_F": (62976, 199423), "2_F_p": (35570, 108296),
+    "3_A": (62976, 247551), "3_Ab_p": (37378, 132097), "3_C": (52096, 183538), "3_Eb": (75520, 217343),
+    "3_Eb_p-PB-loop": (36914, 129106), "3_Gb": (52992, 131327), "4_A": (65920, 162303), "4_B_p": (22741, 100877),
+    "4_C": (52736, 167679), "4_Db_p": (34728, 135436), "4_Eb": (83456, 199660), "4_Gb": (94080, 194969),
+    "4_Gb_p": (30245, 111385), "5_C": (84608, 169599),
+    "horns-sus-ff-a#2-PB-loop": (137089, 260752), "horns-sus-ff-a#3-PB-loop": (110759, 200300),
+    "horns-sus-ff-a#4-PB-loop": (91457, 171062), "horns-sus-ff-c#3-PB-loop": (67586, 193763),
+    "horns-sus-ff-c#4-PB-loop": (80072, 161186), "horns-sus-ff-c#5-PB-loop": (51367, 166667),
+    "horns-sus-ff-e2-PB-loop": (43074, 161104), "horns-sus-ff-e3-PB-loop": (80055, 195177),
+    "horns-sus-ff-e4-PB-loop": (33625, 127592), "horns-sus-ff-e5-PB-loop": (30936, 159653),
+    "horns-sus-ff-g2-PB-loop": (92915, 195581), "horns-sus-ff-g3-PB-loop": (31821, 106776),
+    "horns-sus-ff-g4-PB-loop": (47691, 127710), "horns-sus-mp-a#2-PB-loop": (84586, 205719),
+    "horns-sus-mp-a#3-PB-loop": (81487, 204467), "horns-sus-mp-a#4-PB-loop": (18687, 195585),
+    "horns-sus-mp-c#3-PB-loop": (59534, 200560), "horns-sus-mp-c#4-PB-loop": (31591, 161158),
+    "horns-sus-mp-c#5-PB-loop": (25744, 140790), "horns-sus-mp-e2-PB-loop": (65876, 265846),
+    "horns-sus-mp-e3-PB-loop": (17755, 151550), "horns-sus-mp-e4-PB-loop": (52902, 174650),
+    "horns-sus-mp-e5-PB-loop": (40234, 116733), "horns-sus-mp-g2-PB-loop": (34697, 161800),
+    "horns-sus-mp-g3-PB-loop": (77013, 177169), "horns-sus-mp-g4-PB-loop": (32587, 105591),
+}
+_RECORDING_CAP = 24 << 20       # (no recording here is over 5 MB; an SFZ file over 1 MB is not one)
+
+
+def _download(url: str, cap: int) -> bytes:
+    """An untrusted download, read to at most ``cap`` bytes (more: refused, not truncated)."""
+    with urllib.request.urlopen(url, timeout=60) as r:
+        data = r.read(cap + 1)
+    if len(data) > cap:
+        raise OSError(f"{url}: over {cap} bytes - not the recording expected")
+    return data
+
+
+def _library_path(folder: str, sample: str) -> str:
+    """A sample an SFZ names (relative to its folder, Windows separators), as a path inside the
+    library - plain names only: nothing outside the library, no scheme, nothing odd."""
+    import re
+    parts: List[str] = []
+    for p in (folder + "/" + sample.replace("\\", "/")).split("/"):
+        if p in ("", "."):
+            continue
+        if p == "..":
+            if not parts:
+                raise OSError(f"sample {sample!r} is outside the library")
+            parts.pop()
+            continue
+        if not re.fullmatch(r"[A-Za-z0-9 #_.,()+-]+", p) or p.startswith("."):
+            raise OSError(f"sample {sample!r}: not a plain path")
+        parts.append(p)
+    return "/".join(parts)
+
+
+def _recording(base: str, rel: str):
+    """One recording (WAV or FLAC, decoded from memory) -> (float64 (n, 2), rate)."""
+    import io
+    import urllib.parse
+    import numpy as np
+    import soundfile
+    audio, rate = soundfile.read(io.BytesIO(_download(base + urllib.parse.quote(rel), _RECORDING_CAP)),
+                                 dtype="float64", always_2d=True)
+    if not (8000 <= rate <= 192000 and 1 <= audio.shape[1] <= 2 and 0 < len(audio) <= 40 * rate
+            and np.isfinite(audio).all()):
+        raise OSError(f"{rel}: not a recording expected here ({rate} Hz, {audio.shape})")
+    if audio.shape[1] == 1:
+        audio = np.repeat(audio, 2, axis=1)
+    return audio, rate
+
+
+def _sfz(base: str, rel: str) -> List[dict]:
+    """A pinned SFZ file's regions, their samples resolved inside the library ("_rel")."""
+    from music import sf2write
+    regions = sf2write.parse_sfz(_download(base + rel, 1 << 20).decode("utf-8", "replace"))
+    folder = rel.rpartition("/")[0]
+    for r in regions:
+        r["_rel"] = _library_path(folder, r.get("_default_path", "") + r["sample"])
+        if "key" in r:
+            for k in ("lokey", "hikey", "pitch_keycenter"):
+                r.setdefault(k, r["key"])
+    if not regions:
+        raise OSError(f"{rel}: no regions")
+    return regions
+
+
+def _region_audio(r: dict, x, rate: int, vel: int = 100):
+    """A region's recording as its SFZ plays it at ``vel`` (what the synth can't: its volume and
+    pan, its envelope's attack, hold and decay - sfzlite's own arithmetic)."""
+    import numpy as np
+    f = lambda k, d=0.0: float(r.get(k, d))                       # noqa: E731
+    x = x * (10 ** (f("volume") / 20) * f("amplitude", 100) / 100)
+    pan = f("pan") / 100
+    if pan:
+        th = (pan + 1) * math.pi / 4
+        x = x * np.array([math.cos(th), math.sin(th)]) * math.sqrt(2)
+    vf = vel / 127
+    att, hold = f("ampeg_attack"), f("ampeg_hold") + f("ampeg_vel2hold") * vf
+    dec = f("ampeg_decay") + f("ampeg_vel2decay") * vf
+    sus = max(0.0, min(100.0, f("ampeg_sustain", 100))) / 100
+    t = np.arange(len(x)) / rate
+    env = np.ones(len(x))
+    if dec > 0 and sus < 1:
+        env = sus + (1 - sus) * np.exp(-np.maximum(t - att - hold, 0) * 5 / dec)
+    if att > 0:
+        env = np.where(t < att, t / att, env)
+    x = x * env[:, None]
+    if sus <= 0 and dec > 0:                                      # (a stroke: to 60 dB down)
+        x = x[:max(16, int((att + hold + dec * 60 / 43.4) * rate))]
+    return x
+
+
+def _zone(r: dict, audio, rate: int, release_s: float, loop=None, lo=None, hi=None) -> dict:
+    """An SF2 zone (sf2write) for an SFZ region's recording (int16 already)."""
+    from music import sf2write
+    key = sf2write.sfz_key(r.get("pitch_keycenter", r.get("lokey", 60))) - int(float(r.get("transpose", 0)))
+    z = {"audio": audio, "rate": rate, "key": key, "release_s": release_s,
+         "lo": sf2write.sfz_key(r.get("lokey", 0)) if lo is None else lo,
+         "hi": sf2write.sfz_key(r.get("hikey", 127)) if hi is None else hi,
+         "vlo": int(r.get("lovel", 1)) or 1, "vhi": int(r.get("hivel", 127)), "tune": int(round(float(r.get("tune", 0))))}
+    if loop:
+        z.update({"ls": loop[0], "le": loop[1] + 1})
+    else:
+        z.update({"loop": False, "ls": 8, "le": len(audio) - 8})
+    return z
+
+
+def _cover(zones: List[dict], lo: int, hi: int) -> None:
+    """The outermost recordings stretched to cover a part's range (RANGES)."""
+    top, bot = max(z["hi"] for z in zones), min(z["lo"] for z in zones)
+    for z in zones:
+        if z["hi"] == top:
+            z["hi"] = max(top, hi)
+        if z["lo"] == bot:
+            z["lo"] = min(bot, lo)
+
+
+def _scaled(items, peak: float = 0.95):
+    """Float recordings -> int16, all scaled by one gain (their loudest at ``peak``): the levels
+    between them (velocity layers, round-robins) kept."""
+    import numpy as np
+    from music import sf2write
+    top = max(float(np.abs(x).max()) for x in items)
+    return [sf2write.to_int16((x * (peak / top)).astype("float32")) for x in items]
+
+
+def fetch_strings_short(dest: Path = None, quiet: bool = False) -> Path:
+    """The short string notes: VPO's staccato/spiccato SFZs (STRINGS_SHORT) and their 118
+    recordings (13 MB of FLAC, once) built into a SoundFont of eight presets - two round-robins a part
+    (STRINGS_SHORT's "preset" and the next) - each recording as its SFZ plays it (volume, pan,
+    envelope baked in), placed as STRINGS_SHORT says (stereo, or one mono microphone sum)."""
+    dest = dest or STRINGS_SHORT_SF2
+    if dest.is_file() and dest.stat().st_size > 1_000_000:
+        return dest
+    import numpy as np
+    from music import sf2write
+    if not quiet:
+        print("[orchestra] downloading the short string notes (13 MB, once)", file=sys.stderr, flush=True)
+    presets = []
+    for part, s in sorted(STRINGS_SHORT.items(), key=lambda kv: kv[1]["preset"]):
+        rrs: Dict[int, list] = {1: [], 2: []}
+        got = {}
+        for r in _sfz(VPO, s["sfz"]):
+            if r["_rel"] not in got:
+                got[r["_rel"]] = _recording(VPO, r["_rel"])
+            x, rate = got[r["_rel"]]
+            x = _region_audio(r, x, rate)
+            if s["mono_lag"] is not None:                       # one microphone sum, aligned
+                right = np.roll(x[:, 1], s["mono_lag"])
+                if s["mono_lag"] > 0:
+                    right[:s["mono_lag"]] = 0
+                elif s["mono_lag"] < 0:
+                    right[s["mono_lag"]:] = 0
+                x = ((x[:, 0] + right) / 2)[:, None]
+            rrs[int(r.get("seq_position", 1))].append((r, x, rate))
+        flat = [x for rr in rrs.values() for _, x, _ in rr]
+        scaled = iter(_scaled(flat))
+        release = (s["one_shot"] or s["release"]) * 4 / 3   # (the synth's release: 80 dB in its time; SFZ's: 60)
+        for n in sorted(rrs):
+            zones = [_zone(r, next(scaled), rate, release) for r, _, rate in rrs[n]]
+            for z in zones:
+                if s.get("soft") and z["vhi"] <= s["soft"][0]:
+                    z["att_cb"] = round(10 * s["soft"][1])
+            _cover(zones, *RANGES[part])
+            presets.append((f"{part} rr{n}", zones))
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    part_path = dest.with_suffix(".part")
+    sf2write.write(part_path, presets, "Short strings: SSO (CC Sampling Plus 1.0), VSCO 2 CE (CC0), via VPO")
+    part_path.replace(dest)
+    return dest
+
+
+def fetch_brass(dest: Path = None, quiet: bool = False) -> Path:
+    """The brass sections: VPO's horn and trombone SFZs ("normal": the mod wheel at 0) and their
+    44 recordings (15 MB of FLAC, once) built into a SoundFont of four mono presets - 0 horns ff, 1 horns
+    mp, 2 trombones ff, 3 trombones mp (OWN's crossfades blend them by velocity) - each the left
+    microphone (the section's two microphones summed comb, -4 dB dips), as its SFZ plays it; the
+    horns' accent layer (the same recording, 0.15 s held then fading: the attack's bite) a short
+    recording of its own beside it."""
+    dest = dest or BRASS_SF2
+    if dest.is_file() and dest.stat().st_size > 1_000_000:
+        return dest
+    from music import sf2write
+    if not quiet:
+        print("[orchestra] downloading the brass sections (15 MB, once)", file=sys.stderr, flush=True)
+    presets = []
+    for part, rel in (("horns", "Brass/french-horn-SEC-normal-mod-wheel.sfz"),
+                      ("trombones", "Brass/trombone-SEC-normal-mod-wheel.sfz")):
+        layers: Dict[str, list] = {"ff": [], "mp": []}
+        got = {}
+        for r in _sfz(VPO, rel):
+            if r["_rel"] not in got:
+                got[r["_rel"]] = _recording(VPO, r["_rel"])
+            x, rate = got[r["_rel"]]
+            name = Path(r["_rel"]).stem
+            accent = float(r.get("ampeg_sustain", 100)) <= 0
+            if not accent and name not in VPO_LOOPS:
+                raise OSError(f"{rel}: no loop known for {name}")
+            mono = _region_audio(r, x, rate)[:, :1]            # (the left microphone)
+            release = float(r.get("ampeg_release", 0.6)) * 4 / 3
+            layers["ff" if "xfin_lovel" in r else "mp"].append((r, mono, rate, release, None if accent else VPO_LOOPS[name]))
+        scaled = iter(_scaled([x for zs in layers.values() for _, x, _, _, _ in zs]))
+        for lay in ("ff", "mp"):
+            zones = [_zone(r, next(scaled), rate, rel_s, loop) for r, _, rate, rel_s, loop in layers[lay]]
+            if (part, lay) in BRASS_EVEN_DB:
+                for z in zones:
+                    z["att_cb"] = round(10 * BRASS_EVEN_DB[(part, lay)])
+            _cover(zones, *RANGES[part])
+            presets.append((f"{part} {lay}", zones))
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    part_path = dest.with_suffix(".part")
+    sf2write.write(part_path, presets, "Brass: Westlund horns (CC BY-SA 3.0), NBO trombones (CC BY-SA 4.0), via VPO")
+    part_path.replace(dest)
+    return dest
+
+
+def fetch_horn_solo(dest: Path = None, quiet: bool = False) -> Path:
+    """The solo horn: VSCO 2 CE's F horn sustains (its SFZ, 29 recordings with up to four
+    velocity layers, 51 MB, once) built into a one-preset SoundFont, the right microphone (mono:
+    the two comb when summed), each given a long crossfaded loop over its held tone (the
+    recordings, 4-15 s, have none)."""
+    dest = dest or HORN_SOLO_SF2
+    if dest.is_file() and dest.stat().st_size > 1_000_000:
+        return dest
+    import numpy as np
+    from music import sf2write
+    if not quiet:
+        print("[orchestra] downloading the solo horn (51 MB, once)", file=sys.stderr, flush=True)
+    found = []
+    for r in _sfz(VSCO2_SFZ, "FHornSus.sfz"):
+        x, rate = _recording(VSCO2_SFZ, r["_rel"])
+        found.append((r, _region_audio(r, x, rate)[:, 1:2], rate))
+    scaled = _scaled([x for _, x, _ in found])
+    zones = []
+    for (r, x, rate), a in zip(found, scaled):
+        lvl = np.sqrt(np.convolve(a[:, 0].astype("float64") ** 2, np.ones(int(0.05 * rate)) / int(0.05 * rate), "same"))
+        body = lvl[int(0.3 * rate):]
+        held = np.nonzero(body > np.median(body[:max(1, len(body) // 2)]) * 0.5)[0]
+        end = int(0.3 * rate) + (int(held[-1]) if len(held) else len(body) // 2)    # (the tone held, to here)
+        end = max(int(1.2 * rate), min(end, len(a) - int(0.05 * rate)))
+        start = max(int(0.4 * rate), end - int(3.0 * rate))
+        fade = max(0.05, min(0.5, (end - start) / rate / 3))
+        audio, ls, le = sf2write.crossfade_loop(a, rate, start / rate, fade, (len(a) - end) / rate)
+        zones.append({**_zone(r, audio, rate, float(r.get("ampeg_release", 0.7)) * 4 / 3), "ls": ls, "le": le,
+                      "loop": True})
+    _cover(zones, *RANGES["horn_solo"])
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    part_path = dest.with_suffix(".part")
+    sf2write.write(part_path, [("F horn", zones)], "VSCO 2 CE F horn (CC0)")
+    part_path.replace(dest)
+    return dest
+
+
+def _xfade(xf, vel: float) -> float:
+    """A velocity layer's gain (VPO's xfin / xfout, equal power), 1 when it has none."""
+    if xf is None:
+        return 1.0
+    kind, lo, hi = xf
+    if kind == "in":
+        return 0.0 if vel < lo else 1.0 if vel >= hi else math.sqrt((vel - lo) / (hi - lo))
+    return 1.0 if vel <= lo else 0.0 if vel > hi else math.sqrt((hi - vel) / (hi - lo))
+
+
+def _split_short(events: list) -> Tuple[list, list]:
+    """A string part's events -> (its notes shorter than SHORT_S, the rest): each note's on and
+    off together (a note left on is long)."""
+    ons: Dict[int, list] = {}
+    short, long_ = [], []
+    for e in sorted(events, key=lambda e: (e[0], e[1])):
+        t, is_on, _, key, _ = e
+        if is_on == 1:
+            ons.setdefault(key, []).append(e)
+        elif is_on == 0 and ons.get(key):
+            on = ons[key].pop(0)
+            (short if t - on[0] < SHORT_S else long_).extend([on, e])
+        else:
+            long_.append(e)
+    long_ += [e for left in ons.values() for e in left]
+    return short, long_
+
+
+def _sampled_stem(syn, font: int, part: str, how: dict, events: list, total: int, rate: int):
+    """A part from its own recordings (STRINGS_SHORT, OWN) -> (first sample, stereo stem): each
+    note on a channel of its round-robin (per key, in turn) and velocity layer (crossfaded), the
+    players' unevenness (HUMAN_*: a channel detuned, a level, a few ms) when ``how`` asks, a
+    one-shot let ring; at the sound set's part's pan and volume, so it stands where that did."""
+    import zlib
+    import numpy as np
+    pan, vol = PARTS[part][2], PARTS[part][3]
+    rr_sets = how["presets"]
+    layers = how.get("xfade") or [None] * len(rr_sets[0])
+    human = how.get("human", False)
+    dets = DETUNE if human else (0.0,)
+    chans = {}
+    for r in range(len(rr_sets)):
+        for lay in range(len(layers)):
+            for d in range(len(dets)):
+                chans[(r, lay, d)] = len(chans)
+    bends = [(t, vel) for t, is_on, _, _, vel in events if is_on == 2]
+    for (r, lay, d), ch in chans.items():
+        syn.program_select(ch, font, 0, rr_sets[r][lay])
+        syn.control_change(ch, 7, vol)
+        syn.control_change(ch, 10, pan)
+        syn.set_tuning(ch, dets[d] / 100)
+        if bends:
+            syn.pitchbend_range(ch, 12)
+            syn.pitchbend(ch, 8192)
+    ons: Dict[int, list] = {}
+    notes = []
+    for t, is_on, _, key, vel in sorted(events, key=lambda e: (e[0], e[1])):
+        if is_on == 1:
+            ons.setdefault(key, []).append((t, vel))
+        elif is_on == 0 and ons.get(key):
+            t0, v = ons[key].pop(0)
+            notes.append((t0, t, key, v))
+    notes += [(t0, total / rate, key, v) for key, left in ons.items() for t0, v in left]
+    notes.sort()
+    if not notes:
+        return total, np.zeros((0, 2), dtype="float32")
+    rng = np.random.default_rng(zlib.crc32(part.encode()))      # (the same unevenness every time)
+    turn: Dict[int, int] = {}
+    ev = []
+    for i, (t0, t1, key, vel) in enumerate(notes):
+        r = turn.get(key, 0) % len(rr_sets)
+        turn[key] = turn.get(key, 0) + 1
+        late = float(rng.uniform(0, HUMAN_DELAY)) if human else 0.0
+        amp = 10 ** (-float(rng.uniform(0, HUMAN_DB)) / 20) if human else 1.0
+        off = t0 + how["one_shot"] if how.get("one_shot") else t1
+        for lay, xf in enumerate(layers):
+            v = int(round(vel * amp * _xfade(xf, vel)))
+            if v < 1:
+                continue
+            ch = chans[(r, lay, i % len(dets))]
+            ev.append((t0 + late, 1, ch, key, min(127, v)))
+            ev.append((off + late, 0, ch, key, 0))
+    ev += [(t, 2, None, 0, sem) for t, sem in bends]
+    ev.sort(key=lambda e: (e[0], e[1]))
+    first = min(total, int(ev[0][0] * rate))
+    chunks, pos = [], first
+    for t, kind, ch, key, vel in ev:
+        at = min(total, int(t * rate))
+        if at > pos:
+            chunks.append(np.frombuffer(syn.generate(at - pos), dtype="float32"))
+            pos = at
+        if kind == 2:
+            for c in chans.values():
+                syn.pitchbend(c, int(max(0, min(16383, 8192 + vel / 12 * 8191))))
+        elif kind == 1:
+            syn.noteon(ch, key, vel)
+        else:
+            syn.noteoff(ch, key)
+    step = max(1, rate // 4)
+    while pos < total:                                      # ring out, then stop: silence
+        piece = np.frombuffer(syn.generate(min(step, total - pos)), dtype="float32")
+        chunks.append(piece)
+        pos += len(piece) // 2
+        if float(np.abs(piece).max(initial=0.0)) < 1e-6:
+            break
+    for c in chans.values():
+        syn.sounds_off(c)
+        syn.set_tuning(c, 0.0)
+        if bends:
+            syn.pitchbend(c, 8192)
+    syn.generate(256)
+    stem = np.concatenate(chunks).reshape(-1, 2) if chunks else np.zeros((0, 2), dtype="float32")
+    side, tilt = how.get("side", 1.0), how.get("tilt_db", 0.0)
+    if (side != 1.0 or tilt) and len(stem):                 # (its width: the side signal's gain;
+        mid, sd = (stem[:, 0] + stem[:, 1]) / 2, (stem[:, 0] - stem[:, 1]) / 2 * np.float32(side)
+        r = 10 ** (tilt / 10)                               # its position: left over right, dB)
+        gr = math.sqrt(2 / (1 + r))
+        stem = np.stack([(mid + sd) * np.float32(math.sqrt(2 - gr * gr)), (mid - sd) * np.float32(gr)], axis=1)
+    return first, (stem * np.float32(10 ** (how.get("trim_db", 0.0) / 20))).astype("float32")
+
+
+def _plays_own(part: str, fonts: dict) -> bool:
+    """Whether a part plays its own recordings here (OWN: their font loaded), not the stand-in."""
+    return part in OWN and fonts.get(OWN[part]["font"]) is not None
+
+
+def part_send_db(part: str, own: bool = False) -> float:
+    """A part's hall send (dB): matched to the room its recording carries (ROOM; its own
+    recordings: OWN's), the brass's BRASS_DRY_DB under that."""
+    base = OWN[part]["send_db"] if own and part in OWN else send_db(ROOM.get(part))
+    return base + (BRASS_DRY_DB if part in BRASS_DRY else 0.0)
+
+
+def part_advance(part: str, short: bool = False, own: bool = False) -> float:
+    """How early a part's notes start (ADVANCE): its short notes' and its own recordings' own."""
+    if short and part in STRINGS_SHORT:
+        return STRINGS_SHORT[part]["advance"]
+    if own and part in OWN:
+        return OWN[part]["advance"]
+    return ADVANCE.get(part, 0.0)
+
+
 # --- the electric guitar ---
 GUITAR = {"guitar": 0, "guitar_mute": 1}        # its parts: the articulation (0 sustain, 1 palm mute)
 GUITAR_TAKES = 3        # takes (round-robins) kept a note, each a stereo pair: its left and right
@@ -960,7 +1469,8 @@ def _guitar_stem(syn, sfid, fonts, events: list, total: int, rate: int):
 
 
 EXTRA_FONTS = {"chorus": fetch_choir, "vowels": fetch_vowels, "perc": fetch_percussion,
-               "guitar": fetch_guitar}
+               "guitar": fetch_guitar, "strings_short": fetch_strings_short, "brass": fetch_brass,
+               "horn_solo": fetch_horn_solo}
 
 
 def available() -> bool:
@@ -982,7 +1492,7 @@ LOUDNESS = {
     "organ": -2.6, "toms": -2.6, "violins": -0.8, "bells": 0.0, "basses": 0.0, "kit": 0.2,
     "harp": 0.2, "oboe": 0.4, "bassoons": 1.9, "english_horn": 2.7, "reverse_cymbal": 5.4,
     "taiko": 5.5, "trumpets": 5.7, "brass": 6.6, "timpani": 6.9, "tuba": 8.2, "cellos": 8.6,
-    "trombones": 9.7, "horns": 11.8, "solo_violin": 2.9, "men_choir": 5.5, "chorus": 5.6, "choir_oo": 11.5, "choir_oh": 11.6,
+    "trombones": 9.7, "horns": 11.8, "horn_solo": 11.8, "solo_violin": 2.9, "men_choir": 5.5, "chorus": 5.6, "choir_oo": 11.5, "choir_oh": 11.6,
     # the real percussion (perc.sf2), set so a mf stroke (velocity 80) peaks (400 ms) like the
     # kit's: the gong like its crash "gong", the bass drum like its bass drum, the anvil and
     # the brake drum like its snare
@@ -991,15 +1501,19 @@ LOUDNESS = {
     # a distorted guitar is dense (its peaks barely over its body): heard well there
     "guitar": 0.0, "guitar_mute": 0.0,
 }
+# (The parts that play their own recordings - OWN, STRINGS_SHORT's short notes - are evened out
+# to these, the sound set's, by their "trim_db": the same velocity, the same loudness.)
 # How long each instrument's recording takes to speak (seconds to half its level), and
-# where it plays (MIDI, its practical range): for the score critic (arrangement.check).
+# where it plays (MIDI, its practical range): for the score critic (arrangement.check). A string
+# part's notes under SHORT_S play from the short-note recordings, which speak at once
+# (STRINGS_SHORT's "speak": 0.04-0.055 s): only its longer notes take SPEAKS to speak.
 SPEAKS = {"choir": 0.18, "men_choir": 0.1, "chorus": 0.1, "choir_oo": 0.05, "choir_oh": 0.08, "strings": 0.48, "violins": 0.50, "violins2": 0.26, "english_horn": 0.42,
           "cellos": 0.24, "tremolo": 0.16, "organ": 0.10, "oboe": 0.12, "brass": 0.08, "horns": 0.06}
 RANGES = {
     "violins": (55, 100), "violins2": (55, 96), "strings": (36, 96), "tremolo": (36, 96),
     "pizzicato": (28, 96), "cellos": (36, 76), "basses": (28, 60), "flutes": (60, 96),
     "piccolo": (74, 108), "oboe": (58, 91), "english_horn": (52, 81), "clarinets": (50, 91),
-    "bassoons": (34, 72), "horns": (41, 77), "trumpets": (54, 82), "trombones": (40, 72),
+    "bassoons": (34, 72), "horns": (41, 77), "horn_solo": (41, 77), "trumpets": (54, 82), "trombones": (40, 72),
     "tuba": (28, 58), "brass": (36, 84), "choir": (40, 81), "harp": (24, 103),
     "celesta": (60, 108), "glockenspiel": (79, 108), "bells": (60, 77), "organ": (24, 96),
     "timpani": (38, 55), "solo_violin": (55, 100), "men_choir": (40, 69), "chorus": (40, 88), "choir_oo": (45, 87), "choir_oh": (45, 87),
@@ -1016,7 +1530,8 @@ RANGES = {
 # clarinet were ~150 ms behind it). The reverse cymbal is written to swell into the
 # beat; the string pad, which holds chords, is moved at most 250 ms. The host, on a
 # tune they knew (Ode to Joy): "clearly better". (Another sound set's instruments need
-# their own measurement.)
+# their own measurement: the short string notes' and the parts' own recordings' are
+# STRINGS_SHORT's and OWN's "advance" - part_advance.)
 ADVANCE = {"violins": 0.15, "violins2": 0.18, "cellos": 0.09, "tremolo": 0.115, "choir": 0.13, "men_choir": 0.06, "chorus": 0.06, "choir_oo": 0.02, "choir_oh": 0.06,
            "strings": 0.25, "trombones": 0.02, "organ": 0.015, "flutes": 0.012, "piccolo": 0.01,
            "solo_violin": 0.032}
@@ -1027,13 +1542,15 @@ ADVANCE = {"violins": 0.15, "violins2": 0.18, "cellos": 0.09, "tremolo": 0.115, 
 # one; each part is sent to it just enough to end at that same room, so the orchestra
 # sounds like one place (the host heard recordings with their own room as a different
 # acoustic: "the difference is mainly in the acoustics").
-ROOM = {"flutes": -20.8, "horns": -17.5, "trumpets": -39.3, "trombones": -25.5, "tuba": -25.6,
+ROOM = {"flutes": -20.8, "horns": -17.5, "horn_solo": -17.5, "trumpets": -39.3, "trombones": -25.5, "tuba": -25.6,
         "piccolo": -22.3, "oboe": -24.1, "english_horn": -34.2, "clarinets": -33.4, "bassoons": -25.6,
         "brass": -20.9, "organ": -15.4, "pizzicato": -24.9, "taiko": -20.9, "toms": -28.9,
         # the guitar: close-miked in a small room of its own (_studio_room), sent to the hall
         # only a little (-12 dB) - a rhythm guitar is heard dry, in front, not across a hall
         "guitar": HALL_ROOM_GUITAR}
 HALL_ROOM = -12.8
+# (A part playing its own recordings is sent as OWN says; the brass BRASS_DRY_DB drier:
+# part_send_db.)
 
 
 def send_db(room: Optional[float]) -> float:
@@ -1045,7 +1562,7 @@ def send_db(room: Optional[float]) -> float:
 
 
 BALANCE = {
-    "horns": 2, "trumpets": 3, "trombones": 2, "brass": 3, "violins": 1, "strings": -3,
+    "horns": 2, "horn_solo": 2, "trumpets": 3, "trombones": 2, "brass": 3, "violins": 1, "strings": -3,
     "tremolo": -2, "choir": 3, "men_choir": 3, "chorus": 3, "choir_oo": 3, "choir_oh": 3, "timpani": 2, "taiko": 3, "glockenspiel": -2, "piccolo": -2,
     "reverse_cymbal": -2,
 }
@@ -1090,19 +1607,26 @@ def _synth(rate: int, sf2: Path, need=()):
                 fonts[font] = syn.sfload(str(EXTRA_FONTS[font](quiet=True)))
             except Exception as e:                              # offline: the sound set's stand-in
                 instead = ("the GM distortion guitar plays it, through a cabinet (orchestra.fetch_guitar "
-                           "builds the real one)" if font == "guitar" else "the sound set's stand-in plays")
+                           "builds the real one)" if font == "guitar" else
+                           "the sound set's sustained strings play the short notes too" if font == "strings_short"
+                           else "the sound set's stand-in plays")
                 print(f"[orchestra] no {font} ({e}): {instead}", file=sys.stderr)
     return syn, sfid, fonts
 
 
-def _stem(syn, sfid, fonts, name: str, events: list, total: int, rate: int):
+def _stem(syn, sfid, fonts, name: str, events: list, total: int, rate: int, short: bool = False):
     """One part (or one layer of one) played alone -> (first sample, stereo float32 stem
     from there): nothing is played before its first note or after its last note has rung
-    out (most parts are silent most of a piece)."""
+    out (most parts are silent most of a piece). ``short``: a string part's short notes, from
+    their own recordings (STRINGS_SHORT)."""
     import numpy as np
     part = name.partition(":")[0]
     if part in GUITAR:                                      # (the guitar: its own player, an amp)
         return _guitar_stem(syn, sfid, fonts, events, total, rate)
+    if short:
+        return _sampled_stem(syn, fonts["strings_short"], part, STRINGS_SHORT[part], events, total, rate)
+    if _plays_own(part, fonts):
+        return _sampled_stem(syn, fonts[OWN[part]["font"]], part, OWN[part], events, total, rate)
     bank, preset, pan, vol = PARTS[part][:4]
     font, drum, stand_in, own = sfid, part in DRUMS, None, False
     if len(PARTS[part]) > 4:
@@ -1179,22 +1703,34 @@ def play_layers(score: Score, seconds: float, layer_of, sf2: Path = SF2, rate: i
         groups.setdefault("guitar" + colon + layer if part in GUITAR else e[2], []).append(e)
     keys: List = []
     jobs = []
+    wanted = {name: layer_of(name) for name in groups}
+    need = set()
+    for name, k in wanted.items():
+        part = name.partition(":")[0]
+        if k is not None and len(PARTS[part]) > 4:
+            need.add(PARTS[part][4])
+        if k is not None and part in STRINGS_SHORT:
+            need.add("strings_short")
+    syn, sfid, fonts = _synth(rate, sf2, sorted(need))
     for name, events in groups.items():
-        k = layer_of(name)
+        k = wanted[name]
         if k is None:
             continue
         if k not in keys:
             keys.append(k)
         part = name.partition(":")[0]
         bends = [(t, 2, name, 0, sem) for t, p, sem in getattr(score, "bends", []) if p == part]
-        events = list(events) + bends                        # (2: a bend, its semitones as "vel")
-        early = ADVANCE.get(part, 0.0) if align else 0.0
-        if early:                                           # (heard on the beat: see ADVANCE)
-            events = [(max(0.0, t - early), *rest) for t, *rest in events]
-        jobs.append((name, keys.index(k), events))
+        arts = [(False, events)]
+        if part in STRINGS_SHORT and fonts.get("strings_short") is not None:
+            short, long_ = _split_short(events)             # (a short note: its own recordings)
+            arts = [(s, ev) for s, ev in ((True, short), (False, long_)) if ev]
+        for short, evs in arts:
+            evs = list(evs) + bends                         # (2: a bend, its semitones as "vel")
+            early = part_advance(part, short, _plays_own(part, fonts)) if align else 0.0
+            if early:                                       # (heard on the beat: see ADVANCE)
+                evs = [(max(0.0, t - early), *rest) for t, *rest in evs]
+            jobs.append((name, keys.index(k), evs, short))
     total = int((seconds + 0.5) * rate)
-    need = {PARTS[n.partition(":")[0]][4] for n, _, _ in jobs if len(PARTS[n.partition(":")[0]]) > 4}
-    syn, sfid, fonts = _synth(rate, sf2, sorted(need))
     lanes = 2 if send else 1
     w = _workers(len(jobs))
     shape = (w, len(keys), lanes, total, 2)
@@ -1203,8 +1739,8 @@ def play_layers(score: Score, seconds: float, layer_of, sf2: Path = SF2, rate: i
     acc = np.frombuffer(buf, dtype="float32", count=int(np.prod(shape))).reshape(shape)
 
     def run(slot: int, mine) -> None:
-        for name, k, events in mine:
-            first, stem = _stem(syn, sfid, fonts, name, events, total, rate)
+        for name, k, events, short in mine:
+            first, stem = _stem(syn, sfid, fonts, name, events, total, rate, short)
             if not len(stem):
                 continue
             part, _, layer = name.partition(":")
@@ -1212,7 +1748,8 @@ def play_layers(score: Score, seconds: float, layer_of, sf2: Path = SF2, rate: i
             span = slice(first, first + len(stem))
             acc[slot, k, 0, span] += stem * np.float32(10 ** (gain / 20))
             if send:
-                acc[slot, k, 1, span] += stem * np.float32(10 ** ((gain + send_db(ROOM.get(part))) / 20))
+                hall_db = part_send_db(part, _plays_own(part, fonts))
+                acc[slot, k, 1, span] += stem * np.float32(10 ** ((gain + hall_db) / 20))
 
     if w == 1:
         run(0, jobs)
