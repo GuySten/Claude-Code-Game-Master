@@ -2625,7 +2625,10 @@
   // New narration appears a few words at a time — in step with the voice when
   // it's read aloud — and one beat at a time. Tap it to see the rest at once.
   const reveals = [];                  // oldest first; only the first one is moving
-  const REVEAL_CPS = 45;               // characters per second, when not read aloud
+  // Characters per second, when not read aloud: reading pace, not faster. Adults read fiction
+  // silently at about 260 words a minute (Brysbaert 2019), ~4.3 words or ~22 characters a
+  // second; 45 ran ahead of the players (the host: "too fast"). A tap shows it all.
+  const REVEAL_CPS = 22;
   let revealTimer = null, revealLast = 0;
   function revealedText(r) { return r.nodes.map((x) => x.node.data).join(""); }
   function startReveal(m, el) {
