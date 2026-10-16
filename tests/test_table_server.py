@@ -1873,8 +1873,15 @@ def test_a_hebrew_name_inside_another_word_is_not_that_name():
     import table_server
     f = table_server.fold_name
     assert not table_server.name_in(f("ספי"), f("זה הספיק."))       # Sefi is not "was enough"
-    assert table_server.name_in(f("ספי"), f("ולספי יש מפתח"))        # prefixes are fine
-    assert table_server.name_in(f("קסטרל"), f("לקֶסְטְרֶל נשארו"))
+    assert table_server.name_in(f("ספי"), "ולְסֶפִי יש מפתח")         # prefixes are fine on a pointed name
+    assert table_server.name_in(f("ספי"), "ספי שותק")                # and no prefix needs no points
+    assert table_server.name_in(f("קסטרל"), "לקֶסְטְרֶל נשארו")
+    assert table_server.name_in(f("קסטרל"), "לקסטרל נשארו")          # a long name, prefixed and unpointed
+    # A short name after a prefix, unpointed, is an ordinary word (the host: "בן שמונה" showed Wenna)
+    assert not table_server.name_in(f("ונה"), "הוא בן שמונה")
+    assert not table_server.name_in(f("ונה"), "זה שונה")
+    assert not table_server.name_in(f("ספי"), "אין לו כספי")
+    assert table_server.name_in(f("ונה"), "ולוֶנָּה אין קול")
     assert not table_server.name_in(f("קסטרל"), f("קסטרלים"))
     assert table_server.name_in("hane", "hane smiled") and not table_server.name_in("hane", "chane")
 

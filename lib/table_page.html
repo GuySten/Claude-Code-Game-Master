@@ -3148,6 +3148,10 @@
       const frag = document.createDocumentFragment();
       let last = 0, mm;
       while ((mm = loreRe.exec(text))) {
+        // A short Hebrew name after a prefix counts only when pointed (לוֶנָּה): unpointed,
+        // it's usually an ordinary word (שמונה is not ש+מ+ונה, כספי is not כ+ספי).
+        if (mm.index > 0 && /[א-ת֑-ׇ]/.test(text[mm.index - 1]) &&
+            unpointed(mm[0]).length <= 3 && mm[0] === unpointed(mm[0])) continue;
         if (mm.index > last) frag.appendChild(document.createTextNode(text.slice(last, mm.index)));
         const span = document.createElement("span");
         span.className = "lore"; span.textContent = mm[0]; span.dataset.term = unpointed(mm[0]);

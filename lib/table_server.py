@@ -95,17 +95,27 @@ def fold_name(s: str) -> str:
 _HEB = re.compile("[\u05d0-\u05ea]")
 
 
+_POINTS = "[֑-ׇֽֿׁׂׅׄ]*"
+
+
 def name_in(form: str, text: str) -> bool:
-    """Does folded ``text`` mention the folded name ``form`` as a word? A Hebrew
-    name may carry up to two one-letter prefixes (ולספי) but must end the word
-    (ספי is not in הספיק); any other name is matched as a whole word."""
+    """Does ``text`` (pointed or not) mention the folded name ``form`` as a word? A
+    Hebrew name may carry up to two one-letter prefixes (ולספי) but must end the
+    word (ספי is not in הספיק). A short name (three letters or fewer) carries a
+    prefix only when it is pointed (לוֶנָּה): unpointed, the prefixed form is
+    usually an ordinary word (שמונה is not ש+מ+ונה, כספי is not כ+ספי). Any other
+    name is matched as a whole word."""
     if not form:
         return False
-    if _HEB.search(form):
-        pat = r"(?<![^\W\d_])(?:[והבלמשכ]{0,2})" + re.escape(form) + r"(?![^\W\d_])"
-    else:
+    if not _HEB.search(form):
         pat = r"(?<![\w])" + re.escape(form) + r"(?![\w])"
-    return re.search(pat, text) is not None
+        return re.search(pat, fold_name(text)) is not None
+    name = "".join(re.escape(ch) + (_POINTS if _HEB.match(ch) else "") for ch in form)
+    pat = r"(?<![^\W\d_])((?:[והבלמשכ]" + _POINTS + r"){0,2})(" + name + r")(?![^\W\d_])"
+    for m in re.finditer(pat, text.lower()):
+        if not m.group(1) or len(form) > 3 or languages.NIQQUD.search(m.group(2)):
+            return True
+    return False
 
 
 MAX_TEXT = 4000            # longest single message (GM narration can be long)
@@ -1139,11 +1149,10 @@ class TableState:
         spellings, so they get hover cards too (a small model)."""
         import narrator
         with self.spelling_lock:                 # one at a time
-            low = fold_name(text)
             aliases = self.aliases()
-            spelled = {n.lower() for a, n in aliases.items() if name_in(fold_name(a), low)}
+            spelled = {n.lower() for a, n in aliases.items() if name_in(fold_name(a), text)}
             names = [n for n in self._named_things()
-                     if not name_in(fold_name(n), low) and n.lower() not in spelled][:200]
+                     if not name_in(fold_name(n), text) and n.lower() not in spelled][:200]
             try:
                 found = narrator.find_names(text, names, lang, ask=self.narrator_ask)
             except Exception as e:               # offline...: names just aren't hoverable
@@ -1210,8 +1219,8 @@ class TableState:
         key = ("terms", viewer, self.rev, lang)
         if key in self.lore_cache:
             return self.lore_cache[key]["terms"]
-        # Compared without niqqud: narration may point a name (קֶסְטְרֶל) or not.
-        lines = [fold_name(l) for l in narrator.story_lines(self.since(0, viewer), viewer or "", lang)]
+        # name_in ignores niqqud (קֶסְטְרֶל is קסטרל), but reads it on a short name with a prefix.
+        lines = list(narrator.story_lines(self.since(0, viewer), viewer or "", lang))
         seen = "\n".join(lines)
         things = self._named_things()
         spellings = self._spellings()
@@ -1254,7 +1263,7 @@ class TableState:
         name, kind = hit.get("of") or hit["term"], hit["kind"]
         forms = self._spellings().get(name.lower(), {fold_name(name)})
         lines = [l for l in narrator.story_lines(self.since(0, viewer), viewer, lang)
-                 if any(name_in(f, fold_name(l)) for f in forms)]
+                 if any(name_in(f, l) for f in forms)]
         key = f"{viewer}|{name.lower()}|{lang}"
         for _ in range(150):                    # no card yet, but one is being made: wait for it
             with self.lock:
