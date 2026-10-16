@@ -50,3 +50,20 @@ def test_a_campaigns_folder_that_is_not_a_repo_is_left_alone(tmp_path):
     (tmp_path / "active-campaign.txt").write_text("keep")
     r = push(tmp_path)
     assert r.returncode == 0 and "isn't a git repo" in r.stdout
+
+
+def test_a_relative_campaigns_folder_is_pushed_too(tmp_path):
+    # The host's .env: GM_WORLD_STATE_BASE=dnd-campaigns (relative). git ran from inside the
+    # campaigns repo with that relative path: "pathspec ... did not match any files".
+    remote = tmp_path / "remote.git"
+    git("init", "-q", "--bare", str(remote), cwd=tmp_path)
+    base = tmp_path / "campaigns-repo"
+    camp = base / "campaigns" / "keep"
+    camp.mkdir(parents=True)
+    (base / "active-campaign.txt").write_text("keep")
+    (camp / "session-log.md").write_text("Session 2.")
+    git("init", "-q", "-b", "main", cwd=base)
+    git("remote", "add", "origin", str(remote), cwd=base)
+    r = push(Path(os.path.relpath(base, ROOT)), "session two")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "campaigns/keep/session-log.md" in git("ls-tree", "-r", "--name-only", "origin/main", cwd=base).split()

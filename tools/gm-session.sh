@@ -142,6 +142,9 @@ case "$ACTION" in
         # committed and pushed, so the session is kept (and can be reviewed) off this
         # machine. A campaigns folder that isn't a git repo is left alone.
         CAMPAIGN_DIR=$(get_campaign_dir) || { echo "No active campaign."; exit 1; }
+        # Absolute: git runs from the campaigns repo, where a relative path (a relative
+        # GM_WORLD_STATE_BASE such as "dnd-campaigns") would not exist.
+        CAMPAIGN_DIR=$(cd "$CAMPAIGN_DIR" && pwd) || { echo "No campaign folder: $CAMPAIGN_DIR"; exit 1; }
         if ! git -C "$CAMPAIGN_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
             echo "The campaigns folder isn't a git repo: nothing to push ($WORLD_STATE_BASE)."
             exit 0
