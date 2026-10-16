@@ -2244,6 +2244,33 @@ def test_the_stop_signal_reaches_the_gm_at_once_past_the_round(table):
     assert code == 403
 
 
+def test_whoever_raised_the_stop_can_release_it(table):
+    # The host pressed ✋ by mistake and found no way to take it back.
+    call = table["call"]
+    pip = call("/api/claim", {"code": CODE, "pc": "Pip"})[1]["token"]
+    bram = call("/api/create", {"code": CODE, "name": "Bram", "concept": "a dwarf"})[1]["token"]
+    call("/api/stop", {"code": CODE, "token": pip})
+    _, info = call(f"/api/info?code={CODE}&token={pip}")
+    assert info["paused"] and info["paused_mine"]
+    _, info = call(f"/api/info?code={CODE}&token={bram}")
+    assert info["paused"] and not info["paused_mine"]
+    code, _ = call("/api/resume", {"code": CODE, "token": bram})        # not Bram's to release
+    assert code == 403
+    # released before the GM read it: as if never sent
+    assert call("/api/resume", {"code": CODE, "token": pip})[0] == 200
+    _, info = call(f"/api/info?code={CODE}&token={bram}")
+    assert not info["paused"]
+    _, pending = call("/api/gm/pending", host=True)
+    assert pending["stop"] is None and pending["resume"] is None
+    # read by the GM, then released: the GM hears the release
+    call("/api/stop", {"code": CODE, "token": pip})
+    assert call("/api/gm/inbox", {}, host=True)[1]["stop"]["pc"] == "Pip"
+    call("/api/resume", {"code": CODE, "token": pip})
+    _, inbox = call("/api/gm/inbox", {}, host=True)
+    assert inbox["resume"]["pc"] == "Pip" and not inbox["stop"]
+    assert call("/api/resume", {"code": CODE, "token": pip})[0] == 403  # nothing left to release
+
+
 def test_a_boss_hit_matches_the_stage_it_is_played_over(table):
     call, camp = table["call"], table["camp"]
     _touch_music(camp, "ashen-saint-stage1.ogg", "ashen-saint-stage2.ogg", "ashen-saint-hit.ogg",

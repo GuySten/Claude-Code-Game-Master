@@ -404,6 +404,8 @@ class TableState:
         # The stop signal (the X): it reaches the GM at once, past any round.
         self.stop_signal: Optional[Dict[str, Any]] = None
         self.paused_at: Optional[float] = None    # (every page shows the pause - not who asked)
+        self.paused_by: Optional[str] = None      # (only they can release it)
+        self.resume_signal: Optional[Dict[str, Any]] = None
         self.settings_path = self.dir / "settings.json"
         self.settings: Dict[str, Any] = self._read_json(self.settings_path, {})
         self.turn_times_path = self.dir / "turn-times.json"
@@ -2100,7 +2102,7 @@ class TableState:
     def _gm_spoke(self, lang: Optional[str]) -> None:
         """Narration went out (caller holds the lock). The turn ends once every
         language at the table has its version of the beat."""
-        self.paused_at = None                     # the GM has spoken after a stop
+        self.paused_at = self.paused_by = None    # the GM has spoken after a stop
         if not self.turn:
             return
         done = set(self.turn["langs_done"])
@@ -3417,6 +3419,7 @@ def make_handler(state: TableState, code: str, host_key: str):
                     return self._err("host only", 403)
                 if url.path == "/api/gm/pending":
                     return self._json({"ok": True, "round": state.round_state(), "stop": state.stop_signal,
+                                       "resume": state.resume_signal,
                                    "unread": len(state.gm_unread(mark=False)),
                                    "waiting_on": state.waiting_on(),
                                    "seated": sorted(set(state.seats.values())),
@@ -3442,6 +3445,7 @@ def make_handler(state: TableState, code: str, host_key: str):
                                    "fight": state.fight_for(me),
                                    "tracks": state.tracks_for(me),
                                    "paused": bool(state.paused_at),
+                                   "paused_mine": bool(state.paused_at) and state.paused_by == me,
                                    "languages": languages.describe(state.languages),
                                    "lang": state.lang_for(me),
                                    "narration_id": state.last_narration(me),
@@ -3607,7 +3611,19 @@ def make_handler(state: TableState, code: str, host_key: str):
                     return self._err("Take a seat first.", 403)
                 state.stop_signal = {"pc": me, "at": time.time(),
                                      "note": " ".join(str(data.get("note", "")).split())[:200]}
-                state.paused_at = time.time()
+                state.paused_at, state.paused_by, state.resume_signal = time.time(), me, None
+                return self._json({"ok": True})
+
+            if url.path == "/api/resume":
+                # Whoever raised the stop may release it (a mistake, or they're ready): the
+                # pause lifts on every page, and the GM hears it (or never hears the stop at all).
+                if not me or not state.paused_at or state.paused_by != me:
+                    return self._err("Only the player who asked for the pause can release it.", 403)
+                if state.stop_signal and state.stop_signal.get("pc") == me:
+                    state.stop_signal = None      # the GM never read it: as if never sent
+                else:
+                    state.resume_signal = {"pc": me, "at": time.time()}
+                state.paused_at = state.paused_by = None
                 return self._json({"ok": True})
 
             if url.path == "/api/edit":
@@ -3671,8 +3687,10 @@ def make_handler(state: TableState, code: str, host_key: str):
             if path == "/api/gm/inbox":
                 rnd = state.round_state()
                 stop, state.stop_signal = state.stop_signal, None
-                if stop:                            # the X outranks the round: nothing waits for it
-                    return self._json({"ok": True, "messages": [], "stop": stop, "round": rnd,
+                resume, state.resume_signal = state.resume_signal, None
+                if stop or resume:                  # the X outranks the round: nothing waits for it
+                    return self._json({"ok": True, "messages": [], "stop": stop, "resume": resume,
+                                       "round": rnd,
                                        "waiting_on": rnd.get("waiting_on", []), "langs": state.seated_langs(),
                                        "languages": state.languages,
                                        "music": state.music, "auto_music": state.auto_music})
@@ -4079,6 +4097,19 @@ def _open_tables(base: str) -> List[tuple]:
         if info and _alive(info.get("pid")):
             out.append((camp, info))
     return out
+
+
+def _print_stop(r: Dict[str, Any]) -> bool:
+    """The stop signal, or its release by the player who raised it (gm-craft Safety)."""
+    if r.get("stop"):
+        s = r["stop"]
+        print(f"STOP: {s['pc']} raised the stop signal (X){': ' + s['note'] if s.get('note') else ''}. "
+              "Halt the scene now - no questions about why. Rewind or skip the moment, check in "
+              "with them privately (say --to), and only go on when they're ready (gm-craft Safety).")
+    if r.get("resume"):
+        print(f"RESUMED: {r['resume']['pc']} released the stop signal: they're ready, and every page "
+              "shows the scene going on. Continue, no questions about why.")
+    return bool(r.get("stop") or r.get("resume"))
 
 
 def _stop_server(campaign_dir: Path, info: Dict[str, Any]) -> bool:
@@ -4591,6 +4622,8 @@ def main() -> None:
 
     if args.action == "inbox":
         r = _call(campaign_dir, "POST", "/api/gm/inbox", {})
+        if _print_stop(r):
+            return
         if r.get("held"):
             print(f"({_held_note(r['round'])} — run wait)")
             return
@@ -4609,8 +4642,8 @@ def main() -> None:
             if rnd.get("settling"):                 # a player may still be fixing a typo
                 time.sleep(max(0.2, min(1.0, rnd["ready_at"] - time.time() + 0.05)))
                 continue
-            if r.get("stop"):
-                break                               # the X: at once, past any round
+            if r.get("stop") or r.get("resume"):
+                break                               # the X (or its release): at once, past any round
             if rnd.get("redo") and rnd.get("timed_out"):
                 break                               # chose nothing new in time
             if r.get("unread") and rnd.get("seconds"):
@@ -4627,11 +4660,7 @@ def main() -> None:
                         break
             time.sleep(1.0)
         r = _call(campaign_dir, "POST", "/api/gm/inbox", {})
-        if r.get("stop"):
-            s = r["stop"]
-            print(f"STOP: {s['pc']} raised the stop signal (X){': ' + s['note'] if s.get('note') else ''}. "
-                  "Halt the scene now - no questions about why. Rewind or skip the moment, check in "
-                  "with them privately (say --to), and only go on when they're ready (gm-craft Safety).")
+        if _print_stop(r):
             return
         if r.get("held"):
             print(f"(the players are still acting — run wait again)")

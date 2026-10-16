@@ -1840,6 +1840,7 @@
     roundState = info.round || { open: false };
     fightState = info.fight || null;
     renderTracks(info.tracks || []);
+    pausedMine = !!info.paused_mine;
     showPaused(!!info.paused);
     setLoreTerms(info.lore_terms);
     waitingOn = info.waiting_on || [];
@@ -3611,10 +3612,18 @@
   }, 4000);
   // The stop signal (the X): it reaches the GM at once, past the round; no reason needed.
   // A 3-second undo (it sits next to the menu on a phone); then the voice stops, and every
-  // page shows the pause until the GM speaks again (it never says who asked).
-  let stopTimer = null;
+  // page shows the pause until the GM speaks again (it never says who asked). Whoever
+  // asked can tap ✋ again to release it (a mistake, or they're ready to go on).
+  let stopTimer = null, pausedMine = false;
   $("stop-signal").onclick = () => {
     const b = $("stop-signal");
+    if (pausedMine && !stopTimer) {                    // my pause: release it
+      api("/api/resume", {}).then((r) => {
+        if (r && r.ok) { pausedMine = false; showPaused(false); setStatus(t("stopReleased")); }
+        else setStatus((r && r.error) || "✗", true);
+      });
+      return;
+    }
     if (stopTimer) {                                   // tapped again: undo
       clearTimeout(stopTimer); stopTimer = null;
       b.setAttribute("aria-pressed", "false"); b.textContent = "✋";
@@ -3631,7 +3640,7 @@
       stopSpeaking();
       api("/api/stop", {}).then((r) => {
         setStatus(r && r.ok ? t("stopSent") : (r && r.error) || "✗", !(r && r.ok));
-        if (r && r.ok) showPaused(true);
+        if (r && r.ok) { pausedMine = true; showPaused(true); }
       });
     };
     stopTimer = setTimeout(tick, 1000);
