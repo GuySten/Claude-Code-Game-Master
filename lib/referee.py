@@ -317,6 +317,13 @@ class Referee:
             data = {}
         self.combat._save(data)
 
+    def _their_turn(self, name: str) -> None:
+        """Whoever takes a turn's action (attack, hide, death save) has the turn: the
+        record catches up if next-turn was skipped, and says so."""
+        note = self.combat.catch_up(name)
+        if note:
+            print(note)
+
     def _log(self, action: str, **fields) -> None:
         audit(getattr(self.combat, "campaign_dir", None), {"kind": "referee", "action": action, **fields})
 
@@ -579,6 +586,7 @@ class Referee:
         stable, three failures are death."""
         sheet = self._dying_pc(name)
         who = sheet.get("name", name)
+        self._their_turn(who)
         r = self.roller("1d20", 10, "DC", who, "⚖ Death save")
         nat = r.get("natural") if r.get("natural") is not None else r.get("total")
         res = self.players.record_death_save(who, int(nat or 0), r.get("outcome") == "success")
@@ -614,6 +622,8 @@ class Referee:
         """Stealth against the best passive Perception on the other side."""
         data = self._data()
         who = self.who(data, name)
+        self._their_turn(who.name)
+        data = self._data()
         side = who.state.get("side", "party")
         foes = [self.who(data, c["name"]) for c in data["combatants"]
                 if c.get("side", "party") != side and c.get("hp_current", 1) != 0]
@@ -635,9 +645,14 @@ class Referee:
         return r
 
     def attack(self, attacker: str, target: str, weapon: str, long_range: bool = False,
-               within_5ft: bool = True) -> Dict[str, Any]:
+               within_5ft: bool = True, reaction: bool = False) -> Dict[str, Any]:
         data = self._data()
-        a, t = self.who(data, attacker), self.who(data, target)
+        a = self.who(data, attacker)
+        if not reaction:                         # (an opportunity attack is on someone else's turn)
+            self._their_turn(a.name)
+            data = self._data()
+            a = self.who(data, attacker)
+        t = self.who(data, target)
         atk = a.attack(weapon)
         ranged = atk["ranged"]
         adv, dis = [], []
@@ -970,6 +985,7 @@ def main() -> None:
     p.add_argument("attacker"); p.add_argument("target"); p.add_argument("weapon")
     p.add_argument("--long-range", action="store_true")
     p.add_argument("--not-adjacent", action="store_true", help="a melee-only bonus doesn't apply (target prone, 5+ ft away)")
+    p.add_argument("--reaction", action="store_true", help="on someone else's turn (an opportunity attack): the turn doesn't move")
     p = sub.add_parser("damage", help="Damage from a stated source: damage <target> <dice> --source '...'")
     p.add_argument("target"); p.add_argument("notation"); p.add_argument("--source", required=True)
     p = sub.add_parser("heal", help="heal <target> <dice|N> --source '...'")
@@ -1028,7 +1044,8 @@ def main() -> None:
                 dc, src = parse_dc(args.dc), args.source or "a hazard"
             ref.save(args.who, args.ability, dc, src)
         elif args.cmd == "attack":
-            out = ref.attack(args.attacker, args.target, args.weapon, args.long_range, not args.not_adjacent)
+            out = ref.attack(args.attacker, args.target, args.weapon, args.long_range, not args.not_adjacent,
+                             reaction=args.reaction)
             if out["damage"]:
                 d = out["damage"]
                 print(f"→ {d['target']}: {d['amount']} damage, {d['hp']}/{d['hp_max']} HP left")

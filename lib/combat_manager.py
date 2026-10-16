@@ -108,16 +108,75 @@ class CombatManager(EntityManager):
         self._save(data)
         return c
 
+    @staticmethod
+    def takes_turns(c: Dict[str, Any]) -> bool:
+        """An object (a vein, a plate: a stat block with no attacks) and a foe at 0 HP
+        have no turn; a PC always does (at 0 HP it makes death saves)."""
+        if c.get('kind') == 'pc' or c.get('side') == 'party':
+            return True
+        if isinstance(c.get('block'), dict) and not c['block'].get('attacks'):
+            return False
+        return c.get('hp_current', 1) > 0
+
     def next_turn(self) -> Dict[str, Any]:
+        """The next combatant who takes a turn (objects and fallen foes are passed by);
+        past the last one, the next round."""
         data = self._load()
-        n = len(data.get('combatants', []))
-        if n == 0:
+        cs = data.get('combatants', [])
+        if not cs or not any(self.takes_turns(c) for c in cs):
             return data
-        data['turn_index'] = (data.get('turn_index', 0) + 1) % n
-        if data['turn_index'] == 0:
-            data['round'] = data.get('round', 1) + 1
+        i = data.get('turn_index', 0)
+        for _ in range(len(cs)):
+            i += 1
+            if i >= len(cs):
+                i = 0
+                data['round'] = data.get('round', 1) + 1
+            if self.takes_turns(cs[i]):
+                break
+        data['turn_index'] = i
         self._save(data)
         return data
+
+    def catch_up(self, name: str) -> Optional[str]:
+        """``name`` acts (an attack, a hide, a death save): make it their turn, so the
+        record (and the players' panel) follows the fight even when next-turn was never
+        run. Someone later in the order: the turns between are passed; someone earlier:
+        a new round. Returns a line saying what moved, or None (already their turn, or
+        no fight). A reaction (an opportunity attack) must not call this."""
+        data = self._load()
+        cs = data.get('combatants', [])
+        if not data.get('active') or not cs:
+            return None
+        idx = next((k for k, c in enumerate(cs) if c['name'].lower() == name.lower()), None)
+        cur = data.get('turn_index', 0)
+        if idx is None or idx == cur:
+            return None
+        if idx < cur:
+            data['round'] = data.get('round', 1) + 1
+        passed = [c['name'] for c in (cs[cur:idx] if idx > cur else cs[cur:] + cs[:idx])
+                  if self.takes_turns(c)]
+        data['turn_index'] = idx
+        self._save(data)
+        return (f"↻ turn: {cs[idx]['name']}, round {data.get('round', 1)}"
+                + (f" (passed: {', '.join(passed)})" if passed else ""))
+
+    def remove(self, name: str) -> Optional[Dict[str, Any]]:
+        """Take someone out of the fight who is no longer in it (a freed captive, a foe
+        who surrendered or fled): off the order and off the players' panel. The turn
+        stays with whoever has it."""
+        data = self._load()
+        cs = data.get('combatants', [])
+        idx = next((k for k, c in enumerate(cs) if c['name'].lower() == name.lower()), None)
+        if idx is None:
+            return None
+        gone = cs.pop(idx)
+        cur = data.get('turn_index', 0)
+        if idx < cur:
+            data['turn_index'] = cur - 1
+        elif idx == cur and cs:
+            data['turn_index'] = cur % len(cs)  # (the next one is up)
+        self._save(data)
+        return gone
 
     def end(self) -> Dict[str, Any]:
         data = self._load()
@@ -163,6 +222,8 @@ def main():
     p = sub.add_parser('hp'); p.add_argument('name'); p.add_argument('delta', type=int)
     p = sub.add_parser('condition'); p.add_argument('name'); p.add_argument('op', choices=['add', 'remove']); p.add_argument('condition')
     sub.add_parser('next-turn')
+    p = sub.add_parser('remove', help='take someone out of the fight (a freed captive, a foe who surrendered or fled)')
+    p.add_argument('name')
     sub.add_parser('header')
     sub.add_parser('status')
     sub.add_parser('end')
@@ -191,6 +252,8 @@ def main():
         out = m.set_condition(args.name, args.op, args.condition)
     elif args.action == 'next-turn':
         out = m.next_turn()
+    elif args.action == 'remove':
+        out = m.remove(args.name)
     elif args.action == 'end':
         out = m.end()
     elif args.action in ('header', 'status'):

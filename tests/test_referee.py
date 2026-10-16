@@ -283,3 +283,48 @@ def test_a_repeat_roll_is_flagged_never_blocked(world, capsys):
     assert "REPEAT ROLL" in out and "1× in this scene (1 failed)" in out
     r = ref.check("Pip", "athletics", 15, why="a harder wall")          # another DC: another task
     assert "REPEAT ROLL" not in capsys.readouterr().out and r["outcome"] == "success"
+
+
+VEIN = {"name": "Vein", "ac": 12, "hp": 10, "abilities": {"str": 1, "dex": 1, "con": 10, "int": 1,
+                                                        "wis": 1, "cha": 1}, "attacks": []}
+
+
+def test_the_turn_follows_whoever_acts(world, capsys):
+    # The host: the panel still said "round 1, Izrin's turn" in round 3 (next-turn never ran).
+    ref = Referee(world["base"], roller=Dice(*[10] * 12))
+    ref.add_enemy(GOBLIN)
+    ref.add_enemy({**GOBLIN, "name": "Grik"})
+    ref.add_enemy(VEIN)
+    data = ref.combat._load()
+    for c, init in zip(data["combatants"], (15, 12, 0)):
+        c["initiative"] = init
+    data["combatants"].insert(1, {"name": "Pip", "kind": "pc", "side": "party", "initiative": 14,
+                                  "conditions": [], "states": {}})
+    data.update(round=1, turn_index=0)                 # Grak, Pip, Grik, Vein
+    ref.combat._save(data)
+    ref.attack("Grik", "Pip", "Scimitar")             # Grik acts: Pip's turn was passed
+    st = ref.status()
+    assert st["turn"] == "Grik" and st["round"] == 1
+    assert "passed: Grak, Pip" in capsys.readouterr().out
+    ref.attack("Grak", "Pip", "Scimitar", reaction=True)   # an opportunity attack moves nothing
+    assert ref.status()["turn"] == "Grik"
+    ref.attack("Pip", "Grik", "shortsword")           # back up the order: the next round
+    st = ref.status()
+    assert st["turn"] == "Pip" and st["round"] == 2
+
+
+def test_next_turn_passes_objects_and_fallen_foes_and_remove_takes_one_out(world):
+    ref = Referee(world["base"], roller=Dice())
+    for b in (GOBLIN, {**GOBLIN, "name": "Grik"}, VEIN):
+        ref.add_enemy(b)
+    data = ref.combat._load()
+    data["combatants"][1]["hp_current"] = 0            # Grik is down
+    data.update(round=1, turn_index=0)
+    ref.combat._save(data)
+    ref.combat.next_turn()                             # past fallen Grik and the Vein: round 2, Grak
+    st = ref.status()
+    assert st["turn"] == "Grak" and st["round"] == 2
+    assert ref.combat.remove("Grik")["name"] == "Grik"   # a freed captive, a foe who fled
+    assert [c["name"] for c in ref.status()["combatants"]] == ["Grak", "Vein"]
+    assert ref.status()["turn"] == "Grak"
+    assert ref.combat.remove("Nobody") is None

@@ -8,7 +8,8 @@
 #                              # gm-combat.sh zone "Legolas" clears it
 #   gm-combat.sh hp "Orc Warrior" -5
 #   gm-combat.sh condition "Orc Warrior" add prone
-#   gm-combat.sh next-turn
+#   gm-combat.sh next-turn     # the next one who takes a turn (objects and fallen foes are passed)
+#   gm-combat.sh remove "Tess" # out of the fight: a freed captive, a foe who surrendered or fled
 #   gm-combat.sh header        # render the combat header
 #   gm-combat.sh end           # clear state (award XP/loot via gm-player afterwards)
 #

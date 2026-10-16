@@ -29,7 +29,11 @@ from the sheets and the foes' locked stat blocks, never from you, and every deci
    `hide`, `help`, `cover`). Keep positions: `gm-combat.sh zone "<name>" "on the chain, 15 ft up"`
    (shown on the table's party panel); judge reach and range from the zones. A ruling made in
    error (a target out of reach): `gm-referee.sh void <log line> --reason "..."`, never a fake heal. A foe's turn: spawn the **`combat-referee` agent** with the foe's
-   name, and narrate the line it returns. `gm-combat.sh next-turn` between turns.
+   name, and narrate the line it returns. `gm-combat.sh next-turn` between turns (it passes
+   objects and fallen foes); an `attack`, `hide` or `death-save` also makes it the actor's turn
+   (`↻ turn: …`), and an opportunity attack takes `--reaction` so the turn stays put. Someone who
+   leaves the fight (a freed captive, a foe who surrenders or flees) comes off the board in the
+   same step: `gm-combat.sh remove "<name>"`.
 4. Resolution: `gm-combat.sh end`, award XP, handle loot (persist BEFORE narrating), advance time.
 
 ## XP by Challenge Rating
