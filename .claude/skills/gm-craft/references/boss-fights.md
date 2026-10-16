@@ -57,6 +57,12 @@ none of this. Numbers refer to `design-directives.md`; sources at the end.
 
 ## In the fight: fair and readable
 
+8a. **Open with the whole board.** Before the first roll, record the boss, its minions and
+   every weak point or object of the stage plan (`gm-referee.sh enemy`, broken ones at 0) and
+   start its stage music (`gm-table.sh music boss "<boss>" stage N`). The players' fight panel
+   shows only what is recorded, so the objective is visible from round one, not one target at a
+   time. (The host, 2026-10-16: the veins appeared only when attacked; the music had to be asked for.)
+
 9. **Telegraph the big attack a full turn ahead.** End the boss's turn with the
    wind-up of its next signature move (the breath gathering, sigils igniting), so the
    players can scatter, shield or interrupt - and let a good counter work. The same

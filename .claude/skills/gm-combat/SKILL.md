@@ -17,6 +17,13 @@ from the sheets and the foes' locked stat blocks, never from you, and every deci
    "traits": [...], "temperament": "cowardly|cautious|brutal|cunning|fanatical",
    "attacks": [{"name", "to_hit", "damage": "1d6+2 slashing"} | {"name", "damage", "save": {"ability", "dc"}}]}`,
    locked in with `gm-referee.sh enemy '<json>'` (two of a kind: "Goblin 1", "Goblin 2").
+   **The whole board, before the first roll:** every foe AND every object the fight is about
+   (each vein, seal, plate or grate in the stage plan, `"attacks": []`), with its zone; an object
+   already broken goes in too, then `damage` to 0, so it shows as down. The players' panel lists
+   only what is recorded: a target added when someone first swings at it is a target they
+   never saw (the host, 2026-10-16: two of four veins missing).
+   A boss fight starts its stage music in the same step: `gm-table.sh music boss "<boss>" stage N`
+   (never the boss's ordinary theme).
 2. `gm-referee.sh initiative` (everyone, from the records).
 3. A PC's turn: `gm-referee.sh attack "<pc>" "<foe>" "<weapon on the sheet>"` (or a check, save,
    `hide`, `help`, `cover`). Keep positions: `gm-combat.sh zone "<name>" "on the chain, 15 ft up"`

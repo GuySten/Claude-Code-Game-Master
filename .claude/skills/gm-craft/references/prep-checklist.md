@@ -89,7 +89,8 @@ Most of this file assumes a party; with one PC the numbers and the safety nets c
 - [ ] **A boss met this session has its stage plan in the prep notes** (`prep/session-<N>.md`, the campaign's prep notes for that session): each
       stage's trigger and numbers (HP, AC, attacks, DCs, and each object - vein, grate - with its
       AC and HP), sized to the party's damage a round; each remaining weak point asks a different
-      answer. A music brief is not a stage plan. Tune finals and fight-brief review done
+      answer. The plan lists every object to record when the fight opens (`boss-fights.md` 8a),
+      broken ones included. A music brief is not a stage plan. Tune finals and fight-brief review done
       (`orchestrate/references/boss-music.md`): no boss without them. (`boss-fights.md` 1, 4, 5)
 - [ ] One obstacle that needs two PCs' abilities combined. (4) V1
 

@@ -242,6 +242,9 @@ cliffhanger + open threads), STORY THREADS, KEY FACTS, NPC VOICES (present NPCs 
 goal/mood + canonical lines), THREAT CLOCKS, PENDING CONSEQUENCES, and YOUR
 WORLD'S RULES (full, never truncated). `bash tools/gm-context.sh ["loc"]` adds
 grounded source passages.
+**Before you place a recurring NPC in a scene, check where they are**: `gm-npc.sh status
+"<name>"` and the last session's log, never memory (the host, 2026-10-16: an NPC carried up to
+the Hip last session was narrated still lying in the Vault).
 
 ## The living world (fires on its own)
 - **Plan as you go, never pre-build.** The world grows from the table, not from a gazetteer authored before play. When you see a long-game opportunity, seed it with one of these tools and let it develop — a threat clock, an open thread, a new plot beat, or a triggered consequence. That IS the campaign's mid- to long-term planning; do not fan out a book's worth of canon up front (`/new-game` and `/import` both stop at one stage on purpose).
