@@ -191,6 +191,12 @@
   .chips:empty { display: none; }
   .chips button { flex: 0 0 auto; padding: 4px 10px; font-size: .85rem; border-radius: 16px; }
   @media (max-width: 760px) { .chips button { min-height: 36px; } }
+  /* Folded until a player goes to write: one line (mic + text) and the story keeps the room.
+     Focus anywhere in the form (click, the mic, a redo) opens it; empty and left, it folds. */
+  form#say.folded { padding: 6px 16px 8px; }
+  form#say.folded .chips, form#say.folded .say-row { display: none; }
+  form#say.folded .input-row textarea { height: 40px; }
+  form#say.folded #mic { min-width: 48px; font-size: 1.2rem; }
 
   aside { border-inline-start: 1px solid var(--line); overflow-y: auto; padding: 12px 14px; }
   aside h2 { font-size: .95rem; margin: 4px 0 10px; color: var(--muted); font-weight: normal;
@@ -3564,6 +3570,14 @@
 
   // ------------------------------------------------------------- wiring ---
   $("say").onsubmit = (ev) => { ev.preventDefault(); sendAction(); };
+  const foldSay = () => {
+    const f = $("say");
+    if (!f.contains(document.activeElement) && !$("text").value.trim() && !$("mic").classList.contains("live"))
+      f.classList.add("folded");
+  };
+  $("say").addEventListener("focusin", () => $("say").classList.remove("folded"));
+  $("say").addEventListener("focusout", () => setTimeout(foldSay, 150));   // a click on a chip or Send lands first
+  foldSay();
   const fitTextDir = () => { $("text").dir = $("text").value.trim() ? dirFor($("text").value)
                                                                    : (isRtl(lang) ? "rtl" : "ltr"); };
   $("text").addEventListener("input", fitTextDir);
