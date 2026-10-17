@@ -118,3 +118,18 @@ def test_void_strikes_a_mistake_instead_of_resolving_it(tmp_path):
     assert voided[wrong]["voided_from"] == "active" and voided[real]["voided_from"] == "resolved"
     assert "resolved" not in voided[real]
     assert not cm.void("nope")
+
+
+def test_a_dated_trigger_waits_for_its_day(tmp_path):
+    # "Dawn of the 13th day of the Stride" fired on the morning of the 12th: "day"
+    # and "Stride" are in every date, so half its words always matched.
+    ws, _ = _campaign(tmp_path)
+    cm = ConsequenceManager(ws)
+    cm.add_consequence("The Household takes the Hip", "Dawn of the 13th day of the Stride")
+    def due(time, date):
+        return cm.check_pending({"location": "The Heartstone Vault", "time": time,
+                                 "date": date, "present_npcs": []}, limit=10)
+    assert due("Morning", "12th day of the Stride since Brannoch") == []
+    assert due("Dawn", "12th day of the Stride since Brannoch") == []
+    assert [c["consequence"] for c in due("Dawn", "13th day of the Stride since Brannoch")] == [
+        "The Household takes the Hip"]

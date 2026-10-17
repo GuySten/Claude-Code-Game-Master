@@ -187,6 +187,17 @@ class ConsequenceManager(EntityManager):
             name = overview.get('campaign_name') or overview.get('name') or ''
         return set(self._words(name))
 
+    def _calendar_words(self, world_state: Dict[str, Any]) -> set:
+        """The calendar's own words ("day", "Stride" in "12th day of the Stride"):
+        every date has them, so like the campaign's name they say nothing."""
+        return {w for w in self._words(world_state.get('date', '')) if not self._number(w)}
+
+    @staticmethod
+    def _number(word: str) -> str:
+        """'13th' and '13' are the same number; '' when the word is no number."""
+        m = re.fullmatch(r'(\d+)(st|nd|rd|th)?', word)
+        return m.group(1) if m else ''
+
     def _evaluate_trigger(self, consequence: Dict[str, Any], world_state: Dict[str, Any]):
         """Return (score, reason). 0 = ignore; >= 0.3 near-miss; >= 0.5 match. Structured = 1.0.
 
@@ -214,10 +225,15 @@ class ConsequenceManager(EntityManager):
         # Legacy free-text: score word overlap between the trigger phrase and world.
         world_words = set(self._words(self._world_text(world_state)))
         world_time = str(world_state.get('time', ''))
-        ignore = self.STOP_WORDS | self._campaign_words(world_state)
+        ignore = self.STOP_WORDS | self._campaign_words(world_state) | self._calendar_words(world_state)
         words = {w for w in self._words(consequence.get('trigger', ''))
                  if w not in ignore and len(w) > 2}
         if not words:
+            return 0.0, ''
+        # A number names one thing ("the 13th day"): it must be here, or nothing fires.
+        world_numbers = {self._number(w) for w in world_words if self._number(w)}
+        if any(self._number(w) and self._number(w) not in world_numbers
+               for w in self._words(consequence.get('trigger', ''))):
             return 0.0, ''
 
         def hit(w: str) -> bool:

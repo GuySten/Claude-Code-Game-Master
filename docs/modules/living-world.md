@@ -77,10 +77,13 @@ do not fire. `check_pending(..., world_state)` uses the same disclose-not-hide r
 ## Two ways a trigger matches, and one that misfires
 
 Structured triggers (`--trigger-type on_location|on_npc|on_time|on_event` with `--match`)
-score 1.0 on a substring hit against the corresponding world-state field. Legacy free-text
+score 1.0 on a whole-word hit against the corresponding world-state field. Legacy free-text
 triggers fall back to word-overlap scoring against the whole scene, and need **≥ 50% of
-non-stopword trigger words** present to fire at all. Prefer structured triggers; the fuzzy
-path is a compatibility fallback, not a feature.
+non-stopword trigger words** present to fire at all. Words of the campaign's name and of the
+calendar (the date's non-number words: "day", "Stride") never count, since every scene has
+them, and a number in the trigger ("the 13th day") must be in the scene or nothing fires:
+"Dawn of the 13th day of the Stride" once fired on the morning of the 12th. Prefer
+structured triggers; the fuzzy path is a compatibility fallback, not a feature.
 
 **The expiry check is a whole-word match against the entire scene text** (`_is_expired`) —
 location, time, date, present NPC names, and events concatenated. It was a bare substring
