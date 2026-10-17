@@ -360,6 +360,10 @@
   #fight .fc.target { outline: 2px dashed var(--hp-low); outline-offset: 1px; }
   #fight .fc.down { opacity: .5; text-decoration: line-through; }
   #fight .fields { margin-top: 4px; }
+  /* Folded, the fight is its one header line and the story gets the room. */
+  #fight .fhead { cursor: pointer; user-select: none; }
+  #fight .fhead .fold { color: var(--muted); font-weight: normal; }
+  #fight.folded .order, #fight.folded .fields { display: none; }
   @media (max-width: 760px) { #fight { margin: 4px 8px 0; } }
   /* A phone keeps the story on screen: the tracks one scrolling line, the composer's
      two options side by side. */
@@ -2017,16 +2021,25 @@
     const foes = f.order.filter((c) => c.foe && c.health !== "down");
     const aim = aimAt && foes.some((c) => c.name === aimAt) ? aimAt : (foes[0] || {}).name;
     const party = f.order.filter((c) => !c.foe).map((c) => partyLive.find((p) => p.name === c.name) || {});
-    const sig = lang + "|" + aim + "|" + JSON.stringify(f) + JSON.stringify(party.map((p) => [p.hp, p.conditions]));
+    const folded = store.get("fightFolded") === "1";
+    const sig = lang + "|" + aim + "|" + folded + "|" + JSON.stringify(f) + JSON.stringify(party.map((p) => [p.hp, p.conditions]));
     if (box.dataset.sig === sig) return;
     box.dataset.sig = sig;
     box.classList.remove("hidden");
+    box.classList.toggle("folded", folded);
     box.textContent = "";
     const head = document.createElement("div");
     head.className = "fhead";
-    head.innerHTML = `<span>${esc(t("fightTitle").replace("{n}", f.round || 1))}</span>` +
+    head.setAttribute("role", "button");
+    head.tabIndex = 0;
+    head.setAttribute("aria-expanded", String(!folded));
+    head.title = t(folded ? "fightUnfold" : "fightFold");
+    head.innerHTML = `<span><span class="fold">${folded ? "▸" : "▾"}</span> ${esc(t("fightTitle").replace("{n}", f.round || 1))}</span>` +
       (f.turn ? `<span dir="auto">${esc(t("fightTurn").replace("{name}",
         (f.order.find((c) => c.name === f.turn) || {}).label || tx(f.turn)))}</span>` : "");
+    const flip = () => { store.set("fightFolded", folded ? null : "1"); renderFight(); };
+    head.onclick = flip;
+    head.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); flip(); } };
     box.appendChild(head);
     const order = document.createElement("div");
     order.className = "order";
